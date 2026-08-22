@@ -23,7 +23,10 @@ export default function BibleMultiFunction({
   const [isAddFolderModalOpen, setAddFolderModalOpen] = useState(false)
 
   const clearHistory = useBibleHistoryStore((state) => state.clearHistory)
-  const { currentFolderId, navigateToRoot, navigateToFolder, getFolderPath } = useBibleFolderStore()
+  const currentFolderId = useBibleFolderStore((s) => s.currentFolderId)
+  const navigateToRoot = useBibleFolderStore((s) => s.navigateToRoot)
+  const navigateToFolder = useBibleFolderStore((s) => s.navigateToFolder)
+  const getFolderPath = useBibleFolderStore((s) => s.getFolderPath)
 
   const folderPath = getFolderPath(currentFolderId).slice(1)
 

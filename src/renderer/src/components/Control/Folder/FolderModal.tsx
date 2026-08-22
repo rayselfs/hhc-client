@@ -69,6 +69,7 @@ export function FolderModal({
                     onChange={onFolderNameChange}
                     className="w-full p-1"
                     onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && onSubmit()}
+                    onFocus={(e) => (e.target as HTMLInputElement).select()}
                   >
                     <Label>{tKey('folderName', 'Folder Name')}</Label>
                     <Input variant="secondary" />

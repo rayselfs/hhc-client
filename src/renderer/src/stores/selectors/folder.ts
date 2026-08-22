@@ -4,6 +4,8 @@ import { useBibleFolderStore } from '@renderer/stores/folder'
 import type { FolderStoreState } from '@renderer/stores/folder'
 import type { FolderRecord, AnyItemRecord } from '@shared/types/folder'
 
+const EMPTY_ARRAY: never[] = []
+
 type FolderStore = UseBoundStore<StoreApi<FolderStoreState>>
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -19,25 +21,11 @@ export function createFolderSelectors(useStore: FolderStore) {
   }
 
   function useChildFolders(parentId: string): FolderRecord[] {
-    const folders = useStore((s: FolderStoreState) => s.folders)
-    return useMemo(
-      () =>
-        Object.values(folders)
-          .filter((f) => f.parentId === parentId)
-          .sort((a, b) => a.sortIndex - b.sortIndex),
-      [folders, parentId]
-    )
+    return useStore((s: FolderStoreState) => s._childFoldersByParent[parentId] ?? EMPTY_ARRAY)
   }
 
   function useItems(parentId: string): AnyItemRecord[] {
-    const items = useStore((s: FolderStoreState) => s.items)
-    return useMemo(
-      () =>
-        Object.values(items)
-          .filter((i) => i.parentId === parentId)
-          .sort((a, b) => a.sortIndex - b.sortIndex),
-      [items, parentId]
-    )
+    return useStore((s: FolderStoreState) => s._itemsByParent[parentId] ?? EMPTY_ARRAY)
   }
 
   function useFolderPath(folderId: string): FolderRecord[] {

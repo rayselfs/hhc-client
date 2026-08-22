@@ -1,0 +1,441 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { FileItemRecord } from '@shared/types/folder'
+import { presentPreviewItem } from '@renderer/lib/projection-actions'
+import ImagePreview from '../ImagePreview'
+import VideoPreview from '../VideoPreview'
+
+const { mockGetFileSource, mockNext, mockExit, mockT, mockSendCommand } = vi.hoisted(() => ({
+  mockGetFileSource: vi.fn(),
+  mockNext: vi.fn(),
+  mockExit: vi.fn(),
+  mockT: (key: string) => key,
+  mockSendCommand: vi.fn()
+}))
+
+vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  useTranslation: () => ({ t: mockT })
+}))
+
+vi.mock('@heroui/react/toast', () => ({
+  toast: { warning: vi.fn() }
+}))
+
+vi.mock('@renderer/lib/file-explorer-db', () => ({
+  openFileExplorerDB: vi.fn().mockResolvedValue({}),
+  getFileSource: mockGetFileSource
+}))
+
+vi.mock('@renderer/contexts/PresenterCommandContext', () => ({
+  usePresenterCommands: () => ({ sendCommand: mockSendCommand })
+}))
+
+const storeState = {
+  zoomLevel: 1,
+  pan: { x: 0, y: 0 },
+  snapshot: null as null | {
+    entries: Array<{
+      itemId: string
+      sourceUrl: string
+      seekable?: boolean
+      remoteSource?: {
+        providerConnectionId: string
+        remoteItemId: string
+        rootRemoteFolderId: string
+        etag: string
+      }
+      remoteItem?: {
+        providerConnectionId: string
+        remoteItemId: string
+        rootRemoteFolderId: string
+      }
+    }>
+  },
+  typeStates: {} as { video?: { currentTime?: number; duration?: number } },
+  setTypeState: vi.fn(),
+  next: mockNext,
+  exit: mockExit,
+  canNext: () => true
+}
+
+vi.mock('@renderer/stores/media-projection', () => ({
+  useMediaProjectionStore: Object.assign(
+    vi.fn((selector: (state: typeof storeState) => unknown) => selector(storeState)),
+    { getState: () => storeState }
+  )
+}))
+
+function makeCopy(mimeType: string, name: string): FileItemRecord {
+  return {
+    id: 'copy-id',
+    parentId: 'folder-id',
+    type: 'file',
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null,
+    name,
+    url: 'blob:original-id',
+    size: 1,
+    mimeType
+  }
+}
+
+function setRemoteSource(sourceUrl: string): void {
+  storeState.snapshot = {
+    entries: [
+      {
+        itemId: 'copy-id',
+        sourceUrl,
+        remoteSource: {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1',
+          etag: 'etag-1'
+        },
+        remoteItem: {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1'
+        }
+      }
+    ]
+  }
+}
+
+function setPendingRemoteSource(): void {
+  storeState.snapshot = {
+    entries: [
+      {
+        itemId: 'copy-id',
+        sourceUrl: 'hhc-line:asset-1',
+        remoteItem: {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1'
+        }
+      }
+    ]
+  }
+}
+
+async function presentRemoteItem(item: FileItemRecord, sourceUrl: string): Promise<void> {
+  const navigate = vi.fn()
+  await expect(
+    presentPreviewItem({
+      item,
+      playlist: [item],
+      start: async () => {
+        setRemoteSource(sourceUrl)
+        return {
+          summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+          items: [
+            {
+              itemId: item.id,
+              blobId: 'original-id',
+              status: 'ready',
+              reason: 'ready-remote',
+              support: 'native'
+            }
+          ]
+        }
+      },
+      navigate
+    })
+  ).resolves.toBeNull()
+  expect(navigate).toHaveBeenCalledWith('/media')
+}
+
+function seekRelative(seconds: number): void {
+  act(() => {
+    window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds } }))
+  })
+}
+
+async function getLoadedVideo(container: HTMLElement): Promise<HTMLVideoElement> {
+  const video = await waitFor(() => {
+    const element = container.querySelector('video')
+    expect(element).not.toBeNull()
+    return element!
+  })
+  Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+  Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+  fireEvent.loadedMetadata(video)
+  video.currentTime = 30
+  return video
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  storeState.snapshot = null
+  storeState.typeStates = {}
+  mockGetFileSource.mockResolvedValue({
+    url: 'blob:resolved-source',
+    revoke: vi.fn()
+  })
+  HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+  HTMLMediaElement.prototype.pause = vi.fn()
+})
+
+describe('copied media preview identity', () => {
+  it('loads a copied image by its original blob identity', async () => {
+    render(<ImagePreview item={makeCopy('image/png', 'copy.png')} />)
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'image/png')
+    })
+    expect(screen.getByAltText('copy.png')).toHaveAttribute('src', 'blob:resolved-source')
+  })
+
+  it('loads a copied video by its original blob identity', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'video/mp4')
+    })
+    expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+  })
+
+  it('keeps local audio on the existing Blob-backed controller path', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('audio/mpeg', 'copy.mp3')} />)
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'audio/mpeg')
+    })
+    expect(container.querySelector('audio')).toHaveAttribute('src', 'blob:resolved-source')
+  })
+
+  it('uses the persistent native blob and existing controls after a remote VLC download', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.snapshot = {
+      entries: [{ itemId: item.id, sourceUrl: item.url, seekable: true }]
+    }
+    const { container } = render(<VideoPreview item={item} />)
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'video/x-matroska')
+      expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+    })
+    fireEvent.click(container.querySelector('button')!)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'play', itemId: item.id })
+  })
+
+  it.each([
+    ['image/png', 'photo.png', 'img'],
+    ['video/mp4', 'movie.mp4', 'video'],
+    ['audio/mpeg', 'song.mp3', 'audio']
+  ])(
+    'uses the current browser ticket in the operator %s controller without reading IndexedDB',
+    async (mimeType, name, selector) => {
+      const sourceUrl = 'https://www.alive.org.tw/api/assets/content?ticket=browser-secret'
+      const Component = mimeType.startsWith('image/') ? ImagePreview : VideoPreview
+      const item = makeCopy(mimeType, name)
+      await presentRemoteItem(item, sourceUrl)
+
+      const { container } = render(<Component item={item} />)
+
+      await waitFor(() => {
+        expect(container.querySelector(selector)).toHaveAttribute('src', sourceUrl)
+      })
+      expect(mockGetFileSource).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    ['image/png', 'photo.png'],
+    ['video/mp4', 'movie.mp4'],
+    ['audio/mpeg', 'song.mp3'],
+    ['video/x-matroska', 'movie.mkv']
+  ])(
+    'does not fall back to IndexedDB while the remote %s source is preparing',
+    async (mimeType, name) => {
+      setPendingRemoteSource()
+
+      render(
+        mimeType.startsWith('image/') ? (
+          <ImagePreview item={makeCopy(mimeType, name)} />
+        ) : (
+          <VideoPreview item={makeCopy(mimeType, name)} />
+        )
+      )
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(mockGetFileSource).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    ['image/png', 'photo.png', 'img'],
+    ['video/mp4', 'movie.mp4', 'video'],
+    ['audio/mpeg', 'song.mp3', 'audio']
+  ])(
+    'uses the current Electron lease in the operator %s controller without reading IndexedDB',
+    async (mimeType, name, selector) => {
+      const sourceUrl = 'hhc-media://lease/11111111-1111-4111-8111-111111111111'
+      const Component = mimeType.startsWith('image/') ? ImagePreview : VideoPreview
+      const item = makeCopy(mimeType, name)
+      await presentRemoteItem(item, sourceUrl)
+
+      const { container } = render(<Component item={item} />)
+
+      await waitFor(() => {
+        expect(container.querySelector(selector)).toHaveAttribute('src', sourceUrl)
+      })
+      expect(mockGetFileSource).not.toHaveBeenCalled()
+    }
+  )
+
+  it('reloads the operator audio controller when its ticket is renewed', async () => {
+    setRemoteSource('https://www.alive.org.tw/api/assets/content?ticket=first')
+    const item = makeCopy('audio/mpeg', 'song.mp3')
+    const { container, rerender } = render(<VideoPreview item={item} />)
+    await waitFor(() => {
+      expect(container.querySelector('audio')).toHaveAttribute(
+        'src',
+        'https://www.alive.org.tw/api/assets/content?ticket=first'
+      )
+    })
+
+    setRemoteSource('https://www.alive.org.tw/api/assets/content?ticket=second')
+    rerender(<VideoPreview item={item} />)
+
+    await waitFor(() => {
+      expect(container.querySelector('audio')).toHaveAttribute(
+        'src',
+        'https://www.alive.org.tw/api/assets/content?ticket=second'
+      )
+    })
+    fireEvent.click(container.querySelector('button')!)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'play', itemId: 'copy-id' })
+  })
+
+  it('syncs video playback state immediately on first play', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+    })
+    storeState.setTypeState.mockClear()
+
+    const playButton = container.querySelector('button')
+    expect(playButton).not.toBeNull()
+    fireEvent.click(playButton!)
+
+    expect(storeState.setTypeState).toHaveBeenCalledWith('video', {
+      hasStarted: true,
+      isPlaying: true,
+      isEnded: false
+    })
+  })
+
+  it('seeks a video relative to the current playback time', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    const video = await getLoadedVideo(container)
+
+    seekRelative(5)
+
+    expect(video.currentTime).toBe(35)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 35 })
+  })
+
+  it('shows accumulated video seek feedback for repeated same-direction jumps', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+    await getLoadedVideo(container)
+
+    seekRelative(5)
+    expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+5')
+
+    seekRelative(5)
+    expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+10')
+
+    seekRelative(-5)
+    expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('-5')
+  })
+
+  it('resets accumulated video seek feedback after the flash timeout', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+    await getLoadedVideo(container)
+
+    vi.useFakeTimers()
+    try {
+      seekRelative(5)
+      seekRelative(5)
+      expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+10')
+
+      act(() => {
+        vi.advanceTimersByTime(1100)
+      })
+      expect(screen.queryByTestId('video-seek-flash')).toBeNull()
+
+      seekRelative(5)
+      expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+5')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('blurs the seek range after pointer release so keyboard shortcuts resume', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    fireEvent.loadedMetadata(video)
+
+    const playButton = container.querySelector('button')
+    expect(playButton).not.toBeNull()
+    fireEvent.click(playButton!)
+
+    const seekRange = container.querySelector<HTMLInputElement>('input.video-seek-range')
+    expect(seekRange).not.toBeNull()
+    seekRange!.focus()
+    expect(document.activeElement).toBe(seekRange)
+
+    fireEvent.pointerUp(seekRange!, { pointerId: 1 })
+
+    expect(document.activeElement).not.toBe(seekRange)
+  })
+
+  it('pauses a playing video through the pause-only media event', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    fireEvent.play(video)
+
+    window.dispatchEvent(new CustomEvent('media:pauseVideo'))
+
+    expect(video.pause).toHaveBeenCalled()
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pause', itemId: 'copy-id' })
+  })
+
+  it('keeps the presenter open and retries a failed media load', async () => {
+    mockGetFileSource.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      url: 'blob:retry-source',
+      revoke: vi.fn()
+    })
+    render(<ImagePreview item={makeCopy('image/png', 'copy.png')} />)
+
+    const retry = await screen.findByRole('button', { name: 'presenter.retry' })
+    expect(mockNext).not.toHaveBeenCalled()
+    expect(mockExit).not.toHaveBeenCalled()
+
+    fireEvent.click(retry)
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledTimes(2)
+    })
+    expect(screen.getByAltText('copy.png')).toHaveAttribute('src', 'blob:retry-source')
+  })
+})

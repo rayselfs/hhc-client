@@ -7,6 +7,8 @@ import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
 import { ThemePreference } from '@renderer/types/theme'
 import type { WhisperModel } from '@shared/ipc-channels'
+import type { SyncOfflinePolicy } from '@shared/types/folder'
+import { APP_CONFIG } from '@shared/app-config'
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -62,7 +64,14 @@ const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
+const DEFAULT_REMINDER_MODE = 'subtract'
+const DEFAULT_PROJECTION_DISPLAY_ID = ''
+export const LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID = APP_CONFIG.oneDriveClientId
 const RELOAD_DELAY_MS = 500
+const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
+const OFFLINE_POLICIES: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
+type ReminderMode = 'subtract' | 'add'
+const REMINDER_MODES: ReminderMode[] = ['subtract', 'add']
 
 export type SpeechProvider = 'azure' | 'gcp' | 'webSpeech' | 'whisper'
 
@@ -94,6 +103,146 @@ export const DEFAULT_SPEECH: SpeechSettings = {
   whisper: { modelDir: '', installedModel: null }
 }
 
+export function getDefaultSpeechSettings(): SpeechSettings {
+  return isElectron() ? DEFAULT_SPEECH : { ...DEFAULT_SPEECH, activeProvider: 'webSpeech' }
+}
+
+export const DEFAULT_SYNC_OFFLINE_POLICY: SyncOfflinePolicy = 'always-offline'
+
+export interface LanRemoteSettings {
+  enabled: boolean
+  selectedHost: string
+}
+
+export const DEFAULT_LAN_REMOTE: LanRemoteSettings = {
+  enabled: false,
+  selectedHost: ''
+}
+
+export function getEffectiveOneDriveClientId(): string {
+  return LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function normalizePositiveInteger(
+  value: unknown,
+  fallback: number,
+  max = Number.MAX_SAFE_INTEGER
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(0, Math.floor(value)))
+}
+
+function normalizeProjectionDisplayId(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') return DEFAULT_PROJECTION_DISPLAY_ID
+  return /^\d+$/.test(value) ? value : DEFAULT_PROJECTION_DISPLAY_ID
+}
+
+function normalizeSyncOfflinePolicy(value: unknown): SyncOfflinePolicy {
+  return OFFLINE_POLICIES.includes(value as SyncOfflinePolicy)
+    ? (value as SyncOfflinePolicy)
+    : DEFAULT_SYNC_OFFLINE_POLICY
+}
+
+function normalizeLanRemoteSettings(value: unknown): LanRemoteSettings {
+  if (!isRecord(value)) return DEFAULT_LAN_REMOTE
+  return {
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : DEFAULT_LAN_REMOTE.enabled,
+    selectedHost: typeof value.selectedHost === 'string' ? value.selectedHost : ''
+  }
+}
+
+function normalizeSpeechSettings(value: unknown): SpeechSettings {
+  const defaultSpeech = getDefaultSpeechSettings()
+  if (!isRecord(value)) return defaultSpeech
+
+  const activeProvider =
+    value.activeProvider === 'azure' ||
+    value.activeProvider === 'gcp' ||
+    value.activeProvider === 'webSpeech' ||
+    value.activeProvider === 'whisper'
+      ? value.activeProvider
+      : defaultSpeech.activeProvider
+  const azure = isRecord(value.azure) ? value.azure : {}
+  const gcp = isRecord(value.gcp) ? value.gcp : {}
+  const whisper = isRecord(value.whisper) ? value.whisper : {}
+
+  return {
+    activeProvider,
+    azure: {
+      region:
+        typeof azure.region === 'string' &&
+        AZURE_REGION_OPTIONS.some((option) => option.value === azure.region)
+          ? azure.region
+          : defaultSpeech.azure.region,
+      language:
+        azure.language === 'zh-TW' || azure.language === 'zh-CN'
+          ? azure.language
+          : defaultSpeech.azure.language
+    },
+    gcp: {
+      language:
+        gcp.language === 'cmn-Hant-TW' || gcp.language === 'cmn-Hans-CN'
+          ? gcp.language
+          : defaultSpeech.gcp.language
+    },
+    whisper: {
+      modelDir: typeof whisper.modelDir === 'string' ? whisper.modelDir : '',
+      installedModel:
+        whisper.installedModel === 'whisper-base' ||
+        whisper.installedModel === 'whisper-small' ||
+        whisper.installedModel === 'whisper-medium'
+          ? whisper.installedModel
+          : null
+    }
+  }
+}
+
+export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
+  const state = isRecord(value) ? value : {}
+  const timezone =
+    typeof state.timezone === 'string' &&
+    TIMEZONE_OPTIONS.some((option) => option.value === state.timezone)
+      ? state.timezone
+      : DEFAULT_TIMEZONE
+  const themePreference = THEME_PREFERENCES.includes(state.themePreference as ThemePreference)
+    ? (state.themePreference as ThemePreference)
+    : DEFAULT_THEME_PREFERENCE
+  const timerRingColor =
+    typeof state.timerRingColor === 'string' && /^#[0-9a-f]{6}$/i.test(state.timerRingColor)
+      ? state.timerRingColor
+      : DEFAULT_TIMER_RING_COLOR
+  const reminderMode = REMINDER_MODES.includes(state.reminderMode as ReminderMode)
+    ? (state.reminderMode as ReminderMode)
+    : DEFAULT_REMINDER_MODE
+
+  return {
+    timezone,
+    hardwareAcceleration:
+      typeof state.hardwareAcceleration === 'boolean'
+        ? state.hardwareAcceleration
+        : DEFAULT_HW_ACCEL,
+    themePreference,
+    timerRingColor,
+    timerRingColorEnabled:
+      typeof state.timerRingColorEnabled === 'boolean'
+        ? state.timerRingColorEnabled
+        : DEFAULT_TIMER_RING_COLOR_ENABLED,
+    speech: normalizeSpeechSettings(state.speech),
+    defaultSyncOfflinePolicy: normalizeSyncOfflinePolicy(state.defaultSyncOfflinePolicy),
+    trashRetentionDays: normalizePositiveInteger(
+      state.trashRetentionDays,
+      DEFAULT_TRASH_RETENTION_DAYS
+    ),
+    reminderMode,
+    projectionDisplayId: normalizeProjectionDisplayId(state.projectionDisplayId),
+    lanRemote: normalizeLanRemoteSettings(state.lanRemote)
+  }
+}
+
 export interface SettingsStore {
   timezone: string
   hardwareAcceleration: boolean
@@ -101,27 +250,61 @@ export interface SettingsStore {
   timerRingColor: string
   timerRingColorEnabled: boolean
   speech: SpeechSettings
+  defaultSyncOfflinePolicy: SyncOfflinePolicy
   trashRetentionDays: number
+  reminderMode: 'subtract' | 'add'
+  projectionDisplayId: string
+  lanRemote: LanRemoteSettings
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
   setTimerRingColor: (color: string) => void
   setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
+  setDefaultSyncOfflinePolicy: (policy: SyncOfflinePolicy) => void
   setTrashRetentionDays: (days: number) => void
-  resetToDefaults: () => void
+  setReminderMode: (mode: 'subtract' | 'add') => void
+  setProjectionDisplayId: (displayId: string) => void
+  setLanRemote: (settings: LanRemoteSettings) => void
+  resetSettings: () => void
+  resetToDefaults: () => Promise<void>
+}
+
+function getDefaultSettingsState(): Omit<
+  SettingsStore,
+  | 'setTimezone'
+  | 'setHardwareAcceleration'
+  | 'setThemePreference'
+  | 'setTimerRingColor'
+  | 'setTimerRingColorEnabled'
+  | 'setSpeech'
+  | 'setDefaultSyncOfflinePolicy'
+  | 'setTrashRetentionDays'
+  | 'setReminderMode'
+  | 'setProjectionDisplayId'
+  | 'setLanRemote'
+  | 'resetSettings'
+  | 'resetToDefaults'
+> {
+  return {
+    timezone: DEFAULT_TIMEZONE,
+    hardwareAcceleration: DEFAULT_HW_ACCEL,
+    themePreference: DEFAULT_THEME_PREFERENCE,
+    timerRingColor: DEFAULT_TIMER_RING_COLOR,
+    timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
+    speech: getDefaultSpeechSettings(),
+    defaultSyncOfflinePolicy: DEFAULT_SYNC_OFFLINE_POLICY,
+    trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
+    reminderMode: DEFAULT_REMINDER_MODE,
+    projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID,
+    lanRemote: DEFAULT_LAN_REMOTE
+  }
 }
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      timezone: DEFAULT_TIMEZONE,
-      hardwareAcceleration: DEFAULT_HW_ACCEL,
-      themePreference: DEFAULT_THEME_PREFERENCE,
-      timerRingColor: DEFAULT_TIMER_RING_COLOR,
-      timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
-      speech: DEFAULT_SPEECH,
-      trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
+      ...getDefaultSettingsState(),
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -143,6 +326,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ speech: settings })
       },
 
+      setDefaultSyncOfflinePolicy: (policy: SyncOfflinePolicy) => {
+        set({ defaultSyncOfflinePolicy: normalizeSyncOfflinePolicy(policy) })
+      },
+
       setTimerRingColorEnabled: (enabled: boolean) => {
         set({ timerRingColorEnabled: enabled })
       },
@@ -151,8 +338,25 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ trashRetentionDays: days })
       },
 
-      resetToDefaults: () => {
-        clearAllSiteData()
+      setReminderMode: (mode: 'subtract' | 'add') => {
+        set({ reminderMode: mode })
+      },
+
+      setProjectionDisplayId: (displayId: string) => {
+        set({ projectionDisplayId: normalizeProjectionDisplayId(displayId) })
+      },
+
+      setLanRemote: (settings: LanRemoteSettings) => {
+        set({ lanRemote: normalizeLanRemoteSettings(settings) })
+      },
+
+      resetSettings: () => {
+        set(getDefaultSettingsState())
+        toast.success(i18n.t('toast.settingsReset'))
+      },
+
+      resetToDefaults: async () => {
+        await clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
         if (isElectron()) {
           setTimeout(() => window.api.app.relaunch(), RELOAD_DELAY_MS)
@@ -164,7 +368,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 7,
+      version: 12,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -193,7 +397,7 @@ export const useSettingsStore = create<SettingsStore>()(
           state.azureSpeech = null
         }
         if (version < 4) {
-          state.speech = DEFAULT_SPEECH
+          state.speech = getDefaultSpeechSettings()
         }
         if (version < 5) {
           const speech = state.speech as Record<string, unknown> | undefined
@@ -212,7 +416,25 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 7) {
           state.trashRetentionDays = DEFAULT_TRASH_RETENTION_DAYS
         }
-        return state
+        if (version < 8) {
+          state.reminderMode = DEFAULT_REMINDER_MODE
+        }
+        if (version < 10) {
+          state.projectionDisplayId = DEFAULT_PROJECTION_DISPLAY_ID
+        }
+        if (version < 12) {
+          state.lanRemote = DEFAULT_LAN_REMOTE
+        }
+        return normalizeSettingsState(state)
+      },
+      merge: (persistedState, currentState) => {
+        const normalized = normalizeSettingsState(persistedState)
+        const lanRemote = normalized.lanRemote ?? currentState.lanRemote
+        return {
+          ...currentState,
+          ...normalized,
+          lanRemote: { ...lanRemote, enabled: false }
+        }
       },
       partialize: (state) => ({
         timezone: state.timezone,
@@ -221,7 +443,11 @@ export const useSettingsStore = create<SettingsStore>()(
         timerRingColor: state.timerRingColor,
         timerRingColorEnabled: state.timerRingColorEnabled,
         speech: state.speech,
-        trashRetentionDays: state.trashRetentionDays
+        defaultSyncOfflinePolicy: state.defaultSyncOfflinePolicy,
+        trashRetentionDays: state.trashRetentionDays,
+        reminderMode: state.reminderMode,
+        projectionDisplayId: state.projectionDisplayId,
+        lanRemote: { ...state.lanRemote, enabled: false }
       })
     }
   )

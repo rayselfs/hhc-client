@@ -210,6 +210,24 @@ describe('ThemeProvider', () => {
     expect(screen.getByTestId('resolved').textContent).toBe('dark')
   })
 
+  it('syncs when settings reset changes theme preference', () => {
+    mockMatchMedia(false)
+    useSettingsStore.setState({ themePreference: 'dark' })
+    render(
+      <ThemeProvider>
+        <TestConsumer />
+      </ThemeProvider>
+    )
+
+    act(() => {
+      useSettingsStore.setState({ themePreference: 'system' })
+    })
+
+    expect(screen.getByTestId('preference').textContent).toBe('system')
+    expect(screen.getByTestId('resolved').textContent).toBe('light')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+  })
+
   it('uses renderHook to verify useTheme returns context values', () => {
     mockMatchMedia(false)
     const { result } = renderHook(() => useTheme(), {

@@ -2,17 +2,61 @@
   "nav": {
     "timer": "TIMER",
     "bible": "BIBLE",
+    "service": "SERVICE",
+    "soundboard": "SOUNDBOARD",
     "files": "FILES",
     "media": "MEDIA",
     "favorites": "FAVORITES",
     "trash": "TRASH"
   },
   "welcome": {
-    "title": "Welcome to HHC",
+    "title": "Welcome to LibrePresenter",
     "subtitle": "Let's set up your preferences",
     "language": "Language",
     "timezone": "Timezone",
     "confirm": "Get Started"
+  },
+  "service": {
+    "title": "SERVICE",
+    "subtitle": "Build a live rundown with media, Bible, timer.",
+    "addMedia": "Add Media",
+    "addBible": "Add Bible",
+    "addTimer": "Add Timer",
+    "projectCurrentCue": "Project Current",
+    "projectCue": "Project cue",
+    "projecting": "Projecting...",
+    "projectionStarted": "Projection started.",
+    "defaultTimerCue": "Timer Cue",
+    "defaultBibleCue": "Bible Cue",
+    "defaultMediaCue": "Media Cue",
+    "selectMediaLater": "Select media later",
+    "emptyTitle": "No cues yet",
+    "emptyDescription": "Add cues to build the service order.",
+    "completed": "Completed",
+    "previewing": "Previewing",
+    "jumpToCue": "Jump to cue",
+    "previewCue": "Preview cue",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "duplicateCue": "Duplicate cue",
+    "completeCue": "Mark complete",
+    "removeCue": "Remove cue",
+    "currentCue": "Current",
+    "nextCue": "Next",
+    "missingMediaSource": "Missing media source",
+    "notImplementedYet": "Not implemented yet",
+    "projectErrors": {
+      "missingSource": "This cue is missing its source.",
+      "unsupported": "This cue source cannot be projected on this platform.",
+      "notReady": "This cue source is not ready yet.",
+      "notImplemented": "This cue type is not implemented yet."
+    },
+    "cueTypes": {
+      "media": "Media",
+      "bible": "Bible",
+      "timer": "Timer",
+      "song": "Song"
+    }
   },
   "timer": {
     "title": "TIMER",
@@ -120,12 +164,14 @@
       "errorRetryExceeded": "Too many consecutive errors, recognition stopped"
     },
     "settings": {
-      "fontSize": "Projection Font Size"
+      "fontSize": "Projection Font Size",
+      "template": "Scripture Template"
     },
     "contextMenu": {
       "project": "Project",
       "addToHistory": "Add to History",
       "addToFolder": "Add to Folder",
+      "addToService": "Add to Service",
       "copyText": "Copy Text",
       "removeFromHistory": "Remove from History",
       "removeFromFolder": "Remove from Folder"
@@ -357,7 +403,18 @@
     "deleteTitle": "Delete {{name}} ?",
     "deleteFolderDescription": "This action cannot be undone. All items inside will be lost.",
     "deleteItemDescription": "This action cannot be undone.",
+    "deleteSoundboardAssetDescription": "This removes audio assigned to {{count}} soundboard pad(s). This action cannot be undone.",
     "deleteSelectedTitle": "Delete {{count}} item(s)?",
+    "persistence": {
+      "loading": "Loading local library",
+      "loadingDescription": "Your saved folders and items are being loaded.",
+      "loadFailed": "Local library is unavailable",
+      "saveFailed": "Local changes were not saved",
+      "saving": "Saving local changes",
+      "pending": "{{count}} change(s) waiting to be saved.",
+      "unknownError": "Local storage is unavailable.",
+      "retry": "Retry"
+    },
     "contextMenu": {
       "copy": "Copy",
       "cut": "Cut",
@@ -456,23 +513,199 @@
       "edit": "Edit",
       "uploadFiles": "Upload Files",
       "uploadFolder": "Upload Folder",
+      "createPresentation": "Create Presentation",
+      "addLocalSyncFolder": "Add Sync Folder",
+      "addOneDrive": "Add OneDrive",
+      "addHhcLine": "Add HHC LINE",
       "addFavorite": "Add to Favorites",
       "removeFavorite": "Remove from Favorites",
+      "refreshSyncFolder": "Refresh Sync Folder",
+      "resyncFile": "Resync File",
+      "project": "Project",
+      "openPresentation": "Open Presentation",
+      "convertPresentation": "Convert to Editable Presentation",
       "restore": "Restore",
       "permanentDelete": "Delete Permanently"
+    },
+    "presenter": {
+      "skippedItems": "{{count}} skipped",
+      "readinessSummary": "{{ready}} ready, {{preparing}} preparing, {{unsupported}} unsupported, {{missing}} missing, {{failed}} failed"
+    },
+    "noProjectableFiles": "No presentable files found",
+    "invalidName": "Invalid name",
+    "folderAlreadyExists": "A folder with this name already exists",
+    "fileAlreadyExists": "A file with this name already exists",
+    "uploadSkippedUnsupported": "Skipped {{count}} unsupported file(s)",
+    "renameFile": "Rename file",
+    "renameFolder": "Rename folder",
+    "blobLoadFailed": "Failed to load file, skipping",
+    "syncSources": {
+      "localSyncConnected": "Connected {{name}} and imported {{count}} file(s).",
+      "localSyncConnectFailed": "Failed to connect sync folder.",
+      "oneDriveFolderImported": "Added {{name}} and imported {{count}} item(s).",
+      "hhcLineFolderImported": "Added {{name}} and imported {{count}} item(s).",
+      "hhcLineImportFailed": "Could not import the HHC LINE collection.",
+      "oneDriveLoginRequired": "Sign in to OneDrive in Preferences first.",
+      "oneDriveDesktopOnly": "OneDrive connection is available in the desktop app only.",
+      "oneDriveImportFailed": "Failed to add OneDrive folder.",
+      "refreshComplete": "Sync folder refreshed.",
+      "refreshFailed": "Failed to refresh sync folder.",
+      "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled.",
+      "unlink": "Disconnect",
+      "unlinkTitle": "Disconnect {{name}}?",
+      "unlinkDescription": "This removes the sync source from LibrePresenter and clears local synced cache. Original local or cloud files are not changed.",
+      "unlinked": "Sync folder disconnected.",
+      "unlinkFailed": "Failed to disconnect sync folder."
+    },
+    "oneDriveFolderPicker": {
+      "title": "Choose OneDrive Folder",
+      "back": "Back",
+      "empty": "No folders are available here.",
+      "import": "Add Folder",
+      "loadFailed": "Failed to load OneDrive folders."
+    },
+    "cloudFolderPicker": {
+      "title": "Choose {{provider}} Folder",
+      "back": "Back",
+      "empty": "No folders are available here.",
+      "import": "Add Folder",
+      "loadFailed": "Failed to load {{provider}} folders."
+    }
+  },
+  "presentationWorkspace": {
+    "title": "Presentation Workspace",
+    "subtitle": "Open and arrange PPTX decks",
+    "home": "Home",
+    "insert": "Insert",
+    "design": "Design",
+    "ribbonGroups": {
+      "font": "Font",
+      "paragraph": "Paragraph",
+      "position": "Position",
+      "arrange": "Arrange",
+      "insert": "Insert",
+      "background": "Background",
+      "adjust": "Adjust",
+      "size": "Size"
+    },
+    "fontFamily": "Font family",
+    "loadLocalFonts": "Load local fonts",
+    "localFontsLoadFailed": "Unable to load local fonts. Check the font access permission.",
+    "present": "Present",
+    "copyPage": "Copy Page",
+    "untitledName": "Untitled Presentation",
+    "text": "Text",
+    "image": "Image",
+    "moveSlideUp": "Move Up",
+    "moveSlideDown": "Move Down",
+    "copyElement": "Copy Element",
+    "pasteElement": "Paste",
+    "deleteElement": "Delete Element",
+    "slides": "Slides",
+    "newSlide": "New slide",
+    "formatBackground": "Format Background",
+    "solidFill": "Solid fill",
+    "gradientFill": "Gradient fill",
+    "fillColor": "Color",
+    "gradientFrom": "From",
+    "gradientTo": "To",
+    "gradientType": "Type",
+    "gradientDirection": "Direction",
+    "gradientAngle": "Angle",
+    "gradientStops": "Gradient stops",
+    "gradientStop": "Gradient stop",
+    "positionPercent": "Position",
+    "transparency": "Transparency",
+    "brightness": "Brightness",
+    "gradientLeftRight": "Left to right",
+    "gradientTopBottom": "Top to bottom",
+    "gradientDiagonal": "Diagonal",
+    "applyToAll": "Apply to All",
+    "resetBackground": "Reset Background",
+    "inspector": "Inspector",
+    "fileName": "File name",
+    "slideCount": "Slides",
+    "dimensions": "Dimensions",
+    "previousSlide": "Previous slide",
+    "nextSlide": "Next slide",
+    "closeTab": "Close tab",
+    "loadFailed": "Failed to load presentation",
+    "emptyTitle": "No presentation open",
+    "emptyDescription": "Open a PPTX from Files to start editing the presentation workspace.",
+    "backToFiles": "Back to Files",
+    "undo": "Undo",
+    "redo": "Redo",
+    "saveStatus": {
+      "dirty": "Unsaved",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "error": "Save failed"
+    },
+    "previewWarning": "Preview needs repair",
+    "retrySave": "Retry save",
+    "closeDecisionTitle": "Presentation could not be saved",
+    "closeDecisionBody": "Retry saving, keep editing, or close without saving your latest changes.",
+    "keepEditing": "Keep editing",
+    "closeWithoutSaving": "Close without saving",
+    "increaseFontSize": "Increase font size",
+    "decreaseFontSize": "Decrease font size",
+    "clearFormatting": "Clear formatting",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "strikethrough": "Strikethrough",
+    "subscript": "Subscript",
+    "superscript": "Superscript",
+    "characterSpacing": "Character spacing",
+    "changeCase": "Change case",
+    "textHighlight": "Text highlight color",
+    "fontColor": "Font color",
+    "bullets": "Bullets",
+    "numbering": "Numbering",
+    "decreaseIndent": "Decrease indent",
+    "increaseIndent": "Increase indent",
+    "lineSpacing": "Line spacing",
+    "lineSpacingOptions": "Line Spacing Options",
+    "bringToFront": "Bring to Front",
+    "bringForward": "Bring Forward",
+    "sendBackward": "Send Backward",
+    "sendToBack": "Send to Back",
+    "align": {
+      "left": "Align left",
+      "center": "Center",
+      "right": "Align right",
+      "justify": "Justify"
+    },
+    "objectAlign": {
+      "left": "Align objects left",
+      "center": "Align objects center",
+      "right": "Align objects right",
+      "top": "Align objects top",
+      "middle": "Align objects middle",
+      "bottom": "Align objects bottom"
+    },
+    "distribute": {
+      "horizontal": "Distribute objects horizontally",
+      "vertical": "Distribute objects vertically"
     }
   },
   "projection": {
-    "showButton": "Show projection",
-    "blankButton": "Blank projection",
-    "openButton": "Open projection window",
-    "closeButton": "Close projection window",
-    "closeTitle": "Close Projection",
-    "closeConfirm": "Are you sure you want to close the projection window?",
+    "startButton": "Start projection",
+    "stopButton": "Stop projection",
+    "closeTitle": "Stop Projection",
+    "closeConfirm": "Stop the current projection and close the output window?",
     "waiting": "Waiting for content...",
-    "openTitle": "Open Projection",
-    "openMessage": "Open the projection window to display content on a second screen.",
-    "open": "Open"
+    "recovery": {
+      "recoveringTitle": "Restoring projection",
+      "recoveringDescription": "The output window is restarting with the last projected content.",
+      "popupBlockedTitle": "Projection popup was blocked",
+      "popupBlockedDescription": "Allow popups for this site, then retry.",
+      "readyTimeoutTitle": "Projection did not become ready",
+      "readyTimeoutDescription": "Retry opening the output window.",
+      "rendererCrashTitle": "Projection stopped unexpectedly",
+      "rendererCrashDescription": "Automatic recovery stopped after repeated failures.",
+      "retry": "Retry projection"
+    }
   },
   "common": {
     "cancel": "Cancel",
@@ -490,6 +723,11 @@
   },
   "userMenu": {
     "guest": "Guest",
+    "accountMenu": "Account menu for {{name}}",
+    "loadingAccount": "Loading account...",
+    "accountUnavailable": "Account unavailable",
+    "signInFailed": "Unable to sign in",
+    "signOutFailed": "Unable to sign out",
     "login": "Login",
     "logout": "Logout",
     "preferences": "Preferences",
@@ -505,34 +743,138 @@
   },
   "about": {
     "title": "About",
-    "description": "Projection software."
+    "description": "Projection software.",
+    "tagline": "Open-source presentation software for churches and live events.",
+    "version": "Version",
+    "license": "License",
+    "openSourceLicenses": "Open Source Licenses",
+    "viewLicenses": "View licenses",
+    "licensesIntro": "Licenses for LibrePresenter and bundled video components.",
+    "source": "Source",
+    "back": "Back"
   },
   "preferences": {
     "title": "Preferences",
     "categories": {
       "general": "General",
+      "timer": "Timer",
       "media": "Media",
-      "bible": "Bible"
+      "bible": "Bible",
+      "storage": "Storage",
+      "recovery": "Recovery"
+    },
+    "timer": {
+      "reminderModeLabel": "Time Warning Calculation",
+      "reminderModeSwitchLabel": "Add"
     },
     "language": "Language",
     "timezone": "Timezone",
     "darkMode": "Dark Mode",
     "hardwareAcceleration": "Hardware Acceleration",
     "hardwareAccelerationDesc": "Requires restarting the application",
-    "resetToDefaults": "Reset to Defaults",
-    "resetBtn": "Reset",
-    "resetToDefaultsConfirm": "Reset all settings to their default values?",
-    "mediaPlaceholder": "Media settings coming soon",
+    "projectionDisplay": {
+      "label": "Projection Window Display",
+      "noExternalDisplay": "No external display"
+    },
+    "reset": {
+      "title": "Reset",
+      "settingsDesc": "Clear preferences and restore defaults while keeping media, Bible data, and user files.",
+      "settingsButton": "Reset Settings",
+      "settingsConfirm": "Reset app settings to their defaults while keeping user data?",
+      "allDataDesc": "Clear all settings, user data, media cache, and local data. This cannot be undone.",
+      "allDataButton": "Clear All Data",
+      "allDataConfirm": "Clear all settings, user data, media cache, and local data? This cannot be undone."
+    },
     "trash": {
       "retentionLabel": "Trash Retention Period",
       "retentionDesc": "Items in trash will be permanently deleted after this period",
       "days": {
+        "0": "Forever",
         "7": "7 days",
         "14": "14 days",
         "30": "30 days",
         "60": "60 days",
-        "90": "90 days",
-        "0": "Forever"
+        "90": "90 days"
+      }
+    },
+    "media": {
+      "sections": {
+        "general": "General",
+        "oneDrive": "OneDrive",
+        "lanRemote": "LAN Remote Control"
+      },
+      "defaultOfflinePolicy": "Offline Policy",
+      "offlinePolicies": {
+        "online-only": "Online only",
+        "on-demand": "On demand",
+        "always-offline": "Always available offline"
+      },
+      "oneDrive": {
+        "title": "OneDrive",
+        "description": "OneDrive folders are read-only sources. LibrePresenter never uploads, renames, moves, or deletes remote files.",
+        "connectedAccount": "Connected Account",
+        "noConnectedAccount": "No OneDrive account connected.",
+        "connect": "Sign in",
+        "connecting": "Signing in",
+        "connected": "OneDrive connected.",
+        "alreadyConnected": "Only one OneDrive account can be connected.",
+        "desktopOnly": "OneDrive connection is available in the desktop app only.",
+        "connectFailed": "Failed to connect OneDrive.",
+        "disconnect": "Logout",
+        "disconnectTitle": "Logout from OneDrive?",
+        "disconnectDescription": "This removes the OneDrive source from LibrePresenter and clears locally cached synced files. Remote files are not changed.",
+        "disconnected": "Logged out of OneDrive.",
+        "disconnectFailed": "Failed to logout from OneDrive."
+      },
+      "lanRemote": {
+        "enable": "Enable LAN remote",
+        "privateInterface": "Private interface address",
+        "running": "Remote running at {{host}}:{{port}}",
+        "disabled": "LAN remote is disabled",
+        "hostRequired": "Choose a private LAN address before enabling LAN remote.",
+        "createPairing": "Create pairing link",
+        "pairingUrl": "Pairing URL",
+        "pairingFailed": "Failed to create pairing link.",
+        "updateFailed": "Failed to update LAN remote."
+      }
+    },
+    "storage": {
+      "sections": {
+        "usage": "Usage",
+        "cleanup": "Cache Cleanup"
+      },
+      "refresh": "Refresh",
+      "total": "Total",
+      "browserEstimate": "Browser storage: {{usage}} used of {{quota}}. Persistent storage: {{persisted}}.",
+      "persistedYes": "enabled",
+      "persistedNo": "not enabled",
+      "usage": {
+        "title": "Usage",
+        "sourceMedia": "Original media files",
+        "coversAndPreviews": "Covers and previews",
+        "pdfPreviews": "PDF page previews",
+        "offlineSyncFiles": "Offline sync files",
+        "temporaryFiles": "Temporary and failed job files"
+      },
+      "cleanup": {
+        "title": "Cache Cleanup",
+        "actions": {
+          "removeOrphans": {
+            "title": "Clear orphan derived assets",
+            "description": "Clears covers, PDF previews, and video posters that no longer have an original file or reference. Original media files are not deleted.",
+            "button": "Clear"
+          },
+          "clearRegenerable": {
+            "title": "Clear regenerable assets",
+            "description": "Clears covers, PDF page previews, and video posters that can be rebuilt from the original files. They will be regenerated next time they are needed. Original media files are not deleted.",
+            "button": "Clear"
+          },
+          "clearSyncCache": {
+            "title": "Clear unpinned sync cache",
+            "description": "Clears synced temporary files that are not set to always available offline. Remote files are not deleted and will be downloaded again when needed.",
+            "button": "Clear"
+          }
+        }
       }
     },
     "languageNames": {
@@ -568,6 +910,48 @@
       "speechEnabled": "Enable Voice Recognition"
     }
   },
+  "recovery": {
+    "empty": "No current recovery issues",
+    "dismiss": "Dismiss",
+    "filters": {
+      "all": "All",
+      "media": "Media",
+      "sync": "Sync",
+      "storage": "Storage"
+    },
+    "actions": {
+      "retryJob": "Retry",
+      "cancelJob": "Cancel job",
+      "retrySyncDownload": "Retry download",
+      "runIntegrityRepair": "Run repair scan",
+      "retryResourceCleanup": "Retry cleanup",
+      "exportDiagnostics": "Export diagnostics"
+    },
+    "cancelJobConfirmTitle": "Cancel background job?",
+    "cancelJobConfirmDescription": "Cancel this background job? Its current progress will be discarded.",
+    "issues": {
+      "jobFailed": {
+        "title": "Media job needs attention",
+        "detail": "A background media task failed or is blocked."
+      },
+      "storageIntegrity": {
+        "title": "Storage integrity issue",
+        "detail": "Media storage has a missing or orphaned record."
+      },
+      "resourceCleanupFailed": {
+        "title": "Media cleanup needs attention",
+        "detail": "A deleted media resource could not be fully removed. You can retry safely."
+      },
+      "syncDownload": {
+        "title": "Sync download failed",
+        "detail": "A synced item could not be cached locally."
+      },
+      "syncAuth": {
+        "title": "Sync account needs attention",
+        "detail": "A cloud account needs to be reconnected before sync can continue."
+      }
+    }
+  },
   "error": {
     "somethingWentWrong": "Something went wrong",
     "tryAgain": "Try again",
@@ -585,6 +969,7 @@
   },
   "toast": {
     "storageSaveFailed": "Failed to save settings",
+    "syncStorageLimitReached": "Sync stopped: storage has reached the 80% limit.",
     "projectionOpenFailed": "Failed to open projection window",
     "projectionCloseFailed": "Failed to close projection window",
     "settingsReset": "Settings reset to defaults",
@@ -613,9 +998,14 @@
   "shortcuts": {
     "title": "Keyboard Shortcuts",
     "sections": {
+      "projection": "Projection",
       "bible": "Bible",
       "timer": "Timer",
+      "media": "Media",
       "edit": "Edit"
+    },
+    "projection": {
+      "start": "Start projection"
     },
     "bible": {
       "prev_verse": "Previous Verse",
@@ -630,6 +1020,26 @@
     "timer": {
       "toggle": "Start / Stop",
       "reset": "Reset"
+    },
+    "media": {
+      "escape": "Close presentation",
+      "next_slide": "Next item",
+      "prev_slide": "Previous item",
+      "next_slide_alt": "Next item (alternative)",
+      "prev_slide_alt": "Previous item (alternative)",
+      "first_slide": "First item",
+      "last_slide": "Last item",
+      "toggle_grid": "Toggle grid",
+      "toggle_zoom": "Toggle zoom",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "video_toggle_play": "Play / pause video",
+      "video_seek_forward": "Seek forward 5 seconds",
+      "video_seek_backward": "Seek backward 5 seconds",
+      "pdf_next_page": "Next PDF page",
+      "pdf_prev_page": "Previous PDF page",
+      "pdf_toggle_view_mode": "Toggle PDF view mode",
+      "start_from_current": "Start from current item"
     },
     "edit": {
       "copy": "Copy",
@@ -652,6 +1062,39 @@
       "description": "Deleted files and folders will appear here"
     },
     "permanentDeleteTitle": "Delete Permanently?",
-    "permanentDeleteDescription": "This action cannot be undone."
+    "permanentDeleteDescription": "This action cannot be undone.",
+    "emptyTrash": "Empty Trash",
+    "restoreNameConflictTitle": "Rename before restoring",
+    "restoreNameConflictDescription": "An item with this name already exists in the restore destination.",
+    "restoreNameLabel": "Name"
+  },
+  "mediaPreview": {
+    "close": "Close preview",
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in",
+    "present": "Present",
+    "preparing": "Preparing…",
+    "errors": {
+      "not-presentable": "This item cannot be presented on this device.",
+      "not-ready": "This item is not ready to present.",
+      "missing-source": "The original media file is missing."
+    }
+  },
+  "presenter": {
+    "noMediaSelected": "No media selected",
+    "grid": "Grid",
+    "zoom": "Zoom",
+    "next": "Next",
+    "prev": "Prev",
+    "slideInfo": "Slide {{current}} of {{total}}",
+    "endOfSlides": "End of slides",
+    "retry": "Retry",
+    "noPreview": "No preview",
+    "notes": "Notes",
+    "notesPlaceholder": "Add notes...",
+    "loading": "Loading...",
+    "imageLoadFailed": "Failed to load image",
+    "videoLoadFailed": "Failed to load video",
+    "pdfLoadFailed": "Failed to load PDF"
   }
 }

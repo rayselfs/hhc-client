@@ -7,41 +7,88 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Build
+        env:
+          VITE_HHC_ACCOUNT_ORIGIN: ${{ vars.VITE_HHC_ACCOUNT_ORIGIN }}
+          VITE_HHC_ASSET_ORIGIN: ${{ vars.VITE_HHC_ASSET_ORIGIN }}
+          VITE_ONEDRIVE_CLIENT_ID: ${{ vars.VITE_ONEDRIVE_CLIENT_ID }}
+          VITE_BIBLE_API_HOST: ${{ vars.VITE_BIBLE_API_HOST }}
+          VITE_BIBLE_API_V1_PREFIX: ${{ vars.VITE_BIBLE_API_V1_PREFIX }}
+          VITE_BIBLE_API_V2_PREFIX: ${{ vars.VITE_BIBLE_API_V2_PREFIX }}
+        run: npm run build
+
   prepare:
+    needs: quality-gates
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
-        with:
-          fetch-depth: 0
 
-      - name: Extract version from tag
+      - name: Validate release version
         id: get_version
         shell: bash
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION=$(node -p "require('./package.json').version")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG_VERSION=${GITHUB_REF#refs/tags/v}
+            if [[ "${TAG_VERSION}" != "${PACKAGE_VERSION}" ]]; then
+              echo "Tag version ${TAG_VERSION} does not match package version ${PACKAGE_VERSION}"
+              exit 1
+            fi
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
+          echo "version=${PACKAGE_VERSION}" >> "${GITHUB_OUTPUT}"
 
-  build:
-    needs: prepare
+  package:
+    needs: [quality-gates, prepare]
     runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-14, windows-2025]
-
     env:
-      BUILD_VERSION: ${{ needs.prepare.outputs.version }}
+      VITE_HHC_ACCOUNT_ORIGIN: ${{ vars.VITE_HHC_ACCOUNT_ORIGIN }}
+      VITE_HHC_ASSET_ORIGIN: ${{ vars.VITE_HHC_ASSET_ORIGIN }}
+      VITE_ONEDRIVE_CLIENT_ID: ${{ vars.VITE_ONEDRIVE_CLIENT_ID }}
+      VITE_BIBLE_API_HOST: ${{ vars.VITE_BIBLE_API_HOST }}
+      VITE_BIBLE_API_V1_PREFIX: ${{ vars.VITE_BIBLE_API_V1_PREFIX }}
+      VITE_BIBLE_API_V2_PREFIX: ${{ vars.VITE_BIBLE_API_V2_PREFIX }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: --mac
+            artifact: macos
+            smoke_executable: dist/mac-arm64/LibrePresenter.app/Contents/MacOS/LibrePresenter
+          - os: windows-2025
+            target: --win
+            artifact: windows
+            smoke_executable: dist/win-unpacked/libre-presenter.exe
 
     steps:
       - name: Checkout code
@@ -56,14 +103,133 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and Release (macOS)
-        if: matrix.os == 'macos-14'
+      - name: Download macOS video engine runtime
+        if: runner.os == 'macOS'
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build:mac -- --publish always
+          VLC_URL: ${{ vars.VIDEO_ENGINE_VLC_DARWIN_ARM64_URL }}
+          VLC_SHA256: ${{ vars.VIDEO_ENGINE_VLC_DARWIN_ARM64_SHA256 }}
+        run: |
+          VLC_DMG="${RUNNER_TEMP}/vlc-arm64.dmg"
+          VLC_MOUNT="${RUNNER_TEMP}/vlc-volume"
 
-      - name: Build and Release (Windows)
-        if: matrix.os == 'windows-2025'
+          curl --fail --location --silent --show-error "${VLC_URL}" --output "${VLC_DMG}"
+          printf '%s  %s\n' "${VLC_SHA256}" "${VLC_DMG}" | shasum --algorithm 256 --check
+          mkdir -p "${VLC_MOUNT}" .local-runtimes/vlc/darwin-arm64
+          hdiutil attach -nobrowse -readonly -mountpoint "${VLC_MOUNT}" "${VLC_DMG}"
+          trap 'hdiutil detach "${VLC_MOUNT}" >/dev/null 2>&1 || true' EXIT
+          cp -R "${VLC_MOUNT}/VLC.app/Contents/MacOS/." .local-runtimes/vlc/darwin-arm64/
+          hdiutil detach "${VLC_MOUNT}"
+          trap - EXIT
+
+      - name: Build LGPL FFmpeg runtime for macOS
+        if: runner.os == 'macOS'
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build:win -- --publish always
+          FFMPEG_VERSION: 8.1.2
+          FFMPEG_SOURCE_SHA256: 464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c
+        run: |
+          FFMPEG_ARCHIVE="${RUNNER_TEMP}/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+          FFMPEG_SOURCE_DIR="${RUNNER_TEMP}/ffmpeg-${FFMPEG_VERSION}"
+
+          curl --fail --location --silent --show-error \
+            "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" \
+            --output "${FFMPEG_ARCHIVE}"
+          printf '%s  %s\n' "${FFMPEG_SOURCE_SHA256}" "${FFMPEG_ARCHIVE}" \
+            | shasum --algorithm 256 --check
+          tar --extract --xz --file "${FFMPEG_ARCHIVE}" --directory "${RUNNER_TEMP}"
+
+          pushd "${FFMPEG_SOURCE_DIR}"
+          ./configure \
+            --disable-autodetect \
+            --disable-debug \
+            --disable-doc \
+            --disable-ffplay \
+            --disable-ffprobe \
+            --disable-network \
+            --disable-shared \
+            --enable-static \
+            --disable-gpl \
+            --disable-version3 \
+            --disable-nonfree
+          make -j"$(sysctl -n hw.logicalcpu)" ffmpeg
+          popd
+
+          mkdir -p .local-runtimes/ffmpeg/darwin-arm64
+          cp "${FFMPEG_SOURCE_DIR}/ffmpeg" .local-runtimes/ffmpeg/darwin-arm64/ffmpeg
+          chmod +x .local-runtimes/ffmpeg/darwin-arm64/ffmpeg
+          .local-runtimes/ffmpeg/darwin-arm64/ffmpeg -version
+
+      - name: Download Windows video engine runtime
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          VLC_URL: ${{ vars.VIDEO_ENGINE_VLC_WIN32_X64_URL }}
+          VLC_SHA256: ${{ vars.VIDEO_ENGINE_VLC_WIN32_X64_SHA256 }}
+          FFMPEG_URL: ${{ vars.VIDEO_ENGINE_FFMPEG_WIN32_X64_URL }}
+          FFMPEG_SHA256: ${{ vars.VIDEO_ENGINE_FFMPEG_WIN32_X64_SHA256 }}
+        run: |
+          node scripts/download-video-engine-runtime.mjs --component=vlc --platform=win32 --arch=x64 --url="${VLC_URL}" --sha256="${VLC_SHA256}"
+          node scripts/download-video-engine-runtime.mjs --component=ffmpeg --platform=win32 --arch=x64 --url="${FFMPEG_URL}" --sha256="${FFMPEG_SHA256}"
+
+      - name: Prepare video engine runtime
+        run: npm run prepare:video-engine:strict
+
+      - name: Build explicit unsigned desktop package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: >-
+          npm run package:desktop -- ${{ matrix.target }} --publish never
+          --config.forceCodeSigning=false
+          --config.mac.identity=null
+          --config.mac.notarize=false
+
+      - name: Verify packaged runtime and notices
+        run: npm run check:packaged-runtime
+
+      - name: Packaged projection smoke
+        env:
+          PACKAGED_APP_PATH: ${{ matrix.smoke_executable }}
+        run: npm run test:e2e:packaged
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: libre-presenter-${{ matrix.artifact }}-${{ needs.prepare.outputs.version }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.blockmap
+            dist/*.yml
+            dist/*.yaml
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [quality-gates, prepare, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4.3.0
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Generate release checksums
+        working-directory: release-artifacts
+        shell: bash
+        run: |
+          mapfile -d '' artifacts < <(find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z)
+          if (( ${#artifacts[@]} == 0 )); then
+            echo 'No release artifacts found'
+            exit 1
+          fi
+          sha256sum "${artifacts[@]}" > SHA256SUMS
+          test -s SHA256SUMS
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" release-artifacts/* --generate-notes --verify-tag

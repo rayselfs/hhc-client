@@ -9,12 +9,16 @@ import { BibleSelectorDialog } from '@renderer/components/Control/Bible/BibleSel
 import { useBibleContextMenu } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import type { VerseMenuData } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { useAppInit } from '@renderer/contexts/AppInitContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
+import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
+import { startBibleProjection } from '@renderer/lib/projection-actions'
 import type { BiblePassage } from '@shared/types/bible'
+import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
 
 type ProjectedPassage = { bookNumber: number; chapter: number; verse: number }
 
@@ -29,13 +33,14 @@ export default function BiblePage(): React.JSX.Element {
     prevChapter
   } = useBibleStore.getState()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
+  const scriptureTemplateId = useBibleSettingsStore((s) => s.scriptureTemplateId)
   const speechEnabled = useBibleSettingsStore((s) => s.speechEnabled)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
   const [projectedPassage, setProjectedPassage] = useState<ProjectedPassage | null>(null)
   const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
   const { showPreviewMenu } = useBibleContextMenu()
-  const { claimProjection, project } = useProjection()
+  const { project, startProjection, isProjectionOpen } = useProjection()
 
   const selectedVerseIndexRef = useRef(0)
 
@@ -44,8 +49,10 @@ export default function BiblePage(): React.JSX.Element {
   })
 
   useEffect(() => {
-    project('bible:settings', { fontSize })
-  }, [fontSize, project])
+    const settings = getBibleProjectionSettingsPayload()
+    useBibleProjectionStore.getState().updateSettingsPayload(settings)
+    if (isProjectionOpen) project('bible:settings', settings)
+  }, [fontSize, scriptureTemplateId, isProjectionOpen, project])
 
   useEffect(() => {
     const handler = (): void => setSelectorOpen(true)
@@ -82,17 +89,19 @@ export default function BiblePage(): React.JSX.Element {
       const chapter = getCurrentChapter()
       if (!book || !chapter) return
 
-      claimProjection('bible', { unblank: true })
-      project(
-        'bible:chapter',
-        {
-          bookNumber: book.number,
-          chapter: chapter.number,
-          chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
-          currentVerse: verse.number
-        },
-        { autoOpen: true }
-      )
+      const payloads = [
+        ['bible:settings', getBibleProjectionSettingsPayload()],
+        [
+          'bible:chapter',
+          {
+            bookNumber: book.number,
+            chapter: chapter.number,
+            chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+            currentVerse: verse.number
+          }
+        ]
+      ] satisfies ContentMessageTuple[]
+      void startBibleProjection(payloads, { startProjection })
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
       setProjectedPassage({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
@@ -109,7 +118,7 @@ export default function BiblePage(): React.JSX.Element {
         useBibleHistoryStore.getState().addToHistory(historyItem)
       }
     },
-    [getCurrentVerses, getCurrentBook, getCurrentChapter, claimProjection, project, navigateTo]
+    [getCurrentVerses, getCurrentBook, getCurrentChapter, startProjection, navigateTo]
   )
 
   const handleNextVerse = useCallback(() => {

@@ -2,10 +2,14 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { UseBoundStore, StoreApi } from 'zustand'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
-import { deleteThumbnail } from '@renderer/lib/thumbnail-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
+import {
+  cleanupFileResources,
+  purgeExpiredFileTrash,
+  type CleanupResult
+} from '@renderer/lib/file-resource-cleanup'
 
 export type SortField = 'name' | 'createdAt' | 'size' | 'kind'
 export type SortDir = 'asc' | 'desc' | 'none'
@@ -34,6 +38,24 @@ export const useFileExplorerStore = createFolderStore({
   rootName: 'Files',
   getDB: () => openFileExplorerDB()
 })
+
+export function publishPersistedFileItem(item: FileItemRecord): void {
+  useFileExplorerStore.setState((state) => {
+    const items = { ...state.items, [item.id]: item }
+    const siblings = [
+      ...(state._itemsByParent[item.parentId] ?? []).filter((entry) => entry.id !== item.id),
+      item
+    ].sort((a, b) => a.sortIndex - b.sortIndex)
+    return {
+      items,
+      _itemsArray: Object.values(items),
+      _itemsByParent: {
+        ...state._itemsByParent,
+        [item.parentId]: siblings
+      }
+    }
+  })
+}
 
 function createExplorerSettingsStore(
   persistName: string,
@@ -111,7 +133,11 @@ export const useFileExplorerCustomOrder = create<FileExplorerCustomOrderState>()
   )
 )
 
-export async function addFileItemToStore(file: File, parentId: string): Promise<string> {
+export async function addFileItemToStore(
+  file: File,
+  parentId: string,
+  canonicalMimeType = file.type || 'application/octet-stream'
+): Promise<string> {
   const db = await openFileExplorerDB()
   const id = crypto.randomUUID()
 
@@ -124,10 +150,19 @@ export async function addFileItemToStore(file: File, parentId: string): Promise<
     name: file.name,
     url: `blob:${id}`,
     size: file.size,
-    mimeType: file.type || 'application/octet-stream'
+    mimeType: canonicalMimeType
   }
 
   useFileExplorerStore.getState().addItem(item)
+  const storedItem = useFileExplorerStore.getState().items[id]
+  try {
+    if (!storedItem) throw new Error(`Failed to create file metadata: ${id}`)
+    await db.put('folder-items', storedItem)
+  } catch (error) {
+    useFileExplorerStore.getState().removeItem(id)
+    await deleteFileBlob(db, id).catch(() => undefined)
+    throw error
+  }
   return id
 }
 
@@ -135,10 +170,43 @@ export function removeFileItemFromStore(id: string): void {
   useFileExplorerStore.getState().softDeleteItem(id)
 }
 
+export function removeCleanedEntriesFromStore(result: CleanupResult): void {
+  const folderIds = new Set(result.folderIds)
+  const itemIds = new Set(result.itemIds)
+  useFileExplorerStore.setState((state) => {
+    const folders = Object.fromEntries(
+      Object.entries(state.folders).filter(([id]) => !folderIds.has(id))
+    )
+    const items = Object.fromEntries(Object.entries(state.items).filter(([id]) => !itemIds.has(id)))
+    const childFoldersByParent: typeof state._childFoldersByParent = {}
+    for (const folder of Object.values(folders)) {
+      if (folder.parentId === null) continue
+      const list = childFoldersByParent[folder.parentId] ?? []
+      list.push(folder)
+      childFoldersByParent[folder.parentId] = list
+    }
+    const itemsByParent: typeof state._itemsByParent = {}
+    for (const [parentId, loadedItems] of Object.entries(state._itemsByParent)) {
+      if (folderIds.has(parentId)) continue
+      itemsByParent[parentId] = loadedItems.filter((item) => !itemIds.has(item.id))
+    }
+    return {
+      folders,
+      items,
+      _foldersArray: Object.values(folders),
+      _itemsArray: Object.values(items),
+      _childFoldersByParent: childFoldersByParent,
+      _itemsByParent: itemsByParent,
+      loadedParents: new Set([...state.loadedParents].filter((id) => !folderIds.has(id))),
+      currentFolderId: folderIds.has(state.currentFolderId)
+        ? FILE_EXPLORER_ROOT_ID
+        : state.currentFolderId
+    }
+  })
+}
+
 export async function permanentDeleteFileItemFromStore(id: string): Promise<void> {
-  const db = await openFileExplorerDB()
-  useFileExplorerStore.getState().removeItem(id)
-  await Promise.all([deleteFileBlob(db, id), deleteThumbnail(id)])
+  removeCleanedEntriesFromStore(await cleanupFileResources({ itemIds: [id] }))
 }
 
 export function deleteFolderFromStore(folderId: string): void {
@@ -146,27 +214,9 @@ export function deleteFolderFromStore(folderId: string): void {
 }
 
 export async function permanentDeleteFolderFromStore(folderId: string): Promise<void> {
-  const state = useFileExplorerStore.getState()
-  const db = await openFileExplorerDB()
+  removeCleanedEntriesFromStore(await cleanupFileResources({ folderIds: [folderId] }))
+}
 
-  const itemIds: string[] = []
-  const queue: string[] = [folderId]
-
-  while (queue.length > 0) {
-    const currentId = queue.shift()!
-    for (const item of state._itemsArray) {
-      if (item.parentId === currentId && item.type === 'file') {
-        itemIds.push(item.id)
-      }
-    }
-    for (const folder of state._foldersArray) {
-      if (folder.parentId === currentId) {
-        queue.push(folder.id)
-      }
-    }
-  }
-
-  await Promise.all(itemIds.flatMap((id) => [deleteFileBlob(db, id), deleteThumbnail(id)]))
-
-  state.deleteFolder(folderId)
+export async function purgeExpiredTrashFromStore(retentionMs: number): Promise<void> {
+  removeCleanedEntriesFromStore(await purgeExpiredFileTrash(retentionMs))
 }

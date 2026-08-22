@@ -45,6 +45,17 @@ export default function ConfirmDialog(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending])
 
+  useEffect(() => {
+    if (!pending) return undefined
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Enter' || event.isComposing) return
+      event.preventDefault()
+      settle(true)
+    }
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [pending, settle])
+
   if (!pending) return <></>
 
   const { status = 'warning', title, description, confirmLabel, cancelLabel } = pending.options

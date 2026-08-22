@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { formatVerseReference } from '@renderer/lib/bible-utils'
+import type { ProjectionPayload } from '@shared/projection-messages'
 import { useTranslation } from 'react-i18next'
 
 export type BibleChapterData = {
@@ -13,15 +14,16 @@ export type BibleChapterData = {
 
 interface BibleProjectionProps {
   data: BibleChapterData
-  fontSize: number
+  settings: ProjectionPayload<'bible:settings'>
 }
 
 export default function BibleProjection({
   data,
-  fontSize
+  settings
 }: BibleProjectionProps): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { bookNumber, chapter, chapterVerses, currentVerse, versionLocale } = data
+  const { fontSize, templateTheme } = settings
   const containerRef = useRef<HTMLDivElement>(null)
   const prevChapterKeyRef = useRef<string>('')
   const isFirstRenderRef = useRef(true)
@@ -59,14 +61,18 @@ export default function BibleProjection({
     i18n.language
   )
   const referenceSize = Math.max(16, fontSize * 0.35)
+  const backgroundColor = templateTheme?.backgroundColor ?? '#000000'
+  const textColor = templateTheme?.textColor ?? '#ffffff'
+  const fontFamily = templateTheme?.fontFamily
 
   return (
-    <div className="h-screen w-full bg-black flex flex-col overflow-hidden">
-      <div
-        className="shrink-0 flex items-center justify-center bg-black/80 px-8"
-        style={{ height: '60px' }}
-      >
-        <span className="text-white font-bold" style={{ fontSize: `${referenceSize}px` }}>
+    <div
+      data-testid="bible-projection"
+      className="h-screen w-full flex flex-col overflow-hidden"
+      style={{ backgroundColor, fontFamily }}
+    >
+      <div className="shrink-0 flex items-center justify-center px-8" style={{ height: '60px' }}>
+        <span className="font-bold" style={{ fontSize: `${referenceSize}px`, color: textColor }}>
           {reference}
         </span>
       </div>
@@ -86,7 +92,7 @@ export default function BibleProjection({
             style={{
               fontSize: `${fontSize}px`,
               lineHeight: '150%',
-              color: '#ffffff'
+              color: textColor
             }}
           >
             <span

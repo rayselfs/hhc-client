@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, protocol, session } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import path from 'path'
 import fs from 'fs'
@@ -92,9 +92,15 @@ function httpsHead(url: string): Promise<{ contentLength: number }> {
 function downloadFile(
   url: string,
   destPath: string,
+  expectedSize: number,
   onProgress: (bytes: number) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    const temporaryPath = `${destPath}.tmp`
+    const fail = (error: unknown): void => {
+      fs.rmSync(temporaryPath, { force: true })
+      reject(error)
+    }
     const request = (targetUrl: string): void => {
       https
         .get(targetUrl, (res) => {
@@ -116,22 +122,60 @@ function downloadFile(
           }
           const dir = path.dirname(destPath)
           fs.mkdirSync(dir, { recursive: true })
-          const out = fs.createWriteStream(destPath)
+          const out = fs.createWriteStream(temporaryPath)
           res.on('data', (chunk: Buffer) => {
             onProgress(chunk.length)
           })
           res.pipe(out)
-          out.on('finish', resolve)
-          out.on('error', reject)
-          res.on('error', reject)
+          out.on('finish', () => {
+            out.close(() => {
+              try {
+                const size = fs.statSync(temporaryPath).size
+                if (expectedSize > 0 && size !== expectedSize) {
+                  fail(new Error(`Downloaded file size mismatch for ${targetUrl}`))
+                  return
+                }
+                fs.renameSync(temporaryPath, destPath)
+                resolve()
+              } catch (error) {
+                fail(error)
+              }
+            })
+          })
+          out.on('error', fail)
+          res.on('error', fail)
         })
-        .on('error', reject)
+        .on('error', fail)
     }
     request(url)
   })
 }
 
 let whisperModelDir: string | null = null
+
+async function clearMainProcessUserData(): Promise<void> {
+  const userData = app.getPath('userData')
+  for (const entry of [
+    'native-files',
+    'onedrive-credentials',
+    'local-sync-connections.json',
+    'speech-api-key-azure.enc',
+    'speech-api-key-gcp.enc'
+  ]) {
+    fs.rmSync(path.join(userData, entry), { recursive: true, force: true })
+  }
+  await session.defaultSession.clearData()
+}
+
+function resolveContainedPath(baseDir: string, relativePath: string): string | null {
+  const base = path.resolve(baseDir)
+  const resolved = path.resolve(base, relativePath)
+  return resolved === base || resolved.startsWith(`${base}${path.sep}`) ? resolved : null
+}
+
+function isValidModelDirectory(dir: unknown): dir is string {
+  return typeof dir === 'string' && path.isAbsolute(dir)
+}
 
 function detectInstalledModel(destDir: string): WhisperDirInfo {
   const whisperSubDir = path.join(destDir, 'whisper')
@@ -141,6 +185,11 @@ function detectInstalledModel(destDir: string): WhisperDirInfo {
 }
 
 export function registerAppIpc(wm: WindowManager): void {
+  ipcMain.handle('app:confirm-close', (event) => {
+    if (!isMainWindow(wm, event)) return { closing: false }
+    return { closing: wm.confirmMainWindowClose() }
+  })
+
   ipcMain.handle('app:relaunch', (event) => {
     if (!isMainWindow(wm, event)) return
     if (is.dev) {
@@ -152,26 +201,34 @@ export function registerAppIpc(wm: WindowManager): void {
     }
   })
 
+  ipcMain.handle('app:clear-user-data', async (event) => {
+    if (!isMainWindow(wm, event)) return
+    await clearMainProcessUserData()
+  })
+
   ipcMain.handle('app:select-directory', async (event) => {
     if (!isMainWindow(wm, event)) return null
     const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return result.canceled ? null : result.filePaths[0]
   })
 
-  ipcMain.handle('app:set-model-dir', (event, dir: string) => {
+  ipcMain.handle('app:set-model-dir', (event, dir: unknown) => {
     if (!isMainWindow(wm, event)) return
+    if (!isValidModelDirectory(dir)) throw new Error('Invalid model directory')
     whisperModelDir = dir
   })
 
-  ipcMain.handle('app:check-whisper-dir', (event, dir: string): WhisperDirInfo => {
+  ipcMain.handle('app:check-whisper-dir', (event, dir: unknown): WhisperDirInfo => {
     if (!isMainWindow(wm, event)) return { hasFiles: false }
+    if (!isValidModelDirectory(dir)) return { hasFiles: false }
     return detectInstalledModel(dir)
   })
 
   ipcMain.handle(
     'app:download-whisper-model',
-    async (event, model: WhisperModel, destDir: string) => {
+    async (event, model: WhisperModel, destDir: unknown) => {
       if (!isMainWindow(wm, event)) return
+      if (!isValidModelDirectory(destDir)) throw new Error('Invalid model directory')
       const sender = event.sender
 
       const files = WHISPER_FILES[model]
@@ -225,7 +282,7 @@ export function registerAppIpc(wm: WindowManager): void {
         })
 
         try {
-          await downloadFile(url, destPath, (bytes) => {
+          await downloadFile(url, destPath, fileSizes[i], (bytes) => {
             downloadedBytes += bytes
             const percent = totalBytes > 0 ? Math.round((downloadedBytes / totalBytes) * 100) : 0
             sendProgress({ model, percent, currentFile: file, done: false })
@@ -245,9 +302,11 @@ export function registerAppIpc(wm: WindowManager): void {
 export function registerLocalModelProtocol(): void {
   protocol.handle('local-model', (request) => {
     if (!whisperModelDir) return new Response('Model dir not set', { status: 503 })
-    const url = new URL(request.url)
-    const filePath = path.join(whisperModelDir, url.pathname)
     try {
+      const url = new URL(request.url)
+      const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, '')
+      const filePath = resolveContainedPath(whisperModelDir, relativePath)
+      if (!filePath) return new Response('Invalid model path', { status: 400 })
       const data = fs.readFileSync(filePath)
       return new Response(data)
     } catch {

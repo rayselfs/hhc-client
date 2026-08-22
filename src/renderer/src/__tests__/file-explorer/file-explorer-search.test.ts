@@ -41,10 +41,18 @@ function makeStoreState(items: AnyItemRecord[], folders: FolderRecord[] = []): F
     items: {},
     _foldersArray: folders,
     _itemsArray: items,
+    _childFoldersByParent: {},
+    _itemsByParent: {},
     loadedParents: new Set(),
     currentFolderId: 'file-root',
     isLoading: false,
+    isInitialized: false,
+    persistenceStatus: 'ready',
+    persistenceError: null,
+    pendingPersistenceCount: 0,
     initialize: vi.fn(),
+    retryInitialization: vi.fn(),
+    retryPersistence: vi.fn(),
     addFolder: vi.fn(),
     updateFolder: vi.fn(),
     deleteFolder: vi.fn(),
@@ -68,7 +76,9 @@ function makeStoreState(items: AnyItemRecord[], folders: FolderRecord[] = []): F
     getChildFolders: vi.fn().mockReturnValue([]),
     getItems: vi.fn().mockReturnValue([]),
     getFolderPath: vi.fn().mockReturnValue([]),
-    isItemsLoaded: vi.fn().mockReturnValue(false)
+    isItemsLoaded: vi.fn().mockReturnValue(false),
+    copyItem: vi.fn(),
+    softDeleteExpired: vi.fn()
   }
 }
 

@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 import { useSettingsStore } from '@renderer/stores/settings'
 
@@ -11,9 +11,27 @@ vi.mock('@renderer/components/Projection/DefaultProjection', () => ({
   default: () => <div data-testid="default-projection">Default</div>
 }))
 
+vi.mock('@renderer/components/Projection/FileProjection', () => ({
+  default: ({
+    controlEvent,
+    projectionSessionId
+  }: {
+    controlEvent?: { data: { action: string } } | null
+    projectionSessionId?: string
+  }) => (
+    <div
+      data-testid="file-projection"
+      data-control-action={controlEvent?.data.action ?? ''}
+      data-projection-session={projectionSessionId}
+    />
+  )
+}))
+
 const mockAdapter = (() => {
   const handlers = new Map<string, (data: unknown) => void>()
   return {
+    setGeneration: vi.fn(),
+    getGeneration: vi.fn(() => 4),
     send: vi.fn(),
     on: vi.fn((channel: string, handler: (data: unknown) => void) => {
       handlers.set(channel, handler)
@@ -33,6 +51,9 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
 }))
 
 import ProjectionPage from '../ProjectionPage'
+import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
+
+const mockProjectionVlcStop = vi.fn()
 
 const baseTimerTick: TimerTickPayload = {
   mode: 'timer',
@@ -54,12 +75,31 @@ const baseStopwatchTick: StopwatchTickPayload = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.location.hash = '#/projection?generation=4&session=session-1'
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: {
+      projectionVlc: {
+        stop: mockProjectionVlcStop
+      }
+    }
+  })
 })
 
 describe('ProjectionPage', () => {
   it('renders default content when no timer data received', () => {
     render(<ProjectionPage />)
     expect(screen.getByTestId('default-projection')).toBeInTheDocument()
+  })
+
+  it('announces projection route readiness with its generation', async () => {
+    render(<ProjectionPage />)
+
+    await waitFor(() => {
+      expect(createProjectionAdapter).toHaveBeenCalledWith('projection', 'session-1')
+      expect(mockAdapter.setGeneration).toHaveBeenCalledWith(4)
+      expect(mockAdapter.send).toHaveBeenCalledWith('__system:ready', { generation: 4 })
+    })
   })
 
   it('shows TimerDisplay when receiving timer:tick with mode=timer', () => {
@@ -149,5 +189,77 @@ describe('ProjectionPage', () => {
       mockAdapter._trigger('settings:timer-ring-color', { color: '#ef4444' })
     })
     expect(container.querySelectorAll('circle')).toHaveLength(2)
+  })
+
+  it('keeps an early file control command until file projection mounts', () => {
+    render(<ProjectionPage />)
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: false })
+      mockAdapter._trigger('file:control', { action: 'play', itemId: 'video-1' })
+      mockAdapter._trigger('file:show', {
+        itemId: 'video-1',
+        blobId: 'blob-1',
+        fileName: 'video.mkv',
+        mimeType: 'video/mp4',
+        playlist: [],
+        currentIndex: 0,
+        streamUrl: 'hhc-media://native/source-id',
+        seekable: false
+      })
+    })
+
+    expect(screen.getByTestId('file-projection')).toHaveAttribute('data-control-action', 'play')
+    expect(screen.getByTestId('file-projection')).toHaveAttribute(
+      'data-projection-session',
+      'session-1'
+    )
+  })
+
+  it('stops VLC when blanking file projection back to default', async () => {
+    render(<ProjectionPage />)
+    mockProjectionVlcStop.mockClear()
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: false })
+      mockAdapter._trigger('file:show', {
+        itemId: 'video-1',
+        blobId: 'blob-1',
+        fileName: 'video.mkv',
+        mimeType: 'video/x-matroska',
+        playbackMode: 'vlc-embedded'
+      })
+    })
+    expect(screen.getByTestId('file-projection')).toBeInTheDocument()
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: true })
+    })
+
+    await waitFor(() => {
+      expect(mockProjectionVlcStop).toHaveBeenCalled()
+    })
+  })
+
+  it('renders intentional blackout instead of the internal default fallback', async () => {
+    render(<ProjectionPage />)
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: false })
+      mockAdapter._trigger('file:show', {
+        itemId: 'video-1',
+        blobId: 'blob-1',
+        fileName: 'video.mkv',
+        mimeType: 'video/x-matroska',
+        playbackMode: 'vlc-embedded'
+      })
+      mockAdapter._trigger('__system:blackout', { enabled: true })
+    })
+
+    expect(screen.getByTestId('projection-blackout')).toBeInTheDocument()
+    expect(screen.queryByTestId('default-projection')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(mockProjectionVlcStop).toHaveBeenCalled()
+    })
   })
 })

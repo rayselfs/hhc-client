@@ -2,17 +2,61 @@
   "nav": {
     "timer": "计时器",
     "bible": "圣经",
+    "service": "流程",
+    "soundboard": "音效板",
     "files": "文件",
     "media": "多媒体",
     "favorites": "我的收藏",
     "trash": "回收站"
   },
   "welcome": {
-    "title": "欢迎使用 HHC",
+    "title": "欢迎使用 LibrePresenter",
     "subtitle": "让我们设置您的偏好",
     "language": "语言",
     "timezone": "时区",
     "confirm": "开始使用"
+  },
+  "service": {
+    "title": "流程",
+    "subtitle": "建立聚会流程，依序安排多媒体、圣经、计时器。",
+    "addMedia": "新增媒体",
+    "addBible": "新增圣经",
+    "addTimer": "新增计时器",
+    "projectCurrentCue": "投影目前 Cue",
+    "projectCue": "投影 Cue",
+    "projecting": "投影中...",
+    "projectionStarted": "已开始投影。",
+    "defaultTimerCue": "计时器 Cue",
+    "defaultBibleCue": "圣经 Cue",
+    "defaultMediaCue": "媒体 Cue",
+    "selectMediaLater": "稍后选择媒体",
+    "emptyTitle": "尚未建立 Cue",
+    "emptyDescription": "新增 Cue 来建立聚会流程顺序。",
+    "completed": "已完成",
+    "previewing": "预览中",
+    "jumpToCue": "跳到 Cue",
+    "previewCue": "预览 Cue",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "duplicateCue": "复制 Cue",
+    "completeCue": "标记完成",
+    "removeCue": "移除 Cue",
+    "currentCue": "目前",
+    "nextCue": "下一个",
+    "missingMediaSource": "找不到媒体来源",
+    "notImplementedYet": "尚未实现",
+    "projectErrors": {
+      "missingSource": "这个 Cue 找不到来源。",
+      "unsupported": "目前平台无法投影这个 Cue 来源。",
+      "notReady": "这个 Cue 来源尚未准备完成。",
+      "notImplemented": "这个 Cue 类型尚未实现。"
+    },
+    "cueTypes": {
+      "media": "媒体",
+      "bible": "圣经",
+      "timer": "计时器",
+      "song": "歌曲"
+    }
   },
   "timer": {
     "title": "计时器",
@@ -120,12 +164,14 @@
       "errorRetryExceeded": "连续错误过多，已自动停止检测"
     },
     "settings": {
-      "fontSize": "投影字体大小"
+      "fontSize": "投影字体大小",
+      "template": "经文模板"
     },
     "contextMenu": {
       "project": "投影",
       "addToHistory": "加入历史",
       "addToFolder": "加入文件夹",
+      "addToService": "加入流程",
       "copyText": "复制经文",
       "removeFromHistory": "从历史移除",
       "removeFromFolder": "从文件夹移除"
@@ -357,7 +403,18 @@
     "deleteTitle": "删除 {{name}} ?",
     "deleteFolderDescription": "此操作无法撤销。文件夹中的所有项目将被删除。",
     "deleteItemDescription": "此操作无法撤销。",
+    "deleteSoundboardAssetDescription": "这会移除已指定到 {{count}} 个音效板 pad 的音频。此操作无法撤销。",
     "deleteSelectedTitle": "删除 {{count}} 个项目?",
+    "persistence": {
+      "loading": "正在加载本地数据库",
+      "loadingDescription": "正在读取已保存的文件夹和项目。",
+      "loadFailed": "无法使用本地数据库",
+      "saveFailed": "本地更改尚未保存",
+      "saving": "正在保存本地更改",
+      "pending": "还有 {{count}} 项更改等待保存。",
+      "unknownError": "本地存储空间无法使用。",
+      "retry": "重试"
+    },
     "contextMenu": {
       "copy": "复制",
       "cut": "剪切",
@@ -371,31 +428,31 @@
     }
   },
   "fileKind": {
-    "folder": "資料夾",
-    "file": "檔案",
-    "pngImage": "PNG 檔案",
-    "jpegImage": "JPEG 檔案",
-    "gifImage": "GIF 檔案",
-    "webpImage": "WebP 檔案",
-    "svgImage": "SVG 檔案",
-    "bmpImage": "BMP 檔案",
-    "tiffImage": "TIFF 檔案",
-    "heicImage": "HEIC 檔案",
-    "heifImage": "HEIF 檔案",
-    "mp4Video": "MP4 檔案",
-    "quicktimeVideo": "QuickTime 檔案",
-    "webmVideo": "WebM 檔案",
-    "aviVideo": "AVI 檔案",
-    "mkvVideo": "MKV 檔案",
-    "mpegVideo": "MPEG 檔案",
-    "oggVideo": "OGG 檔案",
+    "folder": "文件夹",
+    "file": "文件",
+    "pngImage": "PNG 文件",
+    "jpegImage": "JPEG 文件",
+    "gifImage": "GIF 文件",
+    "webpImage": "WebP 文件",
+    "svgImage": "SVG 文件",
+    "bmpImage": "BMP 文件",
+    "tiffImage": "TIFF 文件",
+    "heicImage": "HEIC 文件",
+    "heifImage": "HEIF 文件",
+    "mp4Video": "MP4 文件",
+    "quicktimeVideo": "QuickTime 文件",
+    "webmVideo": "WebM 文件",
+    "aviVideo": "AVI 文件",
+    "mkvVideo": "MKV 文件",
+    "mpegVideo": "MPEG 文件",
+    "oggVideo": "OGG 文件",
     "pdfDocument": "PDF 文件",
-    "powerpointPresentation": "PowerPoint 簡報",
-    "keynotePresentation": "Keynote 簡報",
-    "presentation": "簡報",
-    "imageFile": "{{ext}} 檔案",
-    "videoFile": "{{ext}} 檔案",
-    "audioFile": "{{ext}} 音訊"
+    "powerpointPresentation": "PowerPoint 演示文稿",
+    "keynotePresentation": "Keynote 演示文稿",
+    "presentation": "演示文稿",
+    "imageFile": "{{ext}} 文件",
+    "videoFile": "{{ext}} 文件",
+    "audioFile": "{{ext}} 音频"
   },
   "fileExplorer": {
     "title": "文件",
@@ -405,7 +462,7 @@
     },
     "upload": {
       "button": "上传",
-      "dropToUpload": "拖曳以上传",
+      "dropToUpload": "拖拽以上传",
       "dropToFolder": "放入文件夹"
     },
     "status": {
@@ -456,23 +513,199 @@
       "edit": "编辑",
       "uploadFiles": "上传文件",
       "uploadFolder": "上传文件夹",
+      "createPresentation": "创建演示文稿",
+      "addLocalSyncFolder": "新增同步文件夹",
+      "addOneDrive": "新增 OneDrive",
+      "addHhcLine": "新增 HHC LINE",
       "addFavorite": "加入我的收藏",
       "removeFavorite": "移除我的收藏",
+      "refreshSyncFolder": "重新整理同步文件夹",
+      "resyncFile": "重新同步文件",
+      "project": "投影",
+      "openPresentation": "打开演示文稿",
+      "convertPresentation": "转换为可编辑演示文稿",
       "restore": "还原",
       "permanentDelete": "永久删除"
+    },
+    "presenter": {
+      "skippedItems": "已跳过 {{count}} 个",
+      "readinessSummary": "{{ready}} 个就绪，{{preparing}} 个准备中，{{unsupported}} 个不支持，{{missing}} 个缺失，{{failed}} 个失败"
+    },
+    "noProjectableFiles": "没有可投影的文件",
+    "invalidName": "名称无效",
+    "folderAlreadyExists": "同层已存在相同名称的文件夹",
+    "fileAlreadyExists": "同层已存在相同名称的文件",
+    "uploadSkippedUnsupported": "已跳过 {{count}} 个不支持的文件",
+    "renameFile": "重命名文件",
+    "renameFolder": "重命名文件夹",
+    "blobLoadFailed": "文件加载失败，已跳过",
+    "syncSources": {
+      "localSyncConnected": "已连接 {{name}}，导入 {{count}} 个文件。",
+      "localSyncConnectFailed": "无法连接同步文件夹。",
+      "oneDriveFolderImported": "已加入 {{name}}，导入 {{count}} 个项目。",
+      "hhcLineFolderImported": "已加入 {{name}}，导入 {{count}} 个项目。",
+      "hhcLineImportFailed": "无法导入 HHC LINE 集合。",
+      "oneDriveLoginRequired": "请先在偏好设置登录 OneDrive。",
+      "oneDriveDesktopOnly": "OneDrive 连接目前只支持桌面版。",
+      "oneDriveImportFailed": "无法加入 OneDrive 文件夹。",
+      "refreshComplete": "同步文件夹已重新整理。",
+      "refreshFailed": "无法重新整理同步文件夹。",
+      "unsupportedFiles": "有 {{count}} 个文件格式不支持，已保留但禁用。",
+      "unlink": "取消连接",
+      "unlinkTitle": "取消连接 {{name}}？",
+      "unlinkDescription": "这会从 LibrePresenter 移除同步来源并清除本机同步缓存，不会更改原始本机或云端文件。",
+      "unlinked": "已取消同步文件夹连接。",
+      "unlinkFailed": "无法取消同步文件夹连接。"
+    },
+    "oneDriveFolderPicker": {
+      "title": "选择 OneDrive 文件夹",
+      "back": "返回上一层",
+      "empty": "这里没有可加入的文件夹。",
+      "import": "加入文件夹",
+      "loadFailed": "无法加载 OneDrive 文件夹。"
+    },
+    "cloudFolderPicker": {
+      "title": "选择 {{provider}} 文件夹",
+      "back": "返回上一层",
+      "empty": "这里没有可加入的文件夹。",
+      "import": "加入文件夹",
+      "loadFailed": "无法加载 {{provider}} 文件夹。"
+    }
+  },
+  "presentationWorkspace": {
+    "title": "演示文稿工作区",
+    "subtitle": "打开并整理 PPTX 演示文稿",
+    "home": "常用",
+    "insert": "插入",
+    "design": "设计",
+    "ribbonGroups": {
+      "font": "字体",
+      "paragraph": "段落",
+      "position": "位置",
+      "arrange": "排列",
+      "insert": "插入",
+      "background": "背景",
+      "adjust": "调整",
+      "size": "大小"
+    },
+    "fontFamily": "字体",
+    "loadLocalFonts": "加载本机字体",
+    "localFontsLoadFailed": "无法加载本机字体，请确认已允许字体访问权限。",
+    "present": "投影",
+    "copyPage": "复制页面",
+    "untitledName": "未命名演示文稿",
+    "text": "文字",
+    "image": "图片",
+    "moveSlideUp": "上移",
+    "moveSlideDown": "下移",
+    "copyElement": "复制对象",
+    "pasteElement": "粘贴",
+    "deleteElement": "删除对象",
+    "slides": "幻灯片",
+    "newSlide": "新增幻灯片",
+    "formatBackground": "Format Background",
+    "solidFill": "Solid fill",
+    "gradientFill": "Gradient fill",
+    "fillColor": "颜色",
+    "gradientFrom": "起点",
+    "gradientTo": "终点",
+    "gradientType": "类型",
+    "gradientDirection": "方向",
+    "gradientAngle": "角度",
+    "gradientStops": "渐变光圈",
+    "gradientStop": "渐变光圈",
+    "positionPercent": "位置",
+    "transparency": "透明度",
+    "brightness": "亮度",
+    "gradientLeftRight": "由左至右",
+    "gradientTopBottom": "由上至下",
+    "gradientDiagonal": "对角线",
+    "applyToAll": "Apply to All",
+    "resetBackground": "Reset Background",
+    "inspector": "检查器",
+    "fileName": "文件名",
+    "slideCount": "幻灯片数",
+    "dimensions": "尺寸",
+    "previousSlide": "上一张幻灯片",
+    "nextSlide": "下一张幻灯片",
+    "closeTab": "关闭标签页",
+    "loadFailed": "无法加载演示文稿",
+    "emptyTitle": "没有打开的演示文稿",
+    "emptyDescription": "从文件打开 PPTX，即可开始使用演示文稿工作区。",
+    "backToFiles": "返回文件",
+    "undo": "撤销",
+    "redo": "重做",
+    "saveStatus": {
+      "dirty": "尚未保存",
+      "saving": "保存中...",
+      "saved": "已保存",
+      "error": "保存失败"
+    },
+    "previewWarning": "预览需要修复",
+    "retrySave": "重试保存",
+    "closeDecisionTitle": "演示文稿无法保存",
+    "closeDecisionBody": "请重试保存、继续编辑，或不保存最新更改直接关闭。",
+    "keepEditing": "继续编辑",
+    "closeWithoutSaving": "不保存并关闭",
+    "increaseFontSize": "增大字号",
+    "decreaseFontSize": "减小字号",
+    "clearFormatting": "清除格式",
+    "bold": "加粗",
+    "italic": "斜体",
+    "underline": "下划线",
+    "strikethrough": "删除线",
+    "subscript": "下标",
+    "superscript": "上标",
+    "characterSpacing": "字符间距",
+    "changeCase": "更改大小写",
+    "textHighlight": "文本高亮颜色",
+    "fontColor": "字体颜色",
+    "bullets": "项目符号",
+    "numbering": "编号",
+    "decreaseIndent": "减少缩进",
+    "increaseIndent": "增加缩进",
+    "lineSpacing": "行距",
+    "lineSpacingOptions": "行距选项",
+    "bringToFront": "移到最上层",
+    "bringForward": "上移一层",
+    "sendBackward": "下移一层",
+    "sendToBack": "移到最下层",
+    "align": {
+      "left": "左对齐",
+      "center": "居中",
+      "right": "右对齐",
+      "justify": "两端对齐"
+    },
+    "objectAlign": {
+      "left": "对象左对齐",
+      "center": "对象水平居中",
+      "right": "对象右对齐",
+      "top": "对象顶端对齐",
+      "middle": "对象垂直居中",
+      "bottom": "对象底端对齐"
+    },
+    "distribute": {
+      "horizontal": "水平等距分布对象",
+      "vertical": "垂直等距分布对象"
     }
   },
   "projection": {
-    "showButton": "显示投影",
-    "blankButton": "关闭投影",
-    "openButton": "开启投影窗口",
-    "closeButton": "关闭投影窗口",
-    "closeTitle": "关闭投影",
-    "closeConfirm": "确定要关闭投影窗口吗？",
+    "startButton": "开始投影",
+    "stopButton": "停止投影",
+    "closeTitle": "停止投影",
+    "closeConfirm": "要停止当前投影并关闭输出窗口吗？",
     "waiting": "等待内容...",
-    "openTitle": "开启投影",
-    "openMessage": "开启投影窗口以在第二屏幕上显示内容。",
-    "open": "开启"
+    "recovery": {
+      "recoveringTitle": "正在恢复投影",
+      "recoveringDescription": "输出窗口正在重新启动，并恢复最后投影的内容。",
+      "popupBlockedTitle": "投影弹出窗口被拦截",
+      "popupBlockedDescription": "请允许此网站打开弹出窗口，然后重试。",
+      "readyTimeoutTitle": "投影窗口未能就绪",
+      "readyTimeoutDescription": "请重试打开输出窗口。",
+      "rendererCrashTitle": "投影意外停止",
+      "rendererCrashDescription": "重复发生错误，自动恢复已停止。",
+      "retry": "重试投影"
+    }
   },
   "common": {
     "cancel": "取消",
@@ -490,6 +723,11 @@
   },
   "userMenu": {
     "guest": "访客",
+    "accountMenu": "{{name}}的帐号菜单",
+    "loadingAccount": "正在加载帐号...",
+    "accountUnavailable": "帐号服务不可用",
+    "signInFailed": "无法登录",
+    "signOutFailed": "无法登出",
     "login": "登录",
     "logout": "登出",
     "preferences": "偏好设置",
@@ -505,34 +743,138 @@
   },
   "about": {
     "title": "关于",
-    "description": "投影软件。"
+    "description": "投影软件。",
+    "tagline": "为教会与现场活动打造的开源投影软件。",
+    "version": "版本",
+    "license": "授权",
+    "openSourceLicenses": "开源授权",
+    "viewLicenses": "查看授权",
+    "licensesIntro": "LibrePresenter 与内置视频组件使用的授权。",
+    "source": "来源",
+    "back": "返回"
   },
   "preferences": {
     "title": "偏好设置",
     "categories": {
       "general": "常规",
+      "timer": "计时器",
       "media": "多媒体",
-      "bible": "圣经"
+      "bible": "圣经",
+      "storage": "存储空间",
+      "recovery": "修复中心"
+    },
+    "timer": {
+      "reminderModeLabel": "时间提醒计算方式",
+      "reminderModeSwitchLabel": "累加"
     },
     "language": "语言",
     "timezone": "时区",
     "darkMode": "深色模式",
     "hardwareAcceleration": "硬件加速",
     "hardwareAccelerationDesc": "需要重新启动应用程序",
-    "resetToDefaults": "重置为默认值",
-    "resetBtn": "重置",
-    "resetToDefaultsConfirm": "将所有设置重置为默认值？",
-    "mediaPlaceholder": "媒体设置即将推出",
+    "projectionDisplay": {
+      "label": "投影窗口屏幕",
+      "noExternalDisplay": "没有外接屏幕"
+    },
+    "reset": {
+      "title": "重置",
+      "settingsDesc": "清除偏好设置并恢复默认值，保留多媒体、圣经资料与用户文件。",
+      "settingsButton": "重置设置",
+      "settingsConfirm": "将 App 设置重置为默认值并保留用户资料？",
+      "allDataDesc": "清除所有设置、用户资料、媒体缓存与本地资料。此操作无法复原。",
+      "allDataButton": "清除所有资料",
+      "allDataConfirm": "清除所有设置、用户资料、媒体缓存与本地资料？此操作无法复原。"
+    },
     "trash": {
       "retentionLabel": "垃圾桶保留期限",
       "retentionDesc": "垃圾桶中的项目将在此期限后永久删除",
       "days": {
+        "0": "永久",
         "7": "7 天",
         "14": "14 天",
         "30": "30 天",
         "60": "60 天",
-        "90": "90 天",
-        "0": "永久"
+        "90": "90 天"
+      }
+    },
+    "media": {
+      "sections": {
+        "general": "常规",
+        "oneDrive": "OneDrive",
+        "lanRemote": "LAN 遥控"
+      },
+      "defaultOfflinePolicy": "离线策略",
+      "offlinePolicies": {
+        "online-only": "仅在线",
+        "on-demand": "需要时下载",
+        "always-offline": "始终离线可用"
+      },
+      "oneDrive": {
+        "title": "OneDrive",
+        "description": "OneDrive 文件夹是只读来源。LibrePresenter 不会上传、重命名、移动或删除远程文件。",
+        "connectedAccount": "已连接帐号",
+        "noConnectedAccount": "尚未连接 OneDrive 帐号。",
+        "connect": "登录",
+        "connecting": "登录中",
+        "connected": "已连接 OneDrive。",
+        "alreadyConnected": "只能连接一个 OneDrive 帐号。",
+        "desktopOnly": "OneDrive 连接目前只支持桌面版。",
+        "connectFailed": "无法连接 OneDrive。",
+        "disconnect": "登出",
+        "disconnectTitle": "登出 OneDrive？",
+        "disconnectDescription": "这会从 LibrePresenter 移除 OneDrive 来源并清除本机同步缓存，不会更改远程文件。",
+        "disconnected": "已登出 OneDrive。",
+        "disconnectFailed": "无法登出 OneDrive。"
+      },
+      "lanRemote": {
+        "enable": "启用 LAN 遥控",
+        "privateInterface": "私人网络接口地址",
+        "running": "遥控已启动于 {{host}}:{{port}}",
+        "disabled": "LAN 遥控已停用",
+        "hostRequired": "启用 LAN 遥控前，请先选择私人网络地址。",
+        "createPairing": "建立配对链接",
+        "pairingUrl": "配对链接",
+        "pairingFailed": "无法建立配对链接。",
+        "updateFailed": "无法更新 LAN 遥控。"
+      }
+    },
+    "storage": {
+      "sections": {
+        "usage": "使用量",
+        "cleanup": "缓存清理"
+      },
+      "refresh": "刷新",
+      "total": "总计",
+      "browserEstimate": "浏览器存储空间：已使用 {{usage}} / {{quota}}。持久化存储：{{persisted}}。",
+      "persistedYes": "已启用",
+      "persistedNo": "未启用",
+      "usage": {
+        "title": "使用量",
+        "sourceMedia": "原始媒体文件",
+        "coversAndPreviews": "封面与预览图",
+        "pdfPreviews": "PDF 页面预览",
+        "offlineSyncFiles": "同步离线文件",
+        "temporaryFiles": "临时与失败任务文件"
+      },
+      "cleanup": {
+        "title": "缓存清理",
+        "actions": {
+          "removeOrphans": {
+            "title": "清除孤立衍生资产",
+            "description": "清除已经没有对应原始文件或引用关系的封面、PDF 预览与视频封面。不会删除原始媒体文件。",
+            "button": "清除"
+          },
+          "clearRegenerable": {
+            "title": "清除可重新生成的资产",
+            "description": "清除可由原始文件重新建立的封面、PDF 页面预览与视频封面。下次使用时会重新生成，不会删除原始媒体文件。",
+            "button": "清除"
+          },
+          "clearSyncCache": {
+            "title": "清除未固定同步缓存",
+            "description": "清除没有设置为始终离线可用的同步临时文件。远程文件不会被删除，下次需要时会重新下载。",
+            "button": "清除"
+          }
+        }
       }
     },
     "languageNames": {
@@ -568,6 +910,48 @@
       "speechEnabled": "开启语音识别"
     }
   },
+  "recovery": {
+    "empty": "目前没有需要修复的问题",
+    "dismiss": "忽略",
+    "filters": {
+      "all": "全部",
+      "media": "媒体",
+      "sync": "同步",
+      "storage": "存储空间"
+    },
+    "actions": {
+      "retryJob": "重试",
+      "cancelJob": "取消任务",
+      "retrySyncDownload": "重试下载",
+      "runIntegrityRepair": "执行修复扫描",
+      "retryResourceCleanup": "重试清理",
+      "exportDiagnostics": "导出诊断"
+    },
+    "cancelJobConfirmTitle": "取消后台任务？",
+    "cancelJobConfirmDescription": "确定要取消这个后台任务吗？当前进度将会丢弃。",
+    "issues": {
+      "jobFailed": {
+        "title": "媒体任务需要处理",
+        "detail": "后台媒体任务失败或被阻挡。"
+      },
+      "storageIntegrity": {
+        "title": "存储完整性问题",
+        "detail": "媒体存储有缺失或孤立记录。"
+      },
+      "resourceCleanupFailed": {
+        "title": "媒体清理需要处理",
+        "detail": "已删除的媒体资源尚未完整清除，可以安全地重新尝试。"
+      },
+      "syncDownload": {
+        "title": "同步下载失败",
+        "detail": "同步项目无法缓存到本机。"
+      },
+      "syncAuth": {
+        "title": "同步帐号需要处理",
+        "detail": "需要重新连接云端帐号才能继续同步。"
+      }
+    }
+  },
   "error": {
     "somethingWentWrong": "出现错误",
     "tryAgain": "重试",
@@ -585,6 +969,7 @@
   },
   "toast": {
     "storageSaveFailed": "保存设置失败",
+    "syncStorageLimitReached": "同步已停止：存储空间已达 80% 上限。",
     "projectionOpenFailed": "开启投影窗口失败",
     "projectionCloseFailed": "关闭投影窗口失败",
     "settingsReset": "设置已重置为默认值",
@@ -613,9 +998,14 @@
   "shortcuts": {
     "title": "键盘快捷键",
     "sections": {
+      "projection": "投影",
       "bible": "圣经",
       "timer": "计时器",
+      "media": "多媒体",
       "edit": "编辑"
+    },
+    "projection": {
+      "start": "开始投影"
     },
     "bible": {
       "prev_verse": "上一节",
@@ -630,6 +1020,26 @@
     "timer": {
       "toggle": "开始 / 停止",
       "reset": "重置"
+    },
+    "media": {
+      "escape": "关闭投影",
+      "next_slide": "下一个项目",
+      "prev_slide": "上一个项目",
+      "next_slide_alt": "下一个项目 (替代)",
+      "prev_slide_alt": "上一个项目 (替代)",
+      "first_slide": "第一个项目",
+      "last_slide": "最后一个项目",
+      "toggle_grid": "切换网格视图",
+      "toggle_zoom": "切换缩放",
+      "zoom_in": "放大",
+      "zoom_out": "缩小",
+      "video_toggle_play": "播放 / 暂停视频",
+      "video_seek_forward": "视频前进 5 秒",
+      "video_seek_backward": "视频后退 5 秒",
+      "pdf_next_page": "PDF 下一页",
+      "pdf_prev_page": "PDF 上一页",
+      "pdf_toggle_view_mode": "切换 PDF 查看模式",
+      "start_from_current": "从当前项目开始投影"
     },
     "edit": {
       "copy": "复制",
@@ -652,6 +1062,39 @@
       "description": "已删除的文件与文件夹将显示在这里"
     },
     "permanentDeleteTitle": "永久删除？",
-    "permanentDeleteDescription": "此操作无法撤销。"
+    "permanentDeleteDescription": "此操作无法撤销。",
+    "emptyTrash": "清空回收站",
+    "restoreNameConflictTitle": "还原前重命名",
+    "restoreNameConflictDescription": "还原位置已经有相同名称的项目。",
+    "restoreNameLabel": "名称"
+  },
+  "mediaPreview": {
+    "close": "关闭预览",
+    "zoomOut": "缩小",
+    "zoomIn": "放大",
+    "present": "投影",
+    "preparing": "准备中…",
+    "errors": {
+      "not-presentable": "此项目无法在这台设备上投影。",
+      "not-ready": "此项目尚未准备完成。",
+      "missing-source": "找不到原始媒体文件。"
+    }
+  },
+  "presenter": {
+    "noMediaSelected": "未选择媒体",
+    "grid": "网格",
+    "zoom": "缩放",
+    "next": "下一张",
+    "prev": "上一张",
+    "slideInfo": "第 {{current}} 张投影片（共 {{total}} 张）",
+    "endOfSlides": "投影结束",
+    "retry": "重试",
+    "noPreview": "无预览",
+    "notes": "备注",
+    "notesPlaceholder": "添加备注...",
+    "loading": "加载中...",
+    "imageLoadFailed": "无法加载图片",
+    "videoLoadFailed": "无法加载视频",
+    "pdfLoadFailed": "无法加载 PDF"
   }
 }

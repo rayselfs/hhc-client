@@ -3,9 +3,17 @@ dist
 out
 coverage
 .DS_Store
+.env
+.env.*
+!.env.example
 .eslintcache
 .sisyphus
 .playwright-mcp
 *.log*
 *.tsbuildinfo
 bundle-report.html
+.omo
+.local-runtimes/
+resources/video-engine/**/*
+!resources/video-engine/**/
+!resources/video-engine/**/README.txt

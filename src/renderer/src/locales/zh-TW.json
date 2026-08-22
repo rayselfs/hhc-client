@@ -2,17 +2,61 @@
   "nav": {
     "timer": "計時器",
     "bible": "聖經",
+    "service": "流程",
+    "soundboard": "音效板",
     "files": "文件",
     "media": "多媒體",
     "favorites": "我的最愛",
     "trash": "垃圾桶"
   },
   "welcome": {
-    "title": "歡迎使用 HHC",
+    "title": "歡迎使用 LibrePresenter",
     "subtitle": "讓我們設定您的偏好",
     "language": "語言",
     "timezone": "時區",
     "confirm": "開始使用"
+  },
+  "service": {
+    "title": "流程",
+    "subtitle": "建立聚會流程，依序安排多媒體、聖經、計時器。",
+    "addMedia": "新增媒體",
+    "addBible": "新增聖經",
+    "addTimer": "新增計時器",
+    "projectCurrentCue": "投影目前 Cue",
+    "projectCue": "投影 Cue",
+    "projecting": "投影中...",
+    "projectionStarted": "已開始投影。",
+    "defaultTimerCue": "計時器 Cue",
+    "defaultBibleCue": "聖經 Cue",
+    "defaultMediaCue": "媒體 Cue",
+    "selectMediaLater": "稍後選擇媒體",
+    "emptyTitle": "尚未建立 Cue",
+    "emptyDescription": "新增 Cue 來建立聚會流程順序。",
+    "completed": "已完成",
+    "previewing": "預覽中",
+    "jumpToCue": "跳到 Cue",
+    "previewCue": "預覽 Cue",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "duplicateCue": "複製 Cue",
+    "completeCue": "標記完成",
+    "removeCue": "移除 Cue",
+    "currentCue": "目前",
+    "nextCue": "下一個",
+    "missingMediaSource": "找不到媒體來源",
+    "notImplementedYet": "尚未實作",
+    "projectErrors": {
+      "missingSource": "這個 Cue 找不到來源。",
+      "unsupported": "目前平台無法投影這個 Cue 來源。",
+      "notReady": "這個 Cue 來源尚未準備完成。",
+      "notImplemented": "這個 Cue 類型尚未實作。"
+    },
+    "cueTypes": {
+      "media": "媒體",
+      "bible": "聖經",
+      "timer": "計時器",
+      "song": "歌曲"
+    }
   },
   "timer": {
     "title": "計時器",
@@ -120,12 +164,14 @@
       "errorRetryExceeded": "連續錯誤過多，已自動停止偵測"
     },
     "settings": {
-      "fontSize": "投影字體大小"
+      "fontSize": "投影字體大小",
+      "template": "經文樣板"
     },
     "contextMenu": {
       "project": "投影",
       "addToHistory": "加入歷史",
       "addToFolder": "加入資料夾",
+      "addToService": "加入流程",
       "copyText": "複製經文",
       "removeFromHistory": "從歷史移除",
       "removeFromFolder": "從資料夾移除"
@@ -357,7 +403,18 @@
     "deleteTitle": "刪除 {{name}} ?",
     "deleteFolderDescription": "此動作無法復原。資料夾中的所有項目將被刪除。",
     "deleteItemDescription": "此動作無法復原。",
+    "deleteSoundboardAssetDescription": "這會移除已指定到 {{count}} 個音效板 pad 的音訊。此動作無法復原。",
     "deleteSelectedTitle": "刪除 {{count}} 個項目?",
+    "persistence": {
+      "loading": "正在載入本機資料庫",
+      "loadingDescription": "正在讀取已儲存的資料夾與項目。",
+      "loadFailed": "無法使用本機資料庫",
+      "saveFailed": "本機變更尚未儲存",
+      "saving": "正在儲存本機變更",
+      "pending": "尚有 {{count}} 項變更等待儲存。",
+      "unknownError": "本機儲存空間無法使用。",
+      "retry": "重試"
+    },
     "contextMenu": {
       "copy": "複製",
       "cut": "剪下",
@@ -456,23 +513,199 @@
       "edit": "編輯",
       "uploadFiles": "檔案上傳",
       "uploadFolder": "資料夾上傳",
+      "createPresentation": "建立簡報",
+      "addLocalSyncFolder": "新增同步資料夾",
+      "addOneDrive": "新增 OneDrive",
+      "addHhcLine": "新增 HHC LINE",
       "addFavorite": "加入我的最愛",
       "removeFavorite": "移除我的最愛",
+      "refreshSyncFolder": "重新整理同步資料夾",
+      "resyncFile": "重新同步檔案",
+      "project": "投影",
+      "openPresentation": "開啟簡報",
+      "convertPresentation": "轉成可編輯簡報",
       "restore": "還原",
       "permanentDelete": "永久刪除"
+    },
+    "presenter": {
+      "skippedItems": "已跳過 {{count}} 個",
+      "readinessSummary": "{{ready}} 個就緒，{{preparing}} 個準備中，{{unsupported}} 個不支援，{{missing}} 個遺失，{{failed}} 個失敗"
+    },
+    "noProjectableFiles": "沒有可投影的檔案",
+    "invalidName": "名稱無效",
+    "folderAlreadyExists": "同層已存在相同名稱的資料夾",
+    "fileAlreadyExists": "同層已存在相同名稱的檔案",
+    "uploadSkippedUnsupported": "已略過 {{count}} 個不支援的檔案",
+    "renameFile": "重新命名檔案",
+    "renameFolder": "重新命名資料夾",
+    "blobLoadFailed": "檔案載入失敗，已跳過",
+    "syncSources": {
+      "localSyncConnected": "已連接 {{name}}，匯入 {{count}} 個檔案。",
+      "localSyncConnectFailed": "無法連接同步資料夾。",
+      "oneDriveFolderImported": "已加入 {{name}}，匯入 {{count}} 個項目。",
+      "hhcLineFolderImported": "已加入 {{name}}，匯入 {{count}} 個項目。",
+      "hhcLineImportFailed": "無法匯入 HHC LINE 集合。",
+      "oneDriveLoginRequired": "請先在偏好設定登入 OneDrive。",
+      "oneDriveDesktopOnly": "OneDrive 連線目前只支援桌面版。",
+      "oneDriveImportFailed": "無法加入 OneDrive 資料夾。",
+      "refreshComplete": "同步資料夾已重新整理。",
+      "refreshFailed": "無法重新整理同步資料夾。",
+      "unsupportedFiles": "有 {{count}} 個檔案格式不支援，已保留但禁用。",
+      "unlink": "取消連結",
+      "unlinkTitle": "取消連結 {{name}}？",
+      "unlinkDescription": "這會從 LibrePresenter 移除同步來源並清除本機同步快取，不會變更原始本機或雲端檔案。",
+      "unlinked": "已取消同步資料夾連結。",
+      "unlinkFailed": "無法取消同步資料夾連結。"
+    },
+    "oneDriveFolderPicker": {
+      "title": "選擇 OneDrive 資料夾",
+      "back": "返回上一層",
+      "empty": "這裡沒有可加入的資料夾。",
+      "import": "加入資料夾",
+      "loadFailed": "無法載入 OneDrive 資料夾。"
+    },
+    "cloudFolderPicker": {
+      "title": "選擇 {{provider}} 資料夾",
+      "back": "返回上一層",
+      "empty": "這裡沒有可加入的資料夾。",
+      "import": "加入資料夾",
+      "loadFailed": "無法載入 {{provider}} 資料夾。"
+    }
+  },
+  "presentationWorkspace": {
+    "title": "簡報工作區",
+    "subtitle": "開啟並整理 PPTX 簡報",
+    "home": "常用",
+    "insert": "插入",
+    "design": "設計",
+    "ribbonGroups": {
+      "font": "字型",
+      "paragraph": "段落",
+      "position": "位置",
+      "arrange": "排列",
+      "insert": "插入",
+      "background": "背景",
+      "adjust": "調整",
+      "size": "大小"
+    },
+    "fontFamily": "字型",
+    "loadLocalFonts": "載入本機字型",
+    "localFontsLoadFailed": "無法載入本機字型，請確認已允許字型存取權限。",
+    "present": "投影",
+    "copyPage": "複製頁面",
+    "untitledName": "未命名簡報",
+    "text": "文字",
+    "image": "圖片",
+    "moveSlideUp": "上移",
+    "moveSlideDown": "下移",
+    "copyElement": "複製物件",
+    "pasteElement": "貼上",
+    "deleteElement": "刪除物件",
+    "slides": "投影片",
+    "newSlide": "新增投影片",
+    "formatBackground": "Format Background",
+    "solidFill": "Solid fill",
+    "gradientFill": "Gradient fill",
+    "fillColor": "顏色",
+    "gradientFrom": "起點",
+    "gradientTo": "終點",
+    "gradientType": "類型",
+    "gradientDirection": "方向",
+    "gradientAngle": "角度",
+    "gradientStops": "漸層停駐點",
+    "gradientStop": "漸層停駐點",
+    "positionPercent": "位置",
+    "transparency": "透明度",
+    "brightness": "亮度",
+    "gradientLeftRight": "由左至右",
+    "gradientTopBottom": "由上至下",
+    "gradientDiagonal": "對角線",
+    "applyToAll": "Apply to All",
+    "resetBackground": "Reset Background",
+    "inspector": "檢查器",
+    "fileName": "檔名",
+    "slideCount": "投影片數",
+    "dimensions": "尺寸",
+    "previousSlide": "上一張投影片",
+    "nextSlide": "下一張投影片",
+    "closeTab": "關閉分頁",
+    "loadFailed": "無法載入簡報",
+    "emptyTitle": "沒有開啟的簡報",
+    "emptyDescription": "從檔案開啟 PPTX，即可開始使用簡報工作區。",
+    "backToFiles": "返回檔案",
+    "undo": "復原",
+    "redo": "重做",
+    "saveStatus": {
+      "dirty": "尚未儲存",
+      "saving": "儲存中...",
+      "saved": "已儲存",
+      "error": "儲存失敗"
+    },
+    "previewWarning": "預覽需要修復",
+    "retrySave": "重試儲存",
+    "closeDecisionTitle": "簡報無法儲存",
+    "closeDecisionBody": "請重試儲存、繼續編輯，或不儲存最新變更直接關閉。",
+    "keepEditing": "繼續編輯",
+    "closeWithoutSaving": "不儲存並關閉",
+    "increaseFontSize": "放大字型",
+    "decreaseFontSize": "縮小字型",
+    "clearFormatting": "清除格式",
+    "bold": "粗體",
+    "italic": "斜體",
+    "underline": "底線",
+    "strikethrough": "刪除線",
+    "subscript": "下標",
+    "superscript": "上標",
+    "characterSpacing": "字元間距",
+    "changeCase": "變更大小寫",
+    "textHighlight": "文字醒目提示色彩",
+    "fontColor": "字型色彩",
+    "bullets": "項目符號",
+    "numbering": "編號",
+    "decreaseIndent": "減少縮排",
+    "increaseIndent": "增加縮排",
+    "lineSpacing": "行距",
+    "lineSpacingOptions": "行距選項",
+    "bringToFront": "移到最上層",
+    "bringForward": "上移一層",
+    "sendBackward": "下移一層",
+    "sendToBack": "移到最下層",
+    "align": {
+      "left": "靠左對齊",
+      "center": "置中",
+      "right": "靠右對齊",
+      "justify": "左右對齊"
+    },
+    "objectAlign": {
+      "left": "物件靠左對齊",
+      "center": "物件水平置中",
+      "right": "物件靠右對齊",
+      "top": "物件靠上對齊",
+      "middle": "物件垂直置中",
+      "bottom": "物件靠下對齊"
+    },
+    "distribute": {
+      "horizontal": "水平等距分散物件",
+      "vertical": "垂直等距分散物件"
     }
   },
   "projection": {
-    "showButton": "顯示投影",
-    "blankButton": "關閉投影",
-    "openButton": "開啟投影視窗",
-    "closeButton": "關閉投影視窗",
-    "closeTitle": "關閉投影",
-    "closeConfirm": "確定要關閉投影視窗嗎？",
+    "startButton": "開始投影",
+    "stopButton": "停止投影",
+    "closeTitle": "停止投影",
+    "closeConfirm": "要停止目前投影並關閉輸出視窗嗎？",
     "waiting": "等待內容...",
-    "openTitle": "開啟投影",
-    "openMessage": "開啟投影視窗以在第二螢幕上顯示內容。",
-    "open": "開啟"
+    "recovery": {
+      "recoveringTitle": "正在復原投影",
+      "recoveringDescription": "輸出視窗正在重新啟動，並還原最後投影的內容。",
+      "popupBlockedTitle": "投影彈出視窗遭到封鎖",
+      "popupBlockedDescription": "請允許此網站開啟彈出視窗，然後重試。",
+      "readyTimeoutTitle": "投影視窗未能就緒",
+      "readyTimeoutDescription": "請重試開啟輸出視窗。",
+      "rendererCrashTitle": "投影意外停止",
+      "rendererCrashDescription": "重複發生錯誤，自動復原已停止。",
+      "retry": "重試投影"
+    }
   },
   "common": {
     "cancel": "取消",
@@ -490,6 +723,11 @@
   },
   "userMenu": {
     "guest": "訪客",
+    "accountMenu": "{{name}}的帳號選單",
+    "loadingAccount": "正在載入帳號...",
+    "accountUnavailable": "帳號服務無法使用",
+    "signInFailed": "無法登入",
+    "signOutFailed": "無法登出",
     "login": "登入",
     "logout": "登出",
     "preferences": "偏好設定",
@@ -505,34 +743,138 @@
   },
   "about": {
     "title": "關於",
-    "description": "投影軟體。"
+    "description": "投影軟體。",
+    "tagline": "為教會與現場活動打造的開源投影軟體。",
+    "version": "版本",
+    "license": "授權",
+    "openSourceLicenses": "開源授權",
+    "viewLicenses": "查看授權",
+    "licensesIntro": "LibrePresenter 與內建影片元件使用的授權。",
+    "source": "來源",
+    "back": "返回"
   },
   "preferences": {
     "title": "偏好設定",
     "categories": {
       "general": "一般",
+      "timer": "計時器",
       "media": "多媒體",
-      "bible": "聖經"
+      "bible": "聖經",
+      "storage": "儲存空間",
+      "recovery": "修復中心"
+    },
+    "timer": {
+      "reminderModeLabel": "時間提醒計算方式",
+      "reminderModeSwitchLabel": "累加"
     },
     "language": "語言",
     "timezone": "時區",
     "darkMode": "深色模式",
     "hardwareAcceleration": "硬體加速",
     "hardwareAccelerationDesc": "需要重新啟動應用程式",
-    "resetToDefaults": "重設為預設值",
-    "resetBtn": "重設",
-    "resetToDefaultsConfirm": "將所有設定重設為預設值？",
-    "mediaPlaceholder": "媒體設定即將推出",
+    "projectionDisplay": {
+      "label": "投影視窗螢幕",
+      "noExternalDisplay": "沒有外接螢幕"
+    },
+    "reset": {
+      "title": "重設",
+      "settingsDesc": "清除偏好設定並恢復預設值，保留多媒體、聖經資料與使用者檔案。",
+      "settingsButton": "重設設定",
+      "settingsConfirm": "將 App 設定重設為預設值並保留使用者資料？",
+      "allDataDesc": "清除所有設定、使用者資料、媒體快取與本機資料。此操作無法復原。",
+      "allDataButton": "清除所有資料",
+      "allDataConfirm": "清除所有設定、使用者資料、媒體快取與本機資料？此操作無法復原。"
+    },
     "trash": {
       "retentionLabel": "垃圾桶保留期限",
       "retentionDesc": "垃圾桶中的項目將在此期限後永久刪除",
       "days": {
+        "0": "永久",
         "7": "7 天",
         "14": "14 天",
         "30": "30 天",
         "60": "60 天",
-        "90": "90 天",
-        "0": "永久"
+        "90": "90 天"
+      }
+    },
+    "media": {
+      "sections": {
+        "general": "一般",
+        "oneDrive": "OneDrive",
+        "lanRemote": "LAN 遙控"
+      },
+      "defaultOfflinePolicy": "離線策略",
+      "offlinePolicies": {
+        "online-only": "僅線上",
+        "on-demand": "需要時下載",
+        "always-offline": "永遠離線可用"
+      },
+      "oneDrive": {
+        "title": "OneDrive",
+        "description": "OneDrive 資料夾是唯讀來源。LibrePresenter 不會上傳、重新命名、移動或刪除遠端檔案。",
+        "connectedAccount": "已連結帳號",
+        "noConnectedAccount": "尚未連結 OneDrive 帳號。",
+        "connect": "登入",
+        "connecting": "登入中",
+        "connected": "已連結 OneDrive。",
+        "alreadyConnected": "只能連結一個 OneDrive 帳號。",
+        "desktopOnly": "OneDrive 連線目前只支援桌面版。",
+        "connectFailed": "無法連接 OneDrive。",
+        "disconnect": "登出",
+        "disconnectTitle": "登出 OneDrive？",
+        "disconnectDescription": "這會從 LibrePresenter 移除 OneDrive 來源並清除本機同步快取，不會變更遠端檔案。",
+        "disconnected": "已登出 OneDrive。",
+        "disconnectFailed": "無法登出 OneDrive。"
+      },
+      "lanRemote": {
+        "enable": "啟用 LAN 遙控",
+        "privateInterface": "私人網路介面位址",
+        "running": "遙控已啟動於 {{host}}:{{port}}",
+        "disabled": "LAN 遙控已停用",
+        "hostRequired": "啟用 LAN 遙控前，請先選擇私人網路位址。",
+        "createPairing": "建立配對連結",
+        "pairingUrl": "配對連結",
+        "pairingFailed": "無法建立配對連結。",
+        "updateFailed": "無法更新 LAN 遙控。"
+      }
+    },
+    "storage": {
+      "sections": {
+        "usage": "使用量",
+        "cleanup": "快取清理"
+      },
+      "refresh": "重新整理",
+      "total": "總計",
+      "browserEstimate": "瀏覽器儲存空間：已使用 {{usage}} / {{quota}}。持久化儲存：{{persisted}}。",
+      "persistedYes": "已啟用",
+      "persistedNo": "未啟用",
+      "usage": {
+        "title": "使用量",
+        "sourceMedia": "原始媒體檔案",
+        "coversAndPreviews": "封面與預覽圖",
+        "pdfPreviews": "PDF 頁面預覽",
+        "offlineSyncFiles": "同步離線檔案",
+        "temporaryFiles": "暫存與失敗工作檔案"
+      },
+      "cleanup": {
+        "title": "快取清理",
+        "actions": {
+          "removeOrphans": {
+            "title": "清除孤立衍生資產",
+            "description": "清除已經沒有對應原始檔案或引用關係的封面、PDF 預覽與影片封面。不會刪除原始媒體檔案。",
+            "button": "清除"
+          },
+          "clearRegenerable": {
+            "title": "清除可重新產生的資產",
+            "description": "清除可由原始檔重新建立的封面、PDF 頁面預覽與影片封面。下次使用時會重新產生，不會刪除原始媒體檔案。",
+            "button": "清除"
+          },
+          "clearSyncCache": {
+            "title": "清除未釘選同步快取",
+            "description": "清除沒有設定為永遠離線可用的同步暫存檔。遠端檔案不會被刪除，下次需要時會重新下載。",
+            "button": "清除"
+          }
+        }
       }
     },
     "languageNames": {
@@ -568,6 +910,48 @@
       "speechEnabled": "開啟語音辨識"
     }
   },
+  "recovery": {
+    "empty": "目前沒有需要修復的問題",
+    "dismiss": "忽略",
+    "filters": {
+      "all": "全部",
+      "media": "媒體",
+      "sync": "同步",
+      "storage": "儲存空間"
+    },
+    "actions": {
+      "retryJob": "重試",
+      "cancelJob": "取消工作",
+      "retrySyncDownload": "重試下載",
+      "runIntegrityRepair": "執行修復掃描",
+      "retryResourceCleanup": "重試清理",
+      "exportDiagnostics": "匯出診斷"
+    },
+    "cancelJobConfirmTitle": "取消背景工作？",
+    "cancelJobConfirmDescription": "確定要取消這個背景工作嗎？目前進度將會捨棄。",
+    "issues": {
+      "jobFailed": {
+        "title": "媒體工作需要處理",
+        "detail": "背景媒體工作失敗或被阻擋。"
+      },
+      "storageIntegrity": {
+        "title": "儲存完整性問題",
+        "detail": "媒體儲存有缺失或孤立記錄。"
+      },
+      "resourceCleanupFailed": {
+        "title": "媒體清理需要處理",
+        "detail": "已刪除的媒體資源尚未完整清除，可以安全地重新嘗試。"
+      },
+      "syncDownload": {
+        "title": "同步下載失敗",
+        "detail": "同步項目無法快取到本機。"
+      },
+      "syncAuth": {
+        "title": "同步帳號需要處理",
+        "detail": "需要重新連結雲端帳號才能繼續同步。"
+      }
+    }
+  },
   "error": {
     "somethingWentWrong": "發生錯誤",
     "tryAgain": "重試",
@@ -585,6 +969,7 @@
   },
   "toast": {
     "storageSaveFailed": "儲存設定失敗",
+    "syncStorageLimitReached": "同步已停止：儲存空間已達 80% 上限。",
     "projectionOpenFailed": "開啟投影視窗失敗",
     "projectionCloseFailed": "關閉投影視窗失敗",
     "settingsReset": "設定已重設為預設值",
@@ -613,9 +998,14 @@
   "shortcuts": {
     "title": "鍵盤快速鍵",
     "sections": {
+      "projection": "投影",
       "bible": "聖經",
       "timer": "計時器",
+      "media": "多媒體",
       "edit": "編輯"
+    },
+    "projection": {
+      "start": "開始投影"
     },
     "bible": {
       "prev_verse": "上一節",
@@ -630,6 +1020,26 @@
     "timer": {
       "toggle": "開始 / 停止",
       "reset": "重設"
+    },
+    "media": {
+      "escape": "關閉投影",
+      "next_slide": "下一個項目",
+      "prev_slide": "上一個項目",
+      "next_slide_alt": "下一個項目 (替代)",
+      "prev_slide_alt": "上一個項目 (替代)",
+      "first_slide": "第一個項目",
+      "last_slide": "最後一個項目",
+      "toggle_grid": "切換格狀檢視",
+      "toggle_zoom": "切換縮放",
+      "zoom_in": "放大",
+      "zoom_out": "縮小",
+      "video_toggle_play": "播放 / 暫停影片",
+      "video_seek_forward": "影片前進 5 秒",
+      "video_seek_backward": "影片後退 5 秒",
+      "pdf_next_page": "PDF 下一頁",
+      "pdf_prev_page": "PDF 上一頁",
+      "pdf_toggle_view_mode": "切換 PDF 檢視模式",
+      "start_from_current": "從目前項目開始投影"
     },
     "edit": {
       "copy": "複製",
@@ -652,6 +1062,39 @@
       "description": "已刪除的檔案與資料夾會顯示在這裡"
     },
     "permanentDeleteTitle": "永久刪除？",
-    "permanentDeleteDescription": "此操作無法復原。"
+    "permanentDeleteDescription": "此操作無法復原。",
+    "emptyTrash": "清空垃圾桶",
+    "restoreNameConflictTitle": "還原前重新命名",
+    "restoreNameConflictDescription": "還原位置已經有相同名稱的項目。",
+    "restoreNameLabel": "名稱"
+  },
+  "mediaPreview": {
+    "close": "關閉預覽",
+    "zoomOut": "縮小",
+    "zoomIn": "放大",
+    "present": "投影",
+    "preparing": "準備中…",
+    "errors": {
+      "not-presentable": "此項目無法在這台裝置上投影。",
+      "not-ready": "此項目尚未準備完成。",
+      "missing-source": "找不到原始媒體檔案。"
+    }
+  },
+  "presenter": {
+    "noMediaSelected": "未選擇媒體",
+    "grid": "格狀",
+    "zoom": "縮放",
+    "next": "下一張",
+    "prev": "上一張",
+    "slideInfo": "第 {{current}} 張投影片（共 {{total}} 張）",
+    "endOfSlides": "投影結束",
+    "retry": "重試",
+    "noPreview": "無預覽",
+    "notes": "備註",
+    "notesPlaceholder": "新增備註...",
+    "loading": "載入中...",
+    "imageLoadFailed": "無法載入圖片",
+    "videoLoadFailed": "無法載入影片",
+    "pdfLoadFailed": "無法載入 PDF"
   }
 }

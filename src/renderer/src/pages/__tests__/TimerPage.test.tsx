@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
@@ -7,16 +7,32 @@ import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import TimerPage from '../TimerPage'
 
+const projectionRecoveryMock = {
+  recovery: { status: 'closed' as const, generation: 0, failure: null },
+  vlcFailure: null,
+  retryProjection: vi.fn(),
+  sessionSummary: {
+    owner: null,
+    status: 'closed' as const,
+    label: null,
+    isBlackout: false,
+    failure: null
+  },
+  blackoutProjection: vi.fn(() => Promise.resolve()),
+  getProjectionSnapshot: vi.fn(() => null)
+}
+
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: vi.fn(() => ({
     isProjectionOpen: false,
-    isProjectionBlanked: true,
     projectionReadyCount: 0,
     activeOwner: 'timer',
+    ...projectionRecoveryMock,
     claimProjection: vi.fn(),
-    openProjection: vi.fn(),
+    startProjection: vi.fn(),
+    stopProjection: vi.fn(),
+    bringProjectionToFront: vi.fn(),
     closeProjection: vi.fn(),
-    blankProjection: vi.fn(),
     project: vi.fn(),
     send: vi.fn(),
     on: vi.fn()
@@ -189,13 +205,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
-      openProjection: vi.fn(),
+      startProjection: vi.fn(),
+      stopProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -206,13 +223,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
-      openProjection: vi.fn(),
+      startProjection: vi.fn(),
+      stopProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -232,13 +250,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
-      openProjection: vi.fn(),
+      startProjection: vi.fn(),
+      stopProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -249,13 +268,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
-      openProjection: vi.fn(),
+      startProjection: vi.fn(),
+      stopProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -275,13 +295,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
-      openProjection: vi.fn(),
+      startProjection: vi.fn(),
+      stopProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -291,5 +312,69 @@ describe('TimerPage — projection ownership', () => {
     renderTimerPage()
 
     expect(mockClaimProjection).not.toHaveBeenCalled()
+  })
+})
+
+describe('TimerPage — Space projection action', () => {
+  function mockProjectionForShortcut(): ReturnType<typeof vi.fn> {
+    const startProjection = vi.fn(() => Promise.resolve({ ok: true as const, generation: 1 }))
+    vi.mocked(useProjection).mockReturnValue({
+      isProjectionOpen: true,
+      projectionReadyCount: 1,
+      activeOwner: 'timer',
+      ...projectionRecoveryMock,
+      claimProjection: vi.fn(),
+      startProjection,
+      stopProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
+      closeProjection: vi.fn(),
+      project: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+    return startProjection
+  }
+
+  it('starts projection and timer when Space is pressed from stopped', () => {
+    const startProjection = mockProjectionForShortcut()
+    useTimerStore.setState({ status: 'stopped' })
+    renderTimerPage()
+
+    fireEvent.keyDown(document.body, { code: 'Space' })
+
+    expect(startProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.any(Object)]])
+    )
+    expect(useTimerStore.getState().status).toBe('running')
+  })
+
+  it('starts projection and resumes timer when Space is pressed from paused', () => {
+    const startProjection = mockProjectionForShortcut()
+    useTimerStore.setState({ status: 'paused', remainingSeconds: 30 })
+    renderTimerPage()
+
+    fireEvent.keyDown(document.body, { code: 'Space' })
+
+    expect(startProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.any(Object)]])
+    )
+    expect(useTimerStore.getState().status).toBe('running')
+  })
+
+  it('pauses without foregrounding when Space is pressed while running', () => {
+    const startProjection = mockProjectionForShortcut()
+    useTimerStore.setState({
+      status: 'running',
+      targetEndTime: Date.now() + 30_000,
+      remainingSeconds: 30
+    })
+    renderTimerPage()
+
+    fireEvent.keyDown(document.body, { code: 'Space' })
+
+    expect(startProjection).not.toHaveBeenCalled()
+    expect(useTimerStore.getState().status).toBe('paused')
   })
 })

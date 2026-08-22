@@ -1,7 +1,19 @@
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import type { FolderRecord, FolderItem } from '@shared/types/folder'
-import { Copy, Scissors, Clipboard, Trash2, FolderPlus, Pencil, Upload, Folder } from 'lucide-react'
+import {
+  Copy,
+  Scissors,
+  Clipboard,
+  Trash2,
+  FolderPlus,
+  Pencil,
+  Upload,
+  Folder,
+  FolderSync,
+  Cloud,
+  Presentation
+} from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -28,6 +40,8 @@ export interface ShowItemMenuOptions {
   onCut: (targetIds: Set<string>) => void
   onDelete: (targetIds: Set<string>) => void
   onEdit?: (item: FolderItem) => void
+  isReadOnly?: boolean
+  extraActions?: ContextMenuEntry[]
 }
 
 export interface ShowFolderMenuOptions {
@@ -41,6 +55,8 @@ export interface ShowFolderMenuOptions {
   onPaste: () => void
   onDelete: (targetIds: Set<string>) => void
   onEdit?: (folder: FolderRecord) => void
+  isReadOnly?: boolean
+  extraActions?: ContextMenuEntry[]
 }
 
 export interface ShowMultiSelectMenuOptions {
@@ -49,6 +65,7 @@ export interface ShowMultiSelectMenuOptions {
   onCopy: (targetIds: Set<string>) => void
   onCut: (targetIds: Set<string>) => void
   onDelete: (targetIds: Set<string>) => void
+  isReadOnly?: boolean
 }
 
 export interface ShowEmptyAreaMenuOptions {
@@ -58,6 +75,12 @@ export interface ShowEmptyAreaMenuOptions {
   onNewFolder: () => void
   onUploadFiles?: () => void
   onUploadFolder?: () => void
+  onCreatePresentation?: () => void
+  onAddLocalSyncFolder?: () => void
+  onAddOneDrive?: () => void
+  onAddHhcLine?: () => void
+  isAddOneDriveDisabled?: boolean
+  isReadOnly?: boolean
 }
 
 export interface UseFolderContextMenu {
@@ -87,24 +110,27 @@ export function createFolderContextMenu(
       onCopy,
       onCut,
       onDelete,
-      onEdit
+      onEdit,
+      isReadOnly = false,
+      extraActions = []
     }: ShowItemMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([item.id]))
       }
 
       const targetIds = new Set([item.id])
-      const editItems: ContextMenuEntry[] = onEdit
-        ? [
-            {
-              id: 'edit',
-              label: tKey('edit'),
-              icon: React.createElement(Pencil, { size: 14 }),
-              onAction: () => onEdit(item)
-            },
-            'separator'
-          ]
-        : []
+      const editItems: ContextMenuEntry[] = []
+      if (onEdit && !isReadOnly) {
+        editItems.push({
+          id: 'rename',
+          label: tKey('rename'),
+          icon: React.createElement(Pencil, { size: 14 }),
+          onAction: () => onEdit(item)
+        })
+      }
+      if (editItems.length > 0) {
+        editItems.push('separator')
+      }
       const baseItems: ContextMenuEntry[] = [
         ...editItems,
         {
@@ -113,24 +139,28 @@ export function createFolderContextMenu(
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(targetIds)
         },
-        {
-          id: 'cut',
-          label: tKey('cut'),
-          icon: React.createElement(Scissors, { size: 14 }),
-          onAction: () => onCut(targetIds)
-        },
-        'separator',
-        {
-          id: 'delete',
-          label: tKey('delete'),
-          icon: React.createElement(Trash2, { size: 14 }),
-          variant: 'danger',
-          onAction: () => onDelete(targetIds)
-        }
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'cut',
+                label: tKey('cut'),
+                icon: React.createElement(Scissors, { size: 14 }),
+                onAction: () => onCut(targetIds)
+              },
+              'separator' as const,
+              {
+                id: 'delete',
+                label: tKey('delete'),
+                icon: React.createElement(Trash2, { size: 14 }),
+                variant: 'danger' as const,
+                onAction: () => onDelete(targetIds)
+              }
+            ])
       ]
 
       const extra = config?.extraItemActions?.(item.id, t as (key: string) => string) ?? []
-      showMenu([...baseItems, ...extra], event)
+      showMenu([...baseItems, ...extra, ...extraActions], event)
     }
 
     const showFolderMenu = ({
@@ -143,35 +173,39 @@ export function createFolderContextMenu(
       onCut,
       onPaste,
       onDelete,
-      onEdit
+      onEdit,
+      isReadOnly = false,
+      extraActions = []
     }: ShowFolderMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([folder.id]))
       }
 
       const targetIds = new Set([folder.id])
-      const pasteItems: ContextMenuEntry[] = clipboard
-        ? [
-            {
-              id: 'paste',
-              label: tKey('paste'),
-              icon: React.createElement(Clipboard, { size: 14 }),
-              onAction: onPaste
-            }
-          ]
-        : []
+      const pasteItems: ContextMenuEntry[] =
+        clipboard && !isReadOnly
+          ? [
+              {
+                id: 'paste',
+                label: tKey('paste'),
+                icon: React.createElement(Clipboard, { size: 14 }),
+                onAction: onPaste
+              }
+            ]
+          : []
 
-      const editItems: ContextMenuEntry[] = onEdit
-        ? [
-            {
-              id: 'edit',
-              label: tKey('edit'),
-              icon: React.createElement(Pencil, { size: 14 }),
-              onAction: () => onEdit(folder)
-            },
-            'separator'
-          ]
-        : []
+      const editItems: ContextMenuEntry[] =
+        onEdit && !isReadOnly
+          ? [
+              {
+                id: 'edit',
+                label: tKey('edit'),
+                icon: React.createElement(Pencil, { size: 14 }),
+                onAction: () => onEdit(folder)
+              },
+              'separator'
+            ]
+          : []
 
       const baseItems: ContextMenuEntry[] = [
         ...editItems,
@@ -181,25 +215,33 @@ export function createFolderContextMenu(
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(targetIds)
         },
-        {
-          id: 'cut',
-          label: tKey('cut'),
-          icon: React.createElement(Scissors, { size: 14 }),
-          onAction: () => onCut(targetIds)
-        },
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'cut',
+                label: tKey('cut'),
+                icon: React.createElement(Scissors, { size: 14 }),
+                onAction: () => onCut(targetIds)
+              }
+            ]),
         ...pasteItems,
-        'separator',
-        {
-          id: 'delete',
-          label: tKey('delete'),
-          icon: React.createElement(Trash2, { size: 14 }),
-          variant: 'danger',
-          onAction: () => onDelete(targetIds)
-        }
+        ...(isReadOnly
+          ? []
+          : [
+              'separator' as const,
+              {
+                id: 'delete',
+                label: tKey('delete'),
+                icon: React.createElement(Trash2, { size: 14 }),
+                variant: 'danger' as const,
+                onAction: () => onDelete(targetIds)
+              }
+            ])
       ]
 
       const extra = config?.extraFolderActions?.(folder, t as (key: string) => string) ?? []
-      showMenu([...baseItems, ...extra], event)
+      showMenu([...baseItems, ...extra, ...extraActions], event)
     }
 
     const showMultiSelectMenu = ({
@@ -207,7 +249,8 @@ export function createFolderContextMenu(
       event,
       onCopy,
       onCut,
-      onDelete
+      onDelete,
+      isReadOnly = false
     }: ShowMultiSelectMenuOptions): void => {
       const items: ContextMenuEntry[] = [
         {
@@ -216,20 +259,24 @@ export function createFolderContextMenu(
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(selectedIds)
         },
-        {
-          id: 'cut',
-          label: tKey('cut'),
-          icon: React.createElement(Scissors, { size: 14 }),
-          onAction: () => onCut(selectedIds)
-        },
-        'separator',
-        {
-          id: 'delete',
-          label: tKey('delete'),
-          icon: React.createElement(Trash2, { size: 14 }),
-          variant: 'danger',
-          onAction: () => onDelete(selectedIds)
-        }
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'cut',
+                label: tKey('cut'),
+                icon: React.createElement(Scissors, { size: 14 }),
+                onAction: () => onCut(selectedIds)
+              },
+              'separator' as const,
+              {
+                id: 'delete',
+                label: tKey('delete'),
+                icon: React.createElement(Trash2, { size: 14 }),
+                variant: 'danger' as const,
+                onAction: () => onDelete(selectedIds)
+              }
+            ])
       ]
 
       showMenu(items, event)
@@ -241,24 +288,41 @@ export function createFolderContextMenu(
       onPaste,
       onNewFolder,
       onUploadFiles,
-      onUploadFolder
+      onUploadFolder,
+      onCreatePresentation,
+      onAddLocalSyncFolder,
+      onAddOneDrive,
+      onAddHhcLine,
+      isAddOneDriveDisabled = false,
+      isReadOnly = false
     }: ShowEmptyAreaMenuOptions): void => {
-      const pasteItems: ContextMenuEntry[] = clipboard
-        ? [
-            {
-              id: 'paste',
-              label: tKey('paste'),
-              icon: React.createElement(Clipboard, { size: 14 }),
-              onAction: onPaste
-            },
-            'separator'
-          ]
-        : []
+      const pasteItems: ContextMenuEntry[] =
+        clipboard && !isReadOnly
+          ? [
+              {
+                id: 'paste',
+                label: tKey('paste'),
+                icon: React.createElement(Clipboard, { size: 14 }),
+                onAction: onPaste
+              },
+              'separator'
+            ]
+          : []
 
       const uploadItems: ContextMenuEntry[] =
-        onUploadFiles || onUploadFolder
+        !isReadOnly && (onUploadFiles || onUploadFolder || onCreatePresentation)
           ? [
               'separator',
+              ...(onCreatePresentation
+                ? [
+                    {
+                      id: 'create-presentation',
+                      label: tKey('createPresentation'),
+                      icon: React.createElement(Presentation, { size: 14 }),
+                      onAction: onCreatePresentation
+                    } as ContextMenuEntry
+                  ]
+                : []),
               ...(onUploadFiles
                 ? [
                     {
@@ -284,17 +348,59 @@ export function createFolderContextMenu(
 
       const baseItems: ContextMenuEntry[] = [
         ...pasteItems,
-        {
-          id: 'new-folder',
-          label: tKey('newFolder'),
-          icon: React.createElement(FolderPlus, { size: 14 }),
-          onAction: onNewFolder
-        },
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'new-folder',
+                label: tKey('newFolder'),
+                icon: React.createElement(FolderPlus, { size: 14 }),
+                onAction: onNewFolder
+              }
+            ]),
         ...uploadItems
       ]
 
+      const sourceItems: ContextMenuEntry[] =
+        onAddLocalSyncFolder || onAddOneDrive || onAddHhcLine
+          ? [
+              ...(baseItems.length > 0 ? (['separator'] as ContextMenuEntry[]) : []),
+              ...(onAddLocalSyncFolder
+                ? [
+                    {
+                      id: 'add-local-sync-folder',
+                      label: tKey('addLocalSyncFolder'),
+                      icon: React.createElement(FolderSync, { size: 14 }),
+                      onAction: onAddLocalSyncFolder
+                    } as ContextMenuEntry
+                  ]
+                : []),
+              ...(onAddOneDrive
+                ? [
+                    {
+                      id: 'add-onedrive',
+                      label: tKey('addOneDrive'),
+                      icon: React.createElement(Cloud, { size: 14 }),
+                      disabled: isAddOneDriveDisabled,
+                      onAction: onAddOneDrive
+                    } as ContextMenuEntry
+                  ]
+                : []),
+              ...(onAddHhcLine
+                ? [
+                    {
+                      id: 'add-hhc-line',
+                      label: tKey('addHhcLine'),
+                      icon: React.createElement(Cloud, { size: 14 }),
+                      onAction: onAddHhcLine
+                    } as ContextMenuEntry
+                  ]
+                : [])
+            ]
+          : []
+
       const extra = config?.extraEmptyAreaActions?.() ?? []
-      showMenu([...baseItems, ...extra], event)
+      showMenu([...baseItems, ...sourceItems, ...extra], event)
     }
 
     return { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu }

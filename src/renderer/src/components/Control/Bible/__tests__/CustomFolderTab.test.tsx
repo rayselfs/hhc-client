@@ -43,6 +43,12 @@ const folderSingleton = {
   loadedParents: new Set<string>(['bible-root']),
   currentFolderId: 'bible-root',
   isLoading: false,
+  isInitialized: true,
+  persistenceStatus: 'ready' as const,
+  persistenceError: null,
+  pendingPersistenceCount: 0,
+  retryInitialization: vi.fn().mockResolvedValue(undefined),
+  retryPersistence: vi.fn().mockResolvedValue(undefined),
   addFolder: mockAddFolder,
   deleteFolder: mockDeleteFolder,
   removeItem: mockRemoveItem,
@@ -112,18 +118,21 @@ vi.mock('@renderer/config/shortcuts', () => ({
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     isProjectionOpen: false,
-    isProjectionBlanked: false,
     projectionReadyCount: 0,
     activeOwner: 'timer',
     claimProjection: vi.fn(),
+    startProjection: vi.fn(() => Promise.resolve()),
+    stopProjection: vi.fn(),
     releaseOwnership: vi.fn(),
     project: vi.fn(),
-    openProjection: vi.fn(),
     closeProjection: vi.fn(),
-    blankProjection: vi.fn(),
     send: vi.fn(),
     on: vi.fn()
   })
+}))
+
+vi.mock('@renderer/lib/projection-actions', () => ({
+  startBibleProjection: vi.fn((payloads, deps) => deps.startProjection('bible', payloads))
 }))
 
 vi.mock('@renderer/contexts/ContextMenuContext', () => ({
@@ -213,16 +222,26 @@ vi.mock('@heroui/react/button', () => ({
     children,
     onPress,
     disabled,
+    isDisabled,
+    isIconOnly: _isIconOnly,
     'aria-label': ariaLabel,
     ...rest
   }: {
     children: React.ReactNode
     onPress?: () => void
     disabled?: boolean
+    isDisabled?: boolean
+    isIconOnly?: boolean
     'aria-label'?: string
     [key: string]: unknown
   }) => (
-    <button type="button" onClick={onPress} disabled={disabled} aria-label={ariaLabel} {...rest}>
+    <button
+      type="button"
+      onClick={onPress}
+      disabled={disabled ?? isDisabled}
+      aria-label={ariaLabel}
+      {...rest}
+    >
       {children}
     </button>
   )

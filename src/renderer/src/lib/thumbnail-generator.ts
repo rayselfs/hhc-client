@@ -1,11 +1,26 @@
+import { loadPdfjsLib } from './pdfjs-loader'
+import { generatePptxFirstSlideThumbnail } from './pptx-renderer-service'
+
+declare const scheduler: { yield?: () => Promise<void> } | undefined
+
 const THUMBNAIL_MAX_SIZE = 256
 const JPEG_QUALITY = 0.8
+const MAX_PDF_THUMBNAIL_SIZE = 50 * 1024 * 1024
+
+const yieldToMain = (): Promise<void> =>
+  typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function'
+    ? scheduler.yield()
+    : new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 function createCanvas(width = THUMBNAIL_MAX_SIZE, height = THUMBNAIL_MAX_SIZE): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   return canvas
+}
+
+function isCanvasSecurityError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'SecurityError'
 }
 
 function drawContainFit(
@@ -16,24 +31,22 @@ function drawContainFit(
 ): string | null {
   if (sourceWidth <= 0 || sourceHeight <= 0) return null
 
-  const canvas = createCanvas()
+  const scale = Math.min(THUMBNAIL_MAX_SIZE / sourceWidth, THUMBNAIL_MAX_SIZE / sourceHeight)
+  const canvasWidth = Math.round(sourceWidth * scale)
+  const canvasHeight = Math.round(sourceHeight * scale)
+
+  const canvas = createCanvas(canvasWidth, canvasHeight)
   const context = canvas.getContext('2d')
   if (!context) return null
 
   if (background) {
     context.fillStyle = background
-    context.fillRect(0, 0, THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE)
+    context.fillRect(0, 0, canvasWidth, canvasHeight)
   } else {
-    context.clearRect(0, 0, THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE)
+    context.clearRect(0, 0, canvasWidth, canvasHeight)
   }
 
-  const scale = Math.min(THUMBNAIL_MAX_SIZE / sourceWidth, THUMBNAIL_MAX_SIZE / sourceHeight)
-  const width = Math.round(sourceWidth * scale)
-  const height = Math.round(sourceHeight * scale)
-  const x = Math.round((THUMBNAIL_MAX_SIZE - width) / 2)
-  const y = Math.round((THUMBNAIL_MAX_SIZE - height) / 2)
-
-  context.drawImage(source, x, y, width, height)
+  context.drawImage(source, 0, 0, canvasWidth, canvasHeight)
 
   return canvas.toDataURL('image/jpeg', JPEG_QUALITY)
 }
@@ -57,7 +70,9 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 
 async function generateImageThumbnail(file: File): Promise<string | null> {
   const image = await loadImage(file)
-  return drawContainFit(image, image.naturalWidth, image.naturalHeight)
+  const dataUrl = drawContainFit(image, image.naturalWidth, image.naturalHeight)
+  await yieldToMain()
+  return dataUrl
 }
 
 function waitForVideoEvent(video: HTMLVideoElement, eventName: string): Promise<void> {
@@ -96,7 +111,9 @@ async function generateVideoThumbnail(file: File): Promise<string | null> {
     video.currentTime = targetTime
     await waitForVideoEvent(video, 'seeked')
 
-    return drawContainFit(video, video.videoWidth, video.videoHeight)
+    const dataUrl = drawContainFit(video, video.videoWidth, video.videoHeight)
+    await yieldToMain()
+    return dataUrl
   } finally {
     video.removeAttribute('src')
     video.load()
@@ -105,24 +122,9 @@ async function generateVideoThumbnail(file: File): Promise<string | null> {
 }
 
 async function generatePdfThumbnail(file: File): Promise<string | null> {
-  // pdfjs-dist ≥ 5.7 calls Map.prototype.getOrInsertComputed which is a TC39 Stage 2 proposal
-  // not yet available in browsers or Electron — polyfill it before importing the library.
-  if (!('getOrInsertComputed' in Map.prototype)) {
-    Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
-      value<K, V>(this: Map<K, V>, key: K, factory: (key: K) => V): V {
-        if (!this.has(key)) this.set(key, factory(key))
-        return this.get(key)!
-      },
-      configurable: true,
-      writable: true
-    })
-  }
+  if (file.size > MAX_PDF_THUMBNAIL_SIZE) return null
 
-  const pdfjsLib = await import('pdfjs-dist')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.mjs',
-    import.meta.url
-  ).href
+  const pdfjsLib = await loadPdfjsLib()
 
   const buffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
@@ -150,14 +152,72 @@ async function generatePdfThumbnail(file: File): Promise<string | null> {
   }
 }
 
-export async function generateThumbnail(file: File): Promise<string | null> {
+export async function generateThumbnail(
+  file: File,
+  canonicalMimeType = file.type
+): Promise<string | null> {
   try {
-    if (file.type.startsWith('image/')) return await generateImageThumbnail(file)
-    if (file.type.startsWith('video/')) return await generateVideoThumbnail(file)
-    if (file.type === 'application/pdf') return await generatePdfThumbnail(file)
+    if (canonicalMimeType.startsWith('image/')) return await generateImageThumbnail(file)
+    if (canonicalMimeType.startsWith('video/')) return await generateVideoThumbnail(file)
+    if (canonicalMimeType === 'application/pdf') return await generatePdfThumbnail(file)
+    if (
+      canonicalMimeType ===
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ) {
+      return await generatePptxFirstSlideThumbnail(file)
+    }
     return null
   } catch (error) {
+    if (isCanvasSecurityError(error)) return null
     console.error('Failed to generate thumbnail', error)
     return null
+  }
+}
+
+export async function generateAllPdfPageThumbnails(
+  file: File,
+  options: { signal?: AbortSignal; throwOnError?: boolean } = {}
+): Promise<string[]> {
+  if (file.size > MAX_PDF_THUMBNAIL_SIZE) return []
+
+  try {
+    const pdfjsLib = await loadPdfjsLib()
+    const buffer = await file.arrayBuffer()
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
+
+    const dataUrls: string[] = []
+    try {
+      for (let i = 1; i <= pdf.numPages; i++) {
+        options.signal?.throwIfAborted()
+        const page = await pdf.getPage(i)
+        const viewport = page.getViewport({ scale: 1 })
+        const scale = Math.min(
+          THUMBNAIL_MAX_SIZE / viewport.width,
+          THUMBNAIL_MAX_SIZE / viewport.height
+        )
+        const renderViewport = page.getViewport({ scale })
+        const canvas = createCanvas(
+          Math.ceil(renderViewport.width),
+          Math.ceil(renderViewport.height)
+        )
+        const context = canvas.getContext('2d')
+        if (context) {
+          context.fillStyle = '#ffffff'
+          context.fillRect(0, 0, canvas.width, canvas.height)
+          await page.render({ canvas, canvasContext: context, viewport: renderViewport }).promise
+          const dataUrl = drawContainFit(canvas, canvas.width, canvas.height, '#ffffff')
+          if (dataUrl) dataUrls.push(dataUrl)
+        }
+        await yieldToMain()
+      }
+    } finally {
+      await pdf.destroy()
+    }
+
+    return dataUrls
+  } catch (error) {
+    if (options.throwOnError) throw error
+    console.error('Failed to generate PDF page thumbnails', error)
+    return []
   }
 }

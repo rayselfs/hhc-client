@@ -1,5 +1,9 @@
-appId: tw.org.alive.client
-productName: HHC Client
+appId: org.librepresenter.app
+productName: LibrePresenter
+protocols:
+  name: LibrePresenter
+  schemes:
+    - librepresenter
 directories:
   buildResources: build
 files:
@@ -11,14 +15,26 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: resources/video-engine
+    to: video-engine
+    filter:
+      - '**/*'
+  - from: resources/licenses
+    to: licenses
+    filter:
+      - '**/*'
+afterPack: ./scripts/after-pack.mjs
 win:
-  executableName: hhc-client
+  executableName: libre-presenter
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  identity: null
+  hardenedRuntime: false
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
@@ -41,4 +57,4 @@ npmRebuild: false
 publish:
   provider: github
   owner: rayselfs
-  repo: hhc-client
+  repo: libre-presenter

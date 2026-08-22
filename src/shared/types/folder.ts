@@ -1,3 +1,14 @@
+export type SyncProviderType = 'local-fs' | 'onedrive' | 'hhc-line'
+export type SyncOfflinePolicy = 'online-only' | 'on-demand' | 'always-offline'
+
+export interface FolderSyncLink {
+  providerConnectionId: string
+  remoteFolderId: string
+  providerType: SyncProviderType
+  offlinePolicy?: SyncOfflinePolicy
+  status?: 'active' | 'access-revoked'
+}
+
 export interface FolderRecord {
   id: string
   name: string
@@ -8,6 +19,7 @@ export interface FolderRecord {
   isFavorited?: boolean
   deletedAt?: number
   originalParentId?: string
+  syncLink?: FolderSyncLink
 }
 
 export interface ItemRecord {
@@ -36,6 +48,7 @@ export interface FileItemRecord extends ItemRecord {
   url: string
   size: number
   mimeType: string
+  notes?: string
 }
 
 export type AnyItemRecord = VerseItemRecord | FileItemRecord

@@ -6,6 +6,10 @@ export function isBibleRoute(pathname: string): boolean {
   return pathname === '/bible'
 }
 
+export function isServiceRoute(pathname: string): boolean {
+  return pathname === '/service'
+}
+
 export function isFilesRoute(pathname: string): boolean {
   return pathname === '/files'
 }

@@ -1,14 +1,50 @@
 import { renderHook, act, fireEvent, screen } from '@testing-library/react'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 import React, { useState } from 'react'
 import {
+  matchesConfig,
   useKeyboardShortcuts,
   type ShortcutHandler,
   type ShortcutConfig
 } from '../useKeyboardShortcuts'
 import { ShortcutScopeProvider, ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
+
+let mockIsMac = false
+
+vi.mock('@renderer/lib/env', () => ({
+  isMac: () => mockIsMac
+}))
 
 describe('useKeyboardShortcuts', () => {
+  beforeEach(() => {
+    mockIsMac = false
+  })
+
+  it('matches platform projection shortcuts', () => {
+    expect(
+      matchesConfig(new KeyboardEvent('keydown', { code: 'F5' }), SHORTCUTS.PROJECTION.START)
+    ).toBe(true)
+    expect(
+      matchesConfig(
+        new KeyboardEvent('keydown', { code: 'Enter', metaKey: true, shiftKey: true }),
+        SHORTCUTS.PROJECTION.START
+      )
+    ).toBe(false)
+
+    mockIsMac = true
+
+    expect(
+      matchesConfig(
+        new KeyboardEvent('keydown', { code: 'Enter', metaKey: true, shiftKey: true }),
+        SHORTCUTS.PROJECTION.START
+      )
+    ).toBe(true)
+    expect(
+      matchesConfig(new KeyboardEvent('keydown', { code: 'F5' }), SHORTCUTS.PROJECTION.START)
+    ).toBe(false)
+  })
+
   it('ignores keydown when event.isComposing is true', () => {
     const handler = vi.fn()
     const config: ShortcutConfig = { code: 'Space' }

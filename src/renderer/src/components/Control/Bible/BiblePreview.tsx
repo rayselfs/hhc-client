@@ -8,7 +8,11 @@ import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleFolderStore } from '@renderer/stores/folder'
+import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
+import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
+import { startBibleProjection } from '@renderer/lib/projection-actions'
 import {
   getBookConfig,
   buildVerseHistoryItem,
@@ -18,7 +22,8 @@ import {
 import { buildVerseItem } from './useBibleContextMenu'
 import type { MouseEvent } from 'react'
 import React, { useRef, useEffect, useState, type RefObject } from 'react'
-import { ChevronLeft, ChevronRight, CirclePlus } from 'lucide-react'
+import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
+import { ChevronLeft, ChevronRight, CirclePlus, ListPlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface BiblePreviewProps {
@@ -41,6 +46,8 @@ export function BiblePreview({
   const { t, i18n } = useTranslation()
   const currentPassage = useBibleStore((s) => s.currentPassage)
   const versions = useBibleStore((s) => s.versions)
+  // re-render when content finishes loading (async fetchVersionContent) so getters return fresh data
+  useBibleStore((s) => s.isInitialized)
   // re-render when version changes so getters return the selected version's content
   const selectedVersionId = useBibleSettingsStore((s) => s.selectedVersionId)
   const currentVersionLocale = versions.find((v) => v.id === selectedVersionId)?.locale
@@ -53,7 +60,7 @@ export function BiblePreview({
     navigateTo
   } = useBibleStore.getState()
 
-  const { claimProjection, project } = useProjection()
+  const { startProjection } = useProjection()
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const prevSelectedVerseIndexRef = useRef<number>(selectedVerseIndex)
@@ -73,6 +80,17 @@ export function BiblePreview({
       text: verseText
     })
     useBibleFolderStore.getState().addItem(item)
+  }
+
+  const handleAddToService = (verseNumber: number, e: React.MouseEvent): void => {
+    e.stopPropagation()
+    if (!book || !chapter) return
+    const cue = buildBibleServiceCueInput(t, {
+      bookNumber: book.number,
+      chapter: chapter.number,
+      verse: verseNumber
+    })
+    useServicePlaylistStore.getState().addCue(cue)
   }
 
   const scrollContainerCallbackRef = (node: HTMLDivElement | null): void => {
@@ -102,18 +120,20 @@ export function BiblePreview({
 
   const handleVerseClick = (verseIndex: number, verseNumber: number, _verseText: string): void => {
     if (!book || !chapter) return
-    claimProjection('bible', { unblank: true })
-    project(
-      'bible:chapter',
-      {
-        bookNumber: book.number,
-        chapter: chapter.number,
-        chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
-        currentVerse: verseNumber,
-        versionLocale: currentVersionLocale
-      },
-      { autoOpen: true }
-    )
+    const payloads = [
+      ['bible:settings', getBibleProjectionSettingsPayload()],
+      [
+        'bible:chapter',
+        {
+          bookNumber: book.number,
+          chapter: chapter.number,
+          chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+          currentVerse: verseNumber,
+          versionLocale: currentVersionLocale
+        }
+      ]
+    ] satisfies ContentMessageTuple[]
+    void startBibleProjection(payloads, { startProjection })
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     scrollBehaviorRef.current = 'smooth'
     onSelectedVerseIndexChange(verseIndex)
@@ -268,10 +288,19 @@ export function BiblePreview({
                   >
                     {verse.number}
                   </span>
-                  <span className="flex-1 text-xl pr-9" lang={currentVersionLocale}>
+                  <span className="flex-1 text-xl pr-24" lang={currentVersionLocale}>
                     {verse.text}
                   </span>
                 </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => handleAddToService(verse.number, e)}
+                  className="absolute right-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-transparent!"
+                  aria-label={t('bible.contextMenu.addToService')}
+                >
+                  <ListPlus size={14} className="text-muted" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

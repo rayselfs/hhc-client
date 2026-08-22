@@ -1,23 +1,20 @@
 import type { SpeechAdapter, SpeechAdapterConfig } from './speech-adapter.interface'
 import type { SpeechSettings, SpeechProvider } from '@renderer/stores/settings'
-import { AzureSpeechAdapter } from './providers/azure-speech-adapter'
-import { GcpSpeechAdapter } from './providers/gcp-speech-adapter'
-import { WebSpeechAdapter } from './providers/web-speech-adapter'
-import { WhisperSpeechAdapter } from './providers/whisper-speech-adapter'
 
-export function createSpeechAdapter(config: SpeechAdapterConfig): SpeechAdapter
+export function createSpeechAdapter(config: SpeechAdapterConfig): Promise<SpeechAdapter>
 export function createSpeechAdapter(
   provider: SpeechProvider,
   settings: SpeechSettings,
   opts?: { maxSessionMs?: number }
-): SpeechAdapter
-export function createSpeechAdapter(
+): Promise<SpeechAdapter>
+export async function createSpeechAdapter(
   providerOrConfig: SpeechProvider | SpeechAdapterConfig,
   settings?: SpeechSettings,
   opts?: { maxSessionMs?: number }
-): SpeechAdapter {
+): Promise<SpeechAdapter> {
   // Legacy call with SpeechAdapterConfig (azure only)
   if (typeof providerOrConfig === 'object') {
+    const { AzureSpeechAdapter } = await import('./providers/azure-speech-adapter')
     return new AzureSpeechAdapter(providerOrConfig)
   }
 
@@ -25,31 +22,37 @@ export function createSpeechAdapter(
   const sp = settings!
 
   switch (provider) {
-    case 'azure':
+    case 'azure': {
+      const { AzureSpeechAdapter } = await import('./providers/azure-speech-adapter')
       return new AzureSpeechAdapter({
         subscriptionKey: '',
         region: sp.azure.region,
         language: sp.azure.language,
         maxSessionMs: opts?.maxSessionMs
       })
-    case 'gcp':
+    }
+    case 'gcp': {
+      const { GcpSpeechAdapter } = await import('./providers/gcp-speech-adapter')
       return new GcpSpeechAdapter({
         language: sp.gcp.language,
         maxSessionMs: opts?.maxSessionMs
       })
-    case 'webSpeech':
+    }
+    case 'webSpeech': {
+      const { WebSpeechAdapter } = await import('./providers/web-speech-adapter')
       return new WebSpeechAdapter({
         language: sp.azure.language,
         maxSessionMs: opts?.maxSessionMs
       })
-    case 'whisper':
+    }
+    case 'whisper': {
+      const { WhisperSpeechAdapter } = await import('./providers/whisper-speech-adapter')
       return new WhisperSpeechAdapter({
         maxSessionMs: opts?.maxSessionMs
       })
+    }
   }
 }
-
-export { AzureSpeechAdapter }
 
 export type {
   SpeechAdapter,

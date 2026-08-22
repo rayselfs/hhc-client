@@ -23,7 +23,12 @@ import {
   useSettingsStore,
   TIMEZONE_OPTIONS,
   AZURE_REGION_OPTIONS,
-  DEFAULT_SPEECH
+  DEFAULT_SPEECH,
+  DEFAULT_LAN_REMOTE,
+  getEffectiveOneDriveClientId,
+  getDefaultSpeechSettings,
+  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
+  normalizeSettingsState
 } from '@renderer/stores/settings'
 import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
@@ -36,7 +41,9 @@ beforeEach(() => {
     hardwareAcceleration: true,
     themePreference: 'system',
     timerRingColor: '#3b82f6',
-    speech: DEFAULT_SPEECH
+    speech: DEFAULT_SPEECH,
+    projectionDisplayId: '',
+    lanRemote: DEFAULT_LAN_REMOTE
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -92,7 +99,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(7)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
@@ -129,34 +136,48 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(7)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
 })
 
-describe('resetToDefaults', () => {
-  it('calls clearAllSiteData', () => {
-    useSettingsStore.getState().resetToDefaults()
-    expect(clearAllSiteData).toHaveBeenCalledOnce()
+describe('resetSettings', () => {
+  it('restores settings without clearing user data', () => {
+    useSettingsStore.getState().setHardwareAcceleration(false)
+    useSettingsStore.getState().resetSettings()
+    expect(useSettingsStore.getState().hardwareAcceleration).toBe(true)
+    expect(clearAllSiteData).not.toHaveBeenCalled()
   })
 
   it('shows success toast', () => {
-    useSettingsStore.getState().resetToDefaults()
+    useSettingsStore.getState().resetSettings()
+    expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
+  })
+})
+
+describe('resetToDefaults', () => {
+  it('calls clearAllSiteData', async () => {
+    await useSettingsStore.getState().resetToDefaults()
+    expect(clearAllSiteData).toHaveBeenCalledOnce()
+  })
+
+  it('shows success toast', async () => {
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
   })
 
-  it('reloads page after delay (web mode)', () => {
+  it('reloads page after delay (web mode)', async () => {
     vi.useFakeTimers()
     vi.mocked(isElectron).mockReturnValue(false)
-    useSettingsStore.getState().resetToDefaults()
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockReload).not.toHaveBeenCalled()
     vi.advanceTimersByTime(500)
     expect(mockReload).toHaveBeenCalledOnce()
     vi.useRealTimers()
   })
 
-  it('calls app.relaunch after delay (electron mode)', () => {
+  it('calls app.relaunch after delay (electron mode)', async () => {
     vi.useFakeTimers()
     vi.mocked(isElectron).mockReturnValue(true)
     const mockRelaunch = vi.fn()
@@ -164,10 +185,31 @@ describe('resetToDefaults', () => {
       value: { app: { relaunch: mockRelaunch } },
       writable: true
     })
-    useSettingsStore.getState().resetToDefaults()
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockRelaunch).not.toHaveBeenCalled()
     vi.advanceTimersByTime(500)
     expect(mockRelaunch).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
+
+  it('waits for site data cleanup before scheduling reload', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isElectron).mockReturnValue(false)
+    let resolveCleanup!: () => void
+    vi.mocked(clearAllSiteData).mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveCleanup = resolve
+      })
+    )
+
+    const reset = useSettingsStore.getState().resetToDefaults()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mockReload).not.toHaveBeenCalled()
+
+    resolveCleanup()
+    await reset
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mockReload).toHaveBeenCalledOnce()
     vi.useRealTimers()
   })
 })
@@ -201,7 +243,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(7)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
@@ -235,8 +277,8 @@ describe('TIMEZONE_OPTIONS', () => {
 })
 
 describe('resetToDefaults toast', () => {
-  it('shows toast.success on settings reset', () => {
-    useSettingsStore.getState().resetToDefaults()
+  it('shows toast.success on settings reset', async () => {
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
   })
 })
@@ -274,11 +316,11 @@ describe('themePreference', () => {
     expect(useSettingsStore.getState().themePreference).toBe('light')
   })
 
-  it('resetToDefaults calls clearAllSiteData and reloads', () => {
+  it('resetToDefaults calls clearAllSiteData and reloads', async () => {
     vi.useFakeTimers()
     vi.mocked(isElectron).mockReturnValue(false)
     useSettingsStore.getState().setThemePreference('dark')
-    useSettingsStore.getState().resetToDefaults()
+    await useSettingsStore.getState().resetToDefaults()
     expect(clearAllSiteData).toHaveBeenCalled()
     vi.advanceTimersByTime(500)
     expect(mockReload).toHaveBeenCalled()
@@ -310,13 +352,23 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(7)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
 })
 
 describe('speech settings', () => {
+  it('defaults to Web Speech API on web', () => {
+    vi.mocked(isElectron).mockReturnValue(false)
+    expect(getDefaultSpeechSettings().activeProvider).toBe('webSpeech')
+  })
+
+  it('defaults to Azure Speech on Electron', () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    expect(getDefaultSpeechSettings().activeProvider).toBe('azure')
+  })
+
   it('initializes with default speech settings', () => {
     const state = useSettingsStore.getState()
     expect(state.speech).toEqual(DEFAULT_SPEECH)
@@ -360,9 +412,125 @@ describe('speech settings', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.speech.azure.region).toBe('japaneast')
-    expect(parsed.version).toBe(7)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
+  })
+})
+
+describe('OneDrive settings', () => {
+  it('uses the configured LibrePresenter Client ID', () => {
+    expect(getEffectiveOneDriveClientId()).toBe(LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID)
+  })
+
+  it('normalizes shared sync offline policy', () => {
+    const normalized = normalizeSettingsState({
+      defaultSyncOfflinePolicy: 'online-only'
+    })
+
+    expect(normalized.defaultSyncOfflinePolicy).toBe('online-only')
+  })
+})
+
+describe('LAN remote settings', () => {
+  it('normalizes LAN remote settings', () => {
+    const normalized = normalizeSettingsState({
+      lanRemote: { enabled: true, selectedHost: '192.168.1.10' }
+    })
+
+    expect(normalized.lanRemote).toEqual({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: true,
+      selectedHost: '192.168.1.10'
+    })
+  })
+
+  it('never persists the runtime enabled flag', () => {
+    let localStorageMock: Record<string, string> = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => Object.keys(localStorageMock)[index] || null
+    })
+
+    useSettingsStore.getState().setLanRemote({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: true,
+      selectedHost: '192.168.1.10'
+    })
+
+    const persisted = JSON.parse(localStorage.getItem('hhc-settings')!)
+    expect(persisted.state.lanRemote).toEqual({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: false,
+      selectedHost: '192.168.1.10'
+    })
+
+    vi.unstubAllGlobals()
+  })
+
+  it('rehydrates legacy enabled state as disabled', async () => {
+    localStorage.setItem(
+      'hhc-settings',
+      JSON.stringify({
+        version: 12,
+        state: {
+          lanRemote: {
+            ...DEFAULT_LAN_REMOTE,
+            enabled: true,
+            selectedHost: '192.168.1.10'
+          }
+        }
+      })
+    )
+
+    await useSettingsStore.persist.rehydrate()
+
+    expect(useSettingsStore.getState().lanRemote).toEqual({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: false,
+      selectedHost: '192.168.1.10'
+    })
+  })
+})
+
+describe('settings normalization', () => {
+  it('restores documented defaults for invalid persisted values', () => {
+    const normalized = normalizeSettingsState({
+      timezone: 'Mars/Base',
+      hardwareAcceleration: 'yes',
+      themePreference: 'sepia',
+      timerRingColor: 'var(--accent)',
+      timerRingColorEnabled: 'true',
+      trashRetentionDays: -10,
+      reminderMode: 'multiply',
+      projectionDisplayId: '../bad'
+    })
+
+    expect(normalized).toMatchObject({
+      timezone: 'Asia/Taipei',
+      hardwareAcceleration: true,
+      themePreference: 'system',
+      timerRingColor: '#3b82f6',
+      timerRingColorEnabled: false,
+      trashRetentionDays: 0,
+      reminderMode: 'subtract',
+      projectionDisplayId: ''
+    })
+  })
+
+  it('normalizes valid projection display ids', () => {
+    expect(normalizeSettingsState({ projectionDisplayId: '2' }).projectionDisplayId).toBe('2')
+    expect(normalizeSettingsState({ projectionDisplayId: '' }).projectionDisplayId).toBe('')
   })
 })
 

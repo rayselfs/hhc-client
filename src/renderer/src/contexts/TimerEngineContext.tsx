@@ -83,14 +83,6 @@ export function TimerEngineProvider({
     }
   }, [swStatus])
 
-  useEffect(() => {
-    if (swStatus !== 'running') return
-    const id = setInterval(() => {
-      useStopwatchStore.getState().tick(Date.now())
-    }, 100)
-    return () => clearInterval(id)
-  }, [swStatus])
-
   return <TimerEngineContext.Provider value={adapter}>{children}</TimerEngineContext.Provider>
 }
 

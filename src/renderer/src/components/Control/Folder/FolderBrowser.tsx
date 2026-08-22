@@ -32,7 +32,6 @@ import { FolderModal } from './FolderModal'
 function stripItemMeta<T extends { id: string; sortIndex: number; createdAt: number }>(
   item: T
 ): Omit<T, 'id' | 'sortIndex' | 'createdAt'> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
   return rest
 }
@@ -67,6 +66,7 @@ export interface FolderBrowserProps {
   store: {
     getState: () => FolderStoreState;
     (): FolderStoreState
+    <T>(selector: (s: FolderStoreState) => T): T
   }
   folders: FolderRecord[]
   items: AnyItemRecord[]
@@ -119,8 +119,8 @@ export function FolderBrowser({
   untitledFolderKey = 'folder.untitledFolder',
   emptyMessage
 }: FolderBrowserProps): React.JSX.Element {
+  const currentFolderId = store((s) => s.currentFolderId)
   const {
-    currentFolderId,
     addFolder,
     deleteFolder,
     removeItem,
@@ -131,7 +131,7 @@ export function FolderBrowser({
     reorderFolders,
     addItem,
     updateFolder
-  } = store()
+  } = store.getState()
   const confirm = useConfirm()
   const { t } = useTranslation()
   const { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu } = contextMenu

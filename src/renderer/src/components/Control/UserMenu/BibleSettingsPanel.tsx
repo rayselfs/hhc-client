@@ -106,6 +106,14 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     setWhisperDir(speech.whisper.modelDir)
   }, [speech.whisper.modelDir])
 
+  useEffect(
+    () => () => {
+      unsubscribeDownloadRef.current?.()
+      unsubscribeDownloadRef.current = null
+    },
+    []
+  )
+
   // Reset azure test if key/region changes
   useEffect(() => {
     if (azureKey !== originalAzureKey || azureRegion !== originalAzureRegion) {
@@ -250,6 +258,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   }
 
   const gcpHasChanges = gcpKey !== originalGcpKey
+  const hasAzureKey = azureKey.trim().length > 0
 
   // --- Whisper handlers ---
   const handleDownloadWhisper = async (): Promise<void> => {
@@ -310,7 +319,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="p-5 space-y-6">
       {/* Provider selector */}
       <Select
         variant="secondary"
@@ -366,32 +375,34 @@ export default function BibleSettingsPanel(): React.JSX.Element {
             </div>
           </div>
 
-          <Select
-            variant="secondary"
-            value={azureRegion}
-            onChange={(key) => setAzureRegion(String(key))}
-            aria-label={t('common.region')}
-          >
-            <Label>{t('common.region')}</Label>
-            <Select.Trigger className="rounded-full pl-5">
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {AZURE_REGION_OPTIONS.map((opt) => (
-                  <ListBox.Item
-                    key={opt.value}
-                    id={opt.value}
-                    textValue={opt.label}
-                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                  >
-                    {opt.label}
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+          {hasAzureKey && (
+            <Select
+              variant="secondary"
+              value={azureRegion}
+              onChange={(key) => setAzureRegion(String(key))}
+              aria-label={t('common.region')}
+            >
+              <Label>{t('common.region')}</Label>
+              <Select.Trigger className="rounded-full pl-5">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {AZURE_REGION_OPTIONS.map((opt) => (
+                    <ListBox.Item
+                      key={opt.value}
+                      id={opt.value}
+                      textValue={opt.label}
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      {opt.label}
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          )}
 
           <div className="flex gap-2">
             <Button
@@ -591,7 +602,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       )}
 
       {/* Max session duration */}
-      <div>
+      <div className="border-t border-default-200 pt-4">
         <Label className="mb-2 block">{t('preferences.bible.maxSessionDuration')}</Label>
         <Input
           type="text"

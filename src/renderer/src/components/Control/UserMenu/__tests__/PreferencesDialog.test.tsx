@@ -9,6 +9,8 @@ import ConfirmDialog from '../../../Common/ConfirmDialog'
 import PreferencesDialog from '../PreferencesDialog'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
+const mockListProviderConnectionsByType = vi.hoisted(() => vi.fn(async () => []))
+
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn().mockReturnValue(false),
   isWeb: vi.fn().mockReturnValue(true)
@@ -20,11 +22,61 @@ vi.mock('@renderer/lib/speech-key-storage', () => ({
   deleteSpeechKey: vi.fn().mockResolvedValue(undefined)
 }))
 
+vi.mock('@renderer/lib/media-storage-accounting', () => ({
+  getMediaStorageAccounting: vi.fn().mockResolvedValue({
+    usage: {
+      electronNativeSourceMedia: 0,
+      webIndexedDbSourceBlobs: 0,
+      legacyElectronIndexedDbBlobs: 0,
+      generatedCoverThumbnails: 0,
+      customCoverOverrides: 0,
+      pdfPageThumbnails: 0,
+      videoPosters: 0,
+      presentationDocuments: 0,
+      syncCache: 0,
+      temporaryAndFailedJobFiles: 0
+    },
+    total: 0,
+    browser: null
+  })
+}))
+
+vi.mock('@renderer/lib/media-storage-cleanup', () => ({
+  clearRegenerableDerivedAssets: vi.fn().mockResolvedValue(undefined),
+  clearUnpinnedSyncCache: vi.fn().mockResolvedValue(undefined),
+  removeUnusedDerivedAssets: vi.fn().mockResolvedValue(undefined)
+}))
+
+vi.mock('@renderer/lib/onedrive-connect', () => ({
+  loginOneDriveAccount: vi.fn(async () => null)
+}))
+
+vi.mock('@renderer/lib/recovery-center', () => ({
+  collectRecoveryIssues: vi.fn(async () => []),
+  runRecoveryAction: vi.fn(async () => undefined)
+}))
+
+vi.mock('@renderer/lib/sync-db', () => ({
+  listProviderConnectionsByType: mockListProviderConnectionsByType
+}))
+
+vi.mock('@renderer/lib/sync-unlink', () => ({
+  unlinkSyncConnectionFromApp: vi.fn(async () => undefined)
+}))
+
+vi.mock('@renderer/lib/onedrive-web-credentials', () => ({
+  deleteWebOneDriveCredentials: vi.fn(async () => undefined)
+}))
+
 vi.mock('@renderer/stores/settings', () => ({
+  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+  getEffectiveOneDriveClientId: () => '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   useSettingsStore: vi.fn((selector) => {
     const store = {
       timezone: 'Asia/Taipei',
       hardwareAcceleration: true,
+      reminderMode: 'subtract' as const,
+      setReminderMode: vi.fn(),
       speech: {
         activeProvider: 'azure' as const,
         azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -34,8 +86,16 @@ vi.mock('@renderer/stores/settings', () => ({
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
       setSpeech: vi.fn(),
+      defaultSyncOfflinePolicy: 'always-offline' as const,
+      setDefaultSyncOfflinePolicy: vi.fn(),
       trashRetentionDays: 30,
       setTrashRetentionDays: vi.fn(),
+      lanRemote: {
+        enabled: false,
+        selectedHost: ''
+      },
+      setLanRemote: vi.fn(),
+      resetSettings: vi.fn(),
       resetToDefaults: vi.fn()
     }
     return selector ? selector(store) : store
@@ -72,6 +132,9 @@ describe('PreferencesDialog', () => {
     vi.clearAllMocks()
     await i18n.changeLanguage('en')
 
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(false)
+
     const { useTheme } = await import('@renderer/contexts/ThemeContext')
     vi.mocked(useTheme).mockReturnValue({
       preference: 'light',
@@ -83,8 +146,10 @@ describe('PreferencesDialog', () => {
   it('renders when isOpen is true', () => {
     renderDialog(true)
     expect(screen.getByTestId('category-general')).toBeInTheDocument()
+    expect(screen.getByTestId('category-timer')).toBeInTheDocument()
     expect(screen.getByTestId('category-bible')).toBeInTheDocument()
     expect(screen.getByTestId('category-media')).toBeInTheDocument()
+    expect(screen.getByTestId('category-storage')).toBeInTheDocument()
   })
 
   it('does not render content when isOpen is false', () => {
@@ -95,8 +160,21 @@ describe('PreferencesDialog', () => {
   it('shows general settings by default', () => {
     renderDialog(true)
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
-    expect(screen.getByLabelText('Timezone')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Timezone')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Dark Mode')).toBeInTheDocument()
+  })
+
+  it('navigates to timer category and shows Timer settings', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-timer'))
+    expect(screen.getByLabelText('Timezone')).toBeInTheDocument()
+    expect(screen.getByLabelText('Time Warning Calculation')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-general'))
+    expect(screen.getByLabelText('Language')).toBeInTheDocument()
   })
 
   it('navigates to media category and back', async () => {
@@ -104,11 +182,117 @@ describe('PreferencesDialog', () => {
     renderDialog(true)
 
     await user.click(screen.getByTestId('category-media'))
+    expect(screen.getByTestId('category-media')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByLabelText('Trash Retention Period')).toBeInTheDocument()
+    expect(screen.getByTestId('category-media-general')).toBeInTheDocument()
+    expect(screen.getByTestId('category-media-oneDrive')).toBeInTheDocument()
+    expect(screen.queryByTestId('category-media-video')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-general'))
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
+  })
+
+  it('collapses media children when another top-level category is selected', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    expect(screen.getByTestId('category-media-general')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-timer'))
+    expect(screen.queryByTestId('category-media-general')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Timezone')).toBeInTheDocument()
+  })
+
+  it('navigates between media child sections', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    expect(screen.getByLabelText('Offline Policy')).toBeInTheDocument()
+    await user.click(screen.getByTestId('category-media-oneDrive'))
+    expect(screen.getByTestId('category-media')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('category-media-oneDrive')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Connected Account')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Custom Azure Client ID')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Offline Policy')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
+  })
+
+  it('opens LAN remote media preferences in Electron', async () => {
+    const user = userEvent.setup()
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(true)
+
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-lanRemote'))
+
+    expect(screen.getByLabelText('Enable LAN remote')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Allow trusted devices')).not.toBeInTheDocument()
+  })
+
+  it('allows OneDrive login from web and disables the button while login is pending', async () => {
+    const user = userEvent.setup()
+    const { loginOneDriveAccount } = await import('@renderer/lib/onedrive-connect')
+    let resolveLogin: (value: null) => void = () => undefined
+    vi.mocked(loginOneDriveAccount).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveLogin = resolve
+        })
+    )
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-oneDrive'))
+    const loginButton = screen.getByRole('button', { name: 'Sign in' })
+    expect(loginButton).not.toBeDisabled()
+
+    await user.click(loginButton)
+
+    expect(screen.getByRole('button', { name: 'Signing in' })).toBeDisabled()
+    resolveLogin(null)
+  })
+
+  it('shows Logout for a connected OneDrive account', async () => {
+    const user = userEvent.setup()
+    mockListProviderConnectionsByType.mockResolvedValueOnce([
+      {
+        id: 'onedrive:account-1',
+        providerType: 'onedrive',
+        displayName: 'OneDrive - Alice',
+        accountLabel: 'alice@example.com',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ] as never)
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-oneDrive'))
+
+    expect(await screen.findByRole('button', { name: 'Logout' })).toBeInTheDocument()
+  })
+
+  it('navigates between storage child sections', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-storage'))
+    expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('category-storage-usage')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('heading', { name: 'Usage' })).not.toBeInTheDocument()
+    expect(screen.getAllByText('Original media files')).toHaveLength(1)
+
+    await user.click(screen.getByTestId('category-storage-cleanup'))
+    expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('category-storage-cleanup')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('heading', { name: 'Cache Cleanup' })).not.toBeInTheDocument()
+    expect(screen.getByText('Clear orphan derived assets')).toBeInTheDocument()
+    expect(screen.getByText(/covers, PDF previews, and video posters/)).toBeInTheDocument()
   })
 
   it('navigates to bible category and shows Bible settings', async () => {
@@ -121,6 +305,22 @@ describe('PreferencesDialog', () => {
 
     await user.click(screen.getByTestId('category-general'))
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
+  })
+
+  it('hides unfinished soundboard preferences', () => {
+    renderDialog(true)
+
+    expect(screen.queryByTestId('category-soundboard')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/default trigger mode/i)).not.toBeInTheDocument()
+  })
+
+  it('opens recovery center preferences page', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-recovery'))
+
+    expect(await screen.findByText('No current recovery issues')).toBeInTheDocument()
   })
 
   it('calls i18n.changeLanguage when language option clicked', async () => {
@@ -143,6 +343,7 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone,
         setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
         resetToDefaults: vi.fn(),
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
@@ -150,6 +351,8 @@ describe('PreferencesDialog', () => {
         setTimerRingColor: vi.fn(),
         timerRingColorEnabled: false,
         setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -157,13 +360,25 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
-        setTrashRetentionDays: vi.fn()
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: ''
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })
 
     renderDialog(true)
+
+    // Navigate to timer category
+    await user.click(screen.getByTestId('category-timer'))
 
     const londonButton = screen.getByText('London (UTC+0/+1)')
     await user.click(londonButton)
@@ -202,11 +417,31 @@ describe('PreferencesDialog', () => {
     vi.mocked(isElectron).mockReturnValue(false)
   })
 
-  it('calls reset functions when reset confirmed via modal', async () => {
+  it('disables projection display selector when no external display exists', async () => {
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(true)
+    Object.defineProperty(window, 'api', {
+      value: { projection: { getDisplays: vi.fn().mockResolvedValue([]) } },
+      configurable: true
+    })
+
+    renderDialog(true)
+
+    expect(await screen.findByText('No external display')).toBeInTheDocument()
+    expect(screen.getByLabelText('Projection Window Display')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+
+    vi.mocked(isElectron).mockReturnValue(false)
+  })
+
+  it('calls resetSettings when reset settings confirmed via modal', async () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
     const { useTheme } = await import('@renderer/contexts/ThemeContext')
 
+    const resetSettings = vi.fn()
     const resetToDefaults = vi.fn()
     const setPreference = vi.fn()
     const onOpenChange = vi.fn()
@@ -217,6 +452,7 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
+        resetSettings,
         resetToDefaults,
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
@@ -224,6 +460,8 @@ describe('PreferencesDialog', () => {
         setTimerRingColor: vi.fn(),
         timerRingColorEnabled: false,
         setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -231,8 +469,17 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
-        setTrashRetentionDays: vi.fn()
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: ''
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -244,13 +491,129 @@ describe('PreferencesDialog', () => {
 
     renderDialog(true, onOpenChange)
 
-    const resetButton = screen.getByText('Reset')
+    const resetButton = screen.getAllByText('Reset Settings').at(-1)!
     await user.click(resetButton)
 
-    const allResetButtons = await screen.findAllByText('Reset')
+    const allResetButtons = await screen.findAllByText('Reset Settings')
     await user.click(allResetButtons[allResetButtons.length - 1])
 
+    expect(resetSettings).toHaveBeenCalled()
+    expect(resetToDefaults).not.toHaveBeenCalled()
+  })
+
+  it('calls resetToDefaults when clear all data confirmed via modal', async () => {
+    const user = userEvent.setup()
+    const { useSettingsStore } = await import('@renderer/stores/settings')
+
+    const resetToDefaults = vi.fn()
+
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone: vi.fn(),
+        setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
+        resetToDefaults,
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn(),
+        timerRingColor: '#3b82f6',
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', installedModel: null }
+        },
+        setSpeech: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: ''
+        },
+        setLanRemote: vi.fn()
+      }
+      return selector ? selector(store) : store
+    })
+
+    renderDialog(true)
+
+    await user.click(screen.getAllByText('Clear All Data').at(-1)!)
+    const allClearButtons = await screen.findAllByText('Clear All Data')
+    await user.click(allClearButtons[allClearButtons.length - 1])
+
     expect(resetToDefaults).toHaveBeenCalled()
+  })
+
+  it('disables reset actions while clearing all data', async () => {
+    const user = userEvent.setup()
+    const { useSettingsStore } = await import('@renderer/stores/settings')
+
+    const resetToDefaults = vi.fn(
+      () =>
+        new Promise<void>(() => {
+          // Keep pending so the clearing state is observable.
+        })
+    )
+
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone: vi.fn(),
+        setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
+        resetToDefaults,
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn(),
+        timerRingColor: '#3b82f6',
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', installedModel: null }
+        },
+        setSpeech: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: ''
+        },
+        setLanRemote: vi.fn()
+      }
+      return selector ? selector(store) : store
+    })
+
+    const { container } = renderDialog(true)
+
+    await user.click(screen.getAllByText('Clear All Data').at(-1)!)
+    const confirmButtons = await screen.findAllByText('Clear All Data')
+    await user.click(confirmButtons[confirmButtons.length - 1])
+
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(screen.getByTestId('select-root')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByTestId('category-timer')).toBeDisabled()
+    expect(screen.getAllByText('Reset Settings').at(-1)).toBeDisabled()
+    expect(screen.getAllByText('Clear All Data').at(-1)).toBeDisabled()
   })
 
   it('does not reset when cancel clicked in modal', async () => {
@@ -264,6 +627,7 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
         resetToDefaults,
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
@@ -271,6 +635,8 @@ describe('PreferencesDialog', () => {
         setTimerRingColor: vi.fn(),
         timerRingColorEnabled: false,
         setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -278,15 +644,24 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
-        setTrashRetentionDays: vi.fn()
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: ''
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })
 
     renderDialog(true)
 
-    const resetButton = screen.getByText('Reset')
+    const resetButton = screen.getAllByText('Reset Settings').at(-1)!
     await user.click(resetButton)
 
     const cancelButton = await screen.findByText('Cancel')

@@ -21,7 +21,9 @@ import {
   isMainWindow,
   validateTheme,
   validateTimerCommand,
-  validateTimerSettings
+  validateTimerSettings,
+  validateProjectionMessageTuple,
+  validateProjectionTransportTuple
 } from '../../ipc/validate'
 import type { WindowManager } from '../../windowManager'
 
@@ -72,6 +74,13 @@ describe('isMainWindow', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockUnknownWindow as never)
     expect(isMainWindow(wm, makeEvent())).toBe(false)
   })
+
+  it('returns false when neither the sender nor main window exists', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(null as never)
+    mockWindowManager.getMainWindow.mockReturnValueOnce(null as never)
+
+    expect(isMainWindow(wm, makeEvent())).toBe(false)
+  })
 })
 
 describe('validateTheme', () => {
@@ -94,21 +103,32 @@ describe('validateTheme', () => {
 
 describe('validateTimerCommand', () => {
   it.each([
-    'start',
-    'pause',
-    'resume',
-    'reset',
-    'setDuration',
-    'addTime',
-    'removeTime',
-    'setMode',
-    'setReminder',
-    'setOvertimeMessage',
-    'startStopwatch',
-    'pauseStopwatch',
-    'resetStopwatch'
-  ])('returns true for valid command "%s"', (type) => {
-    expect(validateTimerCommand({ type })).toBe(true)
+    { type: 'start' },
+    { type: 'pause' },
+    { type: 'resume' },
+    { type: 'reset' },
+    { type: 'setDuration', seconds: 300 },
+    { type: 'addTime', seconds: 30 },
+    { type: 'removeTime', seconds: 30 },
+    { type: 'setMode', mode: 'timer' },
+    { type: 'setReminder', enabled: true, durationSeconds: 60 },
+    { type: 'setOvertimeMessage', enabled: true, message: 'Overtime' },
+    { type: 'startStopwatch' },
+    { type: 'pauseStopwatch' },
+    { type: 'resetStopwatch' }
+  ])('returns true for valid command $type', (command) => {
+    expect(validateTimerCommand(command)).toBe(true)
+  })
+
+  it.each([
+    { type: 'setDuration' },
+    { type: 'addTime', seconds: -1 },
+    { type: 'removeTime', seconds: Number.NaN },
+    { type: 'setMode', mode: 'invalid' },
+    { type: 'setReminder', enabled: true },
+    { type: 'setOvertimeMessage', enabled: true, message: 42 }
+  ])('returns false for malformed command $type', (command) => {
+    expect(validateTimerCommand(command)).toBe(false)
   })
 
   it('returns false for unknown type', () => {
@@ -189,5 +209,85 @@ describe('validateTimerSettings', () => {
 
   it('returns false for non-string overtimeMessage', () => {
     expect(validateTimerSettings({ ...valid, overtimeMessage: null })).toBe(false)
+  })
+})
+
+describe('validateProjectionTransportTuple', () => {
+  it('accepts a positive generation with matching ready payload', () => {
+    expect(validateProjectionTransportTuple([4, '__system:ready', { generation: 4 }])).toBe(true)
+  })
+
+  it.each([0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid generation %s',
+    (generation) => {
+      expect(
+        validateProjectionTransportTuple([
+          generation,
+          'timer:overtime-message',
+          { message: 'test' }
+        ])
+      ).toBe(false)
+    }
+  )
+
+  it('rejects a ready payload for another generation', () => {
+    expect(validateProjectionTransportTuple([4, '__system:ready', { generation: 3 }])).toBe(false)
+  })
+
+  it('accepts a minimally valid replay snapshot', () => {
+    expect(
+      validateProjectionTransportTuple([
+        4,
+        '__system:replay',
+        {
+          generation: 4,
+          snapshot: {
+            owner: 'timer',
+            showDefault: false,
+            isBlackout: false,
+            timer: {
+              tick: null,
+              stopwatch: null,
+              overtimeMessage: null,
+              timezone: null,
+              ringColor: null
+            },
+            bible: { chapter: null, settings: null },
+            media: { show: null, state: null }
+          }
+        }
+      ])
+    ).toBe(true)
+  })
+
+  it('rejects replay snapshots without an intentional-blackout state', () => {
+    expect(
+      validateProjectionTransportTuple([
+        4,
+        '__system:replay',
+        {
+          generation: 4,
+          snapshot: {
+            owner: 'timer',
+            showDefault: false,
+            timer: {
+              tick: null,
+              stopwatch: null,
+              overtimeMessage: null,
+              timezone: null,
+              ringColor: null
+            },
+            bible: { chapter: null, settings: null },
+            media: { show: null, state: null }
+          }
+        }
+      ])
+    ).toBe(false)
+  })
+})
+
+describe('validateProjectionMessageTuple', () => {
+  it('rejects the removed null ready payload', () => {
+    expect(validateProjectionMessageTuple(['__system:ready', null])).toBe(false)
   })
 })

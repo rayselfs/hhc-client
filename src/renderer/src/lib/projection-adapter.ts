@@ -4,6 +4,8 @@ import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-me
 type AdapterRole = 'main' | 'projection'
 
 interface ProjectionAdapter {
+  setGeneration(generation: number): void
+  getGeneration(): number
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void
   on<C extends ProjectionChannel>(
     channel: C,
@@ -14,19 +16,43 @@ interface ProjectionAdapter {
 
 class ElectronProjectionAdapter implements ProjectionAdapter {
   private api: Window['api']['projection']
-  private unsubscribers = new Set<() => void>()
+  private handlers = new Map<
+    ProjectionChannel,
+    Set<(data: ProjectionPayload<ProjectionChannel>) => void>
+  >()
   private role: AdapterRole
+  private generation = 0
+  private unsubscribeProjectionMessage: (() => void) | null = null
 
   constructor(api: Window['api']['projection'], role: AdapterRole) {
     this.api = api
     this.role = role
   }
 
+  private ensureSubscribed(): void {
+    if (this.unsubscribeProjectionMessage) return
+    this.unsubscribeProjectionMessage = this.api.onProjectionMessage(
+      (generation, channel, data) => {
+        if (generation !== this.generation) return
+        this.handlers.get(channel)?.forEach((handler) => handler(data))
+      }
+    )
+  }
+
+  setGeneration(generation: number): void {
+    if (Number.isSafeInteger(generation) && generation >= 0) this.generation = generation
+  }
+
+  getGeneration(): number {
+    return this.generation
+  }
+
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
+    if (this.generation <= 0) return
     if (this.role === 'projection') {
-      this.api.sendToMain(channel, data)
+      this.api.sendToMain(this.generation, channel, data)
     } else {
-      this.api.send(channel, data)
+      this.api.send(this.generation, channel, data)
     }
   }
 
@@ -34,40 +60,62 @@ class ElectronProjectionAdapter implements ProjectionAdapter {
     channel: C,
     handler: (data: ProjectionPayload<C>) => void
   ): () => void {
-    const unsubscribe = this.api.onProjectionMessage((ch, d) => {
-      if ((ch as string) === channel) handler(d as ProjectionPayload<C>)
-    })
-    this.unsubscribers.add(unsubscribe)
+    this.ensureSubscribed()
+    const handlers = this.handlers.get(channel) ?? new Set()
+    const wrappedHandler = handler as (data: ProjectionPayload<ProjectionChannel>) => void
+    handlers.add(wrappedHandler)
+    this.handlers.set(channel, handlers)
     return () => {
-      unsubscribe()
-      this.unsubscribers.delete(unsubscribe)
+      handlers.delete(wrappedHandler)
+      if (handlers.size === 0) this.handlers.delete(channel)
     }
   }
 
   dispose(): void {
-    this.unsubscribers.forEach((unsub) => unsub())
-    this.unsubscribers.clear()
+    this.unsubscribeProjectionMessage?.()
+    this.unsubscribeProjectionMessage = null
+    this.handlers.clear()
   }
 }
 
 class BroadcastChannelAdapter implements ProjectionAdapter {
   private bc: BroadcastChannel
   private windowId: string
+  private role: AdapterRole
+  private sessionId: string
   private listeners: Array<{ listener: (event: MessageEvent) => void }> = []
   private disposed = false
+  private generation = 0
 
-  constructor() {
+  constructor(role: AdapterRole, sessionId?: string) {
     this.bc = new BroadcastChannel('hhc-projection')
     this.windowId = crypto.randomUUID()
+    this.role = role
+    this.sessionId = sessionId || (role === 'main' ? crypto.randomUUID() : '')
 
     this.bc.addEventListener('messageerror', () => {
       console.warn('[projection-adapter] Failed to deserialize BroadcastChannel message')
     })
   }
 
+  setGeneration(generation: number): void {
+    if (Number.isSafeInteger(generation) && generation >= 0) this.generation = generation
+  }
+
+  getGeneration(): number {
+    return this.generation
+  }
+
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
-    if (this.disposed) return
-    this.bc.postMessage({ channel, data, sender: this.windowId })
+    if (this.disposed || this.generation <= 0 || !this.sessionId) return
+    this.bc.postMessage({
+      generation: this.generation,
+      sessionId: this.sessionId,
+      senderRole: this.role,
+      channel,
+      data,
+      sender: this.windowId
+    })
   }
 
   on<C extends ProjectionChannel>(
@@ -76,7 +124,20 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   ): () => void {
     const listener = (event: MessageEvent): void => {
       const msg = event.data
-      if (!msg || typeof msg !== 'object' || !('channel' in msg) || !('sender' in msg)) return
+      if (
+        !msg ||
+        typeof msg !== 'object' ||
+        !('generation' in msg) ||
+        !('sessionId' in msg) ||
+        !('senderRole' in msg) ||
+        !('channel' in msg) ||
+        !('sender' in msg)
+      ) {
+        return
+      }
+      if (msg.generation !== this.generation) return
+      if (msg.sessionId !== this.sessionId) return
+      if (msg.senderRole !== (this.role === 'main' ? 'projection' : 'main')) return
       if (msg.sender === this.windowId) return
       if (msg.channel === channel) handler(msg.data as ProjectionPayload<C>)
     }
@@ -92,13 +153,17 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
     this.disposed = true
     this.listeners.forEach(({ listener }) => this.bc.removeEventListener('message', listener))
     this.listeners = []
+    this.generation = 0
     this.bc.close()
   }
 }
 
-function createProjectionAdapter(role: AdapterRole = 'main'): ProjectionAdapter {
+function createProjectionAdapter(
+  role: AdapterRole = 'main',
+  browserSessionId?: string
+): ProjectionAdapter {
   if (isElectron()) return new ElectronProjectionAdapter(window.api.projection, role)
-  return new BroadcastChannelAdapter()
+  return new BroadcastChannelAdapter(role, browserSessionId)
 }
 
 export type { ProjectionAdapter }

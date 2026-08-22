@@ -1,11 +1,51 @@
-import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
+import type {
+  ProjectionChannel,
+  ProjectionLifecycleEvent,
+  ProjectionPayload,
+  ProjectionWindowState
+} from '../shared/projection-messages'
 import type {
   DisplayInfo,
   UpdateStatus,
   WhisperModel,
   WhisperDownloadProgress,
-  WhisperDirInfo
+  WhisperDirInfo,
+  VideoPosterInfo,
+  VideoPosterRequest,
+  VideoPosterResult,
+  ProjectionVlcControlRequest,
+  ProjectionVlcFailure,
+  ProjectionVlcInfo,
+  ProjectionVlcProbeRequest,
+  ProjectionVlcProbeResult,
+  ProjectionVlcStartRequest,
+  LocalSyncConnectionInfo,
+  LocalSyncImportFileRequest,
+  LocalSyncWatchStatus,
+  LocalSyncRemoteItem,
+  OneDriveAccessTokenRequest,
+  OneDriveAccessTokenResult,
+  OneDriveAuthCodeExchangeRequest,
+  OneDriveCredentialStatus,
+  OneDriveConnectedAccount,
+  OneDriveNativeDownloadRequest,
+  OneDriveNativeDownloadResult,
+  OneDriveNativeDownloadProgress,
+  LanRemotePairingInfo,
+  LanRemoteStatus
 } from '../shared/ipc-channels'
+import type {
+  HhcAssetCollectionChangePage,
+  HhcAssetCollectionItem,
+  HhcAssetCollectionPage,
+  HhcAssetCollectionRequest,
+  HhcAssetContentTicket,
+  HhcAssetItemRequest,
+  HhcAssetNativeDownloadRequest,
+  HhcAssetNativeDownloadResult,
+  HhcAssetNativeLease
+} from '../shared/hhc-assets'
+import type { LanRemoteAck, LanRemoteCommand, LanRemoteSnapshot } from '../shared/lan-remote'
 import type {
   TimerCommand,
   TimerSettings,
@@ -14,6 +54,7 @@ import type {
   TimerTickPayload
 } from '../shared/types/timer'
 import type { BibleVersion, BibleBook } from '../shared/types/bible'
+import type { HhcSession } from '../shared/hhc-auth'
 
 interface ThemeAPI {
   get: () => Promise<{ source: string; shouldUseDarkColors: boolean }>
@@ -22,17 +63,32 @@ interface ThemeAPI {
 }
 
 interface ProjectionAPI {
-  check: () => Promise<{ exists: boolean }>
-  ensure: () => Promise<{ created: boolean }>
+  check: () => Promise<ProjectionWindowState>
+  ensure: (displayId?: string) => Promise<{ created: boolean; generation: number }>
+  moveToDisplay: (displayId: string) => Promise<{ moved: boolean; generation: number }>
+  retry: () => Promise<{ retried: boolean; generation: number }>
+  getGeneration: () => Promise<{ generation: number }>
+  bringToFront: () => Promise<{ broughtToFront: boolean }>
   close: () => Promise<{ closed: boolean }>
-  send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void
-  sendToMain: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void
+  send: <C extends ProjectionChannel>(
+    generation: number,
+    channel: C,
+    data: ProjectionPayload<C>
+  ) => void
+  sendToMain: <C extends ProjectionChannel>(
+    generation: number,
+    channel: C,
+    data: ProjectionPayload<C>
+  ) => void
   getDisplays: () => Promise<DisplayInfo[]>
   onProjectionMessage: (
-    callback: (channel: ProjectionChannel, data: ProjectionPayload<ProjectionChannel>) => void
+    callback: (
+      generation: number,
+      channel: ProjectionChannel,
+      data: ProjectionPayload<ProjectionChannel>
+    ) => void
   ) => () => void
-  onProjectionOpened: (callback: () => void) => () => void
-  onProjectionClosed: (callback: () => void) => () => void
+  onProjectionLifecycle: (callback: (event: ProjectionLifecycleEvent) => void) => () => void
 }
 
 interface TimerAPI {
@@ -49,6 +105,9 @@ interface BibleAPI {
 
 interface AppAPI {
   relaunch: () => Promise<void>
+  confirmClose: () => Promise<{ closing: boolean }>
+  onCloseRequested: (callback: () => void) => () => void
+  clearUserData: () => Promise<void>
   selectDirectory: () => Promise<string | null>
   setModelDir: (dir: string) => Promise<void>
   checkWhisperDir: (dir: string) => Promise<WhisperDirInfo>
@@ -70,6 +129,83 @@ interface SpeechAPI {
   deleteKey: (provider: string) => Promise<void>
 }
 
+interface NativeFsAPI {
+  importFile: (id: string, file: File) => Promise<{ size: number }>
+  getUrl: (id: string, mimeType: string) => string
+  exists: (id: string) => Promise<boolean>
+  delete: (id: string) => Promise<void>
+}
+
+interface VideoPosterAPI {
+  getInfo: () => Promise<VideoPosterInfo>
+  generate: (request: VideoPosterRequest) => Promise<VideoPosterResult>
+}
+
+interface ProjectionVlcAPI {
+  getInfo: () => Promise<ProjectionVlcInfo>
+  start: (request: ProjectionVlcStartRequest) => Promise<void>
+  probe: (request: ProjectionVlcProbeRequest) => Promise<ProjectionVlcProbeResult>
+  control: (command: ProjectionVlcControlRequest) => Promise<void>
+  stop: () => Promise<void>
+  onFailure: (callback: (failure: ProjectionVlcFailure) => void) => () => void
+  onStarted: (callback: (generation: number, itemId: string) => void) => () => void
+}
+
+interface LocalSyncAPI {
+  selectFolder: () => Promise<LocalSyncConnectionInfo | null>
+  listFolders: () => Promise<LocalSyncConnectionInfo[]>
+  scanFolder: (connectionId: string) => Promise<LocalSyncRemoteItem[]>
+  importFile: (request: LocalSyncImportFileRequest) => Promise<{ size: number }>
+  startWatch: (connectionId: string) => Promise<LocalSyncWatchStatus>
+  getWatchStatus: (connectionId: string) => Promise<LocalSyncWatchStatus>
+  stopWatch: (connectionId: string) => Promise<LocalSyncWatchStatus>
+  disconnectFolder: (connectionId: string) => Promise<void>
+}
+
+interface OneDriveAPI {
+  getCredentialStatus: (connectionId: string) => Promise<OneDriveCredentialStatus>
+  getAccessToken: (request: OneDriveAccessTokenRequest) => Promise<OneDriveAccessTokenResult>
+  completeAuth: (request: OneDriveAuthCodeExchangeRequest) => Promise<OneDriveConnectedAccount>
+  deleteCredentials: (connectionId: string) => Promise<void>
+  getAuthRedirectUri: () => Promise<string>
+  waitAuthCallback: (expectedState?: string) => Promise<string | null>
+  downloadFile: (request: OneDriveNativeDownloadRequest) => Promise<OneDriveNativeDownloadResult>
+  onDownloadProgress: (callback: (data: OneDriveNativeDownloadProgress) => void) => () => void
+}
+
+interface HhcAuthAPI {
+  begin: () => Promise<void>
+  getAccessToken: () => Promise<string | null>
+  refreshAccessToken: () => Promise<string | null>
+  getSession: () => Promise<HhcSession | null>
+  signOut: () => Promise<void>
+  onSessionChanged: (callback: (session: HhcSession | null) => void) => () => void
+}
+
+interface HhcAssetsAPI {
+  listCollections: (cursor?: string) => Promise<HhcAssetCollectionPage>
+  getCollectionChanges: (
+    request: HhcAssetCollectionRequest
+  ) => Promise<HhcAssetCollectionChangePage>
+  getCollectionItem: (request: HhcAssetItemRequest) => Promise<HhcAssetCollectionItem>
+  issueContentTicket: (request: HhcAssetItemRequest) => Promise<HhcAssetContentTicket>
+  downloadFile: (request: HhcAssetNativeDownloadRequest) => Promise<HhcAssetNativeDownloadResult>
+  cancelDownload: (targetFileId: string) => Promise<void>
+  createContentLease: (request: HhcAssetItemRequest) => Promise<HhcAssetNativeLease>
+  releaseContentLease: (leaseId: string) => Promise<void>
+  clearContentLeases: () => Promise<void>
+}
+
+interface LanRemoteAPI {
+  start: (options: { host: string; port: number }) => Promise<LanRemoteStatus>
+  stop: () => Promise<LanRemoteStatus>
+  getStatus: () => Promise<LanRemoteStatus>
+  createPairing: (deviceName: string) => Promise<LanRemotePairingInfo>
+  publishState: (snapshot: LanRemoteSnapshot) => Promise<void>
+  publishAck: (ack: LanRemoteAck) => Promise<void>
+  onCommand: (callback: (command: LanRemoteCommand) => void) => () => void
+}
+
 declare global {
   interface Window {
     api: {
@@ -80,6 +216,14 @@ declare global {
       app: AppAPI
       update: UpdateAPI
       speech: SpeechAPI
+      nativeFs: NativeFsAPI
+      videoPoster: VideoPosterAPI
+      projectionVlc: ProjectionVlcAPI
+      localSync: LocalSyncAPI
+      oneDrive: OneDriveAPI
+      hhcAuth: HhcAuthAPI
+      hhcAssets: HhcAssetsAPI
+      lanRemote: LanRemoteAPI
     }
   }
 }

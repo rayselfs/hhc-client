@@ -1,0 +1,189 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+vi.mock('../pdfjs-loader', () => ({
+  loadPdfjsLib: vi.fn()
+}))
+
+vi.mock('../pptx-renderer-service', () => ({
+  generatePptxFirstSlideThumbnail: vi.fn()
+}))
+
+import { generateThumbnail } from '../thumbnail-generator'
+import { loadPdfjsLib } from '../pdfjs-loader'
+import { generatePptxFirstSlideThumbnail } from '../pptx-renderer-service'
+
+const mockLoadPdfjsLib = vi.mocked(loadPdfjsLib)
+const mockGeneratePptxFirstSlideThumbnail = vi.mocked(generatePptxFirstSlideThumbnail)
+
+function makeFile(name: string, size: number, type: string): File {
+  const file = new File([], name, { type })
+  Object.defineProperty(file, 'size', { value: size })
+  return file
+}
+
+describe('T2 — PDF size guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('does not load PDF.js during module initialization', () => {
+    expect(mockLoadPdfjsLib).not.toHaveBeenCalled()
+  })
+
+  it('returns null for PDF > 50MB without calling loadPdfjsLib', async () => {
+    const bigPdf = makeFile('big.pdf', 100 * 1024 * 1024, 'application/pdf')
+    const arrayBufferSpy = vi.spyOn(bigPdf, 'arrayBuffer')
+
+    const result = await generateThumbnail(bigPdf)
+
+    expect(result).toBeNull()
+    expect(mockLoadPdfjsLib).not.toHaveBeenCalled()
+    expect(arrayBufferSpy).not.toHaveBeenCalled()
+  })
+
+  it('calls loadPdfjsLib for PDF <= 50MB', async () => {
+    const smallPdf = makeFile('small.pdf', 5 * 1024 * 1024, 'application/pdf')
+
+    const mockPage = {
+      getViewport: vi.fn().mockReturnValue({ width: 100, height: 100 }),
+      render: vi.fn().mockReturnValue({ promise: Promise.resolve() })
+    }
+    const mockPdf = {
+      getPage: vi.fn().mockResolvedValue(mockPage),
+      destroy: vi.fn().mockResolvedValue(undefined)
+    }
+    mockLoadPdfjsLib.mockResolvedValue({
+      getDocument: vi.fn().mockReturnValue({ promise: Promise.resolve(mockPdf) })
+    } as never)
+
+    const mockContext = {
+      fillStyle: '',
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      clearRect: vi.fn()
+    }
+    const mockCanvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn().mockReturnValue(mockContext),
+      toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,abc')
+    }
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag === 'canvas') return mockCanvas as unknown as HTMLCanvasElement
+      return document.createElement(tag)
+    })
+
+    await generateThumbnail(smallPdf)
+
+    expect(mockLoadPdfjsLib).toHaveBeenCalledOnce()
+  })
+})
+
+describe('T5 — generateImageThumbnail yield', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('returns a dataUrl string for a valid image file', async () => {
+    const imageFile = makeFile('test.jpg', 1024, 'image/jpeg')
+
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn().mockReturnValue('blob:mock'),
+      revokeObjectURL: vi.fn()
+    })
+
+    let storedOnload: (() => void) | undefined
+    function MockImage(this: { naturalWidth: number; naturalHeight: number }): void {
+      this.naturalWidth = 200
+      this.naturalHeight = 150
+      Object.defineProperty(this, 'onload', {
+        get() {
+          return storedOnload
+        },
+        set(fn: () => void) {
+          storedOnload = fn
+        }
+      })
+      Object.defineProperty(this, 'src', {
+        set(_val: string) {
+          storedOnload?.()
+        }
+      })
+    }
+    vi.stubGlobal('Image', MockImage)
+
+    const mockContext = {
+      fillStyle: '',
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      clearRect: vi.fn()
+    }
+    const mockCanvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn().mockReturnValue(mockContext),
+      toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,xyz')
+    }
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag === 'canvas') return mockCanvas as unknown as HTMLCanvasElement
+      return document.createElement.call(document, tag)
+    })
+
+    const resultPromise = generateThumbnail(imageFile)
+    await vi.runAllTimersAsync()
+    const result = await resultPromise
+
+    expect(typeof result).toBe('string')
+    expect(result).toMatch(/^data:/)
+  })
+})
+
+describe('PPTX thumbnail generation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('delegates PPTX thumbnails to the browser-native renderer service', async () => {
+    const pptxFile = makeFile(
+      'sermon.pptx',
+      4096,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+    mockGeneratePptxFirstSlideThumbnail.mockResolvedValue('data:image/jpeg;base64,pptx')
+
+    const result = await generateThumbnail(
+      pptxFile,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+
+    expect(result).toBe('data:image/jpeg;base64,pptx')
+    expect(mockGeneratePptxFirstSlideThumbnail).toHaveBeenCalledWith(pptxFile)
+  })
+
+  it('falls back silently when PPTX thumbnail canvas is tainted', async () => {
+    const pptxFile = makeFile(
+      'sermon.pptx',
+      4096,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    mockGeneratePptxFirstSlideThumbnail.mockRejectedValue(
+      Object.assign(new Error('tainted'), { name: 'SecurityError' })
+    )
+
+    const result = await generateThumbnail(
+      pptxFile,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+
+    expect(result).toBeNull()
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+})

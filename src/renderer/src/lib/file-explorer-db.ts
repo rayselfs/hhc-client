@@ -1,13 +1,33 @@
 import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB, unwrap } from 'idb'
 import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
+import { isElectron } from './env'
 
-interface FileBlobRecord {
+export interface FileBlobRecord {
   id: string
-  blob: Blob
+  blob?: Blob
+  storage?: 'indexed-db' | 'native-fs'
+  size?: number
+  refCount?: number
+  revision?: number
 }
 
-interface FileExplorerDBSchema extends DBSchema {
+export interface ResourceCleanupJournalRecord {
+  id: string
+  blobId: string
+  storage?: 'indexed-db' | 'native-fs'
+  deleteNativeFile: boolean
+  deleteDerivedAssets: boolean
+  deletePdfPageThumbs: boolean
+  itemThumbnailIds: string[]
+  status: 'pending' | 'failed'
+  attempt: number
+  lastError?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface FileExplorerDBSchema extends DBSchema {
   'file-blobs': {
     key: string
     value: FileBlobRecord
@@ -20,19 +40,23 @@ interface FileExplorerDBSchema extends DBSchema {
   'folder-items': {
     key: string
     value: AnyItemRecord
-    indexes: { 'by-parent': string }
+    indexes: { 'by-parent': string; 'by-deleted-at': number }
+  }
+  'resource-cleanup-journal': {
+    key: string
+    value: ResourceCleanupJournalRecord
   }
 }
 
 const DB_NAME = 'hhc-file-explorer'
-const DB_VERSION = 2
+export const FILE_EXPLORER_DB_VERSION = 5
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
 function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
   if (!fileExplorerDBPromise) {
-    fileExplorerDBPromise = openDB<FileExplorerDBSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion) {
+    fileExplorerDBPromise = openDB<FileExplorerDBSchema>(DB_NAME, FILE_EXPLORER_DB_VERSION, {
+      upgrade(db, oldVersion, _newVersion, tx) {
         if (!db.objectStoreNames.contains('file-blobs')) {
           db.createObjectStore('file-blobs', { keyPath: 'id' })
         }
@@ -52,6 +76,17 @@ function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
           if (nativeDb.objectStoreNames.contains('folders')) nativeDb.deleteObjectStore('folders')
           if (nativeDb.objectStoreNames.contains('items')) nativeDb.deleteObjectStore('items')
         }
+
+        if (oldVersion < 4) {
+          const itemStore = tx.objectStore('folder-items')
+          if (!itemStore.indexNames.contains('by-deleted-at')) {
+            itemStore.createIndex('by-deleted-at', 'deletedAt')
+          }
+        }
+
+        if (!db.objectStoreNames.contains('resource-cleanup-journal')) {
+          db.createObjectStore('resource-cleanup-journal', { keyPath: 'id' })
+        }
       }
     })
   }
@@ -63,12 +98,59 @@ export async function openFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBS
   return getFileExplorerDB()
 }
 
+export async function listFileBlobRecords(): Promise<FileBlobRecord[]> {
+  return (await getFileExplorerDB()).getAll('file-blobs')
+}
+
+export async function getFileBlobRecord(id: string): Promise<FileBlobRecord | undefined> {
+  return (await getFileExplorerDB()).get('file-blobs', id)
+}
+
+export async function isFileBlobRecordAvailable(
+  record: FileBlobRecord | undefined
+): Promise<boolean> {
+  if (!record) return false
+  if (record.storage === 'native-fs') {
+    if (!isElectron()) return false
+    return window.api.nativeFs.exists(record.id)
+  }
+  return Boolean(record.blob)
+}
+
+export async function isFileBlobAvailable(id: string): Promise<boolean> {
+  return isFileBlobRecordAvailable(await getFileBlobRecord(id))
+}
+
+export async function collectAvailableFileBlobIds(records: FileBlobRecord[]): Promise<Set<string>> {
+  const ids = new Set<string>()
+  for (const record of records) {
+    if (await isFileBlobRecordAvailable(record)) ids.add(record.id)
+  }
+  return ids
+}
+
 export async function storeFileBlob(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string,
-  blob: Blob
+  file: File
 ): Promise<void> {
-  await db.put('file-blobs', { id, blob })
+  if (isElectron()) {
+    const imported = await window.api.nativeFs.importFile(id, file)
+    try {
+      await db.put('file-blobs', {
+        id,
+        storage: 'native-fs',
+        size: imported.size,
+        refCount: 1
+      })
+    } catch (error) {
+      await window.api.nativeFs.delete(id).catch(() => undefined)
+      throw error
+    }
+    return
+  }
+
+  await db.put('file-blobs', { id, blob: file, refCount: 1 })
 }
 
 export async function getFileBlob(
@@ -79,9 +161,82 @@ export async function getFileBlob(
   return record?.blob ?? null
 }
 
+export interface FileSource {
+  url: string
+  revoke: () => void
+}
+
+export interface GetFileSourceOptions {
+  verifyNativeFile?: boolean
+}
+
+export async function getFileSource(
+  db: IDBPDatabase<FileExplorerDBSchema>,
+  id: string,
+  mimeType: string,
+  options: GetFileSourceOptions = {}
+): Promise<FileSource | null> {
+  const record = await db.get('file-blobs', id)
+  if (!record) return null
+
+  if (record.storage !== 'native-fs' || options.verifyNativeFile !== false) {
+    if (!(await isFileBlobRecordAvailable(record))) return null
+  }
+
+  if (record.storage === 'native-fs') {
+    return {
+      url: window.api.nativeFs.getUrl(id, mimeType),
+      revoke: () => undefined
+    }
+  }
+
+  if (!record.blob) return null
+  const url = URL.createObjectURL(record.blob)
+  return {
+    url,
+    revoke: () => URL.revokeObjectURL(url)
+  }
+}
+
 export async function deleteFileBlob(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string
-): Promise<void> {
-  await db.delete('file-blobs', id)
+): Promise<boolean> {
+  const record = await db.get('file-blobs', id)
+  if (!record) return false
+
+  if (record.refCount === undefined || record.refCount <= 1) {
+    if (record.storage === 'native-fs' && isElectron()) {
+      await window.api.nativeFs.delete(id)
+    }
+    await db.delete('file-blobs', id)
+    return true
+  }
+
+  await db.put('file-blobs', { ...record, refCount: record.refCount - 1 })
+  return false
 }
+
+export async function incrementBlobRef(
+  db: IDBPDatabase<FileExplorerDBSchema>,
+  id: string
+): Promise<void> {
+  const record = await db.get('file-blobs', id)
+  if (!record) throw new Error(`File blob not found: ${id}`)
+
+  await db.put('file-blobs', { ...record, refCount: (record.refCount ?? 1) + 1 })
+}
+
+export async function resetFileExplorerDB(): Promise<void> {
+  const db = await fileExplorerDBPromise
+  db?.close()
+  fileExplorerDBPromise = null
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error('File explorer database deletion blocked'))
+  })
+}
+
+export const resetFileExplorerDBForTests = resetFileExplorerDB

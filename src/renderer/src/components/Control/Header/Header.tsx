@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { useCallback, useMemo } from 'react'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
-import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
+import { X, Monitor } from 'lucide-react'
 import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
@@ -28,21 +28,26 @@ import {
   useFavoritesExplorerSettings,
   useTrashExplorerSettings
 } from '@renderer/stores/file-explorer'
+import { getPresentableItems } from '@renderer/lib/presentability'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
+import {
+  getProjectionHeaderState,
+  startProjectionForRoute,
+  stopProjectionSession
+} from '@renderer/lib/projection-actions'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
-  const {
-    isProjectionOpen,
-    isProjectionBlanked,
-    openProjection,
-    closeProjection,
-    blankProjection
-  } = useProjection()
-  const confirm = useConfirm()
+  const { isProjectionOpen, startProjection, stopProjection } = useProjection()
   const mode = useTimerStore((s) => s.mode)
 
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
+  const fileItems = useFileExplorerStore((state) => state._itemsArray)
+  const biblePayloads = useBibleProjectionStore((state) => state.lastPayloads)
   const getFolderPath = useFileExplorerStore((state) => state.getFolderPath)
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const navigateToRoot = useFileExplorerStore((state) => state.navigateToRoot)
@@ -70,6 +75,19 @@ export default function Header(): React.JSX.Element {
   const showFavoritesControls = isFavoritesRoute(location.pathname)
   const showTrashControls = isTrashRoute(location.pathname)
   const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
+  const presentableItems = useMemo(
+    () =>
+      getPresentableItems(
+        fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
+      ),
+    [currentFolderId, fileItems]
+  )
+  const projectionHeaderState = getProjectionHeaderState({
+    pathname: location.pathname,
+    isProjectionOpen,
+    biblePayloads,
+    presentableItems
+  })
 
   const activeViewMode = showFavoritesControls
     ? favViewMode
@@ -97,22 +115,48 @@ export default function Header(): React.JSX.Element {
       ? trashSetSortFieldAndDir
       : setSortFieldAndDir
 
-  const handleCloseOrOpenProjection = async (): Promise<void> => {
+  const startCurrentRouteProjection = useCallback(async (): Promise<void> => {
+    if (isProjectionOpen || projectionHeaderState.disabled) return
+    await startProjectionForRoute({
+      pathname: location.pathname,
+      startProjection,
+      biblePayloads,
+      presentableItems,
+      startMediaPresentation: (items, startIndex) =>
+        useMediaProjectionStore.getState().startPresentationWithReadiness(items, startIndex),
+      onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+    })
+  }, [
+    biblePayloads,
+    isProjectionOpen,
+    location.pathname,
+    presentableItems,
+    projectionHeaderState.disabled,
+    startProjection,
+    t
+  ])
+
+  useKeyboardShortcuts(
+    [
+      {
+        config: SHORTCUTS.PROJECTION.START,
+        handler: () => {
+          void startCurrentRouteProjection()
+        },
+        id: 'projection.start',
+        description: t('shortcuts.projection.start')
+      }
+    ],
+    { sectionKey: 'projection' }
+  )
+
+  const handleProjectionAction = async (): Promise<void> => {
     if (!isProjectionOpen) {
-      await openProjection().catch(() => {
-        toast.danger(t('toast.projectionOpenFailed'))
-      })
+      await startCurrentRouteProjection()
       return
     }
-    const confirmed = await confirm({
-      status: 'warning',
-      title: t('projection.closeTitle'),
-      description: t('projection.closeConfirm'),
-      confirmLabel: t('common.close'),
-      cancelLabel: t('common.cancel')
-    })
-    if (!confirmed) return
-    await closeProjection().catch(() => {
+
+    await stopProjectionSession({ stopProjection }).catch(() => {
       toast.danger(t('toast.projectionCloseFailed'))
     })
   }
@@ -186,32 +230,19 @@ export default function Header(): React.JSX.Element {
         {(showBibleControls || showFilesControls) && (
           <SearchBarToggle variant={showBibleControls ? 'bible' : 'fileExplorer'} />
         )}
-        <ButtonGroup size="lg">
-          <Button
-            isIconOnly
-            variant="outline"
-            className={isProjectionBlanked ? 'text-default-foreground px-6' : 'text-danger px-6'}
-            onPress={() => blankProjection(!isProjectionBlanked)}
-            isDisabled={!isProjectionOpen}
-            aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
-          >
-            {isProjectionBlanked ? (
-              <Monitor className="size-4" />
-            ) : (
-              <MonitorOff className="size-4" />
-            )}
-          </Button>
-          <Button
-            isIconOnly
-            variant="outline"
-            className={isProjectionOpen ? 'text-danger px-6' : 'text-default-foreground px-6'}
-            onPress={handleCloseOrOpenProjection}
-            aria-label={t(isProjectionOpen ? 'projection.closeButton' : 'projection.openButton')}
-          >
-            {isProjectionOpen ? <X className="size-4" /> : <ExternalLink className="size-4" />}
-            <ButtonGroup.Separator className="text-default-foreground" />
-          </Button>
-        </ButtonGroup>
+        <Button
+          size="lg"
+          isIconOnly
+          variant="outline"
+          className={`size-10 min-w-10 rounded-full p-0 ${
+            isProjectionOpen ? 'text-danger' : 'text-default-foreground'
+          }`}
+          onPress={() => void handleProjectionAction()}
+          isDisabled={!isProjectionOpen && projectionHeaderState.disabled}
+          aria-label={t(isProjectionOpen ? 'projection.stopButton' : 'projection.startButton')}
+        >
+          {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}
+        </Button>
       </div>
     </header>
   )

@@ -1,0 +1,358 @@
+import { useEffect, useRef, useState } from 'react'
+import { Button } from '@heroui/react/button'
+import { toast } from '@heroui/react/toast'
+import { Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
+import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
+import { usePresentationCloseDecision } from '@renderer/contexts/PresentationCloseDecisionContext'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
+import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
+import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import {
+  getPresentationWorkspacePath,
+  isEditablePresentationMimeType,
+  isPresentationItem
+} from '@renderer/lib/presentation-media'
+import { startMediaProjection, stopProjectionSession } from '@renderer/lib/projection-actions'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
+import { isFileItem } from '@shared/types/folder'
+import type { FileItemRecord } from '@shared/types/folder'
+
+export default function PresentationWorkspaceHeader(): React.JSX.Element {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { isProjectionOpen, stopProjection } = useProjection()
+  const registry = usePresentationSessionRegistry()
+  const requestCloseDecision = usePresentationCloseDecision()
+  const runPresentationSafeAction = usePresentationSafeAction()
+  const documents = usePresentationWorkspaceStore((state) => state.documents)
+  const activeItemId = usePresentationWorkspaceStore((state) => state.activeItemId)
+  const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
+  const updateDocumentName = usePresentationWorkspaceStore((state) => state.updateDocumentName)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+  const activeSession = activeItemId ? registry.get(activeItemId) : undefined
+  const canUndo = activeDocument?.canUndo === true
+  const canRedo = activeDocument?.canRedo === true
+
+  useEffect(() => {
+    if (!editingItemId) return
+    editInputRef.current?.focus()
+    editInputRef.current?.select()
+  }, [editingItemId])
+
+  const activateDocument = async (itemId: string): Promise<void> => {
+    if (!(await registry.activate(itemId))) return
+    navigate(getPresentationWorkspacePath(itemId))
+  }
+
+  const closeTab = async (itemId: string): Promise<void> => {
+    let closed = await registry.close(itemId)
+    if (!closed) {
+      const decision = await requestCloseDecision([itemId])
+      if (decision === 'keep-editing') return
+      closed = await registry.close(itemId, decision)
+    }
+    if (!closed) return
+    const nextActiveItemId = usePresentationWorkspaceStore.getState().activeItemId
+    navigate(nextActiveItemId ? getPresentationWorkspacePath(nextActiveItemId) : '/files')
+  }
+
+  const startRename = (deck: { itemId: string; name: string }): void => {
+    const { base } = splitFileName(deck.name)
+    setEditingItemId(deck.itemId)
+    setEditingName(base)
+  }
+
+  const cancelRename = (): void => {
+    setEditingItemId(null)
+    setEditingName('')
+  }
+
+  const renameDocument = async (itemId: string, nextBaseName: string): Promise<void> => {
+    const trimmedBase = nextBaseName.trim()
+    const currentDeck = documents.find((deck) => deck.itemId === itemId)
+    if (!currentDeck) return
+    if (!validateDisplayName(trimmedBase)) {
+      toast.danger(t('fileExplorer.invalidName', 'Invalid name'))
+      return
+    }
+
+    const { extension } = splitFileName(currentDeck.name)
+    const nextName = `${trimmedBase}${extension}`
+    if (nextName === currentDeck.name) {
+      cancelRename()
+      return
+    }
+
+    const db = await openFileExplorerDB()
+    const item = await db.get('folder-items', itemId)
+    if (!item || !isFileItem(item)) return
+
+    const siblings = await db.getAllFromIndex('folder-items', 'by-parent', item.parentId)
+    const siblingNames = siblings
+      .filter(
+        (entry): entry is FileItemRecord =>
+          isFileItem(entry) && entry.id !== item.id && !entry.deletedAt
+      )
+      .map((entry) => entry.name)
+    if (hasNameConflict(nextName, siblingNames)) {
+      toast.danger(t('fileExplorer.fileAlreadyExists', 'A file with this name already exists'))
+      return
+    }
+
+    let nextSize = item.size
+    if (isEditablePresentationMimeType(item.mimeType)) {
+      const session = registry.get(itemId) ?? (await registry.open(item))
+      session.commitDraft()
+      session.rename(trimmedBase, nextName)
+      await session.flush()
+      nextSize = new Blob([JSON.stringify(session.getSnapshot().renderedDocument)]).size
+    }
+    useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName, size: nextSize })
+    updateDocumentName(itemId, nextName)
+    cancelRename()
+  }
+
+  const presentActiveDocument = async (from: 'beginning' | 'current'): Promise<void> => {
+    if (!activeDocument) return
+
+    const db = await openFileExplorerDB()
+    const item = await db.get('folder-items', activeDocument.itemId)
+    if (!item || !isFileItem(item) || !isPresentationItem(item)) return
+
+    const activeSlideId = usePresentationWorkspaceStore.getState().getActiveSlideId(item.id)
+    let slideIndex = 0
+    let slideCount = activeDocument.slideCount
+    if (isEditablePresentationMimeType(item.mimeType)) {
+      const session = registry.get(item.id)
+      if (!session) return
+      session.commitDraft()
+      await session.flush()
+      const document = session.getSnapshot().history.present
+      slideIndex = Math.max(0, document.slideOrder.indexOf(activeSlideId ?? ''))
+      slideCount = document.slideOrder.length
+    } else if (activeSlideId?.startsWith('pptx-slide-')) {
+      const parsedIndex = Number(activeSlideId.slice('pptx-slide-'.length))
+      if (Number.isInteger(parsedIndex) && parsedIndex >= 0) slideIndex = parsedIndex
+    }
+    if (from === 'beginning') slideIndex = 0
+    await startMediaProjection(
+      [item],
+      0,
+      { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+      {
+        prioritizeStartItem: true,
+        presentationState: {
+          slideIndex,
+          slideCount
+        }
+      }
+    )
+  }
+
+  const runPresentAction = (from: 'beginning' | 'current'): void => {
+    void presentActiveDocument(from).catch(() => {
+      toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
+    })
+  }
+
+  const handleProjectionAction = (): void => {
+    if (!isProjectionOpen) {
+      runPresentAction('current')
+      return
+    }
+
+    void stopProjectionSession({ stopProjection }).catch(() => {
+      toast.danger(t('toast.projectionCloseFailed'))
+    })
+  }
+
+  useKeyboardShortcuts(
+    [
+      {
+        id: 'presentation-start-beginning',
+        config: SHORTCUTS.PRESENTATION.START_FROM_BEGINNING,
+        description: t('presentationWorkspace.presentFromBeginning', 'Present from Beginning'),
+        handler: () => {
+          runPresentAction('beginning')
+        }
+      },
+      {
+        id: 'presentation-start-current',
+        config: SHORTCUTS.PRESENTATION.START_FROM_CURRENT,
+        description: t('presentationWorkspace.presentFromCurrent', 'Present from Current Slide'),
+        handler: () => {
+          runPresentAction('current')
+        }
+      },
+      {
+        id: 'presentation-undo',
+        config: SHORTCUTS.PRESENTATION.UNDO,
+        description: t('presentationWorkspace.undo', 'Undo'),
+        handler: () => {
+          if (activeDocument?.canUndo) activeSession?.undo()
+        }
+      },
+      {
+        id: 'presentation-redo',
+        config: SHORTCUTS.PRESENTATION.REDO,
+        description: t('presentationWorkspace.redo', 'Redo'),
+        handler: () => {
+          if (activeDocument?.canRedo) activeSession?.redo()
+        }
+      }
+    ],
+    { enabled: Boolean(activeSession), sectionKey: 'presentation' }
+  )
+
+  return (
+    <header className="relative flex h-11 shrink-0 items-end gap-1 bg-content1/80 px-3">
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-divider" />
+      <Button
+        isIconOnly
+        variant="ghost"
+        className="relative z-10 mb-1"
+        onPress={() => void runPresentationSafeAction(() => navigate('/files'))}
+        aria-label={t('presentationWorkspace.backToFiles')}
+      >
+        <Home size={18} />
+      </Button>
+      <Button
+        isIconOnly
+        variant="ghost"
+        className="relative z-10 mb-1"
+        isDisabled={!canUndo}
+        onPress={() => activeSession?.undo()}
+        aria-label={t('presentationWorkspace.undo', 'Undo')}
+      >
+        <Undo2 size={18} />
+      </Button>
+      <Button
+        isIconOnly
+        variant="ghost"
+        className="relative z-10 mb-1"
+        isDisabled={!canRedo}
+        onPress={() => activeSession?.redo()}
+        aria-label={t('presentationWorkspace.redo', 'Redo')}
+      >
+        <Redo2 size={18} />
+      </Button>
+      {documents.map((deck) => (
+        <div
+          key={deck.itemId}
+          role="button"
+          tabIndex={0}
+          className={`relative flex h-10 max-w-56 items-center gap-2 rounded-t-xl border px-3 text-sm ${
+            deck.itemId === activeItemId
+              ? 'z-20 -mb-px border-divider border-b-background bg-background text-foreground shadow-sm'
+              : 'z-10 mb-px border-transparent bg-content2 text-default-500 hover:text-foreground'
+          }`}
+          onClick={() => {
+            if (editingItemId !== deck.itemId) void activateDocument(deck.itemId)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              void activateDocument(deck.itemId)
+            }
+          }}
+        >
+          {editingItemId === deck.itemId ? (
+            <input
+              ref={editInputRef}
+              className="min-w-0 flex-1 rounded-md border border-primary/50 bg-background px-1 text-sm text-foreground outline-none"
+              value={editingName}
+              aria-label={t('fileExplorer.renameFile', 'Rename file')}
+              onChange={(event) => setEditingName(event.currentTarget.value)}
+              onClick={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onBlur={() => void renameDocument(deck.itemId, editingName)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  cancelRename()
+                  return
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void renameDocument(deck.itemId, editingName)
+                }
+              }}
+            />
+          ) : (
+            <span
+              className="min-w-0 flex-1 truncate"
+              onDoubleClick={(event) => {
+                event.stopPropagation()
+                startRename(deck)
+              }}
+            >
+              {deck.name}
+            </span>
+          )}
+          <button
+            type="button"
+            className="rounded p-0.5 hover:bg-black/10"
+            onClick={(event) => {
+              event.stopPropagation()
+              void closeTab(deck.itemId)
+            }}
+            aria-label={t('presentationWorkspace.closeTab', 'Close tab')}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      {activeDocument?.saveStatus && (
+        <div className="relative z-10 mb-1 ml-2 flex items-center gap-2 text-xs text-default-500">
+          <span role={activeDocument.saveStatus === 'error' ? 'alert' : undefined}>
+            {t(
+              `presentationWorkspace.saveStatus.${activeDocument.saveStatus}`,
+              activeDocument.saveStatus === 'dirty'
+                ? 'Unsaved'
+                : activeDocument.saveStatus === 'saving'
+                  ? 'Saving...'
+                  : activeDocument.saveStatus === 'error'
+                    ? 'Save failed'
+                    : 'Saved'
+            )}
+          </span>
+          {activeDocument.mirrorWarnings && activeDocument.mirrorWarnings.length > 0 && (
+            <span>{t('presentationWorkspace.previewWarning', 'Preview needs repair')}</span>
+          )}
+          {activeDocument.saveStatus === 'error' && (
+            <Button size="sm" variant="tertiary" onPress={() => activeSession?.retry()}>
+              {t('presentationWorkspace.retrySave', 'Retry save')}
+            </Button>
+          )}
+        </div>
+      )}
+      <div className="relative z-10 mb-1 ml-auto flex items-center">
+        <Button
+          size="lg"
+          isIconOnly
+          variant="outline"
+          className={`size-10 min-w-10 rounded-full p-0 ${
+            isProjectionOpen ? 'text-danger' : 'text-default-foreground'
+          }`}
+          onPress={handleProjectionAction}
+          isDisabled={!isProjectionOpen && !activeDocument}
+          aria-label={t(
+            isProjectionOpen ? 'projection.stopButton' : 'projection.startButton',
+            isProjectionOpen ? 'Stop projection' : 'Start projection'
+          )}
+        >
+          {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}
+        </Button>
+      </div>
+    </header>
+  )
+}

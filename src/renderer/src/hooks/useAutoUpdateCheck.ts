@@ -6,13 +6,14 @@ import { useUpdateStore } from '@renderer/stores/update'
 
 export function useAutoUpdateCheck(): void {
   const { t } = useTranslation()
-  const store = useUpdateStore()
 
   useEffect(() => {
     if (!isElectron()) return
 
     // Subscribe to status changes from main process
     const unsubscribe = window.api.update.onStatusChanged((data) => {
+      const store = useUpdateStore.getState()
+
       if (data.status === 'checking') store.check()
       else if (data.status === 'available' && data.version) {
         store.setAvailable(data.version)
@@ -25,5 +26,5 @@ export function useAutoUpdateCheck(): void {
     })
 
     return unsubscribe
-  }, []) // empty deps - mount once, store and t are stable
+  }, [t])
 }

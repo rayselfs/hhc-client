@@ -1,0 +1,7 @@
+FFmpeg source code:
+https://git.ffmpeg.org/ffmpeg.git
+
+Project website:
+https://ffmpeg.org/
+
+Bundled binary source/version/configure flags must be recorded in build-info.json before release.

@@ -1,0 +1,118 @@
+import { describe, it, expect } from 'vitest'
+import { isPresentable, getMediaType, getPresentableItems } from '@renderer/lib/presentability'
+import type { AnyItemRecord, FileItemRecord, VerseItemRecord } from '@shared/types/folder'
+
+describe('isPresentable', () => {
+  it.each([
+    ['image/png', true],
+    ['image/jpeg', true],
+    ['image/gif', true],
+    ['image/webp', true],
+    ['video/mp4', true],
+    ['video/webm', true],
+    ['video/ogg', true],
+    ['video/quicktime', true],
+    ['application/pdf', true],
+    ['application/vnd.openxmlformats-officedocument.presentationml.presentation', true],
+    ['video/x-matroska', true],
+    ['text/plain', false],
+    ['application/json', false],
+    ['audio/mpeg', true]
+  ])('isPresentable(%s) → %s', (mime, expected) => {
+    expect(isPresentable(mime)).toBe(expected)
+  })
+
+  it('allows Electron desktop-engine videos as presentation candidates', () => {
+    expect(isPresentable('video/x-matroska', 'electron')).toBe(true)
+    expect(isPresentable('video/x-matroska', 'web')).toBe(true)
+  })
+})
+
+describe('getMediaType', () => {
+  it.each([
+    ['image/png', 'image'],
+    ['image/jpeg', 'image'],
+    ['video/mp4', 'video'],
+    ['video/webm', 'video'],
+    ['application/pdf', 'pdf'],
+    ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'presentation'],
+    ['text/plain', null],
+    ['audio/mpeg', 'video']
+  ] as const)('getMediaType(%s) → %s', (mime, expected) => {
+    expect(getMediaType(mime)).toBe(expected)
+  })
+
+  it('resolves Electron desktop-engine videos to video', () => {
+    expect(getMediaType('video/x-matroska', 'electron')).toBe('video')
+    expect(getMediaType('video/x-matroska', 'web')).toBe('video')
+  })
+})
+
+describe('getPresentableItems', () => {
+  const file = (id: string, mimeType: string): FileItemRecord => ({
+    id,
+    name: `${id}.file`,
+    mimeType,
+    type: 'file',
+    sortIndex: 0,
+    parentId: 'root',
+    size: 100,
+    url: `https://example.com/${id}`,
+    createdAt: Date.now(),
+    expiresAt: null
+  })
+
+  const verse: VerseItemRecord = {
+    id: 'v1',
+    type: 'verse',
+    sortIndex: 0,
+    parentId: 'root',
+    createdAt: Date.now(),
+    expiresAt: null,
+    versionId: 1,
+    bookNumber: 1,
+    chapter: 1,
+    verse: 1,
+    text: 'In the beginning'
+  }
+
+  it('filters to only presentable file items', () => {
+    const items: AnyItemRecord[] = [
+      file('img', 'image/png'),
+      file('vid', 'video/mp4'),
+      file('audio', 'audio/mpeg'),
+      file('deck', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'),
+      file('txt', 'text/plain'),
+      verse
+    ]
+    const result = getPresentableItems(items)
+    expect(result).toHaveLength(4)
+    expect(result[0].id).toBe('img')
+    expect(result[1].id).toBe('vid')
+    expect(result[2].id).toBe('audio')
+    expect(result[3].id).toBe('deck')
+  })
+
+  it('includes Electron desktop-engine video candidates', () => {
+    const items: AnyItemRecord[] = [
+      file('mkv', 'video/x-matroska'),
+      file('txt', 'text/plain'),
+      verse
+    ]
+    const result = getPresentableItems(items, 'electron')
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('mkv')
+  })
+
+  it('excludes unsupported placeholder items from presentation candidates', () => {
+    const unsupported = file('avi', 'video/x-msvideo')
+    unsupported.url = `unsupported:${unsupported.id}`
+
+    expect(getPresentableItems([unsupported], 'electron')).toHaveLength(0)
+  })
+
+  it('returns empty for no presentable items', () => {
+    const items: AnyItemRecord[] = [file('txt', 'text/plain'), verse]
+    expect(getPresentableItems(items)).toHaveLength(0)
+  })
+})

@@ -1,28 +1,45 @@
-import { renderHook, act } from '@testing-library/react'
-import type { ProjectionAdapter } from '@renderer/lib/projection-adapter'
+import { act, renderHook } from '@testing-library/react'
+import { createProjectionAdapter, type ProjectionAdapter } from '@renderer/lib/projection-adapter'
+import type { ProjectionVlcFailure } from '@shared/ipc-channels'
+import type {
+  ProjectionChannel,
+  ProjectionLifecycleEvent,
+  ProjectionPayload
+} from '@shared/projection-messages'
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn(() => false)
 }))
 
-const mockAdapter: ProjectionAdapter & { _trigger: (channel: string, data: unknown) => void } =
-  (() => {
-    const handlers = new Map<string, Set<(data: unknown) => void>>()
-    return {
-      send: vi.fn(),
-      on: vi.fn((channel: string, handler: (data: unknown) => void) => {
-        if (!handlers.has(channel)) handlers.set(channel, new Set())
-        handlers.get(channel)!.add(handler)
-        return () => {
-          handlers.get(channel)?.delete(handler)
-        }
-      }),
-      dispose: vi.fn(),
-      _trigger(channel: string, data: unknown) {
-        handlers.get(channel)?.forEach((h) => h(data))
-      }
+type TestAdapter = ProjectionAdapter & {
+  _trigger<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void
+  _reset(): void
+}
+
+const mockAdapter: TestAdapter = (() => {
+  const handlers = new Map<string, Set<(data: unknown) => void>>()
+  let generation = 0
+  return {
+    setGeneration: vi.fn((nextGeneration: number) => {
+      generation = nextGeneration
+    }),
+    getGeneration: vi.fn(() => generation),
+    send: vi.fn(),
+    on: vi.fn((channel: string, handler: (data: unknown) => void) => {
+      if (!handlers.has(channel)) handlers.set(channel, new Set())
+      handlers.get(channel)?.add(handler)
+      return () => handlers.get(channel)?.delete(handler)
+    }),
+    dispose: vi.fn(),
+    _trigger(channel, data) {
+      handlers.get(channel)?.forEach((handler) => handler(data))
+    },
+    _reset() {
+      generation = 0
+      handlers.clear()
     }
-  })()
+  } as TestAdapter
+})()
 
 vi.mock('@renderer/lib/projection-adapter', () => ({
   createProjectionAdapter: vi.fn(() => mockAdapter)
@@ -34,9 +51,16 @@ import { ProjectionProvider, useProjection } from '../ProjectionContext'
 const mockWindowOpen = vi.fn<(url?: string, target?: string) => Window | null>()
 const originalOpen = window.open
 
+function renderProjection(): ReturnType<
+  typeof renderHook<ReturnType<typeof useProjection>, unknown>
+> {
+  return renderHook(() => useProjection(), { wrapper: ProjectionProvider })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
+  mockAdapter._reset()
   window.open = mockWindowOpen as unknown as typeof window.open
   mockWindowOpen.mockReturnValue({ closed: false, close: vi.fn() } as unknown as Window)
 })
@@ -46,507 +70,249 @@ afterEach(() => {
   window.open = originalOpen
 })
 
-function renderProjection(): ReturnType<
-  typeof renderHook<ReturnType<typeof useProjection>, unknown>
-> {
-  return renderHook(() => useProjection(), { wrapper: ProjectionProvider })
-}
+describe('ProjectionContext web recovery', () => {
+  const mockProjectionVlcStop = vi.fn(() => Promise.resolve())
 
-describe('ProjectionContext — web mode', () => {
   beforeEach(() => {
     vi.mocked(isElectron).mockReturnValue(false)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        projectionVlc: {
+          stop: mockProjectionVlcStop
+        }
+      }
+    })
   })
 
-  it('useProjection throws outside ProjectionProvider', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    expect(() => renderHook(() => useProjection())).toThrow(
-      'useProjection must be used within a ProjectionProvider'
-    )
-    spy.mockRestore()
-  })
-
-  it('does NOT auto-open projection window on mount', () => {
+  it('does not open projection on mount', () => {
     renderProjection()
     expect(mockWindowOpen).not.toHaveBeenCalled()
   })
 
-  it('isProjectionBlanked is true initially', () => {
+  it('opens a session-isolated browser projection window', () => {
     const { result } = renderProjection()
-    expect(result.current.isProjectionBlanked).toBe(true)
+
+    act(() => {
+      void result.current.startProjection('timer')
+    })
+
+    const [url, target] = mockWindowOpen.mock.calls[0]
+    const sessionId = new URLSearchParams(String(url).split('?')[1]).get('session')
+    expect(sessionId).toMatch(/^[0-9a-f-]+$/i)
+    expect(target).toBe(`hhc-projection-${sessionId}`)
+    expect(createProjectionAdapter).toHaveBeenCalledWith('main', sessionId)
   })
 
-  it('isProjectionOpen is false initially, becomes true on __system:pong', () => {
+  it('returns popup-blocked and keeps a retryable failed state', async () => {
+    mockWindowOpen.mockReturnValue(null)
     const { result } = renderProjection()
+    let operation
+
+    await act(async () => {
+      operation = await result.current.startProjection('timer', [
+        ['timer:overtime-message', { message: 'saved' }]
+      ])
+    })
+
+    expect(operation).toEqual({ ok: false, generation: 1, reason: 'popup-blocked' })
+    expect(result.current.recovery).toEqual({
+      status: 'failed',
+      generation: 1,
+      failure: { generation: 1, reason: 'popup-blocked' }
+    })
+  })
+
+  it('resolves a start only after matching ready and replays the snapshot', async () => {
+    const { result } = renderProjection()
+    let operationPromise: ReturnType<typeof result.current.startProjection>
+
+    act(() => {
+      operationPromise = result.current.startProjection('timer', [
+        ['timer:overtime-message', { message: 'saved' }]
+      ])
+    })
+    expect(mockAdapter.send).not.toHaveBeenCalled()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 1 })
+    })
+
+    await expect(operationPromise!).resolves.toEqual({ ok: true, generation: 1 })
+    expect(mockAdapter.send).toHaveBeenCalledWith(
+      '__system:replay',
+      expect.objectContaining({ generation: 1 })
+    )
+  })
+
+  it('ignores stale ready and reports a five-second timeout', async () => {
+    const { result } = renderProjection()
+    let operationPromise: ReturnType<typeof result.current.startProjection>
+
+    act(() => {
+      operationPromise = result.current.startProjection('timer')
+      mockAdapter._trigger('__system:ready', { generation: 2 })
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+
+    await expect(operationPromise!).resolves.toEqual({
+      ok: false,
+      generation: 1,
+      reason: 'ready-timeout'
+    })
+  })
+
+  it('retries a blocked popup with a newer generation', async () => {
+    mockWindowOpen.mockReturnValueOnce(null)
+    const { result } = renderProjection()
+    await act(async () => {
+      await result.current.startProjection('bible', [])
+    })
+
+    let retryPromise: ReturnType<typeof result.current.retryProjection>
+    act(() => {
+      retryPromise = result.current.retryProjection()
+    })
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 2 })
+    })
+
+    await expect(retryPromise!).resolves.toEqual({ ok: true, generation: 2 })
+    expect(mockWindowOpen).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not focus browser windows for explicit foreground intent', async () => {
+    const focus = vi.spyOn(window, 'focus').mockImplementation(() => undefined)
+    const { result } = renderProjection()
+    let operationPromise: ReturnType<typeof result.current.startProjection>
+
+    act(() => {
+      operationPromise = result.current.startProjection('timer')
+      mockAdapter._trigger('__system:ready', { generation: 1 })
+    })
+    await operationPromise!
+
+    expect(focus).not.toHaveBeenCalled()
+  })
+
+  it('ends the session when popup polling observes an explicit close', async () => {
+    const popup = { closed: false, close: vi.fn() } as unknown as Window
+    mockWindowOpen.mockReturnValue(popup)
+    const { result } = renderProjection()
+    let operationPromise: ReturnType<typeof result.current.startProjection>
+    act(() => {
+      operationPromise = result.current.startProjection('timer')
+      mockAdapter._trigger('__system:ready', { generation: 1 })
+    })
+    await operationPromise!
+
+    Object.defineProperty(popup, 'closed', { value: true })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+
     expect(result.current.isProjectionOpen).toBe(false)
-
-    act(() => {
-      mockAdapter._trigger('__system:pong', null)
-    })
-    expect(result.current.isProjectionOpen).toBe(true)
+    expect(result.current.recovery.status).toBe('closed')
   })
 
-  it('isProjectionOpen becomes false on __system:closed', () => {
+  it('blacks out and resumes retained content without focusing or closing projection', async () => {
+    const focus = vi.spyOn(window, 'focus').mockImplementation(() => undefined)
     const { result } = renderProjection()
+    let operationPromise: ReturnType<typeof result.current.startProjection>
 
     act(() => {
-      mockAdapter._trigger('__system:pong', null)
+      operationPromise = result.current.startProjection('media', [
+        [
+          'file:show',
+          {
+            itemId: 'video-1',
+            blobId: 'blob-1',
+            fileName: 'video.mp4',
+            mimeType: 'video/mp4',
+            playlist: [],
+            currentIndex: 0
+          }
+        ]
+      ])
+      mockAdapter._trigger('__system:ready', { generation: 1 })
     })
-    expect(result.current.isProjectionOpen).toBe(true)
+    await operationPromise!
 
-    act(() => {
-      mockAdapter._trigger('__system:closed', null)
+    expect(result.current.sessionSummary).toMatchObject({
+      owner: 'media',
+      status: 'projecting',
+      label: 'video.mp4',
+      isBlackout: false
     })
-    expect(result.current.isProjectionOpen).toBe(false)
+
+    await act(async () => {
+      await result.current.blackoutProjection(true)
+    })
+
+    expect(mockProjectionVlcStop).toHaveBeenCalledOnce()
+    expect(result.current.sessionSummary).toMatchObject({
+      owner: 'media',
+      status: 'connected',
+      label: 'video.mp4',
+      isBlackout: true
+    })
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blackout', { enabled: true })
+
+    await act(async () => {
+      await result.current.blackoutProjection(false)
+    })
+
+    expect(result.current.sessionSummary.status).toBe('projecting')
+    expect(result.current.getProjectionSnapshot()?.media.show?.fileName).toBe('video.mp4')
+    expect(focus).not.toHaveBeenCalled()
+    expect(mockWindowOpen).toHaveBeenCalledOnce()
   })
 
-  it('handles window.open returning null (popup blocked)', async () => {
+  it('maps popup failure to a failed session summary', async () => {
     mockWindowOpen.mockReturnValue(null)
     const { result } = renderProjection()
 
     await act(async () => {
-      await result.current.openProjection()
-    })
-    expect(result.current.isProjectionOpen).toBe(false)
-  })
-
-  it('openProjection opens a new window', async () => {
-    const { result } = renderProjection()
-    mockWindowOpen.mockClear()
-
-    await act(async () => {
-      await result.current.openProjection()
-    })
-    expect(mockWindowOpen).toHaveBeenCalledOnce()
-  })
-
-  it('openProjection does nothing if popup blocked', async () => {
-    mockWindowOpen.mockReturnValue(null)
-    const { result } = renderProjection()
-
-    await act(async () => {
-      await result.current.openProjection()
-    })
-    expect(result.current.isProjectionOpen).toBe(false)
-  })
-
-  it('closeProjection sends __system:close and sets isProjectionOpen false', async () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:pong', null)
-    })
-    expect(result.current.isProjectionOpen).toBe(true)
-
-    await act(async () => {
-      await result.current.closeProjection()
-    })
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:close', null)
-    expect(result.current.isProjectionOpen).toBe(false)
-  })
-
-  it('send delegates to adapter', () => {
-    const { result } = renderProjection()
-    act(() => {
-      result.current.send('timer:overtime-message', { message: 'test' })
-    })
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'test' })
-  })
-
-  it('on delegates to adapter and returns unsubscribe', () => {
-    const { result } = renderProjection()
-    const handler = vi.fn()
-    let unsub: () => void = () => {}
-
-    act(() => {
-      unsub = result.current.on('timer:overtime-message', handler)
-    })
-    expect(mockAdapter.on).toHaveBeenCalledWith('timer:overtime-message', handler)
-    expect(typeof unsub).toBe('function')
-  })
-
-  it('__system:ready sets projection ready', () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
+      await result.current.startProjection('timer')
     })
 
-    act(() => {
-      mockAdapter._trigger('__system:pong', null)
+    expect(result.current.sessionSummary).toEqual({
+      owner: 'timer',
+      status: 'failed',
+      label: null,
+      isBlackout: false,
+      failure: { generation: 1, reason: 'popup-blocked' }
     })
-    expect(result.current.isProjectionOpen).toBe(true)
-  })
-
-  it('project() buffers payload when projection is not ready', async () => {
-    const { result } = renderProjection()
-    expect(result.current.isProjectionBlanked).toBe(true)
-
-    await act(async () => {
-      await result.current.project('timer:overtime-message', { message: 'hello' })
-    })
-
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'hello'
-    })
-    expect(result.current.isProjectionBlanked).toBe(true)
-  })
-
-  it('project() with autoOpen buffers payload and flushes on __system:ready', async () => {
-    const { result } = renderProjection()
-
-    await act(async () => {
-      await result.current.project(
-        'timer:overtime-message',
-        { message: 'buffered' },
-        { autoOpen: true }
-      )
-    })
-
-    expect(mockWindowOpen).toHaveBeenCalledOnce()
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'buffered'
-    })
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'buffered'
-    })
-  })
-
-  it('project() latest-wins: second call to same channel replaces first', async () => {
-    const { result } = renderProjection()
-
-    await act(async () => {
-      await result.current.project('timer:overtime-message', { message: 'first' })
-    })
-    await act(async () => {
-      await result.current.project('timer:overtime-message', { message: 'second' })
-    })
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'first'
-    })
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'second'
-    })
-  })
-
-  it('project() timeout: pending cleared after 5s if ready never arrives', async () => {
-    const { result } = renderProjection()
-
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    await act(async () => {
-      await result.current.project(
-        'timer:overtime-message',
-        { message: 'timeout-test' },
-        { autoOpen: true }
-      )
-    })
-
-    act(() => {
-      vi.advanceTimersByTime(5000)
-    })
-
-    expect(warnSpy).toHaveBeenCalledWith('[Projection] Ready timeout — discarding pending payloads')
-
-    vi.mocked(mockAdapter.send).mockClear()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'timeout-test'
-    })
-
-    warnSpy.mockRestore()
-  })
-
-  it('project() does not unblank on flush (use claimProjection instead)', async () => {
-    const { result } = renderProjection()
-
-    await act(async () => {
-      await result.current.project(
-        'timer:overtime-message',
-        { message: 'show-me' },
-        { autoOpen: true }
-      )
-    })
-
-    expect(result.current.isProjectionBlanked).toBe(true)
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'show-me'
-    })
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
-    expect(result.current.isProjectionBlanked).toBe(true)
-  })
-
-  it('__system:closed clears pending payloads', async () => {
-    const { result } = renderProjection()
-
-    await act(async () => {
-      await result.current.project('timer:overtime-message', { message: 'will-be-cleared' })
-    })
-
-    act(() => {
-      mockAdapter._trigger('__system:closed', null)
-    })
-
-    vi.mocked(mockAdapter.send).mockClear()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'will-be-cleared'
-    })
-  })
-
-  it('project() skips ready wait when already ready', async () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    await act(async () => {
-      await result.current.project('timer:overtime-message', { message: 'hello' })
-    })
-
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
-    expect(result.current.isProjectionBlanked).toBe(true)
-  })
-
-  it('project() does not unblank projection (pure transport)', async () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    await act(async () => {
-      await result.current.project('timer:overtime-message', { message: 'hello' })
-    })
-
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
-    expect(result.current.isProjectionBlanked).toBe(true)
-  })
-
-  it('blankProjection(true) sets isProjectionBlanked true and sends __system:blank', () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    act(() => {
-      result.current.blankProjection(false)
-    })
-    expect(result.current.isProjectionBlanked).toBe(false)
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
-
-    vi.mocked(mockAdapter.send).mockClear()
-    act(() => {
-      result.current.blankProjection(true)
-    })
-    expect(result.current.isProjectionBlanked).toBe(true)
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: true })
-  })
-
-  it('closeProjection resets isProjectionBlanked to true', async () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      result.current.blankProjection(false)
-    })
-    expect(result.current.isProjectionBlanked).toBe(false)
-
-    await act(async () => {
-      await result.current.closeProjection()
-    })
-    expect(result.current.isProjectionBlanked).toBe(true)
-  })
-
-  it('__system:closed resets isProjectionBlanked to true', () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      result.current.blankProjection(false)
-    })
-    expect(result.current.isProjectionBlanked).toBe(false)
-
-    act(() => {
-      mockAdapter._trigger('__system:closed', null)
-    })
-    expect(result.current.isProjectionBlanked).toBe(true)
-  })
-
-  it('__system:closed resets ready state so project() buffers instead of sending', async () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    act(() => {
-      mockAdapter._trigger('__system:closed', null)
-    })
-
-    vi.mocked(mockAdapter.send).mockClear()
-
-    await act(async () => {
-      await result.current.project('timer:overtime-message', { message: 'new content' })
-    })
-
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
-      message: 'new content'
-    })
-  })
-
-  it('polling detects closed window', async () => {
-    const fakeWindow = { closed: false, close: vi.fn() }
-    mockWindowOpen.mockReturnValue(fakeWindow as unknown as Window)
-
-    const { result } = renderProjection()
-
-    await act(async () => {
-      await result.current.openProjection()
-    })
-
-    act(() => {
-      mockAdapter._trigger('__system:pong', null)
-    })
-    expect(result.current.isProjectionOpen).toBe(true)
-
-    fakeWindow.closed = true
-    act(() => {
-      vi.advanceTimersByTime(1000)
-    })
-    expect(result.current.isProjectionOpen).toBe(false)
-  })
-
-  it('cleanup disposes adapter and closes projection window', async () => {
-    const fakeWindow = { closed: false, close: vi.fn() }
-    mockWindowOpen.mockReturnValue(fakeWindow as unknown as Window)
-
-    const { result, unmount } = renderProjection()
-
-    await act(async () => {
-      await result.current.openProjection()
-    })
-
-    unmount()
-
-    expect(fakeWindow.close).toHaveBeenCalled()
-    expect(mockAdapter.dispose).toHaveBeenCalled()
   })
 })
 
-describe('ProjectionContext — claimProjection', () => {
-  beforeEach(() => {
-    vi.mocked(isElectron).mockReturnValue(false)
-  })
-
-  it('claimProjection sets activeOwner and sends __system:active-owner', () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    act(() => {
-      result.current.claimProjection('bible')
-    })
-
-    expect(result.current.activeOwner).toBe('bible')
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:active-owner', { owner: 'bible' })
-  })
-
-  it('claimProjection with unblank: true unblanks when currently blanked', () => {
-    const { result } = renderProjection()
-    expect(result.current.isProjectionBlanked).toBe(true)
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    act(() => {
-      result.current.claimProjection('timer', { unblank: true })
-    })
-
-    expect(result.current.isProjectionBlanked).toBe(false)
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
-  })
-
-  it('claimProjection with unblank: true does not send __system:blank if already unblanked', () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      result.current.blankProjection(false)
-    })
-    vi.mocked(mockAdapter.send).mockClear()
-
-    act(() => {
-      result.current.claimProjection('timer', { unblank: true })
-    })
-
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
-    expect(result.current.isProjectionBlanked).toBe(false)
-  })
-
-  it('claimProjection without options does not change blank state', () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      result.current.claimProjection('bible')
-    })
-
-    expect(result.current.isProjectionBlanked).toBe(true)
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
-  })
-
-  it('claimProjection with unblank: false does not unblank', () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      result.current.claimProjection('bible', { unblank: false })
-    })
-
-    expect(result.current.isProjectionBlanked).toBe(true)
-    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
-  })
-})
-
-describe('ProjectionContext — electron mode', () => {
+describe('ProjectionContext Electron recovery', () => {
+  let lifecycleCallback: ((event: ProjectionLifecycleEvent) => void) | null
+  let vlcFailureCallback: ((failure: ProjectionVlcFailure) => void) | null
+  let vlcStartedCallback: ((generation: number, itemId: string) => void) | null
   let mockCheck: ReturnType<typeof vi.fn>
   let mockEnsure: ReturnType<typeof vi.fn>
+  let mockRetry: ReturnType<typeof vi.fn>
   let mockClose: ReturnType<typeof vi.fn>
-  let openedCallback: (() => void) | null
-  let closedCallback: (() => void) | null
-  const unsubOpened = vi.fn()
-  const unsubClosed = vi.fn()
+  const unsubscribeLifecycle = vi.fn()
+  const unsubscribeVlcFailure = vi.fn()
+  const unsubscribeVlcStarted = vi.fn()
 
   beforeEach(() => {
     vi.mocked(isElectron).mockReturnValue(true)
-    openedCallback = null
-    closedCallback = null
-    mockCheck = vi.fn(() => Promise.resolve({ exists: false }))
-    mockEnsure = vi.fn(() => Promise.resolve({ created: true }))
+    lifecycleCallback = null
+    vlcFailureCallback = null
+    vlcStartedCallback = null
+    mockCheck = vi.fn(() =>
+      Promise.resolve({
+        exists: false,
+        lifecycle: { generation: 0, status: 'closed', reason: 'user-close' }
+      })
+    )
+    mockEnsure = vi.fn(() => Promise.resolve({ created: true, generation: 4 }))
+    mockRetry = vi.fn(() => Promise.resolve({ retried: true, generation: 5 }))
     mockClose = vi.fn(() => Promise.resolve({ closed: true }))
 
     Object.defineProperty(window, 'api', {
@@ -554,91 +320,393 @@ describe('ProjectionContext — electron mode', () => {
         projection: {
           check: mockCheck,
           ensure: mockEnsure,
+          retry: mockRetry,
+          getGeneration: vi.fn(),
+          moveToDisplay: vi.fn(),
+          bringToFront: vi.fn(() => Promise.resolve({ broughtToFront: true })),
           close: mockClose,
+          getDisplays: vi.fn(),
           send: vi.fn(),
-          onProjectionOpened: vi.fn((cb: () => void) => {
-            openedCallback = cb
-            return unsubOpened
+          sendToMain: vi.fn(),
+          onProjectionMessage: vi.fn(() => vi.fn()),
+          onProjectionLifecycle: vi.fn((callback: (event: ProjectionLifecycleEvent) => void) => {
+            lifecycleCallback = callback
+            return unsubscribeLifecycle
+          })
+        },
+        projectionVlc: {
+          stop: vi.fn(() => Promise.resolve()),
+          onFailure: vi.fn((callback: (failure: ProjectionVlcFailure) => void) => {
+            vlcFailureCallback = callback
+            return unsubscribeVlcFailure
           }),
-          onProjectionClosed: vi.fn((cb: () => void) => {
-            closedCallback = cb
-            return unsubClosed
-          }),
-          onProjectionMessage: vi.fn(() => vi.fn())
+          onStarted: vi.fn((callback: (generation: number, itemId: string) => void) => {
+            vlcStartedCallback = callback
+            return unsubscribeVlcStarted
+          })
         }
       },
-      writable: true,
       configurable: true
     })
   })
 
-  it('checks existing projection on mount', async () => {
-    renderProjection()
-    expect(mockCheck).toHaveBeenCalledOnce()
-  })
-
-  it('does not call window.open in electron mode', () => {
-    renderProjection()
-    expect(mockWindowOpen).not.toHaveBeenCalled()
-  })
-
-  it('sets isProjectionOpen true when check returns exists: true', async () => {
-    mockCheck.mockResolvedValue({ exists: true })
-    const { result } = renderProjection()
-
+  async function startReadyVlcMedia(
+    result: ReturnType<typeof renderProjection>['result'],
+    itemId = 'item-1'
+  ): Promise<void> {
+    let startPromise: ReturnType<typeof result.current.startProjection>
     await act(async () => {
+      startPromise = result.current.startProjection('media', [
+        [
+          'file:show',
+          {
+            itemId,
+            blobId: `blob-${itemId}`,
+            fileName: `${itemId}.mp4`,
+            mimeType: 'video/mp4',
+            playlist: [],
+            currentIndex: 0,
+            playbackMode: 'vlc-embedded'
+          }
+        ]
+      ])
       await Promise.resolve()
     })
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 4 })
+    })
+    await act(async () => {
+      await startPromise!
+    })
+  }
+
+  function publishVlcFailure(itemId = 'item-1'): void {
+    act(() => {
+      vlcFailureCallback?.({
+        itemId,
+        code: 'playback-failed',
+        recoverable: true,
+        message: 'VLC playback stopped unexpectedly.'
+      })
+    })
+  }
+
+  it('does not treat an existing window as ready until matching ready arrives', async () => {
+    mockCheck.mockResolvedValue({
+      exists: true,
+      lifecycle: { generation: 4, status: 'opening', reason: 'reload' }
+    })
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+
     expect(result.current.isProjectionOpen).toBe(true)
+    expect(result.current.recovery.status).toBe('opening')
+    await act(async () => {
+      await result.current.project('timer:overtime-message', { message: 'buffered' })
+    })
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', expect.anything())
   })
 
-  it('responds to projection opened/closed IPC events', async () => {
+  it('resolves explicit start after the matching Electron ready', async () => {
     const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    let operationPromise: ReturnType<typeof result.current.startProjection>
+
     await act(async () => {
+      operationPromise = result.current.startProjection('timer')
       await Promise.resolve()
     })
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 4 })
+    })
 
-    expect(result.current.isProjectionOpen).toBe(false)
+    await expect(operationPromise!).resolves.toEqual({ ok: true, generation: 4 })
+  })
+
+  it('reflects recovering and failed lifecycle events without foreground actions', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
 
     act(() => {
-      openedCallback?.()
+      lifecycleCallback?.({ generation: 4, status: 'recovering', reason: 'renderer-crash' })
     })
-    expect(result.current.isProjectionOpen).toBe(true)
+    expect(result.current.recovery.status).toBe('recovering')
 
     act(() => {
-      closedCallback?.()
+      lifecycleCallback?.({ generation: 4, status: 'failed', reason: 'renderer-crash' })
     })
-    expect(result.current.isProjectionOpen).toBe(false)
+    expect(result.current.recovery).toEqual({
+      status: 'failed',
+      generation: 4,
+      failure: { generation: 4, reason: 'renderer-crash' }
+    })
   })
 
-  it('openProjection calls api.projection.ensure', async () => {
+  it('stores only the latest current VLC runtime failure', async () => {
     const { result } = renderProjection()
-    await act(async () => {
-      await Promise.resolve()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+
+    act(() => {
+      vlcFailureCallback?.({
+        itemId: 'item-1',
+        code: 'media-open-failed',
+        recoverable: true,
+        message: 'VLC could not open this media.'
+      })
+      vlcFailureCallback?.({
+        itemId: 'item-1',
+        code: 'playback-failed',
+        recoverable: true,
+        message: 'VLC playback stopped unexpectedly.'
+      })
     })
 
-    await act(async () => {
-      await result.current.openProjection()
+    expect(result.current.vlcFailure).toEqual({
+      itemId: 'item-1',
+      code: 'playback-failed',
+      recoverable: true,
+      message: 'VLC playback stopped unexpectedly.'
     })
-    expect(mockEnsure).toHaveBeenCalledOnce()
   })
 
-  it('closeProjection calls api.projection.close', async () => {
+  it('ignores a VLC failure that does not match the current ready media snapshot', async () => {
     const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+
+    publishVlcFailure('item-stale')
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when projection closes', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+    expect(result.current.vlcFailure).not.toBeNull()
+
     await act(async () => {
+      await result.current.closeProjection()
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when media switches to an image', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+
+    await act(async () => {
+      await result.current.project('file:show', {
+        itemId: 'image-1',
+        blobId: 'blob-image-1',
+        fileName: 'image.png',
+        mimeType: 'image/png',
+        playlist: [],
+        currentIndex: 0,
+        playbackMode: 'native'
+      })
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when another owner claims projection', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+
+    act(() => {
+      result.current.claimProjection('bible')
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when the projection lifecycle is replaced', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+
+    act(() => {
+      lifecycleCallback?.({ generation: 5, status: 'opening', reason: 'reload' })
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('keeps a VLC failure through replay and a repeated failed start', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    const media = {
+      itemId: 'item-1',
+      blobId: 'blob-1',
+      fileName: 'video.mp4',
+      mimeType: 'video/mp4',
+      playlist: [],
+      currentIndex: 0,
+      playbackMode: 'vlc-embedded' as const
+    }
+    let startPromise: ReturnType<typeof result.current.startProjection>
+    await act(async () => {
+      startPromise = result.current.startProjection('media', [['file:show', media]])
       await Promise.resolve()
+    })
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 4 })
+    })
+    await act(async () => {
+      await startPromise!
+    })
+    act(() => {
+      vlcFailureCallback?.({
+        itemId: 'item-1',
+        code: 'playback-failed',
+        recoverable: true,
+        message: 'VLC playback stopped unexpectedly.'
+      })
+    })
+    mockRetry.mockResolvedValueOnce({ retried: false, generation: 4 })
+    vi.mocked(mockAdapter.send).mockClear()
+
+    let retryResult
+    await act(async () => {
+      retryResult = await result.current.retryProjection()
+    })
+    expect(retryResult).toEqual({ ok: true, generation: 4 })
+    expect(mockRetry).not.toHaveBeenCalled()
+    expect(mockAdapter.send).toHaveBeenCalledWith(
+      '__system:replay',
+      expect.objectContaining({
+        generation: 4,
+        snapshot: expect.objectContaining({
+          media: expect.objectContaining({ show: media })
+        })
+      })
+    )
+    expect(result.current.vlcFailure).not.toBeNull()
+
+    act(() => {
+      vlcFailureCallback?.({
+        itemId: 'item-1',
+        code: 'media-open-failed',
+        recoverable: true,
+        message: 'VLC could not open this media.'
+      })
+    })
+    expect(result.current.vlcFailure?.code).toBe('media-open-failed')
+  })
+
+  it.each([
+    ['same-item', 'item-1', 'item-1', 4, false, true],
+    ['cross-item', 'item-2', 'item-2', 4, true, true],
+    ['stale-item', 'item-2', 'item-1', 4, true, true],
+    ['stale-generation', 'item-1', 'item-1', 3, false, false]
+  ] as const)(
+    'handles a %s VLC started acknowledgement against the current media snapshot',
+    async (
+      _case,
+      currentItemId,
+      startedItemId,
+      startedGeneration,
+      shouldClearOnProject,
+      shouldClearAfterStarted
+    ) => {
+      const { result } = renderProjection()
+      await act(async () => Promise.resolve())
+      const failedMedia = {
+        itemId: 'item-1',
+        blobId: 'blob-1',
+        fileName: 'video.mp4',
+        mimeType: 'video/mp4',
+        playlist: [],
+        currentIndex: 0,
+        playbackMode: 'vlc-embedded' as const
+      }
+      let startPromise: ReturnType<typeof result.current.startProjection>
+      await act(async () => {
+        startPromise = result.current.startProjection('media', [['file:show', failedMedia]])
+        await Promise.resolve()
+      })
+      act(() => {
+        mockAdapter._trigger('__system:ready', { generation: 4 })
+      })
+      await act(async () => {
+        await startPromise!
+      })
+      act(() => {
+        vlcFailureCallback?.({
+          itemId: 'item-1',
+          code: 'playback-failed',
+          recoverable: true,
+          message: 'VLC playback stopped unexpectedly.'
+        })
+      })
+      const currentMedia = {
+        ...failedMedia,
+        itemId: currentItemId,
+        blobId: `blob-${currentItemId}`
+      }
+
+      await act(async () => {
+        await result.current.project('file:show', currentMedia)
+      })
+      expect(result.current.vlcFailure === null).toBe(shouldClearOnProject)
+      act(() => {
+        vlcStartedCallback?.(startedGeneration, startedItemId)
+      })
+
+      expect(result.current.vlcFailure === null).toBe(shouldClearAfterStarted)
+    }
+  )
+
+  it('allocates a new generation for manual Retry', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    act(() => {
+      lifecycleCallback?.({ generation: 4, status: 'failed', reason: 'renderer-crash' })
+    })
+    let retryPromise: ReturnType<typeof result.current.retryProjection>
+
+    act(() => {
+      retryPromise = result.current.retryProjection()
+    })
+    await act(async () => Promise.resolve())
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 5 })
+    })
+
+    await expect(retryPromise!).resolves.toEqual({ ok: true, generation: 5 })
+    expect(mockRetry).toHaveBeenCalledOnce()
+  })
+
+  it('explicit close clears recovery and invokes Electron close', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    act(() => {
+      lifecycleCallback?.({ generation: 4, status: 'opening', reason: 'created' })
     })
 
     await act(async () => {
       await result.current.closeProjection()
     })
+
     expect(mockClose).toHaveBeenCalledOnce()
+    expect(result.current.recovery.status).toBe('closed')
+    expect(mockAdapter.getGeneration()).toBe(0)
   })
 
-  it('cleanup unsubscribes from IPC events', () => {
+  it('unsubscribes from lifecycle events on cleanup', () => {
     const { unmount } = renderProjection()
     unmount()
-    expect(unsubOpened).toHaveBeenCalledOnce()
-    expect(unsubClosed).toHaveBeenCalledOnce()
+    expect(unsubscribeLifecycle).toHaveBeenCalledOnce()
+    expect(unsubscribeVlcFailure).toHaveBeenCalledOnce()
+    expect(unsubscribeVlcStarted).toHaveBeenCalledOnce()
   })
 })

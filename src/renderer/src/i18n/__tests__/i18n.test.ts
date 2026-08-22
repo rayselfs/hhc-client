@@ -21,6 +21,19 @@ describe('i18n configuration', () => {
     expect(i18n.getResourceBundle('zh-TW', 'translation')).toBeDefined()
     expect(i18n.getResourceBundle('zh-CN', 'translation')).toBeDefined()
   })
+
+  it('keeps locale keys in sync', () => {
+    function flatten(value: unknown, prefix = ''): string[] {
+      if (typeof value !== 'object' || value === null) return [prefix]
+      return Object.entries(value).flatMap(([key, child]) =>
+        flatten(child, prefix ? `${prefix}.${key}` : key)
+      )
+    }
+
+    const enKeys = flatten(i18n.getResourceBundle('en', 'translation')).sort()
+    expect(flatten(i18n.getResourceBundle('zh-TW', 'translation')).sort()).toEqual(enKeys)
+    expect(flatten(i18n.getResourceBundle('zh-CN', 'translation')).sort()).toEqual(enKeys)
+  })
 })
 
 describe('translations', () => {

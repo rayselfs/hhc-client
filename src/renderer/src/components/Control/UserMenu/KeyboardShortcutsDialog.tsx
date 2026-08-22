@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Modal } from '@heroui/react/modal'
 import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
-import { Timer, BookOpen } from 'lucide-react'
+import { Timer, BookOpen, Film, Monitor } from 'lucide-react'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { getMetaKeyLabel } from '@renderer/lib/env'
 import { ShortcutConfig, getPlatformShortcut } from '@renderer/hooks/useKeyboardShortcuts'
@@ -40,7 +40,7 @@ const getDisplayKey = (code: string): string => {
   return code
 }
 
-type SectionId = 'timer' | 'bible'
+type SectionId = 'projection' | 'timer' | 'bible' | 'media'
 
 interface SectionItem {
   id: SectionId
@@ -50,8 +50,15 @@ interface SectionItem {
 }
 
 const SECTIONS: SectionItem[] = [
+  {
+    id: 'projection',
+    icon: Monitor,
+    labelKey: 'shortcuts.sections.projection',
+    shortcuts: SHORTCUTS.PROJECTION
+  },
   { id: 'timer', icon: Timer, labelKey: 'shortcuts.sections.timer', shortcuts: SHORTCUTS.TIMER },
-  { id: 'bible', icon: BookOpen, labelKey: 'shortcuts.sections.bible', shortcuts: SHORTCUTS.BIBLE }
+  { id: 'bible', icon: BookOpen, labelKey: 'shortcuts.sections.bible', shortcuts: SHORTCUTS.BIBLE },
+  { id: 'media', icon: Film, labelKey: 'shortcuts.sections.media', shortcuts: SHORTCUTS.MEDIA }
 ]
 
 function buildKeysFromConfig(config: ShortcutConfig): string[] {
@@ -100,7 +107,7 @@ export default function KeyboardShortcutsDialog({
 }: KeyboardShortcutsDialogProps): React.JSX.Element {
   const { t: translate } = useTranslation()
   const t = translate as (key: string) => string
-  const [activeSection, setActiveSection] = useState<SectionId>('timer')
+  const [activeSection, setActiveSection] = useState<SectionId>('projection')
   const state = useOverlayState({ isOpen, onOpenChange })
 
   const current = SECTIONS.find((s) => s.id === activeSection)!

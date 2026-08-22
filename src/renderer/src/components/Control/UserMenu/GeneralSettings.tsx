@@ -1,36 +1,60 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Switch } from '@heroui/react/switch'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Button } from '@heroui/react/button'
+import { toast } from '@heroui/react/toast'
 import { Label } from 'react-aria-components'
 import { useTheme } from '@renderer/contexts/ThemeContext'
-import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import type { DisplayInfo } from '@shared/ipc-channels'
 
-const TIMEZONE_LABEL_KEYS = {
-  'timezones.taipei': 'timezones.taipei',
-  'timezones.tokyo': 'timezones.tokyo',
-  'timezones.newYork': 'timezones.newYork',
-  'timezones.losAngeles': 'timezones.losAngeles',
-  'timezones.malaysia': 'timezones.malaysia',
-  'timezones.athens': 'timezones.athens',
-  'timezones.melbourne': 'timezones.melbourne',
-  'timezones.london': 'timezones.london'
-} as const
+interface GeneralSettingsProps {
+  isClearingAllData?: boolean
+  onClearingAllDataChange?: (isClearing: boolean) => void
+}
 
-type TimezoneKey = keyof typeof TIMEZONE_LABEL_KEYS
+function formatDisplayLabel(display: DisplayInfo): string {
+  const name = display.label.trim()
+  const size = `${display.bounds.width}×${display.bounds.height}`
+  return name ? `${name} · ${size}` : size
+}
 
-export default function GeneralSettings(): React.JSX.Element {
+export default function GeneralSettings({
+  isClearingAllData = false,
+  onClearingAllDataChange
+}: GeneralSettingsProps): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { resolved, setPreference } = useTheme()
-  const timezone = useSettingsStore((s) => s.timezone)
   const hardwareAcceleration = useSettingsStore((s) => s.hardwareAcceleration)
-  const setTimezone = useSettingsStore((s) => s.setTimezone)
   const setHardwareAcceleration = useSettingsStore((s) => s.setHardwareAcceleration)
+  const projectionDisplayId = useSettingsStore((s) => s.projectionDisplayId)
+  const setProjectionDisplayId = useSettingsStore((s) => s.setProjectionDisplayId)
+  const resetSettings = useSettingsStore((s) => s.resetSettings)
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
   const confirm = useConfirm()
+  const [displays, setDisplays] = useState<DisplayInfo[]>([])
+  const externalDisplays = displays.filter((display) => !display.isPrimary)
+  const selectedProjectionDisplayId = externalDisplays.length > 0 ? projectionDisplayId : ''
+
+  useEffect(() => {
+    if (!isElectron() || !window.api?.projection?.getDisplays) return
+    window.api.projection
+      .getDisplays()
+      .then((nextDisplays) => {
+        setDisplays(nextDisplays)
+        const external = nextDisplays.filter((display) => !display.isPrimary)
+        const selected = external.some((display) => String(display.id) === projectionDisplayId)
+        const nextProjectionDisplayId = external[0] ? String(external[0].id) : ''
+        if (!selected && projectionDisplayId !== nextProjectionDisplayId) {
+          setProjectionDisplayId(nextProjectionDisplayId)
+        }
+      })
+      .catch(() => setDisplays([]))
+  }, [projectionDisplayId, setProjectionDisplayId])
 
   const languageOptions = [
     { value: 'en', label: t('preferences.languageNames.en') },
@@ -38,24 +62,52 @@ export default function GeneralSettings(): React.JSX.Element {
     { value: 'zh-CN', label: t('preferences.languageNames.zhCN') }
   ]
 
-  const handleResetClick = async (): Promise<void> => {
+  const handleResetSettingsClick = async (): Promise<void> => {
+    if (isClearingAllData) return
     const confirmed = await confirm({
       status: 'warning',
-      description: t('preferences.resetToDefaultsConfirm'),
-      confirmLabel: t('preferences.resetBtn'),
+      description: t('preferences.reset.settingsConfirm'),
+      confirmLabel: t('preferences.reset.settingsButton'),
       cancelLabel: t('common.cancel')
     })
     if (!confirmed) return
-    resetToDefaults()
+    resetSettings()
+  }
+
+  const handleClearAllDataClick = async (): Promise<void> => {
+    if (isClearingAllData) return
+    const confirmed = await confirm({
+      status: 'danger',
+      description: t('preferences.reset.allDataConfirm'),
+      confirmLabel: t('preferences.reset.allDataButton'),
+      cancelLabel: t('common.cancel')
+    })
+    if (!confirmed) return
+    onClearingAllDataChange?.(true)
+    try {
+      if (isElectron()) await window.api.app.clearUserData()
+      await resetToDefaults()
+    } catch (error) {
+      console.warn('[settings] Failed to clear app data', error)
+      toast.danger(t('preferences.reset.clearAllDataFailed', 'Unable to clear all app data.'))
+      onClearingAllDataChange?.(false)
+      return
+    }
+  }
+
+  const handleProjectionDisplayChange = (displayId: string): void => {
+    setProjectionDisplayId(displayId)
+    void window.api.projection.moveToDisplay(displayId)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-5 space-y-6" aria-busy={isClearingAllData}>
       <Select
         variant="secondary"
         value={i18n.language}
         onChange={(key) => i18n.changeLanguage(String(key))}
         aria-label={t('preferences.language')}
+        isDisabled={isClearingAllData}
       >
         <Label>{t('preferences.language')}</Label>
         <Select.Trigger className="rounded-full pl-5">
@@ -78,38 +130,6 @@ export default function GeneralSettings(): React.JSX.Element {
         </Select.Popover>
       </Select>
 
-      <Select
-        variant="secondary"
-        value={timezone}
-        onChange={(key) => setTimezone(String(key))}
-        aria-label={t('preferences.timezone')}
-      >
-        <Label>{t('preferences.timezone')}</Label>
-        <Select.Trigger className="rounded-full pl-5">
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            {TIMEZONE_OPTIONS.map((tz) => {
-              const key = tz.labelKey as TimezoneKey
-              const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.taipei'
-              const label = t(resolvedKey)
-              return (
-                <ListBox.Item
-                  key={tz.value}
-                  id={tz.value}
-                  textValue={String(label)}
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  {String(label)}
-                </ListBox.Item>
-              )
-            })}
-          </ListBox>
-        </Select.Popover>
-      </Select>
-
       <div>
         <label className="mb-2 block text-sm font-medium">{t('preferences.darkMode')}</label>
         <div>
@@ -117,6 +137,7 @@ export default function GeneralSettings(): React.JSX.Element {
             isSelected={resolved === 'dark'}
             onChange={(checked) => setPreference(checked ? 'dark' : 'light')}
             aria-label={t('preferences.darkMode')}
+            isDisabled={isClearingAllData}
           >
             <Switch.Control>
               <Switch.Thumb />
@@ -126,33 +147,88 @@ export default function GeneralSettings(): React.JSX.Element {
       </div>
 
       {isElectron() && (
-        <div>
-          <label className="mb-2 block text-sm font-medium">
-            {t('preferences.hardwareAcceleration')}
-          </label>
-          <div className="mb-2">
-            <Switch
-              isSelected={hardwareAcceleration}
-              onChange={(checked) => setHardwareAcceleration(checked)}
-              aria-label={t('preferences.hardwareAcceleration')}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch>
+        <>
+          <Select
+            variant="secondary"
+            value={selectedProjectionDisplayId}
+            onChange={(key) => handleProjectionDisplayChange(String(key))}
+            aria-label={t('preferences.projectionDisplay.label')}
+            isDisabled={isClearingAllData || externalDisplays.length === 0}
+          >
+            <Label>{t('preferences.projectionDisplay.label')}</Label>
+            <Select.Trigger className="rounded-full pl-5">
+              <Select.Value>
+                {externalDisplays.length === 0
+                  ? t('preferences.projectionDisplay.noExternalDisplay')
+                  : undefined}
+              </Select.Value>
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {externalDisplays.map((display) => {
+                  const label = formatDisplayLabel(display)
+                  return (
+                    <ListBox.Item
+                      key={display.id}
+                      id={String(display.id)}
+                      textValue={label}
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      {label}
+                    </ListBox.Item>
+                  )
+                })}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">
+              {t('preferences.hardwareAcceleration')}
+            </label>
+            <div className="mb-2">
+              <Switch
+                isSelected={hardwareAcceleration}
+                onChange={(checked) => setHardwareAcceleration(checked)}
+                aria-label={t('preferences.hardwareAcceleration')}
+                isDisabled={isClearingAllData}
+              >
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch>
+            </div>
+            <p className="text-xs text-gray-500">{t('preferences.hardwareAccelerationDesc')}</p>
           </div>
-          <p className="text-xs text-gray-500">{t('preferences.hardwareAccelerationDesc')}</p>
-        </div>
+        </>
       )}
 
-      <div className="pt-4 border-t">
-        <label className="mb-2 block text-sm font-medium">{t('preferences.resetToDefaults')}</label>
-        <div>
-          <Button variant="danger" onPress={handleResetClick} className="rounded-full">
-            {t('preferences.resetBtn')}
+      <section className="space-y-3 border-t pt-4">
+        <h3 className="text-sm font-semibold">{t('preferences.reset.title')}</h3>
+        <div className="space-y-2 rounded-2xl bg-default-100">
+          <Button
+            variant="danger"
+            onPress={handleResetSettingsClick}
+            className="rounded-full"
+            isDisabled={isClearingAllData}
+          >
+            {t('preferences.reset.settingsButton')}
           </Button>
+          <p className="text-xs text-gray-500 pl-1">{t('preferences.reset.settingsDesc')}</p>
         </div>
-      </div>
+        <div className="space-y-2 rounded-2xl bg-default-100">
+          <Button
+            variant="danger"
+            onPress={handleClearAllDataClick}
+            className="rounded-full"
+            isDisabled={isClearingAllData}
+          >
+            {t('preferences.reset.allDataButton')}
+          </Button>
+          <p className="text-xs text-gray-500 pl-1">{t('preferences.reset.allDataDesc')}</p>
+        </div>
+      </section>
     </div>
   )
 }
