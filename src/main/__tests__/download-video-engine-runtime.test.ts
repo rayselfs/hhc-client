@@ -61,7 +61,8 @@ async function runWindowsDownloader(root: string): Promise<void> {
     `#!/usr/bin/env node
 const { spawnSync } = require('node:child_process')
 require('node:fs').writeFileSync('pwsh-invoked', '')
-const [archive, destination] = process.argv.slice(-2)
+const archive = process.env.RUNTIME_ARCHIVE_PATH
+const destination = process.env.RUNTIME_EXTRACT_ROOT
 process.exit(spawnSync('tar', ['-xf', archive, '-C', destination]).status ?? 1)
 `
   )

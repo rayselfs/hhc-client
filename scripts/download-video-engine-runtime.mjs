@@ -76,11 +76,16 @@ function extractArchive(archivePath, extractRoot) {
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        "$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-        archivePath,
-        extractRoot
+        "$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath $env:RUNTIME_ARCHIVE_PATH -DestinationPath $env:RUNTIME_EXTRACT_ROOT -Force"
       ],
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUNTIME_ARCHIVE_PATH: archivePath,
+          RUNTIME_EXTRACT_ROOT: extractRoot
+        }
+      }
     )
 
     if (result.status !== 0) {
