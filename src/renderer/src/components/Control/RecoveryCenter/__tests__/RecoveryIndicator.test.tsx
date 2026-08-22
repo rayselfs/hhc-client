@@ -108,43 +108,13 @@ it('does not run full scans for raw sync download progress events', async () => 
   expect(collectRecoveryIssues).toHaveBeenCalledOnce()
 })
 
-it('allows one active full scan and coalesces a burst into one trailing scan', async () => {
+it('handles a terminal full-scan failure without an unhandled rejection', async () => {
+  vi.mocked(collectRecoveryIssues).mockRejectedValueOnce(new Error('scan failed'))
+
   render(<RecoveryIndicator />)
+
   await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
-  let active = 0
-  let maxActive = 0
-  let resolveSlowScan: (() => void) | undefined
-  vi.mocked(collectRecoveryIssues)
-    .mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          active++
-          maxActive = Math.max(maxActive, active)
-          resolveSlowScan = () => {
-            active--
-            resolve([])
-          }
-        })
-    )
-    .mockImplementationOnce(async () => {
-      active++
-      maxActive = Math.max(maxActive, active)
-      active--
-      return []
-    })
-
-  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
-  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
-  for (let index = 0; index < 20; index++) {
-    window.dispatchEvent(new Event('hhc:recovery-source-changed'))
-  }
-  expect(collectRecoveryIssues).toHaveBeenCalledTimes(2)
-  expect(maxActive).toBe(1)
-
-  await act(async () => resolveSlowScan?.())
-
-  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(3))
-  expect(maxActive).toBe(1)
+  expect(screen.queryByText(/recovery issues/)).not.toBeInTheDocument()
 })
 
 it('localizes its accessible issue count', async () => {

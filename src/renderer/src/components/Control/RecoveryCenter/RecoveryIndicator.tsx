@@ -13,40 +13,29 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
 
   useEffect(() => {
     let cancelled = false
-    let fullRefreshRunning = false
-    let fullRefreshTrailing = false
+    let fullRefreshGeneration = 0
     let jobRefreshGeneration = 0
     const dismissedJobIds = dismissedIssueIds.flatMap((id) =>
       id.startsWith('job-failed:') ? [id.slice('job-failed:'.length)] : []
     )
-    const refreshAll = (): void => {
-      if (fullRefreshRunning) {
-        fullRefreshTrailing = true
-        return
-      }
-      fullRefreshRunning = true
-      void (async () => {
-        try {
-          do {
-            fullRefreshTrailing = false
-            const jobGeneration = jobRefreshGeneration
-            const issues = await collectRecoveryIssues()
-            if (cancelled || fullRefreshTrailing) continue
-            const visibleIssues = issues.filter(
-              (issue) => issue.severity !== 'info' && !dismissedIssueIds.includes(issue.id)
-            )
-            setCounts((current) => ({
-              jobs:
-                jobGeneration === jobRefreshGeneration
-                  ? visibleIssues.filter((issue) => issue.kind === 'job-failed').length
-                  : current.jobs,
-              other: visibleIssues.filter((issue) => issue.kind !== 'job-failed').length
-            }))
-          } while (fullRefreshTrailing && !cancelled)
-        } finally {
-          fullRefreshRunning = false
-        }
-      })()
+    const refreshAll = (event?: Event): void => {
+      const generation = ++fullRefreshGeneration
+      const jobGeneration = jobRefreshGeneration
+      void collectRecoveryIssues(event)
+        .then((issues) => {
+          if (cancelled || generation !== fullRefreshGeneration) return
+          const visibleIssues = issues.filter(
+            (issue) => issue.severity !== 'info' && !dismissedIssueIds.includes(issue.id)
+          )
+          setCounts((current) => ({
+            jobs:
+              jobGeneration === jobRefreshGeneration
+                ? visibleIssues.filter((issue) => issue.kind === 'job-failed').length
+                : current.jobs,
+            other: visibleIssues.filter((issue) => issue.kind !== 'job-failed').length
+          }))
+        })
+        .catch(() => undefined)
     }
     const refreshJobs = (): void => {
       const generation = ++jobRefreshGeneration
@@ -61,6 +50,7 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
     window.addEventListener(RECOVERY_SOURCE_CHANGED_EVENT, refreshAll)
     return () => {
       cancelled = true
+      fullRefreshGeneration++
       unsubscribe()
       window.removeEventListener('focus', refreshAll)
       window.removeEventListener(RECOVERY_SOURCE_CHANGED_EVENT, refreshAll)

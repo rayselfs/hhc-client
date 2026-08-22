@@ -316,6 +316,96 @@ describe('sync-db', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
+  it('publishes a semantic recovery change when a normal entry attaches a Blob', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      status: 'remote-only'
+    })
+    const listener = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', listener)
+
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      blobId: 'blob-1',
+      status: 'available-offline'
+    })
+
+    window.removeEventListener('hhc:recovery-source-changed', listener)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('publishes a semantic recovery change when a normal entry detaches a Blob', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      blobId: 'blob-1',
+      status: 'available-offline'
+    })
+    const listener = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', listener)
+
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      status: 'remote-only'
+    })
+
+    window.removeEventListener('hhc:recovery-source-changed', listener)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('publishes a semantic recovery change when a normal Blob-backed entry is deleted', async () => {
+    const entry = await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      blobId: 'blob-1',
+      status: 'available-offline'
+    })
+    const listener = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', listener)
+
+    await deleteSyncEntries([entry.id])
+
+    window.removeEventListener('hhc:recovery-source-changed', listener)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('publishes one semantic recovery change for provider-scoped Blob-backed deletion', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      blobId: 'blob-1',
+      status: 'available-offline'
+    })
+    const listener = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', listener)
+
+    await deleteSyncEntriesByProviderConnection('connection-1')
+
+    window.removeEventListener('hhc:recovery-source-changed', listener)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
   it('publishes a semantic recovery change after a provider is deleted', async () => {
     await putProviderConnection({
       id: 'connection-1',

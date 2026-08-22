@@ -37,43 +37,36 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
   const pruneDismissedIssues = useRecoveryCenterStore((state) => state.pruneDismissedIssues)
   const filter = useRecoveryCenterStore((state) => state.filter)
   const setFilter = useRecoveryCenterStore((state) => state.setFilter)
-  const refreshState = useRef({ running: false, trailing: false, generation: 0 })
+  const refreshGeneration = useRef(0)
 
-  const refresh = useCallback(async (): Promise<void> => {
-    const state = refreshState.current
-    if (state.running) {
-      state.trailing = true
-      return
-    }
-    state.running = true
-    try {
-      do {
-        state.trailing = false
-        const generation = state.generation
-        const nextIssues = await collectRecoveryIssues()
-        if (generation !== state.generation || state.trailing) continue
+  const refresh = useCallback(
+    async (event?: Event): Promise<void> => {
+      const generation = ++refreshGeneration.current
+      try {
+        const nextIssues = await collectRecoveryIssues(event)
+        if (generation !== refreshGeneration.current) return
         setIssues(nextIssues)
         pruneDismissedIssues(nextIssues.map((issue) => issue.id))
-      } while (state.trailing)
-    } finally {
-      state.running = false
-    }
-  }, [pruneDismissedIssues])
+      } catch {
+        // Keep the last successfully collected state until a later refresh succeeds.
+      }
+    },
+    [pruneDismissedIssues]
+  )
 
   useEffect(() => {
-    const state = refreshState.current
-    const generation = ++state.generation
+    const generationRef = refreshGeneration
+    const generation = ++generationRef.current
     queueMicrotask(() => {
-      if (generation === state.generation) void refresh()
+      if (generation === generationRef.current) void refresh()
     })
     return () => {
-      state.generation++
-      state.trailing = false
+      generationRef.current++
     }
   }, [refresh])
 
   useEffect(() => {
-    const handleRefresh = (): void => void refresh()
+    const handleRefresh = (event: Event): void => void refresh(event)
     window.addEventListener(RECOVERY_SOURCE_CHANGED_EVENT, handleRefresh)
     return () => {
       window.removeEventListener(RECOVERY_SOURCE_CHANGED_EVENT, handleRefresh)
@@ -105,7 +98,7 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
       return
     }
     await runRecoveryAction(action.type, issue.sourceId)
-    await refresh()
+    await refresh(new Event(RECOVERY_SOURCE_CHANGED_EVENT))
   }
 
   return (

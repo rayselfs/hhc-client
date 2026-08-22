@@ -27,7 +27,7 @@ export function sortRecoveryIssues(issues: RecoveryIssue[]): RecoveryIssue[] {
   )
 }
 
-export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
+async function collectRecoveryIssuesSnapshot(): Promise<RecoveryIssue[]> {
   const [jobs, integrity, syncEntries, cleanupRecords] = await Promise.all([
     listMediaJobs(),
     scanMediaStorageIntegrity(),
@@ -122,6 +122,53 @@ export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
   }
 
   return sortRecoveryIssues(issues)
+}
+
+let recoveryScanPromise: Promise<RecoveryIssue[]> | null = null
+let activeRecoveryRequest: Event | undefined
+let trailingRecoveryRequest: Event | undefined
+let recoveryScanTrailing = false
+
+export function collectRecoveryIssues(request?: Event): Promise<RecoveryIssue[]> {
+  if (recoveryScanPromise) {
+    if (request && request !== activeRecoveryRequest && request !== trailingRecoveryRequest) {
+      recoveryScanTrailing = true
+      trailingRecoveryRequest = request
+    }
+    return recoveryScanPromise
+  }
+
+  activeRecoveryRequest = request
+  recoveryScanPromise = (async () => {
+    let issues: RecoveryIssue[] = []
+    try {
+      while (true) {
+        recoveryScanTrailing = false
+        trailingRecoveryRequest = undefined
+        let failed = false
+        let failure: unknown
+        try {
+          issues = await collectRecoveryIssuesSnapshot()
+        } catch (error) {
+          failed = true
+          failure = error
+        }
+
+        if (recoveryScanTrailing) {
+          activeRecoveryRequest = trailingRecoveryRequest
+          continue
+        }
+        if (failed) throw failure
+        return issues
+      }
+    } finally {
+      recoveryScanPromise = null
+      activeRecoveryRequest = undefined
+      trailingRecoveryRequest = undefined
+      recoveryScanTrailing = false
+    }
+  })()
+  return recoveryScanPromise
 }
 
 export async function runRecoveryAction(

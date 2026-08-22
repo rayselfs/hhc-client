@@ -4,6 +4,7 @@ import {
   runRecoveryAction,
   sortRecoveryIssues
 } from '@renderer/lib/recovery-center'
+import { scanMediaStorageIntegrity } from '@renderer/lib/media-storage-integrity'
 
 const {
   integrityIssues,
@@ -185,6 +186,60 @@ it('downloads redacted diagnostics through a Blob URL and revokes it', async () 
     href: 'blob:diagnostics'
   })
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:diagnostics')
+})
+
+it('shares one physical scan and coalesces distinct in-flight events into one trailing scan', async () => {
+  vi.mocked(scanMediaStorageIntegrity).mockClear()
+  const emptyReport = { checkedAt: 60, issueCount: 0, issues: [] }
+  let resolveSlowScan: ((report: typeof emptyReport) => void) | undefined
+  vi.mocked(scanMediaStorageIntegrity)
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSlowScan = resolve
+      })
+    )
+    .mockResolvedValueOnce(emptyReport)
+  const firstEvent = new Event('hhc:recovery-source-changed')
+  const trailingEvent = new Event('hhc:recovery-source-changed')
+
+  const first = collectRecoveryIssues(firstEvent)
+  const concurrent = collectRecoveryIssues(firstEvent)
+  const trailing = collectRecoveryIssues(trailingEvent)
+  const duplicateTrailing = collectRecoveryIssues(trailingEvent)
+  const callsBeforeResolve = vi.mocked(scanMediaStorageIntegrity).mock.calls.length
+  resolveSlowScan?.(emptyReport)
+  await Promise.allSettled([first, concurrent, trailing, duplicateTrailing])
+
+  expect(concurrent).toBe(first)
+  expect(trailing).toBe(first)
+  expect(duplicateTrailing).toBe(first)
+  expect(callsBeforeResolve).toBe(1)
+  expect(scanMediaStorageIntegrity).toHaveBeenCalledTimes(2)
+})
+
+it('continues to a queued trailing scan after the active scan rejects', async () => {
+  vi.mocked(scanMediaStorageIntegrity).mockClear()
+  const emptyReport = { checkedAt: 70, issueCount: 0, issues: [] }
+  vi.mocked(scanMediaStorageIntegrity)
+    .mockRejectedValueOnce(new Error('first scan failed'))
+    .mockResolvedValueOnce(emptyReport)
+  const firstEvent = new Event('hhc:recovery-source-changed')
+  const trailingEvent = new Event('hhc:recovery-source-changed')
+
+  const scan = collectRecoveryIssues(firstEvent)
+  expect(collectRecoveryIssues(trailingEvent)).toBe(scan)
+
+  await expect(scan).resolves.toEqual(expect.any(Array))
+  expect(scanMediaStorageIntegrity).toHaveBeenCalledTimes(2)
+})
+
+it('allows a subsequent scan after a terminal rejection', async () => {
+  vi.mocked(scanMediaStorageIntegrity).mockClear()
+  vi.mocked(scanMediaStorageIntegrity).mockRejectedValueOnce(new Error('scan failed'))
+
+  await expect(collectRecoveryIssues()).rejects.toThrow('scan failed')
+
+  await expect(collectRecoveryIssues()).resolves.toEqual(expect.any(Array))
 })
 
 it('sorts errors before warnings and newest within severity', () => {

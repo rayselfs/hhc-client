@@ -21,6 +21,10 @@ function isRecoverySyncEntry(entry: SyncEntryRecord | undefined): boolean {
   return entry?.status === 'failed' || entry?.status === 'insufficient-storage'
 }
 
+function affectsRecoverySource(entry: SyncEntryRecord | undefined): boolean {
+  return isRecoverySyncEntry(entry) || Boolean(entry?.blobId)
+}
+
 export interface ProviderConnectionRecord {
   id: string
   providerType: SyncProviderType
@@ -291,10 +295,10 @@ export async function putSyncEntry(
   await tx.store.put(value)
   await tx.done
   dispatchSyncEntryChanged(value)
-  if (
+  const recoveryStatusChanged =
     (isRecoverySyncEntry(existing) || isRecoverySyncEntry(value)) &&
     (existing?.status !== value.status || existing?.errorKind !== value.errorKind)
-  ) {
+  if (recoveryStatusChanged || existing?.blobId !== value.blobId) {
     dispatchRecoverySourceChanged()
   }
   return value
@@ -373,7 +377,7 @@ export async function deleteSyncEntriesByProviderConnection(
   const tx = db.transaction('sync-entries', 'readwrite')
   await Promise.all(entries.map((entry) => tx.store.delete(entry.id)))
   await tx.done
-  if (entries.some(isRecoverySyncEntry)) dispatchRecoverySourceChanged()
+  if (entries.some(affectsRecoverySource)) dispatchRecoverySourceChanged()
 }
 
 export async function deleteSyncEntries(ids: string[]): Promise<void> {
@@ -383,7 +387,7 @@ export async function deleteSyncEntries(ids: string[]): Promise<void> {
   const entries = await Promise.all(ids.map((id) => tx.store.get(id)))
   await Promise.all(ids.map((id) => tx.store.delete(id)))
   await tx.done
-  if (entries.some(isRecoverySyncEntry)) dispatchRecoverySourceChanged()
+  if (entries.some(affectsRecoverySource)) dispatchRecoverySourceChanged()
 }
 
 export async function putSyncEntryPreference(
