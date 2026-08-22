@@ -10,6 +10,12 @@ import {
 import { putProviderConnection, putSyncEntry, resetSyncDBForTests } from '../sync-db'
 import { putSourceMediaMetadata } from '../media-metadata'
 
+const { mockEnsurePdfPageJob } = vi.hoisted(() => ({ mockEnsurePdfPageJob: vi.fn() }))
+
+vi.mock('../pdf-page-jobs', () => ({
+  ensurePdfPageJob: mockEnsurePdfPageJob
+}))
+
 function file(id: string, name: string, mimeType: string, url = `blob:${id}`): FileItemRecord {
   return {
     id,
@@ -26,6 +32,7 @@ function file(id: string, name: string, mimeType: string, url = `blob:${id}`): F
 }
 
 beforeEach(async () => {
+  vi.clearAllMocks()
   vi.unstubAllGlobals()
   await resetMediaWorkDBForTests()
   await resetSyncDBForTests()
@@ -33,6 +40,63 @@ beforeEach(async () => {
 })
 
 describe('analyzePresentationReadiness', () => {
+  it('enqueues missing PDF pages at the explicit readiness boundary', async () => {
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
+      id: 'legacy-pdf',
+      blob: new Blob(['pdf']),
+      refCount: 1
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('legacy-item', 'legacy.pdf', 'application/pdf', 'blob:legacy-pdf')],
+      'web'
+    )
+
+    expect(report.items[0].status).toBe('ready')
+    expect(mockEnsurePdfPageJob).toHaveBeenCalledWith({
+      sourceBlobId: 'legacy-pdf',
+      itemId: 'legacy-item'
+    })
+  })
+
+  it('enqueues missing pages for a synced PDF after it becomes available offline', async () => {
+    await putProviderConnection({
+      id: 'connection-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-pdf',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'synced.pdf',
+      mimeType: 'application/pdf',
+      itemId: 'synced-item',
+      blobId: 'synced-blob',
+      status: 'available-offline'
+    })
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
+      id: 'synced-blob',
+      blob: new Blob(['pdf']),
+      refCount: 1
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('synced-item', 'synced.pdf', 'application/pdf', 'blob:synced-blob')],
+      'web'
+    )
+
+    expect(report.items[0].status).toBe('ready')
+    expect(mockEnsurePdfPageJob).toHaveBeenCalledWith({
+      sourceBlobId: 'synced-blob',
+      itemId: 'synced-item'
+    })
+  })
   it('uses embedded VLC for Electron native videos when available', async () => {
     vi.stubGlobal('window', {
       api: {

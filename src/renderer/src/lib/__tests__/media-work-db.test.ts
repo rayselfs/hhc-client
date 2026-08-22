@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   deleteDerivedAssetsByKind,
   deleteDerivedAssetsForSource,
@@ -6,12 +6,35 @@ import {
   getDerivedAsset,
   putCustomCoverOverride,
   putDerivedAsset,
+  putMediaJob,
+  subscribeMediaJobs,
   resetMediaWorkDBForTests
 } from '../media-work-db'
 
 describe('media-work-db', () => {
   beforeEach(async () => {
     await resetMediaWorkDBForTests()
+  })
+
+  it('notifies subscribers with the updated media job', async () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeMediaJobs(listener)
+    const job = {
+      id: 'job-1',
+      type: 'pdf-pages' as const,
+      sourceBlobId: 'blob-1',
+      itemId: 'item-1',
+      priority: 0,
+      status: 'completed' as const,
+      attempt: 1,
+      createdAt: 1,
+      updatedAt: 2
+    }
+
+    await putMediaJob(job)
+
+    expect(listener).toHaveBeenCalledWith(job)
+    unsubscribe()
   })
 
   it('upserts a unique derived asset for each source, kind, and variant', async () => {

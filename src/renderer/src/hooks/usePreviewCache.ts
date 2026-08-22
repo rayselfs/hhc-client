@@ -26,32 +26,53 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
 
     let disposed = false
     let refreshId = 0
-    let urls: string[] = []
+    let ownedThumbs: Record<string, string[]> = {}
+    const pdfBlobIds = new Set(pdfItems.map((item) => getBlobId(item)))
 
     const refresh = async (): Promise<void> => {
       const currentRefreshId = ++refreshId
-      const entries = await Promise.all(
-        pdfItems.map(async (item) => [item.id, await getPdfPageThumbs(getBlobId(item))] as const)
+      const results = await Promise.allSettled(
+        pdfItems.map((item) => getPdfPageThumbs(getBlobId(item)))
       )
-      const nextUrls = entries.flatMap(([, thumbs]) => thumbs)
+      const nextUrls = results.flatMap((result) =>
+        result.status === 'fulfilled' ? result.value : []
+      )
       if (disposed || currentRefreshId !== refreshId) {
         nextUrls.forEach((url) => URL.revokeObjectURL(url))
         return
       }
 
-      urls.forEach((url) => URL.revokeObjectURL(url))
-      urls = nextUrls
-      setPdfPageThumbs(Object.fromEntries(entries.filter(([, thumbs]) => thumbs.length > 0)))
+      const nextThumbs = { ...ownedThumbs }
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') return
+        const itemId = pdfItems[index].id
+        nextThumbs[itemId]?.forEach((url) => URL.revokeObjectURL(url))
+        if (result.value.length > 0) nextThumbs[itemId] = result.value
+        else delete nextThumbs[itemId]
+      })
+      ownedThumbs = nextThumbs
+      setPdfPageThumbs({ ...nextThumbs })
     }
 
-    const unsubscribe = subscribeMediaJobs(() => void refresh())
+    const unsubscribe = subscribeMediaJobs((job) => {
+      if (
+        job?.type === 'pdf-pages' &&
+        job.status === 'completed' &&
+        job.sourceBlobId &&
+        pdfBlobIds.has(job.sourceBlobId)
+      ) {
+        void refresh()
+      }
+    })
     void refresh()
 
     return () => {
       disposed = true
       refreshId++
       unsubscribe()
-      urls.forEach((url) => URL.revokeObjectURL(url))
+      Object.values(ownedThumbs)
+        .flat()
+        .forEach((url) => URL.revokeObjectURL(url))
     }
     // The key keeps equivalent playlist arrays from restarting the async cache read.
     // eslint-disable-next-line react-hooks/exhaustive-deps

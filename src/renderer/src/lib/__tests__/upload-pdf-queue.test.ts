@@ -20,6 +20,7 @@ vi.mock('@renderer/lib/thumbnail-generator', () => ({
 }))
 
 vi.mock('@renderer/lib/thumbnail-db', () => ({
+  getPdfPageThumbs: vi.fn().mockResolvedValue([]),
   saveThumbnail: vi.fn(),
   savePdfPageThumbs: mockSavePdfPages
 }))
