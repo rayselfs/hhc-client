@@ -1,5 +1,10 @@
 # M3 Service Playlist / Cue Workflow Plan
 
+## Status
+
+Foundation implemented; deferred. The route remains inaccessible until placeholder Bible and media
+cue creation is replaced with real source selection.
+
 ## Goal
 
 Add a live service rundown so operators present from an ordered cue list instead of directly from File Explorer folders.

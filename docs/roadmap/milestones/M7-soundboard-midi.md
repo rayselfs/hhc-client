@@ -2,7 +2,8 @@
 
 ## Status
 
-Implemented as the first production slice.
+Foundation implemented; deferred. The workspace remains hidden from navigation and preferences
+until operator and MIDI/device acceptance is complete.
 
 ## Goal
 
@@ -10,7 +11,7 @@ Add a top-level Soundboard workspace for live audio cue playback with mouse-firs
 
 ## Implemented Scope
 
-- Top-level Soundboard route and sidebar entry.
+- Dormant Soundboard route implementation; the public route redirects to Timer.
 - Audio media capability support in the shared media registry.
 - Persistent Soundboard state for boards, scenes, pads, pad settings, and MIDI mappings.
 - 8x8 pad grid for the initial layout.
@@ -18,14 +19,13 @@ Add a top-level Soundboard workspace for live audio cue playback with mouse-firs
 - Web Audio playback engine for Electron and Web.
 - Mixer controls for master and per-pad playback.
 - Optional Web MIDI input mapping.
-- Soundboard preferences in Preferences.
+- Dormant Soundboard preferences implementation; the category remains hidden.
 - Asset-delete warning when audio files are referenced by pads.
 
 ## Source Anchors
 
 - `src/renderer/src/pages/SoundboardPage.tsx`
 - `src/renderer/src/components/Control/Soundboard/`
-- `src/renderer/src/components/Control/UserMenu/SoundboardSettings.tsx`
 - `src/renderer/src/stores/soundboard.ts`
 - `src/renderer/src/lib/soundboard-audio.ts`
 - `src/renderer/src/lib/soundboard-midi.ts`

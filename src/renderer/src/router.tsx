@@ -7,8 +7,6 @@ import WelcomePage from '@renderer/pages/WelcomePage'
 
 const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
 const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
-const ServicePage = lazy(() => import('@renderer/pages/ServicePage'))
-const SoundboardPage = lazy(() => import('@renderer/pages/SoundboardPage'))
 const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
 const FilePreviewRoute = lazy(
   () => import('@renderer/components/Control/FileExplorer/Preview/FilePreviewInspector')
@@ -53,24 +51,8 @@ const routes = [
         ),
         ErrorBoundary: RouteError
       },
-      {
-        path: 'service',
-        element: (
-          <Suspense fallback={null}>
-            <ServicePage />
-          </Suspense>
-        ),
-        ErrorBoundary: RouteError
-      },
-      {
-        path: 'soundboard',
-        element: (
-          <Suspense fallback={null}>
-            <SoundboardPage />
-          </Suspense>
-        ),
-        ErrorBoundary: RouteError
-      },
+      { path: 'service', element: <Navigate to="/timer" replace /> },
+      { path: 'soundboard', element: <Navigate to="/timer" replace /> },
       {
         path: 'files',
         element: (

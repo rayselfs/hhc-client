@@ -26,14 +26,6 @@ vi.mock('@renderer/pages/BiblePage', () => ({
   default: () => <div data-testid="bible-page" />
 }))
 
-vi.mock('@renderer/pages/ServicePage', () => ({
-  default: () => <div data-testid="service-page" />
-}))
-
-vi.mock('@renderer/pages/SoundboardPage', () => ({
-  default: () => <div data-testid="soundboard-page" />
-}))
-
 vi.mock('@renderer/pages/FilesPage', () => ({
   default: () => (
     <div data-testid="files-page">
@@ -126,14 +118,9 @@ describe('Router', () => {
     expect(await screen.findByTestId('bible-page')).toBeInTheDocument()
   })
 
-  it('renders service page at /service route', async () => {
-    renderWithRouter(['/service'])
-    expect(await screen.findByTestId('service-page')).toBeInTheDocument()
-  })
-
-  it('renders soundboard page at /soundboard route', async () => {
-    renderWithRouter(['/soundboard'])
-    expect(await screen.findByTestId('soundboard-page')).toBeInTheDocument()
+  it.each(['/service', '/soundboard'])('redirects deferred route %s to timer', async (path) => {
+    renderWithRouter([path])
+    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
   })
 
   it('renders the routed Media workspace at /media', async () => {

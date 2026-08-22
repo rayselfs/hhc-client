@@ -12,8 +12,8 @@ LibrePresenter is open-source presentation software for churches and live events
 
 ## Current Optimization Roadmap
 
-M1–M9 below record the first implemented product roadmap. Current reliability, Media, and
-PowerPoint-like Presentation work is tracked separately in
+M1–M9 below record the first product roadmap and current release readiness. Current reliability,
+Media, and PowerPoint-like Presentation work is tracked separately in
 [`librepresenter-optimization-roadmap.md`](librepresenter-optimization-roadmap.md).
 
 ## Milestones
@@ -22,11 +22,11 @@ PowerPoint-like Presentation work is tracked separately in
 | --- | --- | --- | --- |
 | M1 | Implemented | `milestones/M1-projection-core.md` | Projection window/session lifecycle is reliable, lazy-opened, and fast enough for live use. |
 | M2 | Implemented | `milestones/M2-media-library-sync.md` | Media library and sync status are understandable and recoverable. |
-| M3 | Implemented | `milestones/M3-service-playlist-cue-workflow.md` | Operators can build and run a service rundown instead of presenting directly from folders. |
+| M3 | Foundation implemented; deferred | `milestones/M3-service-playlist-cue-workflow.md` | The workspace remains inaccessible until placeholder Bible/media cue creation is replaced. |
 | M4 | Implemented | `milestones/M4-slide-ppt-template-system.md` | PPTX is a media item with a PowerPoint-like workspace, page-level document model, and media projection integration. |
 | M5 | Implemented | `milestones/M5-bible-professional-workflow.md` | Existing Bible tools become a live scripture workflow integrated with cues and templates. |
 | M6 | Implemented | `milestones/M6-professional-media-playback.md` | Image, PDF, and video playback are production-grade and reusable across features. |
-| M7 | Implemented | `milestones/M7-soundboard-midi.md` | Soundboard with mouse-first operation and optional MIDI support. |
+| M7 | Foundation implemented; deferred | `milestones/M7-soundboard-midi.md` | Soundboard remains hidden from navigation and preferences pending operator acceptance. |
 | M8A | Implemented | `milestones/M8A-recovery-center.md` | Recovery Center derives actionable issues from existing media, sync, storage, and projection state. |
 | M8B | Implemented | `milestones/M8B-lan-remote.md` | LAN-only mobile remote for live controls without cloud relay. |
 | M9 | Implemented | `milestones/M9-release-license-distribution.md` | Public release path, license, notices, packaging, and unsigned distribution. |
