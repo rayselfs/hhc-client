@@ -107,6 +107,8 @@ async function generatePoster(input: unknown): Promise<VideoPosterResult> {
       '1',
       '-vf',
       'scale=640:-2',
+      '-pix_fmt',
+      'yuvj420p',
       temporaryPath
     ])
     const data = await fs.readFile(temporaryPath)

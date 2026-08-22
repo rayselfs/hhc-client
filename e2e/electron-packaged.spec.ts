@@ -97,38 +97,55 @@ test('launches packaged control and projection windows with recovery lifecycle',
       '-f',
       'lavfi',
       '-i',
-      'color=c=black:s=32x32:d=1',
+      'color=c=black:s=320x180:d=2',
       '-c:v',
       'mpeg4',
       '-y',
       fixture
     ])
 
-    await control.evaluate(() => {
-      Reflect.set(window, '__packagedVlcStarted', false)
-      const unsubscribe = window.api.projectionVlc.onStarted(() => {
-        Reflect.set(window, '__packagedVlcStarted', true)
-      })
-      Reflect.set(window, '__packagedVlcUnsubscribe', unsubscribe)
-    })
     const upload = control.locator('input[type="file"]:not([webkitdirectory])').first()
     await upload.setInputFiles(fixture)
     await expect(control.getByText('packaged-vlc-smoke.mkv')).toBeVisible()
+    await expect(control.getByAltText('packaged-vlc-smoke.mkv')).toBeVisible()
     await control.getByText('packaged-vlc-smoke.mkv').dblclick()
+    await control.evaluate(() => {
+      Reflect.set(window, '__packagedVlcResult', null)
+      const unsubscribeStarted = window.api.projectionVlc.onStarted(() => {
+        Reflect.set(window, '__packagedVlcResult', { status: 'started' })
+      })
+      const unsubscribeFailure = window.api.projectionVlc.onFailure((failure) => {
+        Reflect.set(window, '__packagedVlcResult', {
+          status: 'failed',
+          code: failure.code,
+          message: failure.message
+        })
+      })
+      Reflect.set(window, '__packagedVlcUnsubscribe', [unsubscribeStarted, unsubscribeFailure])
+    })
     await control.getByTestId('preview-present').click()
 
     await expect.poll(() => electronApp?.windows().length ?? 0).toBe(2)
     await expect
-      .poll(() => control.evaluate(() => Reflect.get(window, '__packagedVlcStarted')))
-      .toBe(true)
+      .poll(() => control.evaluate(() => Reflect.get(window, '__packagedVlcResult')), {
+        timeout: 15_000
+      })
+      .not.toBeNull()
+    expect(await control.evaluate(() => Reflect.get(window, '__packagedVlcResult'))).toEqual({
+      status: 'started'
+    })
 
     await control.getByTestId('media-back-to-files').click()
     await control.getByRole('button', { name: /Stop projection|停止投影/ }).click()
     await expect.poll(() => electronApp?.windows().length ?? 0).toBe(1)
     await control.evaluate(() => {
-      const unsubscribe = Reflect.get(window, '__packagedVlcUnsubscribe')
-      if (typeof unsubscribe === 'function') unsubscribe()
-      Reflect.deleteProperty(window, '__packagedVlcStarted')
+      const unsubscribes = Reflect.get(window, '__packagedVlcUnsubscribe')
+      if (Array.isArray(unsubscribes)) {
+        for (const unsubscribe of unsubscribes) {
+          if (typeof unsubscribe === 'function') unsubscribe()
+        }
+      }
+      Reflect.deleteProperty(window, '__packagedVlcResult')
       Reflect.deleteProperty(window, '__packagedVlcUnsubscribe')
     })
   })

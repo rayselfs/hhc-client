@@ -24,6 +24,7 @@ extraResources:
     to: licenses
     filter:
       - '**/*'
+afterPack: ./scripts/after-pack.mjs
 win:
   executableName: libre-presenter
 nsis:

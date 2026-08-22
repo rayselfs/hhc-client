@@ -154,7 +154,7 @@ describe('video poster IPC', () => {
 
     expect(mockSpawn).toHaveBeenLastCalledWith(
       '/runtime/ffmpeg',
-      expect.arrayContaining(['-frames:v', '1', '-vf', 'scale=640:-2']),
+      expect.arrayContaining(['-frames:v', '1', '-vf', 'scale=640:-2', '-pix_fmt', 'yuvj420p']),
       expect.objectContaining({ shell: false })
     )
     expect(mockRm).toHaveBeenCalledWith(expect.stringContaining('.poster.jpg'), { force: true })
