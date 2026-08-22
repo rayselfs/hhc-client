@@ -537,6 +537,8 @@
     "folderAlreadyExists": "A folder with this name already exists",
     "fileAlreadyExists": "A file with this name already exists",
     "uploadSkippedUnsupported": "Skipped {{count}} unsupported file(s)",
+    "uploadFileTooLarge": "File \"{{name}}\" exceeds 2GB limit",
+    "uploadInsufficientBrowserStorage": "The selected files exceed available browser storage",
     "renameFile": "Rename file",
     "renameFolder": "Rename folder",
     "blobLoadFailed": "Failed to load file, skipping",
@@ -921,6 +923,7 @@
   "recovery": {
     "empty": "No current recovery issues",
     "dismiss": "Dismiss",
+    "indicatorLabel": "{{count}} recovery issues",
     "filters": {
       "all": "All",
       "media": "Media",

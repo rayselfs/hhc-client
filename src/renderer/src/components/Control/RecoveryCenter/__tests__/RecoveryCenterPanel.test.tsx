@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import RecoveryCenterPanel from '@renderer/components/Control/RecoveryCenter/RecoveryCenterPanel'
@@ -30,7 +30,7 @@ vi.mock('@renderer/lib/recovery-center', () => ({
   runRecoveryAction: vi.fn(async () => undefined)
 }))
 
-import { runRecoveryAction } from '@renderer/lib/recovery-center'
+import { collectRecoveryIssues, runRecoveryAction } from '@renderer/lib/recovery-center'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -79,4 +79,54 @@ it('does not expose a projection filter without a projection issue source', asyn
 
   await screen.findByText('Media job needs attention')
   expect(screen.queryByRole('button', { name: 'Projection' })).not.toBeInTheDocument()
+})
+
+it.each(['hhc:sync-entry-changed', 'hhc:resource-cleanup-journal-changed'])(
+  'refreshes current issues on %s',
+  async (eventName) => {
+    renderPanel()
+    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+
+    await act(async () => {
+      window.dispatchEvent(new Event(eventName))
+    })
+
+    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
+  }
+)
+
+it('keeps the newest event refresh when the mount scan resolves later', async () => {
+  let resolveMountScan:
+    | ((issues: Awaited<ReturnType<typeof collectRecoveryIssues>>) => void)
+    | undefined
+  vi.mocked(collectRecoveryIssues)
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveMountScan = resolve
+      })
+    )
+    .mockResolvedValueOnce([])
+  renderPanel()
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+
+  await act(async () => {
+    window.dispatchEvent(new Event('hhc:sync-entry-changed'))
+  })
+  expect(await screen.findByText('No current recovery issues')).toBeInTheDocument()
+
+  await act(async () => {
+    resolveMountScan?.([
+      {
+        id: 'job-failed:stale',
+        kind: 'job-failed',
+        severity: 'error',
+        titleKey: 'recovery.issues.jobFailed.title',
+        detailKey: 'recovery.issues.jobFailed.detail',
+        occurredAt: 1,
+        actions: []
+      }
+    ])
+  })
+
+  expect(screen.queryByText('Media job needs attention')).not.toBeInTheDocument()
 })

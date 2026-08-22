@@ -4,6 +4,7 @@ import RecoveryIndicator from '@renderer/components/Control/RecoveryCenter/Recov
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
 import { collectRecoveryIssues } from '@renderer/lib/recovery-center'
 import { countFailedOrBlockedMediaJobs } from '@renderer/lib/media-work-db'
+import i18n from '@renderer/i18n'
 
 const mocks = vi.hoisted(() => ({
   mediaJobsListener: undefined as (() => void) | undefined
@@ -21,7 +22,8 @@ vi.mock('@renderer/lib/media-work-db', () => ({
   })
 }))
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
   vi.clearAllMocks()
   mocks.mediaJobsListener = undefined
   useRecoveryCenterStore.setState({
@@ -82,6 +84,27 @@ it('runs a full recovery scan on window focus', async () => {
 
   await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
   expect(countFailedOrBlockedMediaJobs).not.toHaveBeenCalled()
+})
+
+it.each(['hhc:sync-entry-changed', 'hhc:resource-cleanup-journal-changed'])(
+  'runs a full recovery scan on %s',
+  async (eventName) => {
+    render(<RecoveryIndicator />)
+    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+
+    window.dispatchEvent(new Event(eventName))
+
+    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
+    expect(countFailedOrBlockedMediaJobs).not.toHaveBeenCalled()
+  }
+)
+
+it('localizes its accessible issue count', async () => {
+  await i18n.changeLanguage('zh-TW')
+
+  render(<RecoveryIndicator />)
+
+  expect(await screen.findByLabelText('1 個修復問題')).toBeInTheDocument()
 })
 
 it('keeps a newer job count when the full scan was already in flight', async () => {

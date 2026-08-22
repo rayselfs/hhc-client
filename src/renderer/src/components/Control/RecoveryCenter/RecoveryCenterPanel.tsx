@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import { collectRecoveryIssues, runRecoveryAction } from '@renderer/lib/recovery-center'
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { SYNC_ENTRY_CHANGED_EVENT } from '@renderer/lib/sync-db'
+import { RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT } from '@renderer/lib/resource-cleanup-journal'
 import type {
   RecoveryFilter,
   RecoveryIssue,
@@ -36,24 +38,38 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
   const pruneDismissedIssues = useRecoveryCenterStore((state) => state.pruneDismissedIssues)
   const filter = useRecoveryCenterStore((state) => state.filter)
   const setFilter = useRecoveryCenterStore((state) => state.setFilter)
+  const refreshGeneration = useRef(0)
 
   const refresh = useCallback(async (): Promise<void> => {
+    const generation = ++refreshGeneration.current
     const nextIssues = await collectRecoveryIssues()
+    if (generation !== refreshGeneration.current) return
     setIssues(nextIssues)
     pruneDismissedIssues(nextIssues.map((issue) => issue.id))
   }, [pruneDismissedIssues])
 
   useEffect(() => {
-    let cancelled = false
+    const generationRef = refreshGeneration
+    const generation = ++generationRef.current
     void collectRecoveryIssues().then((nextIssues) => {
-      if (cancelled) return
+      if (generation !== generationRef.current) return
       setIssues(nextIssues)
       pruneDismissedIssues(nextIssues.map((issue) => issue.id))
     })
     return () => {
-      cancelled = true
+      generationRef.current++
     }
   }, [pruneDismissedIssues])
+
+  useEffect(() => {
+    const handleRefresh = (): void => void refresh()
+    window.addEventListener(SYNC_ENTRY_CHANGED_EVENT, handleRefresh)
+    window.addEventListener(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT, handleRefresh)
+    return () => {
+      window.removeEventListener(SYNC_ENTRY_CHANGED_EVENT, handleRefresh)
+      window.removeEventListener(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT, handleRefresh)
+    }
+  }, [refresh])
 
   const visibleIssues = useMemo(
     () =>

@@ -46,6 +46,7 @@ import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
 import { ensurePdfPageJob } from '../pdf-page-jobs'
+import i18n from '@renderer/i18n'
 
 function makeFile(name: string, size: number, type = 'image/png'): File {
   const file = new File([], name, { type })
@@ -65,7 +66,8 @@ function setStorageEstimate(estimate?: StorageEstimate): void {
   })
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
   vi.clearAllMocks()
   vi.mocked(addFileItemToStore).mockResolvedValue('mock-id')
   vi.mocked(useFileExplorerStore.getState).mockReturnValue({

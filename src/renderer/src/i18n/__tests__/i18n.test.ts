@@ -56,6 +56,23 @@ describe('translations', () => {
     expect(i18n.t('bible.title', { lng: 'zh-TW' })).toBe('聖經')
     expect(i18n.t('bible.title', { lng: 'zh-CN' })).toBe('圣经')
   })
+
+  it('translates Recovery accessibility and Web upload errors in English and Traditional Chinese', () => {
+    expect(i18n.t('recovery.indicatorLabel', { lng: 'en', count: 2 })).toBe('2 recovery issues')
+    expect(i18n.t('recovery.indicatorLabel', { lng: 'zh-TW', count: 2 })).toBe('2 個修復問題')
+    expect(i18n.t('fileExplorer.uploadFileTooLarge', { lng: 'en', name: 'video.mp4' })).toBe(
+      'File "video.mp4" exceeds 2GB limit'
+    )
+    expect(i18n.t('fileExplorer.uploadFileTooLarge', { lng: 'zh-TW', name: 'video.mp4' })).toBe(
+      '檔案「video.mp4」超過 2GB 上限'
+    )
+    expect(i18n.t('fileExplorer.uploadInsufficientBrowserStorage', { lng: 'en' })).toBe(
+      'The selected files exceed available browser storage'
+    )
+    expect(i18n.t('fileExplorer.uploadInsufficientBrowserStorage', { lng: 'zh-TW' })).toBe(
+      '所選檔案超過瀏覽器可用儲存空間'
+    )
+  })
 })
 
 describe('language persistence', () => {

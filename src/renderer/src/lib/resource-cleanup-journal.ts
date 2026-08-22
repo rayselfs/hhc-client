@@ -8,6 +8,14 @@ type ResourceCleanupRecordInput = Omit<
   'id' | 'status' | 'attempt' | 'lastError' | 'createdAt' | 'updatedAt'
 >
 
+export const RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT = 'hhc:resource-cleanup-journal-changed'
+
+export function dispatchResourceCleanupJournalChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT))
+  }
+}
+
 export interface ResourceCleanupRetryResult {
   attempted: number
   failed: number
@@ -37,6 +45,7 @@ export async function putResourceCleanupRecord(
 ): Promise<void> {
   const db = await openFileExplorerDB()
   await db.put('resource-cleanup-journal', record)
+  dispatchResourceCleanupJournalChanged()
 }
 
 export async function getResourceCleanupRecord(
@@ -75,6 +84,7 @@ export async function retryResourceCleanup(id: string): Promise<void> {
   try {
     await processResourceCleanup(record)
     await db.delete('resource-cleanup-journal', id)
+    dispatchResourceCleanupJournalChanged()
   } catch (error) {
     await db.put('resource-cleanup-journal', {
       ...record,
@@ -83,6 +93,7 @@ export async function retryResourceCleanup(id: string): Promise<void> {
       lastError: getErrorMessage(error),
       updatedAt: Date.now()
     })
+    dispatchResourceCleanupJournalChanged()
     throw error
   }
 }

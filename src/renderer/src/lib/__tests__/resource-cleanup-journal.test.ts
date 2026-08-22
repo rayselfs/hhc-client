@@ -66,6 +66,8 @@ describe('resource cleanup journal', () => {
   })
 
   it('processes browser resources and removes a successful record', async () => {
+    const changed = vi.fn()
+    window.addEventListener('hhc:resource-cleanup-journal-changed', changed)
     const record = createResourceCleanupRecord({
       blobId: 'blob-1',
       storage: 'indexed-db',
@@ -83,6 +85,8 @@ describe('resource cleanup journal', () => {
     expect(mockDeletePdfPageThumbs).toHaveBeenCalledWith('blob-1')
     expect(mockDeleteThumbnail.mock.calls).toEqual([['item-1'], ['item-2']])
     await expect(getResourceCleanupRecord(record.id)).resolves.toBeUndefined()
+    expect(changed).toHaveBeenCalledTimes(2)
+    window.removeEventListener('hhc:resource-cleanup-journal-changed', changed)
   })
 
   it('deletes native files in Electron mode', async () => {
@@ -104,6 +108,8 @@ describe('resource cleanup journal', () => {
   })
 
   it('retains a failed cleanup so the exact work can be retried', async () => {
+    const changed = vi.fn()
+    window.addEventListener('hhc:resource-cleanup-journal-changed', changed)
     mockDeleteDerivedAssets.mockRejectedValueOnce(new Error('quota exceeded'))
     const record = createResourceCleanupRecord({
       blobId: 'blob-2',
@@ -122,9 +128,12 @@ describe('resource cleanup journal', () => {
       attempt: 1,
       lastError: 'quota exceeded'
     })
+    expect(changed).toHaveBeenCalledTimes(2)
 
     await retryResourceCleanup(record.id)
     await expect(getResourceCleanupRecord(record.id)).resolves.toBeUndefined()
+    expect(changed).toHaveBeenCalledTimes(3)
+    window.removeEventListener('hhc:resource-cleanup-journal-changed', changed)
   })
 
   it('retries every pending record without one failure blocking the others', async () => {

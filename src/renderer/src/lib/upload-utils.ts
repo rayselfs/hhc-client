@@ -135,7 +135,7 @@ async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]
       continue
     }
     if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
-      toast.danger(`File "${file.name}" exceeds 2GB limit`)
+      toast.danger(i18n.t('fileExplorer.uploadFileTooLarge', { name: file.name }))
       continue
     }
     candidates.push({ file, classification })
@@ -146,7 +146,7 @@ async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]
   }
 
   if (!(await hasWebStorageCapacity(candidates.map((candidate) => candidate.file)))) {
-    toast.danger('The selected files exceed available browser storage')
+    toast.danger(i18n.t('fileExplorer.uploadInsufficientBrowserStorage'))
     return []
   }
   return candidates

@@ -57,6 +57,7 @@ vi.mock('@renderer/lib/recovery-center', () => ({
 }))
 
 vi.mock('@renderer/lib/sync-db', () => ({
+  SYNC_ENTRY_CHANGED_EVENT: 'hhc:sync-entry-changed',
   listProviderConnectionsByType: mockListProviderConnectionsByType
 }))
 

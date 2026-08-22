@@ -537,6 +537,8 @@
     "folderAlreadyExists": "同层已存在相同名称的文件夹",
     "fileAlreadyExists": "同层已存在相同名称的文件",
     "uploadSkippedUnsupported": "已跳过 {{count}} 个不支持的文件",
+    "uploadFileTooLarge": "文件“{{name}}”超过 2GB 上限",
+    "uploadInsufficientBrowserStorage": "所选文件超过浏览器可用存储空间",
     "renameFile": "重命名文件",
     "renameFolder": "重命名文件夹",
     "blobLoadFailed": "文件加载失败，已跳过",
@@ -921,6 +923,7 @@
   "recovery": {
     "empty": "目前没有需要修复的问题",
     "dismiss": "忽略",
+    "indicatorLabel": "{{count}} 个修复问题",
     "filters": {
       "all": "全部",
       "media": "媒体",
