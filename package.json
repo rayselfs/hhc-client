@@ -1,6 +1,6 @@
 {
   "name": "libre-presenter",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Open-source presentation software for churches and live events",
   "license": "GPL-3.0-or-later",
   "main": "./out/main/index.js",
@@ -85,7 +85,7 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.1.2",
-    "electron": "^42.9.3",
+    "electron": "^41.10.6",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.1",
