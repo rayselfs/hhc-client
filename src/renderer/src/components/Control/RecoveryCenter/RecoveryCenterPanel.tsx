@@ -32,6 +32,7 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
   const [issues, setIssues] = useState<RecoveryIssue[]>([])
+  const [unavailable, setUnavailable] = useState(false)
   const dismissedIssueIds = useRecoveryCenterStore((state) => state.dismissedIssueIds)
   const dismissIssue = useRecoveryCenterStore((state) => state.dismissIssue)
   const pruneDismissedIssues = useRecoveryCenterStore((state) => state.pruneDismissedIssues)
@@ -46,9 +47,12 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
         const nextIssues = await collectRecoveryIssues(event)
         if (generation !== refreshGeneration.current) return
         setIssues(nextIssues)
+        setUnavailable(false)
         pruneDismissedIssues(nextIssues.map((issue) => issue.id))
       } catch {
-        // Keep the last successfully collected state until a later refresh succeeds.
+        if (generation !== refreshGeneration.current) return
+        setIssues([])
+        setUnavailable(true)
       }
     },
     [pruneDismissedIssues]
@@ -119,7 +123,9 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
         ))}
       </div>
 
-      {visibleIssues.length === 0 ? (
+      {unavailable ? (
+        <p className="text-sm text-danger">{t('recovery.unavailable')}</p>
+      ) : visibleIssues.length === 0 ? (
         <p className="text-sm text-muted">{t('recovery.empty')}</p>
       ) : (
         <ul className="space-y-2">

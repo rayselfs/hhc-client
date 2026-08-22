@@ -11,6 +11,7 @@ import { openFileExplorerDB } from './file-explorer-db'
 import { isElectron } from './env'
 import { MAX_FILE_SIZE_WEB } from './media-limits'
 import { deleteSyncEntries, putSyncEntry, updateSyncDownloadProgress } from './sync-db'
+import { dispatchRecoverySourceChanged } from './recovery-source-events'
 
 const STORAGE_USAGE_LIMIT_RATIO = 0.8
 const STORAGE_LIMIT_ERROR = 'OneDrive sync storage has reached 80% usage'
@@ -204,8 +205,17 @@ async function saveWebDownloadedContent(
       await ensureCanCommit(canCommit)
     } catch (error) {
       if (error instanceof SyncDownloadCancelledError) {
-        if (syncEntryId) await deleteSyncEntries([syncEntryId])
-        await db.delete('file-blobs', request.targetBlobId)
+        const cleanup = await Promise.allSettled([
+          syncEntryId
+            ? deleteSyncEntries([syncEntryId], { notifyRecovery: false })
+            : Promise.resolve(),
+          db.delete('file-blobs', request.targetBlobId)
+        ])
+        dispatchRecoverySourceChanged()
+        const cleanupFailure = cleanup.find(
+          (result): result is PromiseRejectedResult => result.status === 'rejected'
+        )
+        if (cleanupFailure) throw cleanupFailure.reason
       }
       throw error
     }
@@ -294,11 +304,20 @@ export async function saveElectronOneDriveDownloadedContent(
     syncEntryId = syncEntry.id
     await ensureCanCommit(canCommit)
   } catch (error) {
-    if (error instanceof SyncDownloadCancelledError && syncEntryId) {
-      await deleteSyncEntries([syncEntryId])
+    const cleanup = await Promise.allSettled([
+      error instanceof SyncDownloadCancelledError && syncEntryId
+        ? deleteSyncEntries([syncEntryId], { notifyRecovery: false })
+        : Promise.resolve(),
+      db.delete('file-blobs', request.targetBlobId),
+      window.api.nativeFs.delete(request.targetBlobId)
+    ])
+    if (error instanceof SyncDownloadCancelledError) {
+      dispatchRecoverySourceChanged()
     }
-    await db.delete('file-blobs', request.targetBlobId).catch(() => undefined)
-    await window.api.nativeFs.delete(request.targetBlobId).catch(() => undefined)
+    const cleanupFailure = cleanup.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    )
+    if (cleanupFailure) throw cleanupFailure.reason
     throw error
   }
 

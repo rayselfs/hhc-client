@@ -922,6 +922,7 @@
   },
   "recovery": {
     "empty": "目前沒有需要修復的問題",
+    "unavailable": "無法取得修復狀態",
     "dismiss": "忽略",
     "indicatorLabel": "{{count}} 個修復問題",
     "filters": {

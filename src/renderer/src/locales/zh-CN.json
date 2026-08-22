@@ -922,6 +922,7 @@
   },
   "recovery": {
     "empty": "目前没有需要修复的问题",
+    "unavailable": "无法获取修复状态",
     "dismiss": "忽略",
     "indicatorLabel": "{{count}} 个修复问题",
     "filters": {

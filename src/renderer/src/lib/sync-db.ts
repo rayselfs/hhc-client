@@ -380,14 +380,19 @@ export async function deleteSyncEntriesByProviderConnection(
   if (entries.some(affectsRecoverySource)) dispatchRecoverySourceChanged()
 }
 
-export async function deleteSyncEntries(ids: string[]): Promise<void> {
+export async function deleteSyncEntries(
+  ids: string[],
+  options: { notifyRecovery?: boolean } = {}
+): Promise<void> {
   if (ids.length === 0) return
   const db = await getSyncDB()
   const tx = db.transaction('sync-entries', 'readwrite')
   const entries = await Promise.all(ids.map((id) => tx.store.get(id)))
   await Promise.all(ids.map((id) => tx.store.delete(id)))
   await tx.done
-  if (entries.some(affectsRecoverySource)) dispatchRecoverySourceChanged()
+  if (options.notifyRecovery !== false && entries.some(affectsRecoverySource)) {
+    dispatchRecoverySourceChanged()
+  }
 }
 
 export async function putSyncEntryPreference(

@@ -110,7 +110,25 @@ it('handles a terminal refresh failure without an unhandled rejection', async ()
   renderPanel()
 
   await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
-  expect(screen.getByText('No current recovery issues')).toBeInTheDocument()
+  expect(await screen.findByText('Recovery status unavailable')).toBeInTheDocument()
+  expect(screen.queryByText('No current recovery issues')).not.toBeInTheDocument()
+})
+
+it('replaces stale rows with an error and clears it after a successful refresh', async () => {
+  renderPanel()
+  expect(await screen.findByText('Media job needs attention')).toBeInTheDocument()
+  vi.mocked(collectRecoveryIssues).mockRejectedValueOnce(new Error('scan failed'))
+
+  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+
+  expect(await screen.findByText('Recovery status unavailable')).toBeInTheDocument()
+  expect(screen.queryByText('Media job needs attention')).not.toBeInTheDocument()
+
+  vi.mocked(collectRecoveryIssues).mockResolvedValueOnce([])
+  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+
+  expect(await screen.findByText('No current recovery issues')).toBeInTheDocument()
+  expect(screen.queryByText('Recovery status unavailable')).not.toBeInTheDocument()
 })
 
 it('keeps the newest event refresh when the mount scan resolves later', async () => {

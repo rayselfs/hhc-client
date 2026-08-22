@@ -114,7 +114,23 @@ it('handles a terminal full-scan failure without an unhandled rejection', async 
   render(<RecoveryIndicator />)
 
   await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
-  expect(screen.queryByText(/recovery issues/)).not.toBeInTheDocument()
+  expect(await screen.findByLabelText('Recovery status unavailable')).toBeInTheDocument()
+})
+
+it('replaces stale counts with an error and clears it after a successful refresh', async () => {
+  render(<RecoveryIndicator />)
+  expect(await screen.findByLabelText('1 recovery issues')).toBeInTheDocument()
+  vi.mocked(collectRecoveryIssues).mockRejectedValueOnce(new Error('scan failed'))
+
+  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+
+  expect(await screen.findByLabelText('Recovery status unavailable')).toBeInTheDocument()
+  expect(screen.queryByLabelText('1 recovery issues')).not.toBeInTheDocument()
+
+  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+
+  expect(await screen.findByLabelText('1 recovery issues')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Recovery status unavailable')).not.toBeInTheDocument()
 })
 
 it('localizes its accessible issue count', async () => {

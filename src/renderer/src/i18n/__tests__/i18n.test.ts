@@ -60,6 +60,9 @@ describe('translations', () => {
   it('translates Recovery accessibility and Web upload errors in English and Traditional Chinese', () => {
     expect(i18n.t('recovery.indicatorLabel', { lng: 'en', count: 2 })).toBe('2 recovery issues')
     expect(i18n.t('recovery.indicatorLabel', { lng: 'zh-TW', count: 2 })).toBe('2 個修復問題')
+    expect(i18n.t('recovery.unavailable', { lng: 'en' })).toBe('Recovery status unavailable')
+    expect(i18n.t('recovery.unavailable', { lng: 'zh-TW' })).toBe('無法取得修復狀態')
+    expect(i18n.t('recovery.unavailable', { lng: 'zh-CN' })).toBe('无法获取修复状态')
     expect(i18n.t('fileExplorer.uploadFileTooLarge', { lng: 'en', name: 'video.mp4' })).toBe(
       'File "video.mp4" exceeds 2GB limit'
     )

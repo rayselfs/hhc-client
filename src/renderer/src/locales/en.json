@@ -922,6 +922,7 @@
   },
   "recovery": {
     "empty": "No current recovery issues",
+    "unavailable": "Recovery status unavailable",
     "dismiss": "Dismiss",
     "indicatorLabel": "{{count}} recovery issues",
     "filters": {

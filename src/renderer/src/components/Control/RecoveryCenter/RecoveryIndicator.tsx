@@ -8,7 +8,7 @@ import { RECOVERY_SOURCE_CHANGED_EVENT } from '@renderer/lib/recovery-source-eve
 
 export default function RecoveryIndicator(): React.JSX.Element | null {
   const { t } = useTranslation()
-  const [counts, setCounts] = useState({ jobs: 0, other: 0 })
+  const [counts, setCounts] = useState({ jobs: 0, other: 0, unavailable: false })
   const dismissedIssueIds = useRecoveryCenterStore((state) => state.dismissedIssueIds)
 
   useEffect(() => {
@@ -32,10 +32,14 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
               jobGeneration === jobRefreshGeneration
                 ? visibleIssues.filter((issue) => issue.kind === 'job-failed').length
                 : current.jobs,
-            other: visibleIssues.filter((issue) => issue.kind !== 'job-failed').length
+            other: visibleIssues.filter((issue) => issue.kind !== 'job-failed').length,
+            unavailable: false
           }))
         })
-        .catch(() => undefined)
+        .catch(() => {
+          if (cancelled || generation !== fullRefreshGeneration) return
+          setCounts({ jobs: 0, other: 0, unavailable: true })
+        })
     }
     const refreshJobs = (): void => {
       const generation = ++jobRefreshGeneration
@@ -59,6 +63,13 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
 
   const count = counts.jobs + counts.other
 
+  if (counts.unavailable) {
+    return (
+      <span aria-label={t('recovery.unavailable')} className="inline-flex text-warning">
+        <AlertTriangle className="size-4" />
+      </span>
+    )
+  }
   if (count === 0) return null
 
   return (

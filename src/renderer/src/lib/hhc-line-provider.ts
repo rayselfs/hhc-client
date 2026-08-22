@@ -12,6 +12,7 @@ import { openFileExplorerDB } from './file-explorer-db'
 import { isElectron } from './env'
 import { saveWebHhcDownloadedContent } from './sync-download-storage'
 import { unlinkSyncConnectionFromApp } from './sync-unlink'
+import { dispatchRecoverySourceChanged } from './recovery-source-events'
 import {
   SyncDownloadCancelledError,
   type ReadOnlySyncProvider,
@@ -102,10 +103,11 @@ async function saveNativeDownloadedContent(
     if (!(await canCommit())) throw new SyncDownloadCancelledError()
   } catch (error) {
     const cleanup = await Promise.allSettled([
-      entryId ? deleteSyncEntries([entryId]) : Promise.resolve(),
+      entryId ? deleteSyncEntries([entryId], { notifyRecovery: false }) : Promise.resolve(),
       db.delete('file-blobs', request.targetBlobId),
       window.api.nativeFs.delete(content.fileId)
     ])
+    if (error instanceof SyncDownloadCancelledError) dispatchRecoverySourceChanged()
     const cleanupFailure = cleanup.find(
       (result): result is PromiseRejectedResult => result.status === 'rejected'
     )
