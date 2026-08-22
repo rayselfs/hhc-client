@@ -65,7 +65,11 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
 
   if (counts.unavailable) {
     return (
-      <span aria-label={t('recovery.unavailable')} className="inline-flex text-warning">
+      <span
+        role="status"
+        aria-label={t('recovery.unavailable')}
+        className="inline-flex text-warning"
+      >
         <AlertTriangle className="size-4" />
       </span>
     )
@@ -74,6 +78,7 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
 
   return (
     <span
+      role="status"
       aria-label={t('recovery.indicatorLabel', { count })}
       className="inline-flex items-center gap-1 text-warning"
     >

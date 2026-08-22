@@ -68,19 +68,23 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
   return (
     <>
       <Dropdown.Root>
-        <Button
-          variant="ghost"
-          aria-label={t('userMenu.accountMenu', { name: accountLabel })}
-          className="flex h-auto w-full min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70 max-lg:justify-center"
-        >
-          <Avatar.Root className="shrink-0">
-            <Avatar.Fallback>
-              <CircleUser />
-            </Avatar.Fallback>
-          </Avatar.Root>
-          <span className="max-lg:hidden">{accountLabel}</span>
-          <RecoveryIndicator />
-        </Button>
+        <div className="relative w-full">
+          <Button
+            variant="ghost"
+            aria-label={t('userMenu.accountMenu', { name: accountLabel })}
+            className="flex h-auto w-full min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70 max-lg:justify-center"
+          >
+            <Avatar.Root className="shrink-0">
+              <Avatar.Fallback>
+                <CircleUser />
+              </Avatar.Fallback>
+            </Avatar.Root>
+            <span className="max-lg:hidden">{accountLabel}</span>
+          </Button>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
+            <RecoveryIndicator />
+          </div>
+        </div>
         <Dropdown.Popover>
           <Dropdown.Menu
             onAction={(key) => {

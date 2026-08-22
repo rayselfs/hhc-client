@@ -8,6 +8,8 @@ import { PresentationSessionRegistryProvider } from '@renderer/contexts/Presenta
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import UserMenu from '../UserMenu'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
+import { collectRecoveryIssues } from '@renderer/lib/recovery-center'
+import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
 
 const auth = vi.hoisted(() => ({
   value: {
@@ -64,6 +66,8 @@ beforeEach(async () => {
   auth.value.signOut = vi.fn(async () => undefined)
   auth.value.getAccessToken = vi.fn(async () => null)
   toastDanger.mockClear()
+  vi.mocked(collectRecoveryIssues).mockResolvedValue([])
+  useRecoveryCenterStore.setState({ dismissedIssueIds: [], filter: 'all' })
 })
 
 describe('UserMenu', () => {
@@ -73,6 +77,37 @@ describe('UserMenu', () => {
     expect(container.querySelector('[data-slot="avatar"]')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Account menu for Guest' })).toHaveLength(1)
     expect(container.querySelector('button button')).not.toBeInTheDocument()
+  })
+
+  it('exposes the recovery issue count outside the account menu button', async () => {
+    vi.mocked(collectRecoveryIssues).mockResolvedValueOnce([
+      {
+        id: 'storage-integrity:orphan:blob-1',
+        kind: 'storage-integrity',
+        severity: 'warning',
+        titleKey: 'recovery.issues.storageIntegrity.title',
+        detailKey: 'recovery.issues.storageIntegrity.detail',
+        occurredAt: 1,
+        actions: []
+      }
+    ])
+
+    renderUserMenu()
+
+    const status = await screen.findByRole('status', { name: '1 recovery issues' })
+    expect(status.closest('button')).toBeNull()
+    expect(status.parentElement).toHaveClass('pointer-events-none')
+    expect(screen.getByRole('button', { name: 'Account menu for Guest' })).toBeInTheDocument()
+  })
+
+  it('exposes recovery unavailability outside the account menu button', async () => {
+    vi.mocked(collectRecoveryIssues).mockRejectedValueOnce(new Error('scan failed'))
+
+    renderUserMenu()
+
+    const status = await screen.findByRole('status', { name: 'Recovery status unavailable' })
+    expect(status.closest('button')).toBeNull()
+    expect(status.parentElement).toHaveClass('pointer-events-none')
   })
 
   it('renders all menu items', () => {
