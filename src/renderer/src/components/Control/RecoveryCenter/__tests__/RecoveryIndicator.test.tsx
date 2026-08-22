@@ -86,18 +86,66 @@ it('runs a full recovery scan on window focus', async () => {
   expect(countFailedOrBlockedMediaJobs).not.toHaveBeenCalled()
 })
 
-it.each(['hhc:sync-entry-changed', 'hhc:resource-cleanup-journal-changed'])(
-  'runs a full recovery scan on %s',
-  async (eventName) => {
-    render(<RecoveryIndicator />)
-    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+it('runs a full recovery scan on a semantic recovery-source change', async () => {
+  render(<RecoveryIndicator />)
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
 
-    window.dispatchEvent(new Event(eventName))
+  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
 
-    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
-    expect(countFailedOrBlockedMediaJobs).not.toHaveBeenCalled()
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
+  expect(countFailedOrBlockedMediaJobs).not.toHaveBeenCalled()
+})
+
+it('does not run full scans for raw sync download progress events', async () => {
+  render(<RecoveryIndicator />)
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+
+  for (let index = 0; index < 20; index++) {
+    window.dispatchEvent(new Event('hhc:sync-entry-changed'))
   }
-)
+  await act(async () => undefined)
+
+  expect(collectRecoveryIssues).toHaveBeenCalledOnce()
+})
+
+it('allows one active full scan and coalesces a burst into one trailing scan', async () => {
+  render(<RecoveryIndicator />)
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+  let active = 0
+  let maxActive = 0
+  let resolveSlowScan: (() => void) | undefined
+  vi.mocked(collectRecoveryIssues)
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          active++
+          maxActive = Math.max(maxActive, active)
+          resolveSlowScan = () => {
+            active--
+            resolve([])
+          }
+        })
+    )
+    .mockImplementationOnce(async () => {
+      active++
+      maxActive = Math.max(maxActive, active)
+      active--
+      return []
+    })
+
+  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
+  for (let index = 0; index < 20; index++) {
+    window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+  }
+  expect(collectRecoveryIssues).toHaveBeenCalledTimes(2)
+  expect(maxActive).toBe(1)
+
+  await act(async () => resolveSlowScan?.())
+
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(3))
+  expect(maxActive).toBe(1)
+})
 
 it('localizes its accessible issue count', async () => {
   await i18n.changeLanguage('zh-TW')

@@ -4,10 +4,8 @@ import {
   publishPersistedFileItem,
   removeCleanedEntriesFromStore
 } from '@renderer/stores/file-explorer'
-import {
-  createResourceCleanupRecord,
-  dispatchResourceCleanupJournalChanged
-} from './resource-cleanup-journal'
+import { createResourceCleanupRecord } from './resource-cleanup-journal'
+import { dispatchRecoverySourceChanged } from './recovery-source-events'
 import { deleteThumbnail, saveThumbnail } from './thumbnail-db'
 import { deleteDerivedAssetsForSource } from './media-work-db'
 import type { IDBPDatabase } from 'idb'
@@ -92,7 +90,7 @@ export async function persistEditablePresentationCreation(
         )
       }
       await tx.done
-      if (externalCleanupFailed) dispatchResourceCleanupJournalChanged()
+      if (externalCleanupFailed) dispatchRecoverySourceChanged()
     }
     throw error
   }

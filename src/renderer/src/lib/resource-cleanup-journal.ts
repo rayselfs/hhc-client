@@ -2,19 +2,12 @@ import { openFileExplorerDB, type ResourceCleanupJournalRecord } from './file-ex
 import { isElectron } from './env'
 import { deleteDerivedAssetsForSource } from './media-work-db'
 import { deletePdfPageThumbs, deleteThumbnail } from './thumbnail-db'
+import { dispatchRecoverySourceChanged } from './recovery-source-events'
 
 type ResourceCleanupRecordInput = Omit<
   ResourceCleanupJournalRecord,
   'id' | 'status' | 'attempt' | 'lastError' | 'createdAt' | 'updatedAt'
 >
-
-export const RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT = 'hhc:resource-cleanup-journal-changed'
-
-export function dispatchResourceCleanupJournalChanged(): void {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT))
-  }
-}
 
 export interface ResourceCleanupRetryResult {
   attempted: number
@@ -45,7 +38,7 @@ export async function putResourceCleanupRecord(
 ): Promise<void> {
   const db = await openFileExplorerDB()
   await db.put('resource-cleanup-journal', record)
-  dispatchResourceCleanupJournalChanged()
+  dispatchRecoverySourceChanged()
 }
 
 export async function getResourceCleanupRecord(
@@ -84,7 +77,7 @@ export async function retryResourceCleanup(id: string): Promise<void> {
   try {
     await processResourceCleanup(record)
     await db.delete('resource-cleanup-journal', id)
-    dispatchResourceCleanupJournalChanged()
+    dispatchRecoverySourceChanged()
   } catch (error) {
     await db.put('resource-cleanup-journal', {
       ...record,
@@ -93,7 +86,7 @@ export async function retryResourceCleanup(id: string): Promise<void> {
       lastError: getErrorMessage(error),
       updatedAt: Date.now()
     })
-    dispatchResourceCleanupJournalChanged()
+    dispatchRecoverySourceChanged()
     throw error
   }
 }

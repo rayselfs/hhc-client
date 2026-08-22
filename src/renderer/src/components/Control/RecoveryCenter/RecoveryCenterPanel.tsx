@@ -4,8 +4,7 @@ import { AlertTriangle } from 'lucide-react'
 import { collectRecoveryIssues, runRecoveryAction } from '@renderer/lib/recovery-center'
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-import { SYNC_ENTRY_CHANGED_EVENT } from '@renderer/lib/sync-db'
-import { RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT } from '@renderer/lib/resource-cleanup-journal'
+import { RECOVERY_SOURCE_CHANGED_EVENT } from '@renderer/lib/recovery-source-events'
 import type {
   RecoveryFilter,
   RecoveryIssue,
@@ -38,36 +37,46 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
   const pruneDismissedIssues = useRecoveryCenterStore((state) => state.pruneDismissedIssues)
   const filter = useRecoveryCenterStore((state) => state.filter)
   const setFilter = useRecoveryCenterStore((state) => state.setFilter)
-  const refreshGeneration = useRef(0)
+  const refreshState = useRef({ running: false, trailing: false, generation: 0 })
 
   const refresh = useCallback(async (): Promise<void> => {
-    const generation = ++refreshGeneration.current
-    const nextIssues = await collectRecoveryIssues()
-    if (generation !== refreshGeneration.current) return
-    setIssues(nextIssues)
-    pruneDismissedIssues(nextIssues.map((issue) => issue.id))
-  }, [pruneDismissedIssues])
-
-  useEffect(() => {
-    const generationRef = refreshGeneration
-    const generation = ++generationRef.current
-    void collectRecoveryIssues().then((nextIssues) => {
-      if (generation !== generationRef.current) return
-      setIssues(nextIssues)
-      pruneDismissedIssues(nextIssues.map((issue) => issue.id))
-    })
-    return () => {
-      generationRef.current++
+    const state = refreshState.current
+    if (state.running) {
+      state.trailing = true
+      return
+    }
+    state.running = true
+    try {
+      do {
+        state.trailing = false
+        const generation = state.generation
+        const nextIssues = await collectRecoveryIssues()
+        if (generation !== state.generation || state.trailing) continue
+        setIssues(nextIssues)
+        pruneDismissedIssues(nextIssues.map((issue) => issue.id))
+      } while (state.trailing)
+    } finally {
+      state.running = false
     }
   }, [pruneDismissedIssues])
 
   useEffect(() => {
-    const handleRefresh = (): void => void refresh()
-    window.addEventListener(SYNC_ENTRY_CHANGED_EVENT, handleRefresh)
-    window.addEventListener(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT, handleRefresh)
+    const state = refreshState.current
+    const generation = ++state.generation
+    queueMicrotask(() => {
+      if (generation === state.generation) void refresh()
+    })
     return () => {
-      window.removeEventListener(SYNC_ENTRY_CHANGED_EVENT, handleRefresh)
-      window.removeEventListener(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT, handleRefresh)
+      state.generation++
+      state.trailing = false
+    }
+  }, [refresh])
+
+  useEffect(() => {
+    const handleRefresh = (): void => void refresh()
+    window.addEventListener(RECOVERY_SOURCE_CHANGED_EVENT, handleRefresh)
+    return () => {
+      window.removeEventListener(RECOVERY_SOURCE_CHANGED_EVENT, handleRefresh)
     }
   }, [refresh])
 

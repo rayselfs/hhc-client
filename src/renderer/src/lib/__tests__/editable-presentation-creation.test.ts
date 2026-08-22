@@ -84,7 +84,7 @@ describe('persistEditablePresentationCreation', () => {
 
   it('journals a failed external compensation after removing the catalog entry', async () => {
     const changed = vi.fn()
-    window.addEventListener('hhc:resource-cleanup-journal-changed', changed)
+    window.addEventListener('hhc:recovery-source-changed', changed)
     await expect(
       persistEditablePresentationCreation(input, {
         saveThumbnail: vi.fn(async () => Promise.reject(new Error('thumbnail'))),
@@ -93,7 +93,7 @@ describe('persistEditablePresentationCreation', () => {
         )
       })
     ).rejects.toThrow('thumbnail')
-    window.removeEventListener('hhc:resource-cleanup-journal-changed', changed)
+    window.removeEventListener('hhc:recovery-source-changed', changed)
 
     const db = await openFileExplorerDB()
     await expect(db.get('folder-items', item.id)).resolves.toBeUndefined()

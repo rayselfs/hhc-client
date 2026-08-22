@@ -81,19 +81,67 @@ it('does not expose a projection filter without a projection issue source', asyn
   expect(screen.queryByRole('button', { name: 'Projection' })).not.toBeInTheDocument()
 })
 
-it.each(['hhc:sync-entry-changed', 'hhc:resource-cleanup-journal-changed'])(
-  'refreshes current issues on %s',
-  async (eventName) => {
-    renderPanel()
-    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+it('refreshes current issues on a semantic recovery-source change', async () => {
+  renderPanel()
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
 
-    await act(async () => {
-      window.dispatchEvent(new Event(eventName))
+  await act(async () => {
+    window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+  })
+
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
+})
+
+it('does not refresh for raw sync download progress events', async () => {
+  renderPanel()
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+
+  for (let index = 0; index < 20; index++) {
+    window.dispatchEvent(new Event('hhc:sync-entry-changed'))
+  }
+  await act(async () => undefined)
+
+  expect(collectRecoveryIssues).toHaveBeenCalledOnce()
+})
+
+it('allows one active refresh and coalesces a burst into one trailing refresh', async () => {
+  renderPanel()
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+  let active = 0
+  let maxActive = 0
+  let resolveSlowScan: (() => void) | undefined
+  vi.mocked(collectRecoveryIssues)
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          active++
+          maxActive = Math.max(maxActive, active)
+          resolveSlowScan = () => {
+            active--
+            resolve([])
+          }
+        })
+    )
+    .mockImplementationOnce(async () => {
+      active++
+      maxActive = Math.max(maxActive, active)
+      active--
+      return []
     })
 
-    await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
+  window.dispatchEvent(new Event('hhc:recovery-source-changed'))
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(2))
+  for (let index = 0; index < 20; index++) {
+    window.dispatchEvent(new Event('hhc:recovery-source-changed'))
   }
-)
+  expect(collectRecoveryIssues).toHaveBeenCalledTimes(2)
+  expect(maxActive).toBe(1)
+
+  await act(async () => resolveSlowScan?.())
+
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledTimes(3))
+  expect(maxActive).toBe(1)
+})
 
 it('keeps the newest event refresh when the mount scan resolves later', async () => {
   let resolveMountScan:
@@ -110,7 +158,7 @@ it('keeps the newest event refresh when the mount scan resolves later', async ()
   await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
 
   await act(async () => {
-    window.dispatchEvent(new Event('hhc:sync-entry-changed'))
+    window.dispatchEvent(new Event('hhc:recovery-source-changed'))
   })
   expect(await screen.findByText('No current recovery issues')).toBeInTheDocument()
 

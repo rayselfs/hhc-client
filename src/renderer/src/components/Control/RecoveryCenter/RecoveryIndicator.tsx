@@ -4,8 +4,7 @@ import { AlertTriangle } from 'lucide-react'
 import { collectRecoveryIssues } from '@renderer/lib/recovery-center'
 import { countFailedOrBlockedMediaJobs, subscribeMediaJobs } from '@renderer/lib/media-work-db'
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
-import { SYNC_ENTRY_CHANGED_EVENT } from '@renderer/lib/sync-db'
-import { RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT } from '@renderer/lib/resource-cleanup-journal'
+import { RECOVERY_SOURCE_CHANGED_EVENT } from '@renderer/lib/recovery-source-events'
 
 export default function RecoveryIndicator(): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -14,27 +13,40 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
 
   useEffect(() => {
     let cancelled = false
-    let fullRefreshGeneration = 0
+    let fullRefreshRunning = false
+    let fullRefreshTrailing = false
     let jobRefreshGeneration = 0
     const dismissedJobIds = dismissedIssueIds.flatMap((id) =>
       id.startsWith('job-failed:') ? [id.slice('job-failed:'.length)] : []
     )
     const refreshAll = (): void => {
-      const fullGeneration = ++fullRefreshGeneration
-      const jobGeneration = jobRefreshGeneration
-      void collectRecoveryIssues().then((issues) => {
-        if (cancelled || fullGeneration !== fullRefreshGeneration) return
-        const visibleIssues = issues.filter(
-          (issue) => issue.severity !== 'info' && !dismissedIssueIds.includes(issue.id)
-        )
-        setCounts((current) => ({
-          jobs:
-            jobGeneration === jobRefreshGeneration
-              ? visibleIssues.filter((issue) => issue.kind === 'job-failed').length
-              : current.jobs,
-          other: visibleIssues.filter((issue) => issue.kind !== 'job-failed').length
-        }))
-      })
+      if (fullRefreshRunning) {
+        fullRefreshTrailing = true
+        return
+      }
+      fullRefreshRunning = true
+      void (async () => {
+        try {
+          do {
+            fullRefreshTrailing = false
+            const jobGeneration = jobRefreshGeneration
+            const issues = await collectRecoveryIssues()
+            if (cancelled || fullRefreshTrailing) continue
+            const visibleIssues = issues.filter(
+              (issue) => issue.severity !== 'info' && !dismissedIssueIds.includes(issue.id)
+            )
+            setCounts((current) => ({
+              jobs:
+                jobGeneration === jobRefreshGeneration
+                  ? visibleIssues.filter((issue) => issue.kind === 'job-failed').length
+                  : current.jobs,
+              other: visibleIssues.filter((issue) => issue.kind !== 'job-failed').length
+            }))
+          } while (fullRefreshTrailing && !cancelled)
+        } finally {
+          fullRefreshRunning = false
+        }
+      })()
     }
     const refreshJobs = (): void => {
       const generation = ++jobRefreshGeneration
@@ -46,14 +58,12 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
     refreshAll()
     const unsubscribe = subscribeMediaJobs(refreshJobs)
     window.addEventListener('focus', refreshAll)
-    window.addEventListener(SYNC_ENTRY_CHANGED_EVENT, refreshAll)
-    window.addEventListener(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT, refreshAll)
+    window.addEventListener(RECOVERY_SOURCE_CHANGED_EVENT, refreshAll)
     return () => {
       cancelled = true
       unsubscribe()
       window.removeEventListener('focus', refreshAll)
-      window.removeEventListener(SYNC_ENTRY_CHANGED_EVENT, refreshAll)
-      window.removeEventListener(RESOURCE_CLEANUP_JOURNAL_CHANGED_EVENT, refreshAll)
+      window.removeEventListener(RECOVERY_SOURCE_CHANGED_EVENT, refreshAll)
     }
   }, [dismissedIssueIds])
 

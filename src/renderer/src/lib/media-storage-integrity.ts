@@ -4,6 +4,7 @@ import { listFileBlobRecords, openFileExplorerDB } from './file-explorer-db'
 import { listDerivedAssets } from './media-work-db'
 import { deferMediaResourceCleanup, isMediaResourceLocked } from './media-resource-locks'
 import { createResourceCleanupRecord, retryResourceCleanup } from './resource-cleanup-journal'
+import { dispatchRecoverySourceChanged } from './recovery-source-events'
 import { listSyncEntries } from './sync-db'
 
 export type MediaStorageIntegrityIssueKind =
@@ -190,6 +191,10 @@ export async function repairMediaStorageIntegrity(): Promise<MediaStorageIntegri
     if (!deferred) await repairMediaStorageIntegrity()
   }
   await Promise.all(cleanupRecords.map((record) => retryResourceCleanup(record.id)))
+
+  if (correctedRefCounts.length > 0 && cleanupRecords.length === 0) {
+    dispatchRecoverySourceChanged()
+  }
 
   return {
     correctedRefCounts,
