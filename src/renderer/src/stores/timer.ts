@@ -1,8 +1,10 @@
+import { useSyncExternalStore } from 'react'
 import { useTimerConfigStore } from './timer-config'
 import { useTimerRuntimeStore, formatTime, computeProgress } from './timer-runtime'
 import type { TimerConfigState } from './timer-config'
 import type { TimerRuntimeState } from './timer-runtime'
 import type { TimerMode, TimerStatus, TimerPhase } from '@shared/types/timer'
+import { useSettingsStore } from './settings'
 
 export { useTimerConfigStore } from './timer-config'
 export { useTimerRuntimeStore } from './timer-runtime'
@@ -12,6 +14,9 @@ export type { TimerConfigState } from './timer-config'
 export type { TimerRuntimeState } from './timer-runtime'
 
 export interface TimerStore extends TimerConfigState, TimerRuntimeState {}
+
+type TimerStoreListener = (state: TimerStore, prevState: TimerStore) => void
+type TimerSelectorListener<T> = (selectedState: T, prevSelectedState: T) => void
 
 const CONFIG_KEYS = new Set<string>([
   'mode',
@@ -27,18 +32,41 @@ const CONFIG_KEYS = new Set<string>([
   'removePreset'
 ])
 
+let cachedConfigState = useTimerConfigStore.getState()
+let cachedRuntimeState = useTimerRuntimeStore.getState()
+let cachedCombinedState = { ...cachedConfigState, ...cachedRuntimeState } as TimerStore
+
+function getCombinedState(): TimerStore {
+  const config = useTimerConfigStore.getState()
+  const runtime = useTimerRuntimeStore.getState()
+  if (config !== cachedConfigState || runtime !== cachedRuntimeState) {
+    cachedConfigState = config
+    cachedRuntimeState = runtime
+    cachedCombinedState = { ...config, ...runtime } as TimerStore
+  }
+  return cachedCombinedState
+}
+
+function subscribeCombined(listener: () => void): () => void {
+  const unsubConfig = useTimerConfigStore.subscribe(listener)
+  const unsubRuntime = useTimerRuntimeStore.subscribe(listener)
+  return () => {
+    unsubConfig()
+    unsubRuntime()
+  }
+}
+
 export function useTimerStore(): TimerStore
 export function useTimerStore<T>(selector: (s: TimerStore) => T): T
 export function useTimerStore<T>(selector?: (s: TimerStore) => T): TimerStore | T {
-  const config = useTimerConfigStore()
-  const runtime = useTimerRuntimeStore()
-  const combined = { ...config, ...runtime } as TimerStore
-  if (selector) return selector(combined)
-  return combined
+  return useSyncExternalStore(
+    subscribeCombined,
+    () => (selector ? selector(getCombinedState()) : getCombinedState()),
+    () => (selector ? selector(getCombinedState()) : getCombinedState())
+  )
 }
 
-useTimerStore.getState = (): TimerStore =>
-  ({ ...useTimerConfigStore.getState(), ...useTimerRuntimeStore.getState() }) as TimerStore
+useTimerStore.getState = getCombinedState
 
 useTimerStore.setState = (partial: Partial<TimerStore>) => {
   const configPart: Record<string, unknown> = {}
@@ -58,29 +86,37 @@ useTimerStore.setState = (partial: Partial<TimerStore>) => {
   }
 }
 
-useTimerStore.subscribe = (
-  listener: (state: TimerStore, prevState: TimerStore) => void
-): (() => void) => {
-  let latestConfig = useTimerConfigStore.getState()
-  let latestRuntime = useTimerRuntimeStore.getState()
+function subscribeTimerStore(listener: TimerStoreListener): () => void
+function subscribeTimerStore<T>(
+  selector: (state: TimerStore) => T,
+  listener: TimerSelectorListener<T>
+): () => void
+function subscribeTimerStore<T>(
+  listenerOrSelector: TimerStoreListener | ((state: TimerStore) => T),
+  selectorListener?: TimerSelectorListener<T>
+): () => void {
+  let previousState = getCombinedState()
+  let previousSelection = selectorListener
+    ? (listenerOrSelector as (state: TimerStore) => T)(previousState)
+    : undefined
 
-  const unsubConfig = useTimerConfigStore.subscribe((config) => {
-    const prev = { ...latestConfig, ...latestRuntime } as TimerStore
-    latestConfig = config
-    listener({ ...latestConfig, ...latestRuntime } as TimerStore, prev)
+  return subscribeCombined(() => {
+    const nextState = getCombinedState()
+    if (selectorListener) {
+      const nextSelection = (listenerOrSelector as (state: TimerStore) => T)(nextState)
+      if (!Object.is(previousSelection, nextSelection)) {
+        const previous = previousSelection as T
+        previousSelection = nextSelection
+        selectorListener(nextSelection, previous)
+      }
+    } else {
+      ;(listenerOrSelector as TimerStoreListener)(nextState, previousState)
+    }
+    previousState = nextState
   })
-
-  const unsubRuntime = useTimerRuntimeStore.subscribe((runtime) => {
-    const prev = { ...latestConfig, ...latestRuntime } as TimerStore
-    latestRuntime = runtime
-    listener({ ...latestConfig, ...latestRuntime } as TimerStore, prev)
-  })
-
-  return () => {
-    unsubConfig()
-    unsubRuntime()
-  }
 }
+
+useTimerStore.subscribe = subscribeTimerStore
 
 useTimerStore.persist = useTimerConfigStore.persist
 
@@ -121,9 +157,11 @@ export function getDisplayValues(
     reminderEnabled
   } = state
 
+  const reminderMode = useSettingsStore.getState().reminderMode
+
   if (phase === 'idle') {
     if (reminderEnabled) {
-      const mainSeconds = totalDuration - reminderDuration
+      const mainSeconds = reminderMode === 'add' ? totalDuration : totalDuration - reminderDuration
       return {
         mainDisplay: formatTime(Math.max(0, mainSeconds)),
         subDisplay: formatTime(reminderDuration),

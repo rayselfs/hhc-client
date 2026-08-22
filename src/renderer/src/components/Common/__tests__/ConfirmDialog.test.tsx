@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect } from 'vitest'
 import '@renderer/i18n'
@@ -73,9 +73,20 @@ describe('ConfirmDialog', () => {
       result = v
     })
     await user.click(screen.getByText('Open'))
-    await act(async () => {
-      await user.click(await screen.findByText('Confirm'))
+    await user.click(await screen.findByText('Confirm'))
+    expect(result).toBe(true)
+    expect(screen.queryByText('Are you sure?')).not.toBeInTheDocument()
+  })
+
+  it('resolves true when Enter is pressed', async () => {
+    const user = userEvent.setup()
+    let result: boolean | undefined
+    renderWithProvider((v) => {
+      result = v
     })
+    await user.click(screen.getByText('Open'))
+    await screen.findByText('Are you sure?')
+    await user.keyboard('{Enter}')
     expect(result).toBe(true)
     expect(screen.queryByText('Are you sure?')).not.toBeInTheDocument()
   })
@@ -87,9 +98,7 @@ describe('ConfirmDialog', () => {
       result = v
     })
     await user.click(screen.getByText('Open'))
-    await act(async () => {
-      await user.click(await screen.findByText('Cancel'))
-    })
+    await user.click(await screen.findByText('Cancel'))
     expect(result).toBe(false)
     expect(screen.queryByText('Are you sure?')).not.toBeInTheDocument()
   })

@@ -1,0 +1,7 @@
+VLC / libVLC source code:
+https://code.videolan.org/videolan/vlc
+
+Project website:
+https://www.videolan.org/vlc/
+
+Bundled binary source/version must be recorded in build-info.json before release.

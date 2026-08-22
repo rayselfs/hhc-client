@@ -1,13 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { performance } from 'node:perf_hooks'
 
-vi.mock('electron', () => ({
-  BrowserWindow: {
-    getAllWindows: vi.fn().mockReturnValue([])
-  }
-}))
-
-import { BrowserWindow } from 'electron'
 import { TimerService } from '../timerService'
+import type { WindowManager } from '../windowManager'
 
 function makeMockWindow(): {
   isDestroyed: () => boolean
@@ -21,10 +16,18 @@ function makeMockWindow(): {
 
 describe('TimerService', () => {
   let service: TimerService
+  let mainWindow: ReturnType<typeof makeMockWindow> | null
+  let projectionWindow: ReturnType<typeof makeMockWindow> | null
 
   beforeEach(() => {
     vi.useFakeTimers()
+    mainWindow = null
+    projectionWindow = null
     service = new TimerService()
+    service.setWindowManager({
+      getMainWindow: () => mainWindow,
+      getProjectionWindow: () => projectionWindow
+    } as unknown as WindowManager)
   })
 
   afterEach(() => {
@@ -153,8 +156,7 @@ describe('TimerService', () => {
 
   describe('broadcast bug fix — lastBroadcastRemaining updated after broadcast', () => {
     it('updates lastBroadcastRemaining to match current remainingSeconds after start', () => {
-      const win = makeMockWindow()
-      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([win as never])
+      mainWindow = makeMockWindow()
 
       service.handleCommand({ type: 'start' })
 
@@ -163,18 +165,25 @@ describe('TimerService', () => {
       expect(lastBroadcast).toBe(service.getState().remainingSeconds)
     })
 
-    it('sends timer-tick to all non-destroyed windows', () => {
-      const win = makeMockWindow()
-      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([win as never])
+    it('sends timer-tick only to WindowManager-managed windows', () => {
+      mainWindow = makeMockWindow()
+      projectionWindow = makeMockWindow()
 
       service.handleCommand({ type: 'start' })
 
-      expect(win.webContents.send).toHaveBeenCalledWith('timer-tick', expect.any(Object))
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('timer-tick', expect.any(Object))
+      expect(projectionWindow.webContents.send).toHaveBeenCalledWith(
+        'timer-tick',
+        expect.any(Object)
+      )
     })
 
     it('skips destroyed windows during broadcast', () => {
-      const destroyedWin = { isDestroyed: () => true, webContents: { send: vi.fn() } }
-      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([destroyedWin as never])
+      const destroyedWin = {
+        isDestroyed: () => true,
+        webContents: { send: vi.fn(), isDestroyed: () => false }
+      }
+      mainWindow = destroyedWin
 
       service.handleCommand({ type: 'start' })
 
@@ -310,6 +319,45 @@ describe('TimerService', () => {
     })
   })
 
+  describe('interval lifecycle', () => {
+    it('does not run an interval while idle', () => {
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('starts on timer start and stops on timer pause', () => {
+      service.handleCommand({ type: 'start' })
+      expect(vi.getTimerCount()).toBe(1)
+
+      service.handleCommand({ type: 'pause' })
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('keeps running while either timer or stopwatch is active', () => {
+      service.handleCommand({ type: 'start' })
+      service.handleCommand({ type: 'startStopwatch' })
+      service.handleCommand({ type: 'pause' })
+      expect(vi.getTimerCount()).toBe(1)
+
+      service.handleCommand({ type: 'pauseStopwatch' })
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('uses one-second ticks unless the stopwatch needs sub-second updates', () => {
+      const tickSpy = vi.spyOn(service as unknown as { tick: () => void }, 'tick')
+      service.handleCommand({ type: 'start' })
+
+      vi.advanceTimersByTime(999)
+      expect(tickSpy).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(tickSpy).toHaveBeenCalledTimes(1)
+
+      service.handleCommand({ type: 'startStopwatch' })
+      tickSpy.mockClear()
+      vi.advanceTimersByTime(500)
+      expect(tickSpy).toHaveBeenCalledTimes(5)
+    })
+  })
+
   describe('getState', () => {
     it('returns idle phase when stopped', () => {
       expect(service.getState().phase).toBe('idle')
@@ -340,6 +388,26 @@ describe('TimerService', () => {
       expect(state.stopwatch).toBeDefined()
       expect(state.stopwatch.status).toBe('stopped')
       expect(state.stopwatch.formattedTime).toBeDefined()
+    })
+
+    it('tracks elapsed overtime after the countdown reaches zero', () => {
+      let now = 0
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => now)
+      try {
+        service.handleCommand({ type: 'setDuration', seconds: 1 })
+        service.handleCommand({ type: 'start' })
+
+        now = 2000
+        vi.advanceTimersByTime(2000)
+
+        expect(service.getState()).toMatchObject({
+          phase: 'overtime',
+          remainingSeconds: 0,
+          overtimeSeconds: 1
+        })
+      } finally {
+        nowSpy.mockRestore()
+      }
     })
   })
 })

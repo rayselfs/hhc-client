@@ -1,0 +1,7 @@
+{
+  "component": "electron-vlc-player",
+  "purpose": "Electron native libVLC embedding",
+  "version": "1.0.2",
+  "sourceUrl": "https://github.com/ssnangua/electron-vlc-player",
+  "license": "MIT"
+}

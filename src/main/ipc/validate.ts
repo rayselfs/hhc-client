@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 import type { WindowManager } from '../windowManager'
+import type { ProjectionMessageTuple, ProjectionTransportTuple } from '@shared/projection-messages'
 
 const VALID_TIMER_COMMAND_TYPES = new Set([
   'start',
@@ -30,7 +31,7 @@ export function isKnownWindow(wm: WindowManager, event: Electron.IpcMainInvokeEv
 
 export function isMainWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
   const senderWindow = BrowserWindow.fromWebContents(event.sender)
-  return senderWindow === wm.getMainWindow()
+  return senderWindow !== null && senderWindow === wm.getMainWindow()
 }
 
 export function validateTheme(theme: unknown): boolean {
@@ -40,8 +41,243 @@ export function validateTheme(theme: unknown): boolean {
 export function validateTimerCommand(cmd: unknown): boolean {
   if (typeof cmd !== 'object' || cmd === null) return false
   const obj = cmd as Record<string, unknown>
-  if (typeof obj.type !== 'string') return false
-  return VALID_TIMER_COMMAND_TYPES.has(obj.type)
+  if (typeof obj.type !== 'string' || !VALID_TIMER_COMMAND_TYPES.has(obj.type)) return false
+  switch (obj.type) {
+    case 'setDuration':
+    case 'addTime':
+    case 'removeTime':
+      return (
+        typeof obj.seconds === 'number' &&
+        Number.isFinite(obj.seconds) &&
+        obj.seconds >= 0 &&
+        obj.seconds <= MAX_DURATION_SECONDS
+      )
+    case 'setMode':
+      return typeof obj.mode === 'string' && VALID_TIMER_MODES.has(obj.mode)
+    case 'setReminder':
+      return (
+        typeof obj.enabled === 'boolean' &&
+        typeof obj.durationSeconds === 'number' &&
+        Number.isFinite(obj.durationSeconds) &&
+        obj.durationSeconds >= 0 &&
+        obj.durationSeconds <= MAX_DURATION_SECONDS
+      )
+    case 'setOvertimeMessage':
+      return (
+        typeof obj.enabled === 'boolean' &&
+        typeof obj.message === 'string' &&
+        obj.message.length <= 1000
+      )
+    default:
+      return true
+  }
+}
+
+const NULL_PROJECTION_CHANNELS = new Set([
+  '__system:pong',
+  '__system:ping',
+  '__system:close',
+  '__system:closed',
+  'file:end'
+])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function validateProjectionPayload(channel: string, data: unknown): boolean {
+  if (channel === '__system:ready') {
+    return isRecord(data) && isValidProjectionGeneration(data.generation)
+  }
+  if (channel === '__system:replay') {
+    return (
+      isRecord(data) &&
+      isValidProjectionGeneration(data.generation) &&
+      validateProjectionReplayPayload(data.generation, data)
+    )
+  }
+  if (NULL_PROJECTION_CHANNELS.has(channel)) return data === null
+  if (!isRecord(data)) return false
+  const obj = data
+
+  switch (channel) {
+    case '__system:blank':
+      return typeof obj.showDefault === 'boolean'
+    case '__system:blackout':
+      return typeof obj.enabled === 'boolean'
+    case '__system:active-owner':
+      return typeof obj.owner === 'string'
+    case 'settings:timezone':
+      return typeof obj.timezone === 'string'
+    case 'settings:timer-ring-color':
+      return obj.color === null || typeof obj.color === 'string'
+    case 'bible:settings':
+      return typeof obj.fontSize === 'number' && Number.isFinite(obj.fontSize)
+    case 'file:show':
+      return (
+        typeof obj.itemId === 'string' &&
+        typeof obj.blobId === 'string' &&
+        typeof obj.fileName === 'string' &&
+        typeof obj.mimeType === 'string' &&
+        Array.isArray(obj.playlist) &&
+        typeof obj.currentIndex === 'number' &&
+        Number.isInteger(obj.currentIndex)
+      )
+    case 'file:control':
+      if (typeof obj.action !== 'string') return false
+      if ('itemId' in obj && obj.itemId !== undefined && typeof obj.itemId !== 'string') {
+        return false
+      }
+      if (['play', 'pause'].includes(obj.action)) return true
+      if (['seek', 'volume', 'pdfPage', 'pdfScroll', 'zoom'].includes(obj.action)) {
+        return isFiniteNumber(obj.value)
+      }
+      if (obj.action === 'pdfViewMode') {
+        return obj.value === 'single' || obj.value === 'continuous'
+      }
+      if (obj.action === 'pan') {
+        const value = obj.value as Record<string, unknown> | null
+        return (
+          typeof value === 'object' &&
+          value !== null &&
+          isFiniteNumber(value.x) &&
+          isFiniteNumber(value.y)
+        )
+      }
+      return false
+    case 'file:playback-state':
+      return (
+        typeof obj.itemId === 'string' &&
+        isFiniteNumber(obj.currentTime) &&
+        isFiniteNumber(obj.duration) &&
+        typeof obj.isPlaying === 'boolean' &&
+        typeof obj.isEnded === 'boolean'
+      )
+    case 'timer:tick':
+      return (
+        typeof obj.mode === 'string' &&
+        VALID_TIMER_MODES.has(obj.mode) &&
+        isFiniteNumber(obj.remainingSeconds) &&
+        typeof obj.phase === 'string' &&
+        typeof obj.mainDisplay === 'string' &&
+        (obj.subDisplay === null || typeof obj.subDisplay === 'string') &&
+        isFiniteNumber(obj.progress) &&
+        isFiniteNumber(obj.overtimeSeconds)
+      )
+    case 'timer:sync': {
+      const state = obj.state as Record<string, unknown> | null
+      const stopwatch = obj.stopwatchState as Record<string, unknown> | null
+      return (
+        validateTimerSettings(obj.settings) &&
+        typeof state === 'object' &&
+        state !== null &&
+        typeof state.status === 'string' &&
+        isFiniteNumber(state.remainingSeconds) &&
+        typeof stopwatch === 'object' &&
+        stopwatch !== null &&
+        typeof stopwatch.status === 'string' &&
+        isFiniteNumber(stopwatch.elapsedMs)
+      )
+    }
+    case 'timer:stopwatch':
+      return (
+        isFiniteNumber(obj.elapsedMs) &&
+        typeof obj.formattedTime === 'string' &&
+        typeof obj.status === 'string'
+      )
+    case 'timer:overtime-message':
+      return typeof obj.message === 'string'
+    case 'bible:chapter':
+      return (
+        isFiniteNumber(obj.bookNumber) &&
+        isFiniteNumber(obj.chapter) &&
+        Array.isArray(obj.chapterVerses) &&
+        isFiniteNumber(obj.currentVerse)
+      )
+    default:
+      return false
+  }
+}
+
+function validateNullablePayload(channel: string, value: unknown): boolean {
+  return value === null || validateProjectionPayload(channel, value)
+}
+
+function validateMediaReplayState(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  if (!isRecord(value.pan)) return false
+  return (
+    typeof value.itemId === 'string' &&
+    isFiniteNumber(value.positionSeconds) &&
+    isFiniteNumber(value.durationSeconds) &&
+    typeof value.isPlaying === 'boolean' &&
+    typeof value.isEnded === 'boolean' &&
+    isFiniteNumber(value.volume) &&
+    isFiniteNumber(value.pdfPage) &&
+    isFiniteNumber(value.pdfScroll) &&
+    (value.pdfViewMode === 'single' || value.pdfViewMode === 'continuous') &&
+    isFiniteNumber(value.zoom) &&
+    isFiniteNumber(value.pan.x) &&
+    isFiniteNumber(value.pan.y)
+  )
+}
+
+function validateProjectionReplayPayload(generation: number, data: unknown): boolean {
+  if (!isRecord(data) || data.generation !== generation || !isRecord(data.snapshot)) return false
+  const snapshot = data.snapshot
+  if (
+    !['timer', 'bible', 'media'].includes(String(snapshot.owner)) ||
+    typeof snapshot.showDefault !== 'boolean' ||
+    typeof snapshot.isBlackout !== 'boolean' ||
+    !isRecord(snapshot.timer) ||
+    !isRecord(snapshot.bible) ||
+    !isRecord(snapshot.media)
+  ) {
+    return false
+  }
+
+  const timer = snapshot.timer
+  const bible = snapshot.bible
+  const media = snapshot.media
+  return (
+    validateNullablePayload('timer:tick', timer.tick) &&
+    validateNullablePayload('timer:stopwatch', timer.stopwatch) &&
+    validateNullablePayload('timer:overtime-message', timer.overtimeMessage) &&
+    validateNullablePayload('settings:timezone', timer.timezone) &&
+    validateNullablePayload('settings:timer-ring-color', timer.ringColor) &&
+    validateNullablePayload('bible:chapter', bible.chapter) &&
+    validateNullablePayload('bible:settings', bible.settings) &&
+    validateNullablePayload('file:show', media.show) &&
+    (media.state === null || validateMediaReplayState(media.state))
+  )
+}
+
+export function isValidProjectionGeneration(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) > 0
+}
+
+export function validateProjectionTransportTuple(
+  args: unknown[]
+): args is ProjectionTransportTuple {
+  if (args.length !== 3 || !isValidProjectionGeneration(args[0])) return false
+  const [generation, channel, data] = args
+  if (typeof channel !== 'string') return false
+  if (channel === '__system:ready') {
+    return isRecord(data) && data.generation === generation
+  }
+  if (channel === '__system:replay') {
+    return validateProjectionReplayPayload(generation, data)
+  }
+  return validateProjectionPayload(channel, data)
+}
+
+export function validateProjectionMessageTuple(args: unknown[]): args is ProjectionMessageTuple {
+  if (args.length !== 2 || typeof args[0] !== 'string') return false
+  return validateProjectionPayload(args[0], args[1])
 }
 
 export function validateTimerSettings(settings: unknown): boolean {

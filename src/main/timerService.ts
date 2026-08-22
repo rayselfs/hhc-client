@@ -1,5 +1,4 @@
 import { performance } from 'perf_hooks'
-import { BrowserWindow } from 'electron'
 import type {
   TimerCommand,
   TimerMode,
@@ -10,6 +9,7 @@ import type {
   TimerTickPayload
 } from '@shared/types/timer'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
+import type { WindowManager } from './windowManager'
 
 function formatTime(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
@@ -82,18 +82,25 @@ export class TimerService {
   }
 
   private intervalId: NodeJS.Timeout | null = null
+  private intervalDelayMs: number | null = null
   private targetEndTime: number | null = null
+  private windowManager: WindowManager | null = null
 
   private lastBroadcastRemaining: number = -1
   private lastBroadcastTime: number = 0
 
-  constructor() {
-    this.startInterval()
+  setWindowManager(windowManager: WindowManager): void {
+    this.windowManager = windowManager
   }
 
-  private startInterval(): void {
-    if (this.intervalId !== null) return
-    this.intervalId = setInterval(() => this.tick(), 100)
+  private syncInterval(): void {
+    const nextDelayMs =
+      this.stopwatch.status === 'running' ? 100 : this.timer.status === 'running' ? 1000 : null
+    if (nextDelayMs === this.intervalDelayMs) return
+    this.stopInterval()
+    if (nextDelayMs === null) return
+    this.intervalDelayMs = nextDelayMs
+    this.intervalId = setInterval(() => this.tick(), nextDelayMs)
   }
 
   private stopInterval(): void {
@@ -101,6 +108,7 @@ export class TimerService {
       clearInterval(this.intervalId)
       this.intervalId = null
     }
+    this.intervalDelayMs = null
   }
 
   private tick(): void {
@@ -108,8 +116,7 @@ export class TimerService {
     const nowMs = Date.now()
 
     if (this.timer.status === 'running' && this.targetEndTime !== null) {
-      const remainingMs = Math.max(0, this.targetEndTime - nowPerfMs)
-      const rawRemaining = remainingMs / 1000
+      const rawRemaining = (this.targetEndTime - nowPerfMs) / 1000
       this.timer.remainingSeconds = Math.ceil(rawRemaining)
 
       if (rawRemaining <= 0) {
@@ -139,8 +146,11 @@ export class TimerService {
 
   private broadcast(): void {
     const payload = this.buildTickPayload()
-    BrowserWindow.getAllWindows().forEach((win) => {
-      if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+    const windows = this.windowManager
+      ? [this.windowManager.getMainWindow(), this.windowManager.getProjectionWindow()]
+      : []
+    new Set(windows).forEach((win) => {
+      if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
         win.webContents.send('timer-tick', payload)
       }
     })
@@ -256,6 +266,7 @@ export class TimerService {
     this.timer.overtimeSeconds = 0
     this.timer.status = 'running'
     this.targetEndTime = performance.now() + this.timer.remainingSeconds * 1000
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -263,6 +274,7 @@ export class TimerService {
     if (this.timer.status !== 'running') return
     this.timer.status = 'paused'
     this.targetEndTime = null
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -270,6 +282,7 @@ export class TimerService {
     if (this.timer.status !== 'paused') return
     this.timer.status = 'running'
     this.targetEndTime = performance.now() + this.timer.remainingSeconds * 1000
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -278,6 +291,7 @@ export class TimerService {
     this.timer.remainingSeconds = this.settings.totalDuration
     this.timer.overtimeSeconds = 0
     this.targetEndTime = null
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -327,6 +341,7 @@ export class TimerService {
     if (this.stopwatch.status === 'running') return
     this.stopwatch.status = 'running'
     this.stopwatch.startMs = performance.now() - this.stopwatch.elapsedMs
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -337,6 +352,7 @@ export class TimerService {
     }
     this.stopwatch.status = 'paused'
     this.stopwatch.startMs = null
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -344,6 +360,7 @@ export class TimerService {
     this.stopwatch.status = 'stopped'
     this.stopwatch.elapsedMs = 0
     this.stopwatch.startMs = null
+    this.syncInterval()
     this.broadcast()
   }
 

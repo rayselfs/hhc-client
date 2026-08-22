@@ -4,6 +4,7 @@ import { createKey } from '@renderer/lib/storage-prefix'
 import en from '../locales/en.json'
 import zhTW from '../locales/zh-TW.json'
 import zhCN from '../locales/zh-CN.json'
+import { loadLanguageFont } from '@renderer/lib/font-loader'
 
 export const LANGUAGE_STORAGE_KEY = createKey('language')
 
@@ -38,10 +39,12 @@ i18n.use(initReactI18next).init({
 } as Parameters<typeof i18n.init>[0])
 
 setHtmlLang(initialLanguage)
+void loadLanguageFont(initialLanguage)
 
 i18n.on('languageChanged', (lng: string) => {
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lng)
   setHtmlLang(lng)
+  void loadLanguageFont(lng)
 })
 
 export default i18n

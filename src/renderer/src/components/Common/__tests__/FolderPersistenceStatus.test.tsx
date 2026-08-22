@@ -1,0 +1,67 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import '@renderer/i18n'
+import { FolderPersistenceStatus } from '../FolderPersistenceStatus'
+
+const baseProps = {
+  error: null,
+  pendingCount: 0,
+  isInitialized: true,
+  onRetryInitialization: vi.fn().mockResolvedValue(undefined),
+  onRetryPersistence: vi.fn().mockResolvedValue(undefined)
+}
+
+describe('FolderPersistenceStatus', () => {
+  it('does not render when persistence is ready', () => {
+    const { container } = render(<FolderPersistenceStatus {...baseProps} status="ready" />)
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('reports unsaved writes and retries the persistence queue', async () => {
+    const user = userEvent.setup()
+    const retryPersistence = vi.fn().mockResolvedValue(undefined)
+    render(
+      <FolderPersistenceStatus
+        {...baseProps}
+        status="degraded"
+        error="quota exceeded"
+        pendingCount={1}
+        onRetryPersistence={retryPersistence}
+      />
+    )
+
+    expect(screen.getByText('Local changes were not saved')).toBeInTheDocument()
+    expect(screen.getByText('quota exceeded')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retryPersistence).toHaveBeenCalledOnce()
+  })
+
+  it('retries initialization after a library load failure', async () => {
+    const user = userEvent.setup()
+    const retryInitialization = vi.fn().mockResolvedValue(undefined)
+    render(
+      <FolderPersistenceStatus
+        {...baseProps}
+        status="degraded"
+        error="indexeddb unavailable"
+        pendingCount={0}
+        isInitialized={false}
+        onRetryInitialization={retryInitialization}
+      />
+    )
+
+    expect(screen.getByText('Local library is unavailable')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retryInitialization).toHaveBeenCalledOnce()
+  })
+
+  it('shows pending saves without offering a retry action', () => {
+    render(<FolderPersistenceStatus {...baseProps} status="saving" pendingCount={2} />)
+
+    expect(screen.getByText('Saving local changes')).toBeInTheDocument()
+    expect(screen.getByText('2 change(s) waiting to be saved.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+  })
+})

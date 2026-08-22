@@ -15,7 +15,12 @@ vi.mock('@renderer/lib/persist-storage', () => ({
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 
 beforeEach(() => {
-  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0, speechMaxSessionSec: 3600 })
+  useBibleSettingsStore.setState({
+    fontSize: 90,
+    selectedVersionId: 0,
+    speechMaxSessionSec: 3600,
+    scriptureTemplateId: 'dark-stage'
+  })
 })
 
 describe('initial state', () => {
@@ -29,6 +34,10 @@ describe('initial state', () => {
 
   it('starts with speechMaxSessionSec of 3600', () => {
     expect(useBibleSettingsStore.getState().speechMaxSessionSec).toBe(3600)
+  })
+
+  it('starts with default scripture template', () => {
+    expect(useBibleSettingsStore.getState().scriptureTemplateId).toBe('dark-stage')
   })
 })
 
@@ -84,7 +93,8 @@ describe('persistence round-trip', () => {
     useBibleSettingsStore.setState({
       fontSize: 90,
       selectedVersionId: 0,
-      speechMaxSessionSec: 3600
+      speechMaxSessionSec: 3600,
+      scriptureTemplateId: 'dark-stage'
     })
   })
 
@@ -97,7 +107,7 @@ describe('persistence round-trip', () => {
     const raw = localStorage.getItem('hhc-bible-settings')
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw!)
-    expect(parsed.version).toBe(3)
+    expect(parsed.version).toBe(4)
     expect(parsed.state.fontSize).toBe(110)
   })
 
@@ -136,6 +146,13 @@ describe('setSpeechMaxSessionSec()', () => {
   })
 })
 
+describe('scripture projection settings', () => {
+  it('updates template id', () => {
+    useBibleSettingsStore.getState().setScriptureTemplateId('warm-sermon')
+    expect(useBibleSettingsStore.getState().scriptureTemplateId).toBe('warm-sermon')
+  })
+})
+
 describe('migration', () => {
   let localStorageMock: Record<string, string> = {}
 
@@ -158,7 +175,8 @@ describe('migration', () => {
     useBibleSettingsStore.setState({
       fontSize: 90,
       selectedVersionId: 0,
-      speechMaxSessionSec: 3600
+      speechMaxSessionSec: 3600,
+      scriptureTemplateId: 'dark-stage'
     })
   })
 

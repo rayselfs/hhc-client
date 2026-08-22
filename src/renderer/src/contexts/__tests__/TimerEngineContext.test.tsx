@@ -1,4 +1,5 @@
 import { render, renderHook, act } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { TimerEngineProvider, useTimerEngine } from '../TimerEngineContext'
 import { useTimerStore, DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
@@ -61,6 +62,21 @@ describe('TimerEngineContext', () => {
       expect(mockAdapter.dispose).not.toHaveBeenCalled()
       unmount()
       expect(mockAdapter.dispose).toHaveBeenCalledOnce()
+    })
+
+    it('disposes each adapter created during a StrictMode remount', () => {
+      const { unmount } = render(
+        <StrictMode>
+          <TimerEngineProvider>
+            <TestChild />
+          </TimerEngineProvider>
+        </StrictMode>
+      )
+
+      unmount()
+
+      expect(timerAdapterModule.createTimerAdapter).toHaveBeenCalledTimes(2)
+      expect(mockAdapter.dispose).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -352,10 +368,8 @@ describe('TimerEngineContext', () => {
     })
   })
 
-  describe('Stopwatch direct tick interval', () => {
-    it('runs 100ms interval when swStatus is running', async () => {
-      vi.useFakeTimers()
-
+  describe('Stopwatch tick source', () => {
+    it('updates stopwatch only from the adapter callback', async () => {
       render(
         <TimerEngineProvider>
           <TestChild />
@@ -366,63 +380,30 @@ describe('TimerEngineContext', () => {
         useStopwatchStore.getState().start()
       })
 
-      await act(async () => {
-        vi.advanceTimersByTime(100)
-      })
+      const tickSpy = vi.spyOn(useStopwatchStore.getState(), 'tick')
+      const callback = mockAdapter.onStopwatchTick.mock.calls[0][0]
 
       await act(async () => {
-        vi.advanceTimersByTime(100)
+        callback()
       })
 
-      vi.useRealTimers()
+      expect(tickSpy).toHaveBeenCalledOnce()
     })
 
-    it('clears interval when swStatus transitions to stopped', async () => {
-      vi.useFakeTimers()
-
+    it('does not create a renderer interval when stopwatch starts', async () => {
       render(
         <TimerEngineProvider>
           <TestChild />
         </TimerEngineProvider>
       )
 
-      const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
+      const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
 
       await act(async () => {
         useStopwatchStore.getState().start()
       })
 
-      await act(async () => {
-        useStopwatchStore.getState().reset()
-      })
-
-      expect(clearIntervalSpy).toHaveBeenCalled()
-
-      vi.useRealTimers()
-    })
-
-    it('clears interval when swStatus transitions to paused', async () => {
-      vi.useFakeTimers()
-
-      render(
-        <TimerEngineProvider>
-          <TestChild />
-        </TimerEngineProvider>
-      )
-
-      const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
-
-      await act(async () => {
-        useStopwatchStore.getState().start()
-      })
-
-      await act(async () => {
-        useStopwatchStore.getState().pause()
-      })
-
-      expect(clearIntervalSpy).toHaveBeenCalled()
-
-      vi.useRealTimers()
+      expect(setIntervalSpy).not.toHaveBeenCalled()
     })
   })
 

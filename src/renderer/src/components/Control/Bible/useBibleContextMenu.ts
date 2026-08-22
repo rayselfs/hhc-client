@@ -3,9 +3,11 @@ import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
+import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
 import { formatVerseReferenceForCopy } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
-import { Copy, Trash2, FolderPlus } from 'lucide-react'
+import { Copy, Trash2, FolderPlus, ListPlus } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -67,6 +69,20 @@ export function useBibleContextMenu(): UseBibleContextMenu {
 
     const items: ContextMenuEntry[] = [
       {
+        id: 'add-to-service',
+        label: t('bible.contextMenu.addToService'),
+        icon: React.createElement(ListPlus, { size: 14 }),
+        onAction: () => {
+          useServicePlaylistStore.getState().addCue(
+            buildBibleServiceCueInput(t, {
+              bookNumber: verse.bookNumber,
+              chapter: verse.chapter,
+              verse: verse.verse
+            })
+          )
+        }
+      },
+      {
         id: 'copy',
         label: t('bible.contextMenu.copyText'),
         icon: React.createElement(Copy, { size: 14 }),
@@ -81,6 +97,20 @@ export function useBibleContextMenu(): UseBibleContextMenu {
 
   const showHistoryMenu = (item: VerseItem, e: React.MouseEvent): void => {
     const items: ContextMenuEntry[] = [
+      {
+        id: 'add-to-service',
+        label: t('bible.contextMenu.addToService'),
+        icon: React.createElement(ListPlus, { size: 14 }),
+        onAction: () => {
+          useServicePlaylistStore.getState().addCue(
+            buildBibleServiceCueInput(t, {
+              bookNumber: item.bookNumber,
+              chapter: item.chapter,
+              verse: item.verse
+            })
+          )
+        }
+      },
       {
         id: 'add-to-folder',
         label: t('bible.contextMenu.addToFolder'),
@@ -114,6 +144,20 @@ export function useBibleContextMenu(): UseBibleContextMenu {
     const formattedText = getFormattedReference(item, t, i18n.language)
 
     const items: ContextMenuEntry[] = [
+      {
+        id: 'add-to-service',
+        label: t('bible.contextMenu.addToService'),
+        icon: React.createElement(ListPlus, { size: 14 }),
+        onAction: () => {
+          useServicePlaylistStore.getState().addCue(
+            buildBibleServiceCueInput(t, {
+              bookNumber: item.bookNumber,
+              chapter: item.chapter,
+              verse: item.verse
+            })
+          )
+        }
+      },
       {
         id: 'copy',
         label: t('bible.contextMenu.copyText'),

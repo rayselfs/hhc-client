@@ -9,6 +9,24 @@ const mockFolderCleanupExpired = vi.fn().mockResolvedValue(undefined)
 const mockFileExplorerInitialize = vi.fn()
 const mockFileExplorerCleanupExpired = vi.fn().mockResolvedValue(undefined)
 const mockInitializeSearchIndexes = vi.fn()
+const mockUnsubscribeBible = vi.fn()
+const mockUnsubscribeBibleFolders = vi.fn()
+const mockUnsubscribeFileExplorer = vi.fn()
+const mockRecoverStaleJobs = vi.fn().mockResolvedValue(0)
+const mockRemoveExpiredHistory = vi.fn().mockResolvedValue(0)
+const mockRegisterExecutor = vi.fn()
+const mockBackfillImportedMediaAssets = vi.fn().mockResolvedValue(undefined)
+const mockRecoverPendingSyncResourceCleanups = vi.fn().mockResolvedValue({
+  folderIds: [],
+  itemIds: [],
+  tombstoneCount: 0
+})
+const mockRetryPendingResourceCleanups = vi.fn().mockResolvedValue({
+  attempted: 0,
+  failed: 0
+})
+const mockStopSyncRuntime = vi.fn()
+const mockStartSyncRuntime = vi.fn(() => mockStopSyncRuntime)
 
 const bibleState = {
   isInitialized: false,
@@ -45,7 +63,7 @@ vi.mock('@renderer/stores/bible', () => ({
     (selector: (s: typeof bibleState) => unknown) => selector(bibleState),
     {
       getState: () => bibleState,
-      subscribe: vi.fn(() => vi.fn()),
+      subscribe: vi.fn(() => mockUnsubscribeBible),
       setState: vi.fn()
     }
   )
@@ -56,7 +74,7 @@ vi.mock('@renderer/stores/folder', () => ({
     (selector: (s: typeof folderState) => unknown) => selector(folderState),
     {
       getState: () => folderState,
-      subscribe: vi.fn(() => vi.fn())
+      subscribe: vi.fn(() => mockUnsubscribeBibleFolders)
     }
   )
 }))
@@ -66,7 +84,7 @@ vi.mock('@renderer/stores/file-explorer', () => ({
     (selector: (s: typeof fileExplorerState) => unknown) => selector(fileExplorerState),
     {
       getState: () => fileExplorerState,
-      subscribe: vi.fn(() => vi.fn())
+      subscribe: vi.fn(() => mockUnsubscribeFileExplorer)
     }
   )
 }))
@@ -81,6 +99,63 @@ vi.mock('@renderer/lib/bible-search', () => ({
   initializeSearchIndexes: mockInitializeSearchIndexes
 }))
 
+vi.mock('@renderer/lib/media-job-queue', () => ({
+  mediaJobQueue: {
+    recoverStaleJobs: mockRecoverStaleJobs,
+    removeExpiredHistory: mockRemoveExpiredHistory,
+    registerExecutor: mockRegisterExecutor
+  }
+}))
+
+vi.mock('@renderer/lib/sync-unlink', () => ({
+  recoverPendingSyncResourceCleanups: mockRecoverPendingSyncResourceCleanups
+}))
+
+vi.mock('@renderer/lib/local-sync-import', () => ({
+  backfillImportedMediaAssets: mockBackfillImportedMediaAssets
+}))
+
+vi.mock('@renderer/lib/resource-cleanup-journal', () => ({
+  retryPendingResourceCleanups: mockRetryPendingResourceCleanups
+}))
+
+vi.mock('@renderer/lib/sync-runtime', () => ({
+  startSyncRuntime: mockStartSyncRuntime
+}))
+
+describe('startEarlyInit', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    window.location.hash = ''
+  })
+
+  it('skips control-window initialization on the projection route', async () => {
+    window.location.hash = '#/projection'
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+
+    expect(mockInitialize).not.toHaveBeenCalled()
+    expect(mockFolderInitialize).not.toHaveBeenCalled()
+    expect(mockFileExplorerInitialize).not.toHaveBeenCalled()
+    expect(mockRecoverStaleJobs).not.toHaveBeenCalled()
+    expect(mockBackfillImportedMediaAssets).not.toHaveBeenCalled()
+  })
+
+  it('replays pending resource cleanup after File Explorer initialization', async () => {
+    const { initializeApp } = await import('../app-init')
+
+    const cleanup = initializeApp()
+
+    await vi.waitFor(() => {
+      expect(mockRetryPendingResourceCleanups).toHaveBeenCalledTimes(1)
+    })
+    cleanup()
+  })
+})
+
 describe('initializeApp — online handler', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -94,6 +169,25 @@ describe('initializeApp — online handler', () => {
   afterEach(async () => {
     const mod = await import('../app-init')
     mod.initializeApp()()
+  })
+
+  it('passes the single context-owned HHC auth facade to the sync runtime', async () => {
+    const { initializeApp } = await import('../app-init')
+    const options = {
+      hhcAuth: {
+        getSession: () => null,
+        getAccessToken: vi.fn(async () => null),
+        refreshAccessToken: vi.fn(async () => null),
+        endSession: vi.fn(async () => undefined)
+      },
+      onHhcAccessRevoked: vi.fn()
+    }
+
+    const cleanup = initializeApp(options)
+
+    expect(mockStartSyncRuntime).toHaveBeenCalledWith(options)
+    cleanup()
+    expect(mockStopSyncRuntime).toHaveBeenCalled()
   })
 
   it('shows success toast when network comes back online', async () => {
@@ -160,5 +254,18 @@ describe('initializeApp — online handler', () => {
     window.dispatchEvent(new Event('offline'))
 
     expect(mockToastWarning).not.toHaveBeenCalled()
+  })
+
+  it('unsubscribes all app-level store subscriptions on cleanup', async () => {
+    const { initializeApp } = await import('../app-init')
+    const cleanup = initializeApp()
+    const bibleCalls = mockUnsubscribeBible.mock.calls.length
+    const folderCalls = mockUnsubscribeBibleFolders.mock.calls.length
+    const fileExplorerCalls = mockUnsubscribeFileExplorer.mock.calls.length
+    cleanup()
+
+    expect(mockUnsubscribeBible).toHaveBeenCalledTimes(bibleCalls + 1)
+    expect(mockUnsubscribeBibleFolders).toHaveBeenCalledTimes(folderCalls + 1)
+    expect(mockUnsubscribeFileExplorer).toHaveBeenCalledTimes(fileExplorerCalls + 1)
   })
 })

@@ -1,9 +1,54 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useBibleFolderStore } from '@renderer/stores/folder'
+
+vi.mock('@renderer/lib/app-init', () => ({
+  initializeApp: vi.fn(() => vi.fn()),
+  prefetchRouteChunks: vi.fn(() => Promise.resolve())
+}))
+
+vi.mock('@renderer/contexts/HhcAuthContext', () => ({
+  useHhcAuth: () => ({
+    status: 'anonymous',
+    session: null,
+    signIn: vi.fn(async () => undefined),
+    signOut: vi.fn(async () => undefined),
+    getAccessToken: vi.fn(async () => null)
+  })
+}))
+
+vi.mock('@renderer/pages/BiblePage', () => ({
+  default: () => <div data-testid="bible-page" />
+}))
+
+vi.mock('@renderer/pages/ServicePage', () => ({
+  default: () => <div data-testid="service-page" />
+}))
+
+vi.mock('@renderer/pages/SoundboardPage', () => ({
+  default: () => <div data-testid="soundboard-page" />
+}))
+
+vi.mock('@renderer/pages/FilesPage', () => ({
+  default: () => (
+    <div data-testid="files-page">
+      <Outlet />
+    </div>
+  )
+}))
+
+vi.mock('@renderer/components/Control/FileExplorer/Preview/FilePreviewInspector', () => ({
+  default: () => <div data-testid="file-preview" />
+}))
+
+vi.mock('@renderer/pages/MediaWorkspacePage', () => ({
+  default: () => <div data-testid="media-presenter" />
+}))
 
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
@@ -21,10 +66,24 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
     ...actual,
     useProjection: vi.fn().mockReturnValue({
       isProjectionOpen: false,
-      isProjectionBlanked: true,
-      openProjection: vi.fn(),
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      recovery: { status: 'closed', generation: 0, failure: null },
+      sessionSummary: {
+        owner: null,
+        status: 'closed',
+        label: null,
+        isBlackout: false,
+        failure: null
+      },
+      claimProjection: vi.fn(),
+      startProjection: vi.fn(() => Promise.resolve({ ok: true, generation: 1 })),
+      stopProjection: vi.fn(() => Promise.resolve()),
+      retryProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
+      blackoutProjection: vi.fn(),
+      getProjectionSnapshot: vi.fn(() => null),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -44,6 +103,8 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
 describe('Router', () => {
   beforeEach(() => {
     localStorage.setItem(ONBOARDED_KEY, 'true')
+    useFileExplorerStore.setState({ isInitialized: true, isLoading: false })
+    useBibleFolderStore.setState({ isInitialized: true, isLoading: false })
   })
 
   afterEach(() => {
@@ -63,6 +124,29 @@ describe('Router', () => {
   it('renders bible page at /bible route', async () => {
     renderWithRouter(['/bible'])
     expect(await screen.findByTestId('bible-page')).toBeInTheDocument()
+  })
+
+  it('renders service page at /service route', async () => {
+    renderWithRouter(['/service'])
+    expect(await screen.findByTestId('service-page')).toBeInTheDocument()
+  })
+
+  it('renders soundboard page at /soundboard route', async () => {
+    renderWithRouter(['/soundboard'])
+    expect(await screen.findByTestId('soundboard-page')).toBeInTheDocument()
+  })
+
+  it('renders the routed Media workspace at /media', async () => {
+    renderWithRouter(['/media'])
+
+    expect(await screen.findByTestId('media-presenter')).toBeInTheDocument()
+  })
+
+  it('keeps Files mounted under the nested safe preview route', async () => {
+    renderWithRouter(['/files/preview/image-1'])
+
+    expect(await screen.findByTestId('files-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('file-preview')).toBeInTheDocument()
   })
 
   it('navigates from timer to bible via sidebar link', async () => {

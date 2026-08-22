@@ -64,8 +64,10 @@ export default function ContextMenuOverlay({
       case 'Enter':
       case ' ':
         e.preventDefault()
-        menuItems[focusedIndex]?.onAction()
-        onClose()
+        if (!menuItems[focusedIndex]?.disabled) {
+          menuItems[focusedIndex]?.onAction()
+          onClose()
+        }
         break
       case 'Escape':
         e.preventDefault()
@@ -98,6 +100,7 @@ export default function ContextMenuOverlay({
         menuItemIdx++
         const currentIdx = menuItemIdx
         const isDanger = entry.variant === 'danger'
+        const isDisabled = entry.disabled === true
         return (
           <button
             key={entry.id}
@@ -106,13 +109,19 @@ export default function ContextMenuOverlay({
             }}
             role="menuitem"
             type="button"
+            aria-disabled={isDisabled}
             tabIndex={currentIdx === focusedIndex ? 0 : -1}
             className={[
               'flex w-full items-center gap-2 rounded-2xl px-2.5 py-1.5 text-sm outline-none cursor-pointer',
               'hover:bg-accent hover:text-accent-foreground active:scale-[0.98] transition-colors',
-              isDanger ? 'text-danger' : 'text-foreground'
+              isDisabled
+                ? 'cursor-not-allowed text-muted opacity-50 hover:bg-transparent hover:text-muted active:scale-100'
+                : isDanger
+                  ? 'text-danger'
+                  : 'text-foreground'
             ].join(' ')}
             onClick={() => {
+              if (isDisabled) return
               entry.onAction()
               onClose()
             }}

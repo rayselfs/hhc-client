@@ -1,128 +1,143 @@
-import { useState, useEffect } from 'react'
-import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
-import { isWeb } from '@renderer/lib/env'
-import { useSettingsStore } from '@renderer/stores/settings'
+import { useEffect, useReducer } from 'react'
 import DefaultProjection from '@renderer/components/Projection/DefaultProjection'
 import BibleProjection from '@renderer/components/Projection/BibleProjection'
 import TimerProjection from '@renderer/components/Projection/TimerProjection'
 import FileProjection from '@renderer/components/Projection/FileProjection'
-import type { BibleChapterData } from '@renderer/components/Projection/BibleProjection'
-import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
+import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
+import { isElectron, isWeb } from '@renderer/lib/env'
+import {
+  initialProjectionRenderState,
+  reduceProjectionRenderState,
+  selectVisibleProjection
+} from '@renderer/lib/projection-render-state'
+import { useSettingsStore } from '@renderer/stores/settings'
+import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
-type ActiveContent = 'timer' | 'bible' | 'file' | null
+function resolveBrowserProjectionSession(): { generation: number; sessionId: string } {
+  const query = location.hash.split('?')[1] ?? ''
+  const params = new URLSearchParams(query)
+  const generation = Number(params.get('generation'))
+  return {
+    generation: Number.isSafeInteger(generation) && generation > 0 ? generation : 0,
+    sessionId: params.get('session') ?? ''
+  }
+}
 
 export default function ProjectionPage(): React.JSX.Element {
-  const [showDefault, setShowDefault] = useState(true)
-  const [activeContent, setActiveContent] = useState<ActiveContent>(null)
-  const [timerData, setTimerData] = useState<TimerTickPayload | null>(null)
-  const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
-  const [bibleChapter, setBibleChapter] = useState<BibleChapterData | null>(null)
-  const [bibleFontSize, setBibleFontSize] = useState(90)
-  const [fileData, setFileData] = useState<{ fileId: string; fileName: string } | null>(null)
-  const [timerRingColor, setTimerRingColor] = useState<string | null>(() => {
-    const s = useSettingsStore.getState()
-    return s.timerRingColorEnabled ? s.timerRingColor : null
-  })
+  const [state, dispatch] = useReducer(reduceProjectionRenderState, initialProjectionRenderState)
+  const browserSession = resolveBrowserProjectionSession()
 
   useEffect(() => {
-    const adapter = createProjectionAdapter('projection')
+    const adapter = createProjectionAdapter('projection', browserSession.sessionId)
+    const unsubscribers: Array<() => void> = []
+    let active = true
 
-    const unsubBlank = adapter.on('__system:blank', ({ showDefault: blank }) => {
-      setShowDefault(blank)
-    })
-
-    const unsubActiveOwner = adapter.on('__system:active-owner', ({ owner }) => {
-      setActiveContent(owner === 'bible' ? 'bible' : 'timer')
-    })
-
-    const unsubTimerTick = adapter.on('timer:tick', (data) => {
-      setTimerData(data)
-    })
-
-    const unsubStopwatch = adapter.on('timer:stopwatch', (data) => {
-      setStopwatchData(data)
-    })
-
-    const unsubBibleChapter = adapter.on('bible:chapter', (data) => {
-      setBibleChapter(data)
-      setActiveContent('bible')
-    })
-
-    const unsubFileShow = adapter.on('file:show', (data) => {
-      setFileData(data)
-      setActiveContent('file')
-    })
-
-    const unsubBibleSettings = adapter.on('bible:settings', ({ fontSize }) => {
-      setBibleFontSize(fontSize)
-    })
-
-    const unsubTimezone = adapter.on('settings:timezone', ({ timezone }) => {
-      useSettingsStore.getState().setTimezone(timezone)
-    })
-
-    const unsubTimerRingColor = adapter.on('settings:timer-ring-color', ({ color }) => {
-      setTimerRingColor(color)
-    })
-
-    let unsubClose = (): void => {}
-    let unsubPing = (): void => {}
-
-    if (isWeb()) {
-      unsubClose = adapter.on('__system:close', () => {
-        window.close()
-      })
-      unsubPing = adapter.on('__system:ping', () => {
-        adapter.send('__system:pong', null)
-      })
-      adapter.send('__system:pong', null)
+    const subscribe = <C extends ProjectionChannel>(channel: C): void => {
+      unsubscribers.push(
+        adapter.on(channel, (data) => {
+          dispatch({
+            type: 'message',
+            channel,
+            data: data as ProjectionPayload<ProjectionChannel>
+          })
+        })
+      )
     }
 
-    adapter.send('__system:ready', null)
-
-    const handleBeforeUnload = (): void => {
-      if (isWeb()) {
-        adapter.send('__system:closed', null)
+    const initialize = (generation: number): void => {
+      if (!active || generation <= 0) return
+      adapter.setGeneration(generation)
+      unsubscribers.push(
+        adapter.on('__system:replay', (payload) => {
+          dispatch({ type: 'replay', payload })
+          const timezone = payload.snapshot.timer.timezone?.timezone
+          if (timezone) useSettingsStore.getState().setTimezone(timezone)
+        })
+      )
+      for (const channel of [
+        '__system:blank',
+        '__system:blackout',
+        '__system:active-owner',
+        'timer:tick',
+        'timer:stopwatch',
+        'bible:chapter',
+        'bible:settings',
+        'file:show',
+        'file:control',
+        'settings:timer-ring-color'
+      ] as const) {
+        subscribe(channel)
       }
+      unsubscribers.push(
+        adapter.on('settings:timezone', ({ timezone }) => {
+          useSettingsStore.getState().setTimezone(timezone)
+        })
+      )
+
+      if (isWeb()) {
+        unsubscribers.push(
+          adapter.on('__system:close', () => window.close()),
+          adapter.on('__system:ping', () => adapter.send('__system:pong', null))
+        )
+        adapter.send('__system:pong', null)
+      }
+      adapter.send('__system:ready', { generation })
     }
-    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    if (isElectron()) {
+      void window.api.projection.getGeneration().then(({ generation }) => initialize(generation))
+    } else {
+      initialize(browserSession.generation)
+    }
 
     return () => {
-      unsubBlank()
-      unsubActiveOwner()
-      unsubTimerTick()
-      unsubStopwatch()
-      unsubBibleChapter()
-      unsubFileShow()
-      unsubBibleSettings()
-      unsubTimezone()
-      unsubTimerRingColor()
-      unsubClose()
-      unsubPing()
-      window.removeEventListener('beforeunload', handleBeforeUnload)
+      active = false
+      for (const unsubscribe of unsubscribers) unsubscribe()
       adapter.dispose()
     }
-  }, [])
+  }, [browserSession.generation, browserSession.sessionId])
 
-  if (showDefault) return <DefaultProjection />
+  useEffect(() => {
+    if (state.isBlackout || state.showDefault || state.activeContent !== 'file') {
+      void window.api?.projectionVlc?.stop()
+    }
+  }, [state.activeContent, state.isBlackout, state.showDefault])
 
-  if (activeContent === 'bible' && bibleChapter) {
-    return <BibleProjection data={bibleChapter} fontSize={bibleFontSize} />
+  const visible = selectVisibleProjection(state)
+  if (visible === 'blackout') {
+    return <div className="h-screen w-screen bg-black" data-testid="projection-blackout" />
   }
-
-  if (activeContent === 'file' && fileData) {
-    return <FileProjection fileName={fileData.fileName} />
+  if (visible === 'bible' && state.bibleChapter) {
+    return <BibleProjection data={state.bibleChapter} settings={state.bibleSettings} />
   }
-
-  if (timerData) {
+  if (visible === 'file' && state.fileData) {
     return (
-      <TimerProjection
-        timerData={timerData}
-        stopwatchData={stopwatchData}
-        ringColor={timerRingColor ?? undefined}
+      <FileProjection
+        generation={state.generation}
+        projectionSessionId={browserSession.sessionId}
+        initialReplayState={state.mediaReplayState}
+        fileName={state.fileData.fileName}
+        initialItemId={state.fileData.itemId}
+        initialBlobId={state.fileData.blobId}
+        initialMimeType={state.fileData.mimeType}
+        initialStreamUrl={state.fileData.streamUrl}
+        initialPlaybackMode={state.fileData.playbackMode}
+        initialSeekable={state.fileData.seekable}
+        initialDurationMs={state.fileData.durationMs}
+        initialPresentation={state.fileData.presentation}
+        initialEditablePresentation={state.fileData.editablePresentation}
+        controlEvent={state.fileControlEvent}
       />
     )
   }
-
+  if (visible === 'timer' && state.timerData) {
+    return (
+      <TimerProjection
+        timerData={state.timerData}
+        stopwatchData={state.stopwatchData}
+        ringColor={state.timerRingColor ?? undefined}
+      />
+    )
+  }
   return <DefaultProjection />
 }

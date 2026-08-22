@@ -1,0 +1,2 @@
+electron-vlc-player source code:
+https://github.com/ssnangua/electron-vlc-player

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
@@ -36,13 +36,32 @@ describe('AboutDialog', () => {
   it('renders app icon, name, version, and description when open', () => {
     render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    const img = screen.getByAltText('HHC Client')
+    const img = screen.getByAltText('LibrePresenter')
     expect(img).toBeInTheDocument()
     expect(img.tagName).toBe('IMG')
 
-    expect(screen.getByText('HHC Client')).toBeInTheDocument()
+    expect(screen.getByText('LibrePresenter')).toBeInTheDocument()
     expect(screen.getByText(/^v/)).toBeInTheDocument()
-    expect(screen.getByText('Projection software.')).toBeInTheDocument()
+    expect(screen.getByText('GPL-3.0-or-later')).toBeInTheDocument()
+    expect(
+      screen.getByText('Open-source presentation software for churches and live events.')
+    ).toBeInTheDocument()
+    expect(screen.getByText('Version')).toBeInTheDocument()
+    expect(screen.getByText('License')).toBeInTheDocument()
+    expect(screen.getByText('Open Source Licenses')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View licenses' })).toBeInTheDocument()
+  })
+
+  it('shows bundled license details from the license viewer', () => {
+    render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
+
+    fireEvent.click(screen.getByRole('button', { name: 'View licenses' }))
+
+    expect(screen.getByText('VLC / libVLC')).toBeInTheDocument()
+    expect(screen.getByText('FFmpeg')).toBeInTheDocument()
+    expect(screen.getByText('electron-vlc-player')).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Source' })).toHaveLength(4)
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
   })
 
   it('does not render when isOpen=false', () => {
@@ -53,12 +72,12 @@ describe('AboutDialog', () => {
     expect(container.querySelector('[role="dialog"]')).not.toBeInTheDocument()
   })
 
-  it('displays icon to the left of text content', () => {
+  it('displays icon in the brand header', () => {
     render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    const img = screen.getByAltText('HHC Client')
+    const img = screen.getByAltText('LibrePresenter')
     const container = img.parentElement!
     expect(container.classList.contains('flex')).toBe(true)
-    expect(container.classList.contains('flex-col')).toBe(false)
+    expect(container.classList.contains('items-start')).toBe(true)
   })
 })

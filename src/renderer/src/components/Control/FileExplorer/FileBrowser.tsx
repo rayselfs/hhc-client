@@ -16,7 +16,9 @@ import {
 import { SortableContext, arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Folder, Upload } from 'lucide-react'
+import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
@@ -26,6 +28,7 @@ import { useThumbnails, canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { searchAllItems } from '@renderer/lib/file-explorer-search'
 import {
+  FILE_EXPLORER_ROOT_ID,
   deleteFolderFromStore,
   removeFileItemFromStore,
   useFileExplorerCustomOrder,
@@ -40,7 +43,25 @@ import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
+import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
+import { startMediaProjection } from '@renderer/lib/projection-actions'
 import type { SortField } from '@renderer/stores/file-explorer'
+import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
+import {
+  listSyncEntries,
+  SYNC_ENTRY_CHANGED_EVENT,
+  type SyncEntryRecord,
+  type SyncEntryStatus
+} from '@renderer/lib/sync-db'
+import { deriveSyncFolderHealth, type SyncFolderHealth } from '@renderer/lib/sync-folder-health'
+import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
+import { getBlobId } from '@renderer/lib/blob-identity'
+import { isWeb } from '@renderer/lib/env'
+import {
+  getPresentationWorkspacePath,
+  isEditablePresentationMimeType
+} from '@renderer/lib/presentation-media'
+import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -49,9 +70,13 @@ export interface FileBrowserProps {
   onSelectionChange?: (selectedIds: Set<string>) => void
   onCopy?: (selectedIds: Set<string>) => void
   onCut?: (selectedIds: Set<string>) => void
+  onDelete?: (selectedIds: Set<string>) => void | Promise<void>
   onPaste?: () => void
   clipboard?: ClipboardState | null
   onEscape?: () => void
+  renameItemRequestId?: string | null
+  onRenameItemRequestHandled?: () => void
+  isCurrentFolderReadOnly?: boolean
 }
 
 type FileExplorerDndData =
@@ -67,7 +92,28 @@ interface SortableViewItemProps {
   isMultiDrag: boolean
   isCut?: boolean
   isOsDragTarget?: boolean
+  onPointerDown?: (itemId: string, event: React.PointerEvent) => void
+  onPointerMove?: (itemId: string, event: React.PointerEvent) => void
   children: React.ReactNode
+}
+
+interface SyncItemViewState {
+  status: SyncEntryStatus
+  downloadedBytes?: number
+  downloadTotalBytes?: number
+}
+
+function formatSyncFolderHealthTooltip(health: SyncFolderHealth): string {
+  const parts = [
+    `Last sync: ${health.lastSyncedAt ? new Date(health.lastSyncedAt).toLocaleString() : 'Unknown'}`,
+    `Downloading: ${health.downloadingCount}`,
+    `Queued: ${health.queuedCount}`,
+    `Failed: ${health.failedCount}`
+  ]
+  if (health.nextRetryAt) {
+    parts.push(`Next retry: ${new Date(health.nextRetryAt).toLocaleString()}`)
+  }
+  return parts.join('\n')
 }
 
 function isFileItemRecord(item: unknown): item is FileItemRecord {
@@ -90,6 +136,8 @@ function SortableViewItem({
   isMultiDrag,
   isCut,
   isOsDragTarget,
+  onPointerDown,
+  onPointerMove,
   children
 }: SortableViewItemProps): React.JSX.Element {
   const sortable = useSortable({
@@ -118,6 +166,22 @@ function SortableViewItem({
     opacity: sortable.isDragging || isDraggedAway ? 0.4 : isCut ? 0.4 : 1
   }
 
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      onPointerDown?.(item.id, event)
+      sortable.listeners?.onPointerDown?.(event)
+    },
+    [item.id, onPointerDown, sortable.listeners]
+  )
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      onPointerMove?.(item.id, event)
+      sortable.listeners?.onPointerMove?.(event)
+    },
+    [item.id, onPointerMove, sortable.listeners]
+  )
+
   return (
     <div
       ref={setRef}
@@ -128,6 +192,8 @@ function SortableViewItem({
       className={`touch-none rounded-lg${isOsDragTarget ? ' ring-2 ring-inset ring-primary/50' : ''}${droppable.isOver && item.isFolder ? ' bg-surface' : ''}`}
       {...sortable.attributes}
       {...sortable.listeners}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
     >
       {children}
     </div>
@@ -178,6 +244,8 @@ function formatSearchFileSize(bytes: number | undefined): string {
 }
 
 const SEARCH_COL = { created: 90, size: 72, kind: 96, path: 200 }
+const EMPTY_ARRAY: never[] = []
+const SLOW_CLICK_RENAME_MIN_MS = 320
 
 function SearchResultsList({
   results,
@@ -298,18 +366,26 @@ export function FileBrowser({
   onSelectionChange,
   onCopy,
   onCut,
+  onDelete,
   onPaste,
   clipboard,
-  onEscape
+  onEscape,
+  renameItemRequestId,
+  onRenameItemRequestHandled,
+  isCurrentFolderReadOnly = false
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
-  const foldersArray = useFileExplorerStore((state) => state._foldersArray)
-  const itemsArray = useFileExplorerStore((state) => state._itemsArray)
+  const rawFolders = useFileExplorerStore(
+    (s) => s._childFoldersByParent[s.currentFolderId] ?? EMPTY_ARRAY
+  )
+  const rawItems = useFileExplorerStore((s) => s._itemsByParent[s.currentFolderId] ?? EMPTY_ARRAY)
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const toggleFavorite = useFileExplorerStore((state) => state.toggleFavorite)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
+  const openPresentationDocument = usePresentationWorkspaceStore((state) => state.openDocument)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
   const customOrders = useFileExplorerCustomOrder((state) => state.orders)
   const setCustomOrder = useFileExplorerCustomOrder((state) => state.setOrder)
@@ -326,6 +402,18 @@ export function FileBrowser({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
+  const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
+  const [syncStates, setSyncStates] = useState<Record<string, SyncItemViewState>>({})
+  const [syncEntries, setSyncEntries] = useState<SyncEntryRecord[]>([])
+  const [unsupportedMediaIds, setUnsupportedMediaIds] = useState<Set<string>>(new Set())
+  const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingRenameItemIdRef = React.useRef<string | null>(null)
+  const pointerRef = React.useRef<{
+    itemId: string
+    x: number
+    y: number
+    moved: boolean
+  } | null>(null)
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -338,23 +426,25 @@ export function FileBrowser({
 
   const folders = useMemo(
     () =>
-      foldersArray
-        .filter((folder) => folder.parentId === currentFolderId && !folder.deletedAt)
-        .sort((a, b) => a.sortIndex - b.sortIndex),
-    [foldersArray, currentFolderId]
+      rawFolders.filter((folder) => !folder.deletedAt).sort((a, b) => a.sortIndex - b.sortIndex),
+    [rawFolders]
   )
   const fileItems = useMemo(
     () =>
-      itemsArray
-        .filter(
-          (item): item is FileItemRecord =>
-            item.parentId === currentFolderId && isFileItemRecord(item) && !item.deletedAt
-        )
+      rawItems
+        .filter((item): item is FileItemRecord => isFileItemRecord(item) && !item.deletedAt)
         .sort((a, b) => a.sortIndex - b.sortIndex),
-    [itemsArray, currentFolderId]
+    [rawItems]
   )
+  const searchRevision = [
+    ...rawFolders.map((folder) => `${folder.id}:${folder.name}:${folder.deletedAt ?? ''}`),
+    ...rawItems.map(
+      (item) => `${item.id}:${'name' in item ? item.name : ''}:${item.deletedAt ?? ''}`
+    )
+  ].join('|')
 
   const searchResults = useMemo(() => {
+    void searchRevision
     if (!searchQuery.trim()) return []
     const raw = searchAllItems(
       searchQuery,
@@ -366,19 +456,115 @@ export function FileBrowser({
       const nameB = b.kind === 'file' ? b.item.name : b.folder.name
       return nameA.localeCompare(nameB)
     })
-  }, [searchQuery, itemsArray, foldersArray, t])
+  }, [searchQuery, searchRevision, t])
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
+
+  const syncFolderHealthById = useMemo(() => {
+    const next: Record<string, SyncFolderHealth> = {}
+    for (const folder of folders) {
+      if (folder.parentId !== FILE_EXPLORER_ROOT_ID || !folder.syncLink) continue
+      next[folder.id] = deriveSyncFolderHealth(syncEntries, folder)
+    }
+    return next
+  }, [folders, syncEntries])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadSyncStatuses(): Promise<void> {
+      const ids = new Set([
+        ...folders.map((folder) => folder.id),
+        ...fileItems.map((item) => item.id)
+      ])
+      if (ids.size === 0) {
+        setSyncStates({})
+        setSyncEntries([])
+        return
+      }
+      try {
+        const entries = await listSyncEntries()
+        if (cancelled) return
+        setSyncEntries(entries)
+        const next: Record<string, SyncItemViewState> = {}
+        for (const entry of entries) {
+          const localId = entry.itemId ?? entry.folderId
+          if (localId && ids.has(localId)) {
+            next[localId] = {
+              status: entry.status,
+              downloadedBytes: entry.downloadedBytes,
+              downloadTotalBytes: entry.downloadTotalBytes
+            }
+          }
+        }
+        setSyncStates(next)
+      } catch {
+        if (!cancelled) {
+          setSyncStates({})
+          setSyncEntries([])
+        }
+      }
+    }
+    const handleSyncEntryChanged = (): void => {
+      void loadSyncStatuses()
+    }
+    void loadSyncStatuses()
+    window.addEventListener(SYNC_ENTRY_CHANGED_EVENT, handleSyncEntryChanged)
+    return () => {
+      cancelled = true
+      window.removeEventListener(SYNC_ENTRY_CHANGED_EVENT, handleSyncEntryChanged)
+    }
+  }, [folders, fileItems])
+
+  useEffect(() => {
+    if (!isWeb()) {
+      setUnsupportedMediaIds(new Set())
+      return
+    }
+
+    let cancelled = false
+    async function loadUnsupportedMedia(): Promise<void> {
+      const next = new Set<string>()
+      await Promise.all(
+        fileItems
+          .filter((item) => item.mimeType.startsWith('video/'))
+          .map(async (item) => {
+            const metadata = await getSourceMediaMetadata(getBlobId(item))
+            if (metadata?.browserPlayback === 'unplayable') next.add(item.id)
+          })
+      )
+      if (!cancelled) setUnsupportedMediaIds(next)
+    }
+
+    const onMetadataReady = (): void => {
+      void loadUnsupportedMedia()
+    }
+
+    void loadUnsupportedMedia()
+    window.addEventListener('hhc:media-metadata-ready', onMetadataReady)
+    return () => {
+      cancelled = true
+      window.removeEventListener('hhc:media-metadata-ready', onMetadataReady)
+    }
+  }, [fileItems])
 
   const allItems: GridViewItem[] = useMemo(
     () => [
       ...folders.map((folder) => ({
+        syncFolderHealth: syncFolderHealthById[folder.id]?.status,
+        syncFolderHealthTooltip: syncFolderHealthById[folder.id]
+          ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id])
+          : undefined,
         id: folder.id,
         name: folder.name,
         isFolder: true,
         createdAt: folder.createdAt,
         isFavorited: folder.isFavorited,
-        isSelected: false
+        isSelected: false,
+        syncStatus: syncStates[folder.id]?.status,
+        downloadedBytes: syncStates[folder.id]?.downloadedBytes,
+        downloadTotalBytes: syncStates[folder.id]?.downloadTotalBytes,
+        syncProviderType:
+          folder.parentId === FILE_EXPLORER_ROOT_ID ? folder.syncLink?.providerType : undefined
       })),
       ...fileItems.map((item) => ({
         id: item.id,
@@ -387,11 +573,20 @@ export function FileBrowser({
         mimeType: item.mimeType,
         size: item.size,
         createdAt: item.createdAt,
-        thumbnailUrl: canHaveThumbnail(item.mimeType) ? thumbnails[item.id] : null,
-        isSelected: false
+        thumbnailUrl:
+          unsupportedMediaIds.has(item.id) || item.url.startsWith('unsupported:')
+            ? null
+            : canHaveThumbnail(item.mimeType)
+              ? thumbnails[item.id]
+              : null,
+        isSelected: false,
+        syncStatus: syncStates[item.id]?.status,
+        downloadedBytes: syncStates[item.id]?.downloadedBytes,
+        downloadTotalBytes: syncStates[item.id]?.downloadTotalBytes,
+        isUnsupportedMedia: unsupportedMediaIds.has(item.id) || item.url.startsWith('unsupported:')
       }))
     ],
-    [folders, fileItems, thumbnails]
+    [folders, fileItems, syncFolderHealthById, thumbnails, syncStates, unsupportedMediaIds]
   )
 
   const sortedItems = useMemo(() => {
@@ -417,6 +612,14 @@ export function FileBrowser({
     const newFiles = filesSubset.filter((item) => !orderedIds.has(item.id))
     return [...ordered, ...newFolders, ...newFiles]
   }, [allItems, sortField, sortDir, currentFolderId, customOrders])
+
+  const sortedFileItems = useMemo(() => {
+    const fileItemMap = new Map(fileItems.map((f) => [f.id, f]))
+    return sortedItems
+      .filter((item) => !item.isFolder)
+      .map((item) => fileItemMap.get(item.id))
+      .filter((item): item is FileItemRecord => item !== undefined)
+  }, [sortedItems, fileItems])
 
   const allIds = useMemo(() => sortedItems.map((item) => item.id), [sortedItems])
   const folderIds = useMemo(
@@ -444,6 +647,7 @@ export function FileBrowser({
     handlers: osDragHandlers
   } = useOsFileDrop(containerRef, {
     onDrop: async (dataTransfer, targetId) => {
+      if (isCurrentFolderReadOnly) return
       await uploadFromDataTransfer(dataTransfer.items, targetId ?? currentFolderId)
     }
   })
@@ -452,6 +656,14 @@ export function FileBrowser({
     () => sortedItems.map((i) => ({ ...i, isSelected: selectedIds.has(i.id) })),
     [sortedItems, selectedIds]
   )
+
+  const cancelPendingRename = useCallback((): void => {
+    if (renameClickTimerRef.current) {
+      clearTimeout(renameClickTimerRef.current)
+      renameClickTimerRef.current = null
+    }
+    pendingRenameItemIdRef.current = null
+  }, [])
 
   useEffect(() => {
     onSelectionChange?.(selectedIds)
@@ -465,10 +677,46 @@ export function FileBrowser({
     setSelectedSearchId(null)
   }, [searchQuery])
 
+  useEffect(() => {
+    if (!renameItemRequestId) return
+    const item = sortedItems.find((entry) => entry.id === renameItemRequestId)
+    if (item && !item.isFolder) {
+      setSelectedIds(new Set([renameItemRequestId]))
+      if (!isCurrentFolderReadOnly) setRenamingItemId(renameItemRequestId)
+    }
+    onRenameItemRequestHandled?.()
+  }, [
+    renameItemRequestId,
+    sortedItems,
+    setSelectedIds,
+    onRenameItemRequestHandled,
+    isCurrentFolderReadOnly
+  ])
+
+  useEffect(() => {
+    cancelPendingRename()
+    setRenamingItemId(null)
+  }, [cancelPendingRename, currentFolderId, viewMode])
+
+  useEffect(() => {
+    const pendingItemId = pendingRenameItemIdRef.current
+    if (pendingItemId && (!selectedIds.has(pendingItemId) || selectedIds.size !== 1)) {
+      cancelPendingRename()
+    }
+  }, [cancelPendingRename, selectedIds])
+
+  useEffect(() => {
+    return () => cancelPendingRename()
+  }, [cancelPendingRename])
+
   const handleEscape = useCallback((): void => {
+    if (renamingItemId) {
+      setRenamingItemId(null)
+      return
+    }
     clearSelection()
     onEscape?.()
-  }, [clearSelection, onEscape])
+  }, [clearSelection, onEscape, renamingItemId])
 
   const handleContainerContextMenu = useCallback(
     (event: React.MouseEvent): void => {
@@ -483,6 +731,7 @@ export function FileBrowser({
     (itemId: string, event: React.MouseEvent): void => {
       event.preventDefault()
       event.stopPropagation()
+      cancelPendingRename()
       if (!selectedIds.has(itemId)) setSelectedIds(new Set([itemId]))
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (item?.isFolder) {
@@ -491,20 +740,185 @@ export function FileBrowser({
         onItemContextMenu?.(itemId, event)
       }
     },
-    [sortedItems, selectedIds, setSelectedIds, onFolderContextMenu, onItemContextMenu]
+    [
+      sortedItems,
+      selectedIds,
+      setSelectedIds,
+      onFolderContextMenu,
+      onItemContextMenu,
+      cancelPendingRename
+    ]
   )
 
   const handleItemDoubleClick = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
+      cancelPendingRename()
       event.stopPropagation()
       const item = sortedItems.find((entry) => entry.id === itemId)
-      if (item?.isFolder) void navigateToFolder(itemId)
+      if (item?.isFolder) {
+        void navigateToFolder(itemId)
+        return
+      }
+      const file = fileItems.find((entry) => entry.id === itemId)
+      if (file && isEditablePresentationMimeType(file.mimeType)) {
+        openPresentationDocument(file)
+        navigate(getPresentationWorkspacePath(file.id))
+        return
+      }
+      if (file && isPresentable(file.mimeType)) {
+        navigate(`/files/preview/${encodeURIComponent(file.id)}`)
+      }
     },
-    [sortedItems, navigateToFolder]
+    [
+      cancelPendingRename,
+      sortedItems,
+      fileItems,
+      navigateToFolder,
+      openPresentationDocument,
+      navigate
+    ]
+  )
+
+  const handleRenameSubmit = useCallback(
+    (itemId: string, baseName: string): void => {
+      if (isCurrentFolderReadOnly) {
+        setRenamingItemId(null)
+        return
+      }
+      const item = sortedItems.find((entry) => entry.id === itemId)
+      if (!item) {
+        setRenamingItemId(null)
+        return
+      }
+
+      const trimmedBase = baseName.trim()
+      if (!validateDisplayName(trimmedBase)) {
+        toast.danger(t('fileExplorer.invalidName', 'Invalid name'))
+        return
+      }
+
+      if (item.isFolder) {
+        const folder = folders.find((entry) => entry.id === itemId)
+        if (!folder) {
+          setRenamingItemId(null)
+          return
+        }
+        const siblingNames = folders
+          .filter((entry) => entry.parentId === folder.parentId)
+          .map((entry) => entry.name)
+        if (hasNameConflict(trimmedBase, siblingNames, { excludeName: folder.name })) {
+          toast.danger(
+            t('fileExplorer.folderAlreadyExists', 'A folder with this name already exists')
+          )
+          return
+        }
+        useFileExplorerStore.getState().updateFolder(itemId, { name: trimmedBase })
+      } else {
+        const file = fileItems.find((entry) => entry.id === itemId)
+        if (!file) {
+          setRenamingItemId(null)
+          return
+        }
+        const { extension } = splitFileName(file.name)
+        const nextName = `${trimmedBase}${extension}`
+        const siblingNames = fileItems
+          .filter((entry) => entry.parentId === file.parentId)
+          .map((entry) => entry.name)
+        if (hasNameConflict(nextName, siblingNames, { excludeName: file.name })) {
+          toast.danger(t('fileExplorer.fileAlreadyExists', 'A file with this name already exists'))
+          return
+        }
+        useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName })
+      }
+      setRenamingItemId(null)
+    },
+    [fileItems, folders, sortedItems, t, isCurrentFolderReadOnly]
+  )
+
+  const handleRenameCancel = useCallback((): void => {
+    cancelPendingRename()
+    setRenamingItemId(null)
+  }, [cancelPendingRename])
+
+  const handleItemPointerDown = useCallback(
+    (itemId: string, event: React.PointerEvent): void => {
+      if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+        pointerRef.current = null
+        cancelPendingRename()
+        return
+      }
+
+      pointerRef.current = {
+        itemId,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false
+      }
+    },
+    [cancelPendingRename]
+  )
+
+  const handleItemPointerMove = useCallback(
+    (itemId: string, event: React.PointerEvent): void => {
+      const pointer = pointerRef.current
+      if (!pointer || pointer.itemId !== itemId) return
+      if (Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 4) {
+        pointer.moved = true
+        cancelPendingRename()
+      }
+    },
+    [cancelPendingRename]
+  )
+
+  const handleViewItemClick = useCallback(
+    (itemId: string, event: React.MouseEvent): void => {
+      const wasAlreadySelected = selectedIds.has(itemId) && selectedIds.size === 1
+      const isNameRegion = (event.target as Element).closest('[data-file-name-region]') !== null
+      const pointer = pointerRef.current
+      const hadPointerMovement = pointer?.itemId === itemId && pointer.moved
+      handleItemClick(itemId, event)
+
+      if (
+        event.button !== 0 ||
+        event.detail > 1 ||
+        event.shiftKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        hadPointerMovement
+      ) {
+        cancelPendingRename()
+        return
+      }
+
+      if (!wasAlreadySelected) {
+        cancelPendingRename()
+        return
+      }
+
+      const item = sortedItems.find((entry) => entry.id === itemId)
+      if (!item) return
+      if (isNameRegion && !isCurrentFolderReadOnly) {
+        cancelPendingRename()
+        pendingRenameItemIdRef.current = itemId
+        renameClickTimerRef.current = setTimeout(() => {
+          setRenamingItemId(itemId)
+          renameClickTimerRef.current = null
+          pendingRenameItemIdRef.current = null
+        }, SLOW_CLICK_RENAME_MIN_MS)
+      }
+    },
+    [cancelPendingRename, handleItemClick, selectedIds, sortedItems, isCurrentFolderReadOnly]
   )
 
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
+    if (isCurrentFolderReadOnly) return
     if (selectedIds.size === 0) return
+    if (onDelete) {
+      await onDelete(new Set(selectedIds))
+      clearSelection()
+      return
+    }
 
     const confirmed = await confirm({
       title: t('folder.deleteSelectedTitle', {
@@ -525,7 +939,7 @@ export function FileBrowser({
       }
     }
     clearSelection()
-  }, [selectedIds, confirm, t, folderIds, clearSelection])
+  }, [selectedIds, onDelete, confirm, t, folderIds, clearSelection, isCurrentFolderReadOnly])
 
   const handleCopySelected = useCallback((): void => {
     if (selectedIds.size === 0) return
@@ -533,13 +947,15 @@ export function FileBrowser({
   }, [selectedIds, onCopy])
 
   const handleCutSelected = useCallback((): void => {
+    if (isCurrentFolderReadOnly) return
     if (selectedIds.size === 0) return
     onCut?.(selectedIds)
-  }, [selectedIds, onCut])
+  }, [selectedIds, onCut, isCurrentFolderReadOnly])
 
   const handlePasteSelected = useCallback((): void => {
+    if (isCurrentFolderReadOnly) return
     onPaste?.()
-  }, [onPaste])
+  }, [onPaste, isCurrentFolderReadOnly])
 
   useKeyboardShortcuts(
     [
@@ -556,6 +972,25 @@ export function FileBrowser({
       {
         config: SHORTCUTS.EDIT.DELETE_ALT,
         handler: () => void handleDeleteSelected(),
+        preventDefault: true
+      },
+      {
+        config: SHORTCUTS.MEDIA.START_FROM_CURRENT,
+        handler: () => {
+          const presentable = getPresentableItems(sortedFileItems)
+          if (presentable.length === 0) {
+            toast.warning(t('fileExplorer.noProjectableFiles'))
+            return
+          }
+          const firstSelected = [...selectedIds].find((id) => presentable.some((f) => f.id === id))
+          const idx = firstSelected ? presentable.findIndex((f) => f.id === firstSelected) : 0
+          void startMediaProjection(
+            presentable,
+            Math.max(0, idx),
+            { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+            { prioritizeStartItem: true }
+          )
+        },
         preventDefault: true
       }
     ],
@@ -577,6 +1012,10 @@ export function FileBrowser({
 
   const handleDragStart = useCallback(
     (event: DragStartEvent): void => {
+      if (isCurrentFolderReadOnly) return
+      setRenamingItemId(null)
+      cancelPendingRename()
+      pointerRef.current = null
       const nextActiveId = String(event.active.id)
       setActiveId(nextActiveId)
 
@@ -587,13 +1026,14 @@ export function FileBrowser({
         setDraggedIds(new Set([nextActiveId]))
       }
     },
-    [selectedIds, setSelectedIds]
+    [cancelPendingRename, selectedIds, setSelectedIds, isCurrentFolderReadOnly]
   )
 
   const handleDragOver = useCallback((): void => {}, [])
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent): void => {
+      if (isCurrentFolderReadOnly) return
       const currentDraggedIds = draggedIds
       setActiveId(null)
       setDraggedIds(new Set())
@@ -638,7 +1078,8 @@ export function FileBrowser({
       moveFolder,
       moveItem,
       setCustomOrder,
-      setSortDir
+      setSortDir,
+      isCurrentFolderReadOnly
     ]
   )
 
@@ -669,16 +1110,38 @@ export function FileBrowser({
           isMultiDrag={isMultiDrag}
           isCut={isCut}
           isOsDragTarget={isOsDragTarget}
+          onPointerDown={handleItemPointerDown}
+          onPointerMove={handleItemPointerMove}
         >
           {children}
         </SortableViewItem>
       )
     },
-    [folders, fileItems, draggedIds, isMultiDrag, clipboard, osDragTargetFolderId]
+    [
+      folders,
+      fileItems,
+      draggedIds,
+      isMultiDrag,
+      clipboard,
+      osDragTargetFolderId,
+      handleItemPointerDown,
+      handleItemPointerMove
+    ]
   )
 
   if (searchQuery.trim()) {
     const handleSearchFileClick = (result: SearchResult & { kind: 'file' }): void => {
+      if (isEditablePresentationMimeType(result.item.mimeType)) {
+        openPresentationDocument(result.item)
+        navigate(getPresentationWorkspacePath(result.item.id))
+        setSearchQuery('')
+        return
+      }
+      if (isPresentable(result.item.mimeType)) {
+        navigate(`/files/preview/${encodeURIComponent(result.item.id)}`)
+        setSearchQuery('')
+        return
+      }
       void navigateToFolder(result.item.parentId)
       setSearchQuery('')
     }
@@ -715,7 +1178,7 @@ export function FileBrowser({
       onDragEnter={osDragHandlers.onDragEnter}
       onDragOver={osDragHandlers.onDragOver}
       onDragLeave={osDragHandlers.onDragLeave}
-      onDrop={osDragHandlers.onDrop}
+      onDrop={isCurrentFolderReadOnly ? undefined : osDragHandlers.onDrop}
     >
       <DndContext
         sensors={sensors}
@@ -734,19 +1197,25 @@ export function FileBrowser({
                 onSortChange={handleSortChange}
                 colWidths={colWidths}
                 onColWidthChange={(col, w) => setColWidths({ [col]: w })}
-                onItemClick={handleItemClick}
+                onItemClick={handleViewItemClick}
                 onItemDoubleClick={handleItemDoubleClick}
                 onItemContextMenu={handleItemContextMenu}
+                renamingItemId={renamingItemId}
+                onRenameSubmit={handleRenameSubmit}
+                onRenameCancel={handleRenameCancel}
                 renderItemWrapper={renderItemWrapper}
               />
             ) : (
               <GridView
                 items={sortedItemsWithSelection}
                 viewMode={viewMode}
-                onItemClick={handleItemClick}
+                onItemClick={handleViewItemClick}
                 onItemDoubleClick={handleItemDoubleClick}
                 onItemContextMenu={handleItemContextMenu}
                 onItemFavoriteToggle={toggleFavorite}
+                renamingItemId={renamingItemId}
+                onRenameSubmit={handleRenameSubmit}
+                onRenameCancel={handleRenameCancel}
                 renderItemWrapper={renderItemWrapper}
               />
             )}

@@ -4,6 +4,10 @@ import BibleSearchBar from './BibleSearchBar'
 
 const mockSearch = vi.fn().mockResolvedValue([])
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key })
+}))
+
 vi.mock('@renderer/lib/bible-search', () => ({
   searchEngine: {
     search: (...args: unknown[]) => mockSearch(...args)

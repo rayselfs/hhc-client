@@ -1,11 +1,16 @@
 import { Avatar } from '@heroui/react/avatar'
+import { Button } from '@heroui/react/button'
 import { Dropdown } from '@heroui/react/dropdown'
+import { toast } from '@heroui/react/toast'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser, Info } from 'lucide-react'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
+import RecoveryIndicator from '@renderer/components/Control/RecoveryCenter/RecoveryIndicator'
+import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
+import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 import { isElectron } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
 import {
@@ -27,13 +32,16 @@ const glassDividerClass = [
 
 export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JSX.Element {
   const { t } = useTranslation()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isShortcutsOpen, setShortcutsOpen] = useState(false)
   const [isAboutOpen, setAboutOpen] = useState(false)
   const confirm = useConfirm()
-  const status = useUpdateStore(selectUpdateStatus)
+  const runPresentationSafeAction = usePresentationSafeAction()
+  const updateStatus = useUpdateStore(selectUpdateStatus)
   const isUpdateAvailable = useUpdateStore(selectIsUpdateAvailable)
   const availableVersion = useUpdateStore(selectAvailableVersion)
+  const { status, session, signIn, signOut } = useHhcAuth()
+  const accountLabel =
+    status === 'authenticated' && session ? session.displayName : t('userMenu.guest')
 
   const handleCloseApp = async (): Promise<void> => {
     const confirmed = await confirm({
@@ -44,27 +52,34 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
       cancelLabel: t('common.cancel')
     })
     if (!confirmed) return
-    window.close()
+    await runPresentationSafeAction(() => window.close())
   }
 
   return (
     <>
       <Dropdown.Root>
-        <Dropdown.Trigger>
-          <div className="flex items-center gap-2 w-full max-lg:justify-center rounded-full text-muted hover:opacity-70 transition-opacity cursor-default">
-            <Avatar.Root className="shrink-0">
-              <Avatar.Fallback>
-                <CircleUser />
-              </Avatar.Fallback>
-            </Avatar.Root>
-            <span className="max-lg:hidden">{t('userMenu.guest')}</span>
-          </div>
-        </Dropdown.Trigger>
+        <Button
+          variant="ghost"
+          aria-label={t('userMenu.accountMenu', { name: accountLabel })}
+          className="flex h-auto w-full min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70 max-lg:justify-center"
+        >
+          <Avatar.Root className="shrink-0">
+            <Avatar.Fallback>
+              <CircleUser />
+            </Avatar.Fallback>
+          </Avatar.Root>
+          <span className="max-lg:hidden">{accountLabel}</span>
+          <RecoveryIndicator />
+        </Button>
         <Dropdown.Popover>
           <Dropdown.Menu
             onAction={(key) => {
-              if (key === 'login') setIsLoggedIn(true)
-              if (key === 'logout') setIsLoggedIn(false)
+              if (key === 'login') {
+                void signIn().catch(() => toast.danger(t('userMenu.signInFailed')))
+              }
+              if (key === 'logout') {
+                void signOut().catch(() => toast.danger(t('userMenu.signOutFailed')))
+              }
               if (key === 'preferences') onOpenPreferences?.()
               if (key === 'closeApp') handleCloseApp()
               if (key === 'keyboardShortcuts') setShortcutsOpen(true)
@@ -75,18 +90,34 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
               }
             }}
           >
-            {isLoggedIn ? (
+            {status === 'authenticated' && session ? (
+              <>
+                <Dropdown.Item id="accountIdentity" isDisabled>
+                  <CircleUser className="size-4" />
+                  {session.displayName}
+                </Dropdown.Item>
+                <Dropdown.Item
+                  id="logout"
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
+                  <LogOut className="size-4" />
+                  {t('userMenu.logout')}
+                </Dropdown.Item>
+              </>
+            ) : status === 'anonymous' ? (
               <Dropdown.Item
-                id="logout"
+                id="login"
                 className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
               >
-                <LogOut className="size-4" />
-                {t('userMenu.logout')}
-              </Dropdown.Item>
-            ) : (
-              <Dropdown.Item id="login" isDisabled>
                 <LogIn className="size-4" />
                 {t('userMenu.login')}
+              </Dropdown.Item>
+            ) : (
+              <Dropdown.Item id="accountStatus" isDisabled>
+                <RefreshCw className={`size-4 ${status === 'loading' ? 'animate-spin' : ''}`} />
+                {status === 'loading'
+                  ? t('userMenu.loadingAccount')
+                  : t('userMenu.accountUnavailable')}
               </Dropdown.Item>
             )}
             <Dropdown.Item
@@ -117,11 +148,11 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
                 className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
               >
                 <RefreshCw className="size-4" />
-                {status === 'available'
+                {updateStatus === 'available'
                   ? t('userMenu.updateAvailable', { version: availableVersion })
-                  : status === 'checking'
+                  : updateStatus === 'checking'
                     ? t('userMenu.checking')
-                    : status === 'downloading'
+                    : updateStatus === 'downloading'
                       ? t('userMenu.downloadingUpdate')
                       : t('userMenu.upToDate')}
               </Dropdown.Item>

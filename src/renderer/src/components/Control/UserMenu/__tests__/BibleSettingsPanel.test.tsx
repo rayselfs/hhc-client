@@ -6,6 +6,7 @@ import BibleSettingsPanel from '../BibleSettingsPanel'
 import { toast } from '@heroui/react/toast'
 import * as speechKeyStorage from '@renderer/lib/speech-key-storage'
 import { DEFAULT_SPEECH } from '@renderer/stores/settings'
+import { isElectron } from '@renderer/lib/env'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 
@@ -78,13 +79,16 @@ describe('BibleSettingsPanel', () => {
     vi.mocked(speechKeyStorage.deleteSpeechKey).mockResolvedValue(undefined)
   })
 
-  it('renders API key input and region select', async () => {
+  it('renders API key input and hides region select until key is entered', async () => {
+    const user = userEvent.setup()
     renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
     })
 
+    expect(screen.queryByLabelText('Region')).not.toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Enter your API key'), 'new-api-key')
     expect(screen.getByLabelText('Region')).toBeInTheDocument()
     expect(screen.getByText('Save')).toBeInTheDocument()
     expect(screen.getByText('Test Connection')).toBeInTheDocument()
@@ -188,6 +192,7 @@ describe('BibleSettingsPanel', () => {
 
   it('shows error toast when save fails', async () => {
     const user = userEvent.setup()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.mocked(speechKeyStorage.saveSpeechKey).mockRejectedValue(new Error('Save failed'))
 
     renderPanel()
@@ -212,6 +217,11 @@ describe('BibleSettingsPanel', () => {
     await waitFor(() => {
       expect(vi.mocked(toast).danger).toHaveBeenCalledWith('Failed to save Azure Speech settings')
     })
+    expect(consoleError).toHaveBeenCalledWith(
+      '[BibleSettings] Failed to save Azure settings:',
+      expect.any(Error)
+    )
+    consoleError.mockRestore()
   })
 
   it('disables save button when no changes', async () => {
@@ -244,9 +254,44 @@ describe('BibleSettingsPanel', () => {
   })
 
   it('disables test button while loading', async () => {
+    vi.mocked(speechKeyStorage.loadSpeechKey).mockReturnValue(new Promise(() => {}))
     renderPanel()
 
     const testButton = screen.getByText('Test Connection')
     expect(testButton).toBeDisabled()
+  })
+
+  it('unsubscribes Whisper download progress on unmount', async () => {
+    const user = userEvent.setup()
+    const unsubscribe = vi.fn()
+    vi.mocked(isElectron).mockReturnValue(true)
+    mockSettingsStore.speech = {
+      ...DEFAULT_SPEECH,
+      activeProvider: 'whisper'
+    }
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        app: {
+          selectDirectory: vi.fn().mockResolvedValue('/models'),
+          checkWhisperDir: vi.fn().mockResolvedValue({ hasFiles: false }),
+          onDownloadProgress: vi.fn(() => unsubscribe),
+          downloadWhisperModel: vi.fn().mockResolvedValue(undefined)
+        }
+      }
+    })
+
+    try {
+      const { unmount } = renderPanel()
+      await user.click(await screen.findByRole('button', { name: 'Download' }))
+      await waitFor(() => expect(window.api.app.onDownloadProgress).toHaveBeenCalledOnce())
+
+      unmount()
+
+      expect(unsubscribe).toHaveBeenCalledOnce()
+    } finally {
+      vi.mocked(isElectron).mockReturnValue(false)
+      Reflect.deleteProperty(window, 'api')
+    }
   })
 })

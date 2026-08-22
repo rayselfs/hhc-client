@@ -66,13 +66,14 @@ interface BibleDBSchema extends DBSchema {
   }
 }
 
+const DB_NAME = 'hhc-bible'
 const DB_VERSION = 3
 
 let bibleDBPromise: Promise<IDBPDatabase<BibleDBSchema>> | null = null
 
 function getBibleDB(): Promise<IDBPDatabase<BibleDBSchema>> {
   if (!bibleDBPromise) {
-    bibleDBPromise = openDB<BibleDBSchema>('hhc-bible', DB_VERSION, {
+    bibleDBPromise = openDB<BibleDBSchema>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion, _newVersion, transaction) {
         if (oldVersion < 1) {
           if (!db.objectStoreNames.contains('content')) db.createObjectStore('content')
@@ -168,6 +169,18 @@ function migrateLegacyTree(
 
 export async function openBibleDB(): Promise<IDBPDatabase<BibleDBSchema>> {
   return getBibleDB()
+}
+
+export async function resetBibleDB(): Promise<void> {
+  const db = await bibleDBPromise
+  db?.close()
+  bibleDBPromise = null
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error('Bible database deletion blocked'))
+  })
 }
 
 // ===== Bible Content =====

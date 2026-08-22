@@ -1,27 +1,13 @@
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Upload } from 'lucide-react'
-import { saveThumbnail } from '@renderer/lib/thumbnail-db'
-import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
-import { addFileItemToStore } from '@renderer/stores/file-explorer'
+import { getUploadMediaPlatform, uploadFiles } from '@renderer/lib/upload-utils'
+import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
 
 interface FileUploadProps {
   currentFolderId: string
   onUploadStart?: () => void
   onUploadComplete?: (count: number) => void
-}
-
-function canGenerateThumbnail(file: File): boolean {
-  return (
-    file.type.startsWith('image/') ||
-    file.type.startsWith('video/') ||
-    file.type === 'application/pdf'
-  )
-}
-
-async function generateAndSaveThumbnail(file: File, itemId: string): Promise<void> {
-  const thumbnail = await generateThumbnail(file)
-  if (thumbnail) await saveThumbnail(itemId, thumbnail)
 }
 
 export function FileUpload({
@@ -31,6 +17,7 @@ export function FileUpload({
 }: FileUploadProps): React.JSX.Element {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
 
   function handleButtonClick(): void {
     inputRef.current?.click()
@@ -42,16 +29,8 @@ export function FileUpload({
 
     onUploadStart?.()
 
-    await Promise.all(
-      files.map(async (file) => {
-        const itemId = await addFileItemToStore(file, currentFolderId)
-        if (canGenerateThumbnail(file)) {
-          generateAndSaveThumbnail(file, itemId).catch(console.error)
-        }
-      })
-    )
-
-    onUploadComplete?.(files.length)
+    const uploadedCount = await uploadFiles(files, currentFolderId)
+    onUploadComplete?.(uploadedCount)
 
     if (inputRef.current) {
       inputRef.current.value = ''
@@ -64,7 +43,7 @@ export function FileUpload({
         ref={inputRef}
         type="file"
         multiple
-        accept="image/*,video/*,.pdf,.pptx,.ppt,.key,.odp"
+        accept={fileAccept}
         className="hidden"
         onChange={handleChange}
       />

@@ -11,6 +11,7 @@ import PresetChips from '@renderer/components/Control/Timer/PresetChips'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { startTimerProjection } from '@renderer/lib/projection-actions'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 
@@ -30,7 +31,7 @@ export default function TimerPage(): React.JSX.Element {
 
   const swFormattedTime = useStopwatchStore(selectFormattedTime)
 
-  const { claimProjection, isProjectionOpen } = useProjection()
+  const { claimProjection, isProjectionOpen, startProjection } = useProjection()
 
   const isTimerActive = timerStatus === 'running' || timerStatus === 'paused'
   const isTimerActiveRef = useRef(isTimerActive)
@@ -60,8 +61,14 @@ export default function TimerPage(): React.JSX.Element {
       config: SHORTCUTS.TIMER.TOGGLE,
       handler: () => {
         const { status, start, pause } = useTimerStore.getState()
-        if (status === 'running') pause()
-        else if (status === 'stopped' || status === 'paused') start()
+        if (status === 'running') {
+          pause()
+          return
+        }
+        if (status === 'stopped' || status === 'paused') {
+          startTimerProjection({ startProjection }).catch(() => {})
+          start()
+        }
       },
       preventDefault: true
     },

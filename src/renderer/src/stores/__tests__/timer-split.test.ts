@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { act, renderHook } from '@testing-library/react'
 import { createJSONStorage } from 'zustand/middleware'
 
 const lazyLocalStorage = vi.hoisted(() => ({
@@ -261,5 +262,32 @@ describe('combined useTimerStore barrel', () => {
 
   it('persist delegates to config store', () => {
     expect(useTimerStore.persist).toBe(useTimerConfigStore.persist)
+  })
+
+  it('supports selector-aware subscriptions', () => {
+    const listener = vi.fn()
+    const unsubscribe = useTimerStore.subscribe((state) => state.mode, listener)
+
+    useTimerRuntimeStore.setState({ remainingSeconds: 120 })
+    expect(listener).not.toHaveBeenCalled()
+
+    useTimerConfigStore.setState({ mode: 'clock' })
+    expect(listener).toHaveBeenCalledWith('clock', 'timer')
+    unsubscribe()
+  })
+
+  it('does not rerender a selector hook for unrelated state changes', () => {
+    let renderCount = 0
+    const { result } = renderHook(() => {
+      renderCount += 1
+      return useTimerStore((state) => state.mode)
+    })
+
+    act(() => {
+      useTimerRuntimeStore.setState({ remainingSeconds: 120 })
+    })
+
+    expect(result.current).toBe('timer')
+    expect(renderCount).toBe(1)
   })
 })

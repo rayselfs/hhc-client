@@ -1,10 +1,8 @@
-const BIBLE_API_HOST = 'https://www.alive.org.tw'
-const BIBLE_API_PREFIX = '/api/bible/v2'
-const BIBLE_API_CONTENT_PREFIX = '/api/bible/v1'
+import { APP_CONFIG } from './app-config'
 
 export const BIBLE_API = {
-  base: `${BIBLE_API_HOST}${BIBLE_API_CONTENT_PREFIX}`,
-  versions: `${BIBLE_API_HOST}${BIBLE_API_PREFIX}/versions`,
+  base: `${APP_CONFIG.bibleApi.host}${APP_CONFIG.bibleApi.v1Prefix}`,
+  versions: `${APP_CONFIG.bibleApi.host}${APP_CONFIG.bibleApi.v2Prefix}/versions`,
   content: (versionId: number) =>
-    `${BIBLE_API_HOST}${BIBLE_API_CONTENT_PREFIX}/content/${versionId}`
+    `${APP_CONFIG.bibleApi.host}${APP_CONFIG.bibleApi.v1Prefix}/content/${versionId}`
 } as const

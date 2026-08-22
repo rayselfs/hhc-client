@@ -1,0 +1,7 @@
+{
+  "name": "@aiden0z/pptx-renderer",
+  "version": "1.2.2",
+  "license": "Apache-2.0",
+  "source": "https://github.com/aiden0z/pptx-renderer",
+  "usage": "Browser-native PPTX preview and projection rendering"
+}

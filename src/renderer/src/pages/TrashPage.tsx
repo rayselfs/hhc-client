@@ -1,7 +1,13 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trash2, RotateCcw } from 'lucide-react'
+import { Button } from '@heroui/react/button'
+import { Input } from '@heroui/react/input'
+import { Label } from '@heroui/react/label'
+import { Modal } from '@heroui/react/modal'
+import { TextField } from '@heroui/react/textfield'
 import {
+  FILE_EXPLORER_ROOT_ID,
   useFileExplorerStore,
   useTrashExplorerSettings,
   permanentDeleteFolderFromStore,
@@ -19,6 +25,8 @@ import FileExplorerShell from '@renderer/components/Control/FileExplorer/FileExp
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { SortField } from '@renderer/stores/file-explorer'
 import type { SortableItem } from '@renderer/lib/file-explorer-sort'
+import { hasNameConflict, validateDisplayName } from '@renderer/lib/file-naming'
+import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 type TrashEntry = { kind: 'folder'; folder: FolderRecord } | { kind: 'file'; item: FileItemRecord }
 
@@ -47,6 +55,7 @@ export default function TrashPage(): React.JSX.Element {
   const { showMenu } = useContextMenu()
   const foldersArray = useFileExplorerStore((state) => state._foldersArray)
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
+  const foldersById = useFileExplorerStore((state) => state.folders)
   const restoreFolder = useFileExplorerStore((state) => state.restoreFolder)
   const restoreItem = useFileExplorerStore((state) => state.restoreItem)
   const viewMode = useTrashExplorerSettings((state) => state.viewMode)
@@ -56,6 +65,11 @@ export default function TrashPage(): React.JSX.Element {
   const setSortFieldAndDir = useTrashExplorerSettings((state) => state.setSortFieldAndDir)
   const colWidths = useTrashExplorerSettings((state) => state.colWidths)
   const setColWidths = useTrashExplorerSettings((state) => state.setColWidths)
+  const [restoreConflict, setRestoreConflict] = useState<{
+    entry: TrashEntry
+    targetParentId: string
+    name: string
+  } | null>(null)
 
   useEffect(() => {
     void useFileExplorerStore.getState().initialize()
@@ -91,6 +105,90 @@ export default function TrashPage(): React.JSX.Element {
 
   const thumbnails = useThumbnails(thumbnailFileItems)
 
+  const getRestoreTargetParentId = useCallback(
+    (originalParentId: string | null | undefined): string => {
+      return originalParentId &&
+        foldersById[originalParentId] &&
+        !foldersById[originalParentId].deletedAt
+        ? originalParentId
+        : FILE_EXPLORER_ROOT_ID
+    },
+    [foldersById]
+  )
+
+  const getActiveSiblingNames = useCallback(
+    (entry: TrashEntry, targetParentId: string): string[] => {
+      if (entry.kind === 'folder') {
+        return foldersArray
+          .filter(
+            (folder) =>
+              folder.parentId === targetParentId &&
+              !folder.deletedAt &&
+              folder.id !== entry.folder.id
+          )
+          .map((folder) => folder.name)
+      }
+      return itemsArray
+        .filter(
+          (item): item is FileItemRecord =>
+            item.type === 'file' &&
+            item.parentId === targetParentId &&
+            !item.deletedAt &&
+            item.id !== entry.item.id
+        )
+        .map((item) => item.name)
+    },
+    [foldersArray, itemsArray]
+  )
+
+  const restoreEntry = useCallback(
+    (entry: TrashEntry, name?: string): void => {
+      const trimmedName = name?.trim()
+      if (entry.kind === 'folder') {
+        if (trimmedName && trimmedName !== entry.folder.name) {
+          useFileExplorerStore.getState().updateFolder(entry.folder.id, { name: trimmedName })
+        }
+        restoreFolder(entry.folder.id)
+      } else {
+        if (trimmedName && trimmedName !== entry.item.name) {
+          useFileExplorerStore.getState().updateItem?.(entry.item.id, { name: trimmedName })
+        }
+        restoreItem(entry.item.id)
+      }
+    },
+    [restoreFolder, restoreItem]
+  )
+
+  const requestRestoreEntry = useCallback(
+    (entry: TrashEntry): boolean => {
+      const originalParentId =
+        entry.kind === 'folder' ? entry.folder.originalParentId : entry.item.originalParentId
+      const targetParentId = getRestoreTargetParentId(originalParentId)
+      const name = entry.kind === 'folder' ? entry.folder.name : entry.item.name
+      if (hasNameConflict(name, getActiveSiblingNames(entry, targetParentId))) {
+        setRestoreConflict({ entry, targetParentId, name })
+        return false
+      }
+      restoreEntry(entry)
+      return true
+    },
+    [getActiveSiblingNames, getRestoreTargetParentId, restoreEntry]
+  )
+
+  const restoreSiblingNames = useMemo(
+    () =>
+      restoreConflict
+        ? getActiveSiblingNames(restoreConflict.entry, restoreConflict.targetParentId)
+        : [],
+    [getActiveSiblingNames, restoreConflict]
+  )
+
+  const restoreName = restoreConflict?.name.trim() ?? ''
+  const canSubmitRestore =
+    !!restoreConflict &&
+    validateDisplayName(restoreName) &&
+    !hasNameConflict(restoreName, restoreSiblingNames)
+
   const gridItems = useMemo(
     () =>
       entries.map((entry) => ({
@@ -123,9 +221,51 @@ export default function TrashPage(): React.JSX.Element {
     containerRef
   } = useItemSelection(allIds)
 
+  const requestRestoreIds = useCallback(
+    (ids: Set<string>): void => {
+      for (const id of ids) {
+        const entry = entries.find((e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === id)
+        if (!entry) continue
+        if (!requestRestoreEntry(entry)) return
+      }
+      clearSelection()
+    },
+    [clearSelection, entries, requestRestoreEntry]
+  )
+
+  const submitRestoreConflict = useCallback((): void => {
+    if (!restoreConflict || !canSubmitRestore) return
+    restoreEntry(restoreConflict.entry, restoreName)
+    setRestoreConflict(null)
+    clearSelection()
+  }, [canSubmitRestore, clearSelection, restoreConflict, restoreEntry, restoreName])
+
   const gridItemsWithSelection = useMemo(
     () => gridItems.map((i) => ({ ...i, isSelected: selectedIds.has(i.id) })),
     [gridItems, selectedIds]
+  )
+
+  const permanentlyDeleteIds = useCallback(
+    async (ids: Set<string>): Promise<void> => {
+      if (ids.size === 0) return
+      const confirmed = await confirm({
+        title: t('trash.permanentDeleteTitle'),
+        description: t('trash.permanentDeleteDescription'),
+        status: 'danger'
+      })
+      if (!confirmed) return
+      for (const id of ids) {
+        const entry = entries.find((e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === id)
+        if (!entry) continue
+        if (entry.kind === 'folder') {
+          await permanentDeleteFolderFromStore(entry.folder.id)
+        } else {
+          await permanentDeleteFileItemFromStore(entry.item.id)
+        }
+      }
+      clearSelection()
+    },
+    [clearSelection, confirm, entries, t]
   )
 
   const handleContextMenu = useCallback(
@@ -143,17 +283,7 @@ export default function TrashPage(): React.JSX.Element {
             id: 'restore',
             label: t('fileExplorer.contextMenu.restore'),
             icon: React.createElement(RotateCcw, { size: 14 }),
-            onAction: () => {
-              for (const eid of effectiveIds) {
-                const entry = entries.find(
-                  (e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === eid
-                )
-                if (!entry) continue
-                if (entry.kind === 'folder') restoreFolder(entry.folder.id)
-                else restoreItem(entry.item.id)
-              }
-              clearSelection()
-            }
+            onAction: () => requestRestoreIds(effectiveIds)
           },
           'separator',
           {
@@ -161,42 +291,33 @@ export default function TrashPage(): React.JSX.Element {
             label: t('fileExplorer.contextMenu.permanentDelete'),
             icon: React.createElement(Trash2, { size: 14 }),
             variant: 'danger',
-            onAction: async () => {
-              const confirmed = await confirm({
-                title: t('trash.permanentDeleteTitle'),
-                description: t('trash.permanentDeleteDescription'),
-                status: 'danger'
-              })
-              if (!confirmed) return
-              for (const eid of effectiveIds) {
-                const entry = entries.find(
-                  (e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === eid
-                )
-                if (!entry) continue
-                if (entry.kind === 'folder') {
-                  await permanentDeleteFolderFromStore(entry.folder.id)
-                } else {
-                  await permanentDeleteFileItemFromStore(entry.item.id)
-                }
-              }
-              clearSelection()
-            }
+            onAction: () => void permanentlyDeleteIds(effectiveIds)
           }
         ],
         event
       )
     },
-    [
-      showMenu,
-      t,
-      restoreFolder,
-      restoreItem,
-      confirm,
-      entries,
-      selectedIds,
-      setSelectedIds,
-      clearSelection
-    ]
+    [showMenu, t, selectedIds, setSelectedIds, requestRestoreIds, permanentlyDeleteIds]
+  )
+
+  const handleContainerContextMenu = useCallback(
+    (event: React.MouseEvent): void => {
+      if ((event.target as Element).closest('[data-file-item]')) return
+      event.preventDefault()
+      showMenu(
+        [
+          {
+            id: 'empty-trash',
+            label: t('trash.emptyTrash'),
+            icon: React.createElement(Trash2, { size: 14 }),
+            variant: 'danger',
+            onAction: () => void permanentlyDeleteIds(new Set(allIds))
+          }
+        ],
+        event
+      )
+    },
+    [allIds, permanentlyDeleteIds, showMenu, t]
   )
 
   const handleSortChange = useCallback(
@@ -215,7 +336,17 @@ export default function TrashPage(): React.JSX.Element {
   useKeyboardShortcuts(
     [
       { config: SHORTCUTS.EDIT.SELECT_ALL, handler: selectAll, preventDefault: true },
-      { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true }
+      { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true },
+      {
+        config: SHORTCUTS.EDIT.DELETE,
+        handler: () => void permanentlyDeleteIds(selectedIds),
+        preventDefault: true
+      },
+      {
+        config: SHORTCUTS.EDIT.DELETE_ALT,
+        handler: () => void permanentlyDeleteIds(selectedIds),
+        preventDefault: true
+      }
     ],
     { enabled: true, sectionKey: 'trash' }
   )
@@ -232,47 +363,102 @@ export default function TrashPage(): React.JSX.Element {
   }
 
   return (
-    <FileExplorerShell itemCount={entries.length} selectedCount={selectedIds.size}>
-      <div
-        ref={containerRef}
-        className="relative h-full overflow-auto"
-        onClick={handleContainerClick}
-        onMouseDown={handleContainerMouseDown}
-      >
-        {viewMode === 'list' ? (
-          <ListView
-            items={gridItemsWithSelection}
-            sortField={sortField}
-            sortDir={sortDir}
-            onSortChange={handleSortChange}
-            colWidths={colWidths}
-            onColWidthChange={(col, w) => setColWidths({ [col]: w })}
-            onItemClick={handleItemClick}
-          onItemDoubleClick={(_id, _e) => {}}
-          onItemContextMenu={handleContextMenu}
-        />
-      ) : (
-        <GridView
-          items={gridItemsWithSelection}
-          viewMode={viewMode}
-          onItemClick={handleItemClick}
-          onItemDoubleClick={(_id, _e) => {}}
-            onItemContextMenu={handleContextMenu}
-          />
-        )}
+    <>
+      <FileExplorerShell itemCount={entries.length} selectedCount={selectedIds.size}>
+        <div
+          ref={containerRef}
+          className="relative h-full overflow-auto"
+          onClick={handleContainerClick}
+          onMouseDown={handleContainerMouseDown}
+          onContextMenu={handleContainerContextMenu}
+        >
+          {viewMode === 'list' ? (
+            <ListView
+              items={gridItemsWithSelection}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSortChange={handleSortChange}
+              colWidths={colWidths}
+              onColWidthChange={(col, w) => setColWidths({ [col]: w })}
+              onItemClick={handleItemClick}
+              onItemDoubleClick={(_id, _e) => {}}
+              onItemContextMenu={handleContextMenu}
+            />
+          ) : (
+            <GridView
+              items={gridItemsWithSelection}
+              viewMode={viewMode}
+              onItemClick={handleItemClick}
+              onItemDoubleClick={(_id, _e) => {}}
+              onItemContextMenu={handleContextMenu}
+            />
+          )}
 
-        {rubberBandRect && (
-          <div
-            className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
-            style={{
-              left: rubberBandRect.left,
-              top: rubberBandRect.top,
-              width: rubberBandRect.width,
-              height: rubberBandRect.height
-            }}
-          />
-        )}
-      </div>
-    </FileExplorerShell>
+          {rubberBandRect && (
+            <div
+              className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
+              style={{
+                left: rubberBandRect.left,
+                top: rubberBandRect.top,
+                width: rubberBandRect.width,
+                height: rubberBandRect.height
+              }}
+            />
+          )}
+        </div>
+      </FileExplorerShell>
+      {restoreConflict && (
+        <Modal>
+          <Modal.Backdrop isOpen onOpenChange={() => setRestoreConflict(null)} isDismissable>
+            <Modal.Container size="sm">
+              <Modal.Dialog className="p-3 pl-5 pt-5">
+                <Modal.Header>
+                  <Modal.Heading>
+                    {t('trash.restoreNameConflictTitle', 'Rename before restoring')}
+                  </Modal.Heading>
+                </Modal.Header>
+                <Modal.Body>
+                  <ShortcutScope name="overlay">
+                    <TextField
+                      autoFocus
+                      value={restoreConflict.name}
+                      onChange={(name) => setRestoreConflict({ ...restoreConflict, name })}
+                      className="w-full p-1"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                          submitRestoreConflict()
+                        }
+                      }}
+                      onFocus={(event) => (event.target as HTMLInputElement).select()}
+                    >
+                      <Label>{t('trash.restoreNameLabel', 'Name')}</Label>
+                      <Input variant="secondary" />
+                    </TextField>
+                  </ShortcutScope>
+                  <p className="px-1 text-xs text-default-500">
+                    {t(
+                      'trash.restoreNameConflictDescription',
+                      'An item with this name already exists in the restore destination.'
+                    )}
+                  </p>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="tertiary" onPress={() => setRestoreConflict(null)}>
+                    {t('common.cancel', 'Cancel')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    isDisabled={!canSubmitRestore}
+                    onPress={submitRestoreConflict}
+                  >
+                    {t('common.confirm', 'Confirm')}
+                  </Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      )}
+    </>
   )
 }

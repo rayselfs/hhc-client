@@ -57,16 +57,20 @@ describe('speech-key-storage', () => {
     })
 
     it('saveSpeechKey throws when localStorage fails', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
         throw new Error('QuotaExceeded')
       })
 
       await expect(saveSpeechKey('azure', 'test-key')).rejects.toThrow('Failed to save API key')
+      expect(consoleError).toHaveBeenCalled()
 
       spy.mockRestore()
+      consoleError.mockRestore()
     })
 
     it('loadSpeechKey returns null when localStorage throws', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
         throw new Error('Storage error')
       })
@@ -74,18 +78,23 @@ describe('speech-key-storage', () => {
       const key = await loadSpeechKey('azure')
 
       expect(key).toBeNull()
+      expect(consoleError).toHaveBeenCalled()
 
       spy.mockRestore()
+      consoleError.mockRestore()
     })
 
     it('deleteSpeechKey throws when localStorage fails', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
       const spy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
         throw new Error('Storage error')
       })
 
       await expect(deleteSpeechKey('azure')).rejects.toThrow('Failed to delete API key')
+      expect(consoleError).toHaveBeenCalled()
 
       spy.mockRestore()
+      consoleError.mockRestore()
     })
   })
 

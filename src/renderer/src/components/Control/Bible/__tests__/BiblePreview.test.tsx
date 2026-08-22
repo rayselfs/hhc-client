@@ -1,15 +1,17 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useRef } from 'react'
 import type { BibleStore } from '@renderer/stores/bible'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { BiblePreview } from '../BiblePreview'
 
 const mockProject = vi.fn()
-const mockClaimProjection = vi.fn()
+const mockStartProjection = vi.fn(() => Promise.resolve())
 const mockNavigateTo = vi.fn()
 const mockNextChapter = vi.fn()
 const mockPrevChapter = vi.fn()
 const mockRetry = vi.fn()
+const mockAddCue = vi.fn()
 
 const storeSingleton: BibleStore = {
   versions: [],
@@ -45,24 +47,41 @@ const storeSingleton: BibleStore = {
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     isProjectionOpen: false,
-    isProjectionBlanked: false,
     projectionReadyCount: 0,
     activeOwner: 'bible',
-    claimProjection: mockClaimProjection,
-    openProjection: vi.fn(),
+    claimProjection: vi.fn(),
+    startProjection: mockStartProjection,
+    stopProjection: vi.fn(),
     closeProjection: vi.fn(),
-    blankProjection: vi.fn(),
     project: mockProject,
     send: vi.fn(),
     on: vi.fn()
   })
 }))
 
+vi.mock('@renderer/lib/projection-actions', async () => {
+  const { useBibleProjectionStore } = await vi.importActual<
+    typeof import('@renderer/stores/bible-projection')
+  >('@renderer/stores/bible-projection')
+  return {
+    startBibleProjection: vi.fn((payloads, deps) => {
+      useBibleProjectionStore.getState().setLastPayloads(payloads)
+      return deps.startProjection('bible', payloads)
+    })
+  }
+})
+
 vi.mock('@renderer/stores/bible-settings', () => ({
   useBibleSettingsStore: Object.assign(
     (selector?: (state: { fontSize: number }) => unknown) =>
       selector ? selector({ fontSize: 90 }) : { fontSize: 90 },
-    { getState: () => ({ fontSize: 90, selectedVersionId: 'mock-version' }) }
+    {
+      getState: () => ({
+        fontSize: 90,
+        selectedVersionId: 1,
+        scriptureTemplateId: 'dark-stage'
+      })
+    }
   )
 }))
 
@@ -112,7 +131,19 @@ vi.mock('@renderer/stores/bible-history', () => ({
   )
 }))
 
+vi.mock('@renderer/stores/service-playlist', () => ({
+  useServicePlaylistStore: Object.assign(vi.fn(), {
+    getState: () => ({
+      addCue: mockAddCue
+    })
+  })
+}))
+
 vi.mock('@renderer/lib/bible-utils', () => ({
+  formatVerseReferenceShort: vi.fn(
+    (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
+      `MockBook ${chapter}:${verse}`
+  ),
   formatVerseReference: vi.fn(
     (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
       `MockBook ${chapter}:${verse}`
@@ -123,6 +154,7 @@ vi.mock('@renderer/lib/bible-utils', () => ({
     chapterCount: bookNumber === 1 ? 50 : 40
   }),
   shouldShowChapterNumber: () => true,
+  toChineseChapterNumber: (chapter: number) => String(chapter),
   buildVerseHistoryItem: vi.fn(() => ({
     id: 'mock-verse-item',
     type: 'verse',
@@ -139,16 +171,19 @@ vi.mock('@renderer/lib/bible-utils', () => ({
 }))
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => {} },
   useTranslation: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         'bible.books.gen.name': '創世記',
         'bible.chapterUnit.default': '章',
         'bible.chapterUnit.psa': '篇',
-        'bible.preview.noContent': '尚未載入經文內容'
+        'bible.preview.noContent': '尚未載入經文內容',
+        'bible.contextMenu.addToService': '加入流程'
       }
       return map[key] ?? key
-    }
+    },
+    i18n: { language: 'zh-TW' }
   })
 }))
 
@@ -198,6 +233,7 @@ describe('BiblePreview', () => {
         { id: 2, number: 2, text: 'Now the earth was formless and empty.' }
       ]
     })
+    useBibleProjectionStore.getState().clearLastPayloads()
   })
 
   it('renders verse list when content is loaded', () => {
@@ -213,22 +249,45 @@ describe('BiblePreview', () => {
     expect(screen.getByText(/創世記/)).toBeInTheDocument()
   })
 
-  it('clicking a verse calls claimProjection and project', () => {
+  it('clicking a verse starts bible projection with the chapter payload', () => {
     renderBiblePreview()
     const verseBtn = screen
       .getByText('In the beginning God created the heavens and the earth.')
       .closest('button')!
     fireEvent.click(verseBtn)
-    expect(mockClaimProjection).toHaveBeenCalledWith('bible', { unblank: true })
-    expect(mockProject).toHaveBeenCalledWith(
-      'bible:chapter',
-      expect.objectContaining({
-        bookNumber: 1,
-        chapter: 1,
-        currentVerse: 1
-      }),
-      { autoOpen: true }
-    )
+    expect(mockStartProjection).toHaveBeenCalledWith('bible', [
+      [
+        'bible:settings',
+        expect.objectContaining({
+          fontSize: 90
+        })
+      ],
+      [
+        'bible:chapter',
+        expect.objectContaining({
+          bookNumber: 1,
+          chapter: 1,
+          currentVerse: 1
+        })
+      ]
+    ])
+    expect(mockProject).not.toHaveBeenCalled()
+    expect(useBibleProjectionStore.getState().lastPayloads).toEqual([
+      [
+        'bible:settings',
+        expect.objectContaining({
+          fontSize: 90
+        })
+      ],
+      [
+        'bible:chapter',
+        expect.objectContaining({
+          bookNumber: 1,
+          chapter: 1,
+          currentVerse: 1
+        })
+      ]
+    ])
   })
 
   it('clicking a verse calls navigateTo with correct passage', () => {
@@ -238,6 +297,29 @@ describe('BiblePreview', () => {
       .closest('button')!
     fireEvent.click(verseBtn)
     expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
+  })
+
+  it('adds a verse to the service playlist', () => {
+    renderBiblePreview()
+    const addButtons = screen.getAllByLabelText('加入流程')
+    fireEvent.click(addButtons[0])
+    expect(mockAddCue).toHaveBeenCalledWith({
+      type: 'bible',
+      title: 'MockBook 1:1',
+      bookNumber: 1,
+      chapter: 1,
+      verse: 1,
+      reference: 'MockBook 1:1',
+      notes: ''
+    })
+  })
+
+  it('renders two quick actions per verse', () => {
+    renderBiblePreview()
+    const verseRow = screen
+      .getByText('In the beginning God created the heavens and the earth.')
+      .closest('.group') as HTMLElement
+    expect(within(verseRow).getAllByRole('button')).toHaveLength(3)
   })
 
   it('calls nextChapter when next chapter button pressed', () => {

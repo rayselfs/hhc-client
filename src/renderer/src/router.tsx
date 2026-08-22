@@ -1,17 +1,22 @@
 import { lazy, Suspense } from 'react'
 import { createHashRouter, Navigate } from 'react-router-dom'
-import ProjectionPage from '@renderer/pages/ProjectionPage'
 import Layout from '@renderer/components/Control/Layout'
 import RouteError from '@renderer/components/RouteError'
-import LoadingFallback from '@renderer/components/Control/LoadingFallback'
 import { isOnboarded } from '@renderer/lib/onboarding'
+import WelcomePage from '@renderer/pages/WelcomePage'
 
 const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
 const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
+const ServicePage = lazy(() => import('@renderer/pages/ServicePage'))
+const SoundboardPage = lazy(() => import('@renderer/pages/SoundboardPage'))
 const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
+const FilePreviewRoute = lazy(
+  () => import('@renderer/components/Control/FileExplorer/Preview/FilePreviewInspector')
+)
+const MediaWorkspacePage = lazy(() => import('@renderer/pages/MediaWorkspacePage'))
+const PresentationWorkspacePage = lazy(() => import('@renderer/pages/PresentationWorkspacePage'))
 const FavoritesPage = lazy(() => import('@renderer/pages/FavoritesPage'))
 const TrashPage = lazy(() => import('@renderer/pages/TrashPage'))
-const WelcomePage = lazy(() => import('@renderer/pages/WelcomePage'))
 
 // eslint-disable-next-line react-refresh/only-export-components
 function OnboardingGuard({ children }: { children: React.JSX.Element }): React.JSX.Element {
@@ -33,7 +38,7 @@ const routes = [
       {
         path: 'timer',
         element: (
-          <Suspense fallback={<LoadingFallback />}>
+          <Suspense fallback={null}>
             <TimerPage />
           </Suspense>
         ),
@@ -42,8 +47,26 @@ const routes = [
       {
         path: 'bible',
         element: (
-          <Suspense fallback={<LoadingFallback />}>
+          <Suspense fallback={null}>
             <BiblePage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'service',
+        element: (
+          <Suspense fallback={null}>
+            <ServicePage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'soundboard',
+        element: (
+          <Suspense fallback={null}>
+            <SoundboardPage />
           </Suspense>
         ),
         ErrorBoundary: RouteError
@@ -51,8 +74,37 @@ const routes = [
       {
         path: 'files',
         element: (
-          <Suspense fallback={<LoadingFallback />}>
+          <Suspense fallback={null}>
             <FilesPage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError,
+        children: [
+          {
+            path: 'preview/:itemId',
+            element: (
+              <Suspense fallback={null}>
+                <FilePreviewRoute />
+              </Suspense>
+            ),
+            ErrorBoundary: RouteError
+          }
+        ]
+      },
+      {
+        path: 'media',
+        element: (
+          <Suspense fallback={null}>
+            <MediaWorkspacePage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'presentations/:itemId?',
+        element: (
+          <Suspense fallback={null}>
+            <PresentationWorkspacePage />
           </Suspense>
         ),
         ErrorBoundary: RouteError
@@ -60,7 +112,7 @@ const routes = [
       {
         path: 'favorites',
         element: (
-          <Suspense fallback={<LoadingFallback />}>
+          <Suspense fallback={null}>
             <FavoritesPage />
           </Suspense>
         ),
@@ -69,7 +121,7 @@ const routes = [
       {
         path: 'trash',
         element: (
-          <Suspense fallback={<LoadingFallback />}>
+          <Suspense fallback={null}>
             <TrashPage />
           </Suspense>
         ),
@@ -79,13 +131,8 @@ const routes = [
   },
   {
     path: '/welcome',
-    element: (
-      <Suspense fallback={<LoadingFallback />}>
-        <WelcomePage />
-      </Suspense>
-    )
-  },
-  { path: '/projection', Component: ProjectionPage, ErrorBoundary: RouteError }
+    element: <WelcomePage />
+  }
 ]
 
 export default routes

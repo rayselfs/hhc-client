@@ -3,6 +3,8 @@ import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
+import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
+import { startBibleProjection } from '@renderer/lib/projection-actions'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import type { VerseItemRecord, FolderRecord, AnyItemRecord } from '@shared/types/folder'
 import { isVerseItem, isFolderRecord } from '@shared/types/folder'
@@ -11,11 +13,13 @@ import { Button } from '@heroui/react/button'
 import { Folder as FolderIcon, X, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
 import { useFolderContextMenu } from '@renderer/components/Control/Folder/useFolderContextMenu'
 import {
   FolderBrowser,
   type FolderBrowserHandlers
 } from '@renderer/components/Control/Folder/FolderBrowser'
+import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
 
 interface CustomFolderTabProps {
   isModalOpen?: boolean
@@ -32,14 +36,20 @@ export function CustomFolderTab({
   onModalOpenChange = () => {},
   onProjected
 }: CustomFolderTabProps): React.JSX.Element {
-  const { currentFolderId } = useBibleFolderStore()
+  const currentFolderId = useBibleFolderStore((s) => s.currentFolderId)
   const { navigateTo } = useBibleStore.getState()
-  const { claimProjection, project } = useProjection()
+  const { startProjection } = useProjection()
   const { t } = useTranslation()
 
   const contextMenu = useFolderContextMenu()
   const folders = useChildFolders(currentFolderId)
   const verses = useItems(currentFolderId)
+  const persistenceStatus = useBibleFolderStore((state) => state.persistenceStatus)
+  const persistenceError = useBibleFolderStore((state) => state.persistenceError)
+  const pendingPersistenceCount = useBibleFolderStore((state) => state.pendingPersistenceCount)
+  const isFolderStoreInitialized = useBibleFolderStore((state) => state.isInitialized)
+  const retryInitialization = useBibleFolderStore((state) => state.retryInitialization)
+  const retryPersistence = useBibleFolderStore((state) => state.retryPersistence)
 
   const handleVerseDoubleClick = useCallback(
     (item: VerseItemRecord) => {
@@ -59,20 +69,22 @@ export function CustomFolderTab({
       const book = books?.find((b) => b.number === item.bookNumber)
       const chapter = book?.chapters.find((c) => c.number === item.chapter)
       if (!chapter) return
-      claimProjection('bible', { unblank: true })
-      project(
-        'bible:chapter',
-        {
-          bookNumber: item.bookNumber,
-          chapter: item.chapter,
-          chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
-          currentVerse: item.verse
-        },
-        { autoOpen: true }
-      )
+      const payloads = [
+        ['bible:settings', getBibleProjectionSettingsPayload()],
+        [
+          'bible:chapter',
+          {
+            bookNumber: item.bookNumber,
+            chapter: item.chapter,
+            chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
+            currentVerse: item.verse
+          }
+        ]
+      ] satisfies ContentMessageTuple[]
+      void startBibleProjection(payloads, { startProjection })
       onProjected?.({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verse })
     },
-    [navigateTo, claimProjection, project, onProjected]
+    [navigateTo, startProjection, onProjected]
   )
 
   const getItemReference = useCallback(
@@ -246,17 +258,27 @@ export function CustomFolderTab({
   )
 
   return (
-    <FolderBrowser
-      store={useBibleFolderStore}
-      folders={folders}
-      items={verses}
-      contextMenu={contextMenu}
-      renderFolderContent={renderFolderContent}
-      renderItemContent={renderItemContent}
-      renderDragOverlay={renderDragOverlay}
-      getItemReference={getItemReference}
-      isModalOpen={isModalOpen}
-      onModalOpenChange={onModalOpenChange}
-    />
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <FolderPersistenceStatus
+        status={persistenceStatus}
+        error={persistenceError}
+        pendingCount={pendingPersistenceCount}
+        isInitialized={isFolderStoreInitialized}
+        onRetryInitialization={retryInitialization}
+        onRetryPersistence={retryPersistence}
+      />
+      <FolderBrowser
+        store={useBibleFolderStore}
+        folders={folders}
+        items={verses}
+        contextMenu={contextMenu}
+        renderFolderContent={renderFolderContent}
+        renderItemContent={renderItemContent}
+        renderDragOverlay={renderDragOverlay}
+        getItemReference={getItemReference}
+        isModalOpen={isModalOpen}
+        onModalOpenChange={onModalOpenChange}
+      />
+    </div>
   )
 }

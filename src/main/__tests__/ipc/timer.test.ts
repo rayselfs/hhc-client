@@ -27,6 +27,7 @@ vi.mock('electron', () => {
 
 vi.mock('../../timerService', () => ({
   timerService: {
+    setWindowManager: vi.fn(),
     handleCommand: vi.fn(),
     getState: vi.fn(() => ({ status: 'stopped', remainingSeconds: 300 })),
     initializeState: vi.fn()
@@ -55,6 +56,10 @@ beforeEach(async () => {
 
   const { registerTimerHandlers } = await import('../../ipc/timer')
   registerTimerHandlers(wm)
+})
+
+it('registers the managed windows with TimerService', () => {
+  expect(timerService.setWindowManager).toHaveBeenCalledWith(wm)
 })
 
 describe('timer:command', () => {

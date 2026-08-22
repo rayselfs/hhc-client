@@ -2,13 +2,76 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { purgeExpiredTrashFromStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { initializeSearchIndexes } from '@renderer/lib/bible-search'
 import { isElectron } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
+import { mediaJobQueue } from '@renderer/lib/media-job-queue'
+import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
+import { startSyncRuntime, type SyncRuntimeOptions } from '@renderer/lib/sync-runtime'
+import { backfillImportedMediaAssets } from '@renderer/lib/local-sync-import'
+import { retryPendingResourceCleanups } from '@renderer/lib/resource-cleanup-journal'
+import { deleteDerivedAssetsByKind } from '@renderer/lib/media-work-db'
 
-let initialized = false
+let earlyInitStarted = false
+let subscriptionsInitialized = false
+let resourceCleanupReplayStarted = false
+let chunksReadyPromise: Promise<void> | null = null
+let routePrefetchScheduled = false
+
+function isProjectionRoute(): boolean {
+  return window.location.hash.startsWith('#/projection')
+}
+
+/**
+ * Kick off async store initializations as early as possible (called from main.tsx
+ * before React renders). Idempotent — safe to call multiple times.
+ */
+export function startEarlyInit(): void {
+  if (isProjectionRoute()) return
+  if (earlyInitStarted) return
+  earlyInitStarted = true
+
+  useBibleStore.getState().initialize()
+  useBibleFolderStore.getState().initialize()
+  useFileExplorerStore.getState().initialize()
+  void mediaJobQueue
+    .recoverStaleJobs()
+    .then(() => mediaJobQueue.removeExpiredHistory())
+    .then(() => deleteDerivedAssetsByKind('editable-presentation-document'))
+    .then(() => backfillImportedMediaAssets())
+    .catch(() => undefined)
+}
+
+function loadRouteChunks(): Promise<void> {
+  if (!chunksReadyPromise) {
+    chunksReadyPromise = Promise.all([
+      import('@renderer/pages/TimerPage'),
+      import('@renderer/pages/BiblePage'),
+      import('@renderer/pages/FilesPage'),
+      import('@renderer/pages/FavoritesPage'),
+      import('@renderer/pages/TrashPage')
+    ])
+      .then(() => undefined)
+      .catch(() => undefined)
+  }
+  return chunksReadyPromise
+}
+
+export function prefetchRouteChunks(): void {
+  if (routePrefetchScheduled) return
+  routePrefetchScheduled = true
+
+  const run = (): void => {
+    void loadRouteChunks()
+  }
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 5000 })
+  } else {
+    setTimeout(run, 2000)
+  }
+}
 
 async function initWhisperModelDir(): Promise<void> {
   if (!isElectron()) return
@@ -25,11 +88,19 @@ async function initWhisperModelDir(): Promise<void> {
   }
 }
 
-export function initializeApp(): () => void {
-  if (initialized) return () => {}
-  initialized = true
+/**
+ * Set up app-level subscriptions and side-effects. Called from Layout.useEffect.
+ * Calls startEarlyInit() internally as a fallback so this function remains safe
+ * to call without a prior startEarlyInit() call.
+ */
+export function initializeApp(options: SyncRuntimeOptions = {}): () => void {
+  startEarlyInit()
+
+  if (subscriptionsInitialized) return () => {}
+  subscriptionsInitialized = true
 
   void initWhisperModelDir()
+  const stopSyncRuntime = startSyncRuntime(options)
 
   let prevModelDir = useSettingsStore.getState().speech.whisper.modelDir
   const unsubWhisper = useSettingsStore.subscribe((state) => {
@@ -58,27 +129,32 @@ export function initializeApp(): () => void {
   const current = useBibleStore.getState()
   if (current.isInitialized) {
     tryInitSearch(current)
-  } else {
-    useBibleStore.getState().initialize()
   }
 
-  useBibleFolderStore.getState().initialize()
-  useBibleFolderStore.subscribe((state, prev) => {
+  const unsubBibleFolders = useBibleFolderStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
       void useBibleFolderStore.getState().cleanupExpired()
     }
   })
 
-  useFileExplorerStore.getState().initialize()
-  useFileExplorerStore.subscribe((state, prev) => {
+  const unsubFileExplorer = useFileExplorerStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
-      void useFileExplorerStore.getState().cleanupExpired()
+      useFileExplorerStore.getState().softDeleteExpired()
       const retentionDays = useSettingsStore.getState().trashRetentionDays
       if (retentionDays > 0) {
-        void useFileExplorerStore.getState().purgeTrash(retentionDays * 86_400_000)
+        void purgeExpiredTrashFromStore(retentionDays * 86_400_000)
+      }
+      void recoverPendingSyncResourceCleanups().catch(() => undefined)
+      if (!resourceCleanupReplayStarted) {
+        resourceCleanupReplayStarted = true
+        void retryPendingResourceCleanups().catch(() => undefined)
       }
     }
   })
+  if (!useFileExplorerStore.getState().isLoading && !resourceCleanupReplayStarted) {
+    resourceCleanupReplayStarted = true
+    void retryPendingResourceCleanups().catch(() => undefined)
+  }
 
   const handleOnline = (): void => {
     toast.success(i18n.t('toast.networkRestored'))
@@ -97,9 +173,12 @@ export function initializeApp(): () => void {
   return () => {
     unsubscribe()
     unsubWhisper()
+    unsubBibleFolders()
+    unsubFileExplorer()
+    stopSyncRuntime()
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
-    initialized = false
+    subscriptionsInitialized = false
     const s = useBibleStore.getState()
     if (s.isLoading && !s.isInitialized) {
       useBibleStore.setState({ isLoading: false })
