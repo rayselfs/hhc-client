@@ -123,6 +123,7 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(release).toContain('npm run check:packaged-runtime')
     expect(release).toContain('npm run test:e2e:packaged')
     expect(release).toContain('actions/upload-artifact@')
+    expect(release).toContain('dist/*.zip')
   })
 
   it('publishes checksums generated from the packaged release artifacts', () => {

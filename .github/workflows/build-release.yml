@@ -187,40 +187,6 @@ jobs:
       - name: Verify packaged runtime and notices
         run: npm run check:packaged-runtime
 
-      - name: Verify Windows 2.2.2 upgrade
-        if: runner.os == 'Windows' && needs.prepare.outputs.version == '2.2.3'
-        shell: pwsh
-        run: |
-          $oldInstaller = Join-Path $env:RUNNER_TEMP 'libre-presenter-2.2.2-setup.exe'
-          $installDir = Join-Path $env:RUNNER_TEMP 'LibrePresenterUpgrade'
-          $newInstaller = (Get-Item 'dist/libre-presenter-2.2.3-setup.exe').FullName
-          curl.exe --fail --location --silent --show-error `
-            'https://github.com/rayselfs/libre-presenter/releases/download/v2.2.2/libre-presenter-2.2.2-setup.exe' `
-            --output $oldInstaller
-
-          function Install-LibrePresenter($installer) {
-            $process = Start-Process $installer -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
-            if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
-          }
-
-          function Get-InstalledVersion {
-            node -e "const asar=require('@electron/asar'); console.log(JSON.parse(asar.extractFile(process.argv[1], 'package.json')).version)" `
-              (Join-Path $installDir 'resources/app.asar')
-          }
-
-          Install-LibrePresenter $oldInstaller
-          if ((Get-InstalledVersion) -ne '2.2.2') { throw '2.2.2 installation was not verified' }
-
-          Install-LibrePresenter $newInstaller
-          if ((Get-InstalledVersion) -ne '2.2.3') { throw '2.2.3 upgrade was not verified' }
-          if (Test-Path (Join-Path $installDir 'resources/app.asar.unpacked/resources/video-engine')) {
-            throw 'Upgrade retained a duplicate unpacked video engine runtime'
-          }
-          $asarFiles = & node_modules/.bin/asar.cmd list (Join-Path $installDir 'resources/app.asar')
-          if ($asarFiles -match '^/\.local-runtimes/') {
-            throw 'Upgrade retained local runtime downloads in app.asar'
-          }
-
       - name: Packaged projection smoke
         env:
           PACKAGED_APP_PATH: ${{ matrix.smoke_executable }}
@@ -233,6 +199,7 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.exe
+            dist/*.zip
             dist/*.blockmap
             dist/*.yml
             dist/*.yaml
