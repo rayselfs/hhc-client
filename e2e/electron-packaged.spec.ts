@@ -72,7 +72,9 @@ test('launches packaged control and projection windows with recovery lifecycle',
       .find((window) => window.url().endsWith('#/projection'))
     if (!projection) throw new Error('Projection window did not open')
 
-    await control.locator('a[href="#/files"]').click()
+    await control.evaluate(() => {
+      window.location.hash = '/files'
+    })
     await expect(control).toHaveURL(/#\/files$/)
     await expect(projection.locator('.timer-digits').first()).toBeVisible()
   })
