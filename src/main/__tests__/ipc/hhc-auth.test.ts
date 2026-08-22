@@ -358,6 +358,14 @@ describe('HhcAuthService authorization', () => {
 })
 
 describe('HhcAuthService credentials and session', () => {
+  it('does not access secure storage when no credential exists', async () => {
+    const service = createHhcAuthService({ now: () => now })
+
+    await expect(service.getSession()).resolves.toBeNull()
+    expect(mockReadFile).toHaveBeenCalledWith(credentialPath)
+    expect(mockIsEncryptionAvailable).not.toHaveBeenCalled()
+  })
+
   it('writes only ciphertext through a same-directory atomic replace with mode 0600', async () => {
     const service = createHhcAuthService({ now: () => now })
     await service.begin()

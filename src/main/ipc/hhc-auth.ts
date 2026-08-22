@@ -395,13 +395,13 @@ class MainHhcAuthService implements HhcAuthService {
   private async loadCredential(create: true): Promise<StoredCredential>
   private async loadCredential(create: false): Promise<StoredCredential | null>
   private async loadCredential(create: boolean): Promise<StoredCredential | null> {
-    if (!secureStorageAvailable()) throw new Error('Secure credential storage is unavailable')
     if (this.storedCredentialLoaded) {
       if (this.storedCredential) return this.storedCredential
       if (!create) return null
     } else {
       try {
         const encrypted = await fs.readFile(this.credentialPath)
+        if (!secureStorageAvailable()) throw new Error('Secure credential storage is unavailable')
         this.storedCredential = parseStoredCredential(
           JSON.parse(safeStorage.decryptString(encrypted))
         )
