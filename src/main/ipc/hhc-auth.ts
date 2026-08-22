@@ -123,6 +123,7 @@ class MainHhcAuthService implements HhcAuthService {
   private readonly now: () => number
   private readonly listeners = new Set<(session: HhcSession | null) => void>()
   private readonly beginsInFlight = new Set<Promise<HhcPendingSignIn>>()
+  private readonly tokenPersistenceInFlight = new Set<Promise<unknown>>()
   private readonly profileLoadsInFlight = new Set<Promise<HhcSession>>()
   private transaction: Transaction | null = null
   private authGeneration = 0
@@ -186,6 +187,15 @@ class MainHhcAuthService implements HhcAuthService {
     action: AccountAuthAction,
     transaction: Transaction
   ): Promise<boolean> {
+    await this.trackTokenPersistence(this.persistProtocolCallbackToken(action, transaction))
+    await this.loadSessionFromAccessToken()
+    return true
+  }
+
+  private async persistProtocolCallbackToken(
+    action: AccountAuthAction,
+    transaction: Transaction
+  ): Promise<void> {
     const credential = await this.loadCredential(true)
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -198,8 +208,6 @@ class MainHhcAuthService implements HhcAuthService {
     })
     const data = await this.requestToken(body)
     await this.acceptTokenResponse(data, credential)
-    await this.loadSessionFromAccessToken()
-    return true
   }
 
   async getAccessToken(): Promise<string | null> {
@@ -281,6 +289,7 @@ class MainHhcAuthService implements HhcAuthService {
     this.transaction = null
     const clearing = this.performClearLocalData(
       [...this.beginsInFlight],
+      [...this.tokenPersistenceInFlight],
       this.completionInFlight,
       this.refreshInFlight,
       this.signOutInFlight
@@ -293,16 +302,18 @@ class MainHhcAuthService implements HhcAuthService {
 
   private async performClearLocalData(
     beginsInFlight: Promise<HhcPendingSignIn>[],
+    tokenPersistenceInFlight: Promise<unknown>[],
     completionInFlight: Promise<boolean> | null,
     refreshInFlight: Promise<string | null> | null,
     signOutInFlight: Promise<void> | null
   ): Promise<void> {
     await Promise.allSettled(beginsInFlight)
     this.transaction = null
+    await Promise.allSettled(tokenPersistenceInFlight)
+    const credential = await this.loadCredential(false).catch(() => null)
     if (completionInFlight) await completionInFlight.catch(() => false)
     if (refreshInFlight) await refreshInFlight.catch(() => null)
     if (signOutInFlight) await signOutInFlight.catch(() => undefined)
-    const credential = await this.loadCredential(false).catch(() => null)
     await Promise.allSettled([...this.profileLoadsInFlight])
 
     this.storedCredential = null
@@ -384,13 +395,19 @@ class MainHhcAuthService implements HhcAuthService {
       }
       throw error
     }
-    await this.loadSessionFromAccessToken()
     return this.accessCredential!.token
   }
 
-  private async refreshStoredCredential(): Promise<string | null> {
+  private async persistStoredCredentialRefresh(): Promise<string | null> {
     const credential = await this.loadCredential(false)
     return credential?.refreshToken ? this.refresh(credential) : null
+  }
+
+  private async refreshStoredCredential(): Promise<string | null> {
+    const token = await this.trackTokenPersistence(this.persistStoredCredentialRefresh())
+    if (!token) return null
+    await this.loadSessionFromAccessToken()
+    return token
   }
 
   private async requestToken(body: URLSearchParams): Promise<Record<string, unknown>> {
@@ -422,7 +439,19 @@ class MainHhcAuthService implements HhcAuthService {
     this.session = null
   }
 
+  private trackTokenPersistence<T>(request: Promise<T>): Promise<T> {
+    this.tokenPersistenceInFlight.add(request)
+    void request.then(
+      () => this.tokenPersistenceInFlight.delete(request),
+      () => this.tokenPersistenceInFlight.delete(request)
+    )
+    return request
+  }
+
   private loadSessionFromAccessToken(): Promise<HhcSession> {
+    if (this.clearLocalDataInFlight) {
+      return Promise.reject(new Error('HHC authentication changed'))
+    }
     const request = this.fetchSessionFromAccessToken(this.authGeneration, this.accessCredential)
     this.profileLoadsInFlight.add(request)
     void request.then(
