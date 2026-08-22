@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetMediaWorkDBForTests } from '../media-work-db'
+import { listMediaJobs, resetMediaWorkDBForTests } from '../media-work-db'
 
-const { mockAddFileItem, mockGenerateThumbnail, mockGeneratePdfPages, mockSavePdfPages } =
-  vi.hoisted(() => ({
-    mockAddFileItem: vi.fn(),
-    mockGenerateThumbnail: vi.fn().mockResolvedValue(null),
-    mockGeneratePdfPages: vi.fn(),
-    mockSavePdfPages: vi.fn()
-  }))
+const {
+  mockAddFileItem,
+  mockGenerateThumbnail,
+  mockGeneratePdfPages,
+  mockGetPdfPages,
+  mockSavePdfPages
+} = vi.hoisted(() => ({
+  mockAddFileItem: vi.fn(),
+  mockGenerateThumbnail: vi.fn().mockResolvedValue(null),
+  mockGeneratePdfPages: vi.fn(),
+  mockGetPdfPages: vi.fn(),
+  mockSavePdfPages: vi.fn()
+}))
 
 vi.mock('@renderer/stores/file-explorer', () => ({
   addFileItemToStore: mockAddFileItem,
@@ -20,7 +26,7 @@ vi.mock('@renderer/lib/thumbnail-generator', () => ({
 }))
 
 vi.mock('@renderer/lib/thumbnail-db', () => ({
-  getPdfPageThumbs: vi.fn().mockResolvedValue([]),
+  getPdfPageThumbs: mockGetPdfPages,
   saveThumbnail: vi.fn(),
   savePdfPageThumbs: mockSavePdfPages
 }))
@@ -34,6 +40,7 @@ import { uploadFiles } from '../upload-utils'
 describe('PDF page upload queue', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockGetPdfPages.mockResolvedValue([])
     await resetMediaWorkDBForTests()
   })
 
@@ -63,5 +70,21 @@ describe('PDF page upload queue', () => {
     releases.shift()?.()
     await vi.waitFor(() => expect(mockSavePdfPages).toHaveBeenCalledTimes(2))
     expect(maxActive).toBe(1)
+  })
+
+  it('skips PDF rendering when cache becomes ready before the executor runs', async () => {
+    const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    mockAddFileItem.mockResolvedValue('pdf-race')
+    mockGeneratePdfPages.mockResolvedValue([])
+    mockGetPdfPages.mockResolvedValueOnce([]).mockResolvedValueOnce(['blob:cached-page'])
+
+    await uploadFiles([new File([], 'race.pdf', { type: 'application/pdf' })], 'parent-1')
+
+    await vi.waitFor(async () => {
+      expect((await listMediaJobs())[0]?.status).toBe('completed')
+    })
+    expect(mockGeneratePdfPages).not.toHaveBeenCalled()
+    expect(mockSavePdfPages).not.toHaveBeenCalled()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:cached-page')
   })
 })

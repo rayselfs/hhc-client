@@ -25,33 +25,34 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
     if (pdfItems.length === 0) return
 
     let disposed = false
-    let refreshId = 0
-    let ownedThumbs: Record<string, string[]> = {}
+    const refreshIds = new Map<string, number>()
+    const ownedThumbs: Record<string, string[]> = {}
     const pdfBlobIds = new Set(pdfItems.map((item) => getBlobId(item)))
 
-    const refresh = async (): Promise<void> => {
-      const currentRefreshId = ++refreshId
+    const refresh = async (items: FileItemRecord[]): Promise<void> => {
+      const requests = items.map((item) => {
+        const refreshId = (refreshIds.get(item.id) ?? 0) + 1
+        refreshIds.set(item.id, refreshId)
+        return { item, refreshId }
+      })
       const results = await Promise.allSettled(
-        pdfItems.map((item) => getPdfPageThumbs(getBlobId(item)))
+        requests.map(({ item }) => getPdfPageThumbs(getBlobId(item)))
       )
-      const nextUrls = results.flatMap((result) =>
-        result.status === 'fulfilled' ? result.value : []
-      )
-      if (disposed || currentRefreshId !== refreshId) {
-        nextUrls.forEach((url) => URL.revokeObjectURL(url))
-        return
-      }
 
-      const nextThumbs = { ...ownedThumbs }
+      let changed = false
       results.forEach((result, index) => {
         if (result.status === 'rejected') return
-        const itemId = pdfItems[index].id
-        nextThumbs[itemId]?.forEach((url) => URL.revokeObjectURL(url))
-        if (result.value.length > 0) nextThumbs[itemId] = result.value
-        else delete nextThumbs[itemId]
+        const { item, refreshId } = requests[index]
+        if (disposed || refreshIds.get(item.id) !== refreshId) {
+          result.value.forEach((url) => URL.revokeObjectURL(url))
+          return
+        }
+        ownedThumbs[item.id]?.forEach((url) => URL.revokeObjectURL(url))
+        if (result.value.length > 0) ownedThumbs[item.id] = result.value
+        else delete ownedThumbs[item.id]
+        changed = true
       })
-      ownedThumbs = nextThumbs
-      setPdfPageThumbs({ ...nextThumbs })
+      if (changed) setPdfPageThumbs({ ...ownedThumbs })
     }
 
     const unsubscribe = subscribeMediaJobs((job) => {
@@ -61,14 +62,13 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
         job.sourceBlobId &&
         pdfBlobIds.has(job.sourceBlobId)
       ) {
-        void refresh()
+        void refresh(pdfItems.filter((item) => getBlobId(item) === job.sourceBlobId))
       }
     })
-    void refresh()
+    void refresh(pdfItems)
 
     return () => {
       disposed = true
-      refreshId++
       unsubscribe()
       Object.values(ownedThumbs)
         .flat()

@@ -197,4 +197,58 @@ describe('usePreviewCache', () => {
     unmount()
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:page-a')
   })
+
+  it('refreshes only PDFs that match the completed job source', async () => {
+    const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const reads = new Map<string, number>()
+    mockGetPdfPageThumbs.mockImplementation(async (blobId: string) => {
+      const count = (reads.get(blobId) ?? 0) + 1
+      reads.set(blobId, count)
+      return [`blob:${blobId}-${count}`]
+    })
+
+    const { result, unmount } = renderHook(() =>
+      usePreviewCache([
+        makeItem('application/pdf', 'a.pdf', 'item-a', 'source-a'),
+        makeItem('application/pdf', 'b.pdf', 'item-b', 'source-b')
+      ])
+    )
+
+    await waitFor(() => {
+      expect(result.current.pdfPageThumbs).toEqual({
+        'item-a': ['blob:source-a-1'],
+        'item-b': ['blob:source-b-1']
+      })
+    })
+
+    act(() =>
+      mediaJobListeners.forEach((listener) =>
+        listener({
+          id: 'job-a',
+          type: 'pdf-pages',
+          sourceBlobId: 'source-a',
+          itemId: 'item-a',
+          priority: 0,
+          status: 'completed',
+          attempt: 1,
+          createdAt: 1,
+          updatedAt: 2
+        })
+      )
+    )
+
+    await waitFor(() => {
+      expect(result.current.pdfPageThumbs).toEqual({
+        'item-a': ['blob:source-a-2'],
+        'item-b': ['blob:source-b-1']
+      })
+    })
+    expect(mockGetPdfPageThumbs).toHaveBeenCalledTimes(3)
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:source-a-1')
+    expect(revokeObjectUrl).not.toHaveBeenCalledWith('blob:source-b-1')
+
+    unmount()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:source-a-2')
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:source-b-1')
+  })
 })

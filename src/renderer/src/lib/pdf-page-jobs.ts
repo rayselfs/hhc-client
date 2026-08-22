@@ -30,6 +30,9 @@ mediaJobQueue.registerExecutor('pdf-pages', async (job, { signal }) => {
     const file =
       pendingFiles.get(job.sourceBlobId) ?? (await loadJobFile(job.sourceBlobId, job.itemId))
     if (!file) throw new Error('PDF source is unavailable')
+    const cachedThumbs = await getPdfPageThumbs(job.sourceBlobId)
+    cachedThumbs.forEach((url) => URL.revokeObjectURL(url))
+    if (cachedThumbs.length > 0) return
     const dataUrls = await generateAllPdfPageThumbnails(file, { signal, throwOnError: true })
     if (dataUrls.length > 0) await savePdfPageThumbs(job.sourceBlobId, dataUrls)
   } finally {
