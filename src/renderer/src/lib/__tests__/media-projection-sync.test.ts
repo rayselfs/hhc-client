@@ -1017,7 +1017,7 @@ describe('media projection sync', () => {
     })
   })
 
-  it('does not close projection when Media workspace state becomes inactive', () => {
+  it('closes projection when the Media live session ends', () => {
     renderSync()
     mockStopProjection.mockClear()
 
@@ -1025,7 +1025,7 @@ describe('media projection sync', () => {
       useMediaProjectionStore.setState({ isPresenting: false })
     })
 
-    expect(mockStopProjection).not.toHaveBeenCalled()
+    expect(mockStopProjection).toHaveBeenCalledOnce()
   })
 
   it('does not synchronize retained Media controls after another owner replaces it', () => {

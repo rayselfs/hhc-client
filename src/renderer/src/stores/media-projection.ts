@@ -119,17 +119,8 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   canNext: () => {
-    const state = get()
-    const { currentIndex, playlist, isEnded } = state
-    const presentation = getCurrentPresentationState(state)
-    if (
-      presentation &&
-      presentation.slideCount !== undefined &&
-      presentation.slideIndex < presentation.slideCount - 1
-    ) {
-      return true
-    }
-    return !isEnded && currentIndex < playlist.length - 1
+    const { playlist, isEnded } = get()
+    return !isEnded && playlist.length > 0
   },
 
   canPrev: () => {

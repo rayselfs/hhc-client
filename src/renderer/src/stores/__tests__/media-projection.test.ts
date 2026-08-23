@@ -256,8 +256,11 @@ describe('next / prev', () => {
 })
 
 describe('canNext / canPrev', () => {
-  it('canNext is false at the last index', () => {
+  it('canNext reaches the end screen from the last item', () => {
     useMediaProjectionStore.getState().startPresentation(files, 2)
+    expect(useMediaProjectionStore.getState().canNext()).toBe(true)
+
+    useMediaProjectionStore.getState().next()
     expect(useMediaProjectionStore.getState().canNext()).toBe(false)
   })
 

@@ -58,7 +58,7 @@ it('rejects presentation navigation when no presentation is active', async () =>
   })
 })
 
-it('rejects presentation navigation at playlist boundaries', async () => {
+it('rejects previous at the first item and lets next reach the end screen', async () => {
   useMediaProjectionStore.setState({
     playlist: [makeFile('only')],
     currentIndex: 0,
@@ -77,8 +77,7 @@ it('rejects presentation navigation at playlist boundaries', async () => {
     executeLanRemoteCommand({ requestId: 'next', type: 'presentation:next' })
   ).resolves.toEqual({
     requestId: 'next',
-    status: 'rejected',
-    reason: 'next-unavailable'
+    status: 'accepted'
   })
 })
 

@@ -307,10 +307,11 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
       if (prev.isPresenting && !state.isPresenting) {
         projectSequenceRef.current += 1
         clearRemoteSource()
+        void stopProjection()
       }
     })
     return unsub
-  }, [clearRemoteSource])
+  }, [clearRemoteSource, stopProjection])
 
   useEffect(() => {
     const unsubscribe = useFileExplorerStore.subscribe((state) => {
