@@ -264,9 +264,7 @@ describe('SpeechRecognitionCard', () => {
       const startButton = screen.getByRole('button', { name: /bible.speech.start/i })
       fireEvent.click(startButton)
 
-      await waitFor(() => {
-        expect(mockAdapter.start).toHaveBeenCalled()
-      })
+      await screen.findByRole('button', { name: /bible.speech.stop/i })
 
       // Simulate network offline
       Object.defineProperty(navigator, 'onLine', {
