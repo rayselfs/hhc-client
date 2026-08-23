@@ -10,6 +10,16 @@ import PreferencesDialog from '../PreferencesDialog'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 const mockListProviderConnectionsByType = vi.hoisted(() => vi.fn(async () => []))
+const mockHhcSignOut = vi.hoisted(() => vi.fn<() => Promise<void>>(async () => undefined))
+const mockToastDanger = vi.hoisted(() => vi.fn())
+
+vi.mock('@renderer/contexts/HhcAuthContext', () => ({
+  useHhcAuth: () => ({ signOut: mockHhcSignOut })
+}))
+
+vi.mock('@heroui/react/toast', () => ({
+  toast: { danger: mockToastDanger }
+}))
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn().mockReturnValue(false),
@@ -57,6 +67,7 @@ vi.mock('@renderer/lib/recovery-center', () => ({
 }))
 
 vi.mock('@renderer/lib/sync-db', () => ({
+  SYNC_ENTRY_CHANGED_EVENT: 'hhc:sync-entry-changed',
   listProviderConnectionsByType: mockListProviderConnectionsByType
 }))
 
@@ -130,6 +141,7 @@ function renderDialog(isOpen: boolean, onOpenChange = vi.fn()): ReturnType<typeo
 describe('PreferencesDialog', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockHhcSignOut.mockResolvedValue(undefined)
     await i18n.changeLanguage('en')
 
     const { isElectron } = await import('@renderer/lib/env')
@@ -545,13 +557,69 @@ describe('PreferencesDialog', () => {
       return selector ? selector(store) : store
     })
 
+    let finishSignOut!: () => void
+    mockHhcSignOut.mockImplementationOnce(
+      () => new Promise<void>((resolve) => void (finishSignOut = resolve))
+    )
     renderDialog(true)
 
     await user.click(screen.getAllByText('Clear All Data').at(-1)!)
     const allClearButtons = await screen.findAllByText('Clear All Data')
     await user.click(allClearButtons[allClearButtons.length - 1])
 
-    expect(resetToDefaults).toHaveBeenCalled()
+    expect(mockHhcSignOut).toHaveBeenCalledOnce()
+    expect(resetToDefaults).not.toHaveBeenCalled()
+    finishSignOut()
+    await vi.waitFor(() => expect(resetToDefaults).toHaveBeenCalledOnce())
+  })
+
+  it('keeps browser data intact and reports failure when account sign-out fails', async () => {
+    const user = userEvent.setup()
+    const { useSettingsStore } = await import('@renderer/stores/settings')
+    const resetToDefaults = vi.fn()
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone: vi.fn(),
+        setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
+        resetToDefaults,
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn(),
+        timerRingColor: '#3b82f6',
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', installedModel: null }
+        },
+        setSpeech: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: { enabled: false, selectedHost: '' },
+        setLanRemote: vi.fn()
+      }
+      return selector ? selector(store) : store
+    })
+    mockHhcSignOut.mockRejectedValueOnce(new Error('logout failed'))
+    renderDialog(true)
+
+    await user.click(screen.getAllByText('Clear All Data').at(-1)!)
+    const allClearButtons = await screen.findAllByText('Clear All Data')
+    await user.click(allClearButtons[allClearButtons.length - 1])
+
+    await vi.waitFor(() => expect(mockToastDanger).toHaveBeenCalledOnce())
+    expect(resetToDefaults).not.toHaveBeenCalled()
   })
 
   it('disables reset actions while clearing all data', async () => {

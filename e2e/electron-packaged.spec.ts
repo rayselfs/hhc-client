@@ -110,7 +110,6 @@ test('launches packaged control and projection windows with recovery lifecycle',
     await upload.setInputFiles(fixture)
     await expect(control.getByText('packaged-vlc-smoke.mkv')).toBeVisible()
     await expect(control.getByAltText('packaged-vlc-smoke.mkv')).toBeVisible()
-    await control.getByText('packaged-vlc-smoke.mkv').dblclick()
     await control.evaluate(() => {
       Reflect.set(window, '__packagedVlcResult', null)
       const unsubscribeStarted = window.api.projectionVlc.onStarted(() => {
@@ -125,7 +124,7 @@ test('launches packaged control and projection windows with recovery lifecycle',
       })
       Reflect.set(window, '__packagedVlcUnsubscribe', [unsubscribeStarted, unsubscribeFailure])
     })
-    await control.getByTestId('preview-present').click()
+    await control.getByText('packaged-vlc-smoke.mkv').dblclick()
 
     await expect.poll(() => electronApp?.windows().length ?? 0).toBe(2)
     await expect

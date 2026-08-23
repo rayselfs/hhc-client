@@ -403,10 +403,10 @@ test('restores the HHC account session without storing the access token', async 
   await importedCollection.dblclick()
   for (const item of media) await expect(page.getByText(item.displayName)).toBeVisible()
 
-  await page.getByText('Welcome.mp4').dblclick()
   const projectionPromise = context.waitForEvent('page')
-  await page.getByTestId('preview-present').click()
+  await page.getByText('Welcome.mp4').dblclick()
   const projection = await projectionPromise
+  await expect(page).toHaveURL(/#\/media$/)
   await expect.poll(() => ticketRequests.length).toBeGreaterThan(0)
   const projectedVideo = projection.locator('video')
   await expect(projectedVideo).toBeVisible()
@@ -438,7 +438,8 @@ test('restores the HHC account session without storing the access token', async 
   for (const item of media.filter(({ id }) => id !== 'video-1')) {
     await page.getByTestId('media-back-to-files').click()
     await page.getByText(item.displayName, { exact: true }).dblclick()
-    await page.getByTestId('preview-present').click()
+    if (!item.mimeType.startsWith('image/')) await page.getByTestId('preview-present').click()
+    await expect(page).toHaveURL(/#\/media$/)
     await expect
       .poll(() => ticketRequests.filter((url) => url.endsWith(`ticket-${item.id}`)).length)
       .toBe(1)
@@ -484,7 +485,7 @@ test('restores the HHC account session without storing the access token', async 
   expect(persistedFileBlobs).toBe(0)
 })
 
-test('keeps Media live through Files preview and closes from the Header', async ({
+test('keeps Media live through Files navigation and closes from the Header', async ({
   page,
   context
 }) => {
@@ -502,10 +503,8 @@ test('keeps Media live through Files preview and closes from the Header', async 
   const upload = page.locator('input[type="file"]:not([webkitdirectory])').first()
   await upload.setInputFiles({ name: 'First.png', mimeType: 'image/png', buffer: png })
   await expect(page.getByText('First.png')).toBeVisible()
-  await page.getByText('First.png').dblclick()
-
   const projectionPromise = context.waitForEvent('page')
-  await page.getByTestId('preview-present').click()
+  await page.getByText('First.png').dblclick()
   const projection = await projectionPromise
   await expect(page).toHaveURL(/#\/media$/)
   await expect(projection.getByRole('img', { name: 'First.png' })).toBeVisible()
@@ -534,10 +533,6 @@ test('keeps Media live through Files preview and closes from the Header', async 
   await upload.setInputFiles({ name: 'Second.png', mimeType: 'image/png', buffer: png })
   await expect(page.getByText('Second.png')).toBeVisible()
   await page.getByText('Second.png').dblclick()
-  await page.getByRole('button', { name: /Zoom in|放大/ }).click()
-
-  await expect(projection.getByRole('img', { name: 'First.png' })).toBeVisible()
-  await page.getByTestId('preview-present').click()
   await expect(page).toHaveURL(/#\/media$/)
   await expect(projection.getByRole('img', { name: 'Second.png' })).toBeVisible()
   expect(context.pages()).toHaveLength(2)

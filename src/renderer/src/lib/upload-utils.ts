@@ -1,7 +1,7 @@
 import { toast } from '@heroui/react/toast'
 import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { generateThumbnail, generateAllPdfPageThumbnails } from '@renderer/lib/thumbnail-generator'
-import { saveThumbnail, savePdfPageThumbs } from '@renderer/lib/thumbnail-db'
+import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
+import { saveThumbnail } from '@renderer/lib/thumbnail-db'
 import { isWeb } from '@renderer/lib/env'
 import {
   canGenerateMediaThumbnail,
@@ -10,14 +10,13 @@ import {
   type MediaPlatform
 } from '@renderer/lib/media-capabilities'
 import { classifyMediaImport, type MediaImportDecision } from '@renderer/lib/media-import-policy'
-import { mediaJobQueue } from '@renderer/lib/media-job-queue'
-import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
 import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
 import { isIgnoredSystemFile } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
+import { ensurePdfPageJob } from '@renderer/lib/pdf-page-jobs'
 
 export { MAX_FILE_SIZE_WEB }
 
@@ -57,7 +56,6 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
 
 const UPLOAD_CONCURRENCY = 3
 const uploadSemaphore = createSemaphore(UPLOAD_CONCURRENCY)
-const pendingPdfFiles = new Map<string, File>()
 
 export function getUploadMediaPlatform(): MediaPlatform {
   return isWeb() ? 'web' : 'electron'
@@ -137,7 +135,7 @@ async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]
       continue
     }
     if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
-      toast.danger(`File "${file.name}" exceeds 2GB limit`)
+      toast.danger(i18n.t('fileExplorer.uploadFileTooLarge', { name: file.name }))
       continue
     }
     candidates.push({ file, classification })
@@ -148,43 +146,11 @@ async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]
   }
 
   if (!(await hasWebStorageCapacity(candidates.map((candidate) => candidate.file)))) {
-    toast.danger('The selected files exceed available browser storage')
+    toast.danger(i18n.t('fileExplorer.uploadInsufficientBrowserStorage'))
     return []
   }
   return candidates
 }
-
-async function loadPdfJobFile(sourceBlobId: string, itemId: string): Promise<File | null> {
-  const db = await openFileExplorerDB()
-  const item = await db.get('folder-items', itemId)
-  if (!item || item.type !== 'file') return null
-
-  const blob = await getFileBlob(db, sourceBlobId)
-  if (blob) return new File([blob], item.name, { type: item.mimeType })
-
-  const source = await getFileSource(db, sourceBlobId, item.mimeType)
-  if (!source) return null
-  try {
-    const response = await fetch(source.url)
-    if (!response.ok) throw new Error(`Failed to read PDF source: ${response.status}`)
-    return new File([await response.blob()], item.name, { type: item.mimeType })
-  } finally {
-    source.revoke()
-  }
-}
-
-mediaJobQueue.registerExecutor('pdf-pages', async (job, { signal }) => {
-  if (!job.sourceBlobId || !job.itemId) throw new Error('PDF page job is missing source identity')
-  try {
-    const file =
-      pendingPdfFiles.get(job.sourceBlobId) ?? (await loadPdfJobFile(job.sourceBlobId, job.itemId))
-    if (!file) throw new Error('PDF source is unavailable')
-    const dataUrls = await generateAllPdfPageThumbnails(file, { signal, throwOnError: true })
-    if (dataUrls.length > 0) await savePdfPageThumbs(job.sourceBlobId, dataUrls)
-  } finally {
-    pendingPdfFiles.delete(job.sourceBlobId)
-  }
-})
 
 async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<number> {
   let uploadedCount = 0
@@ -226,18 +192,7 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
       }
 
       if (id && classification.kind === 'pdf') {
-        pendingPdfFiles.set(id, file)
-        try {
-          await mediaJobQueue.enqueue({
-            type: 'pdf-pages',
-            sourceBlobId: id,
-            itemId: id,
-            dedupeKey: `pdf-pages:${id}`
-          })
-        } catch (error) {
-          pendingPdfFiles.delete(id)
-          throw error
-        }
+        await ensurePdfPageJob({ sourceBlobId: id, itemId: id, file })
       }
 
       if (id && classification.kind === 'video' && !isWeb()) {

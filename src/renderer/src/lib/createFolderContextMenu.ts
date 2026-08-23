@@ -80,6 +80,8 @@ export interface ShowEmptyAreaMenuOptions {
   onAddOneDrive?: () => void
   onAddHhcLine?: () => void
   isAddOneDriveDisabled?: boolean
+  isAddHhcLineDisabled?: boolean
+  hhcLineLabel?: string
   isReadOnly?: boolean
 }
 
@@ -294,6 +296,8 @@ export function createFolderContextMenu(
       onAddOneDrive,
       onAddHhcLine,
       isAddOneDriveDisabled = false,
+      isAddHhcLineDisabled = false,
+      hhcLineLabel,
       isReadOnly = false
     }: ShowEmptyAreaMenuOptions): void => {
       const pasteItems: ContextMenuEntry[] =
@@ -390,8 +394,9 @@ export function createFolderContextMenu(
                 ? [
                     {
                       id: 'add-hhc-line',
-                      label: tKey('addHhcLine'),
+                      label: hhcLineLabel ?? tKey('addHhcLine'),
                       icon: React.createElement(Cloud, { size: 14 }),
+                      disabled: isAddHhcLineDisabled,
                       onAction: onAddHhcLine
                     } as ContextMenuEntry
                   ]

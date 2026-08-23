@@ -124,7 +124,6 @@ export default function FilesPage(): React.JSX.Element {
   const updateFolder = useFileExplorerStore((state) => state.updateFolder)
   const persistenceStatus = useFileExplorerStore((state) => state.persistenceStatus)
   const persistenceError = useFileExplorerStore((state) => state.persistenceError)
-  const pendingPersistenceCount = useFileExplorerStore((state) => state.pendingPersistenceCount)
   const isFolderStoreInitialized = useFileExplorerStore((state) => state.isInitialized)
   const retryInitialization = useFileExplorerStore((state) => state.retryInitialization)
   const retryPersistence = useFileExplorerStore((state) => state.retryPersistence)
@@ -211,9 +210,23 @@ export default function FilesPage(): React.JSX.Element {
     canAddSyncSourceHere &&
     claimsResolvedUserId === session?.userId &&
     session.roles.includes('media_sync_user')
+  const hhcLineDisabledReason = !session
+    ? t('fileExplorer.syncSources.hhcLineSignInRequired')
+    : claimsResolvedUserId !== session.userId
+      ? t('fileExplorer.syncSources.hhcLineClaimsLoading')
+      : !session.roles.includes('media_sync_user')
+        ? t('fileExplorer.syncSources.hhcLineRoleRequired')
+        : null
+  const hhcLineActionLabel = hhcLineDisabledReason
+    ? t('fileExplorer.contextMenu.addHhcLineUnavailable', { reason: hhcLineDisabledReason })
+    : t('fileExplorer.contextMenu.addHhcLine')
 
   useEffect(() => {
     if (!canAddHhcLineFolder) setIsHhcLinePickerOpen(false)
+  }, [canAddHhcLineFolder])
+  const handleOpenHhcLinePicker = useCallback((): void => {
+    if (!canAddHhcLineFolder) return
+    setIsHhcLinePickerOpen(true)
   }, [canAddHhcLineFolder])
   const isCurrentFolderReadOnly = useMemo(
     () => isFolderReadOnlyBySyncLink(currentFolderId, foldersById),
@@ -835,8 +848,10 @@ export default function FilesPage(): React.JSX.Element {
           ? () => void handleAddLocalSyncFolder()
           : undefined,
         onAddOneDrive: canAddOneDriveFolder ? () => void handleAddOneDrive() : undefined,
-        onAddHhcLine: canAddHhcLineFolder ? () => setIsHhcLinePickerOpen(true) : undefined,
+        onAddHhcLine: canAddSyncSourceHere ? handleOpenHhcLinePicker : undefined,
         isAddOneDriveDisabled: !hasOneDriveConnection,
+        isAddHhcLineDisabled: !canAddHhcLineFolder,
+        hhcLineLabel: hhcLineActionLabel,
         isReadOnly: isCurrentFolderReadOnly
       })
     },
@@ -851,6 +866,9 @@ export default function FilesPage(): React.JSX.Element {
       canAddLocalSyncFolder,
       canAddOneDriveFolder,
       canAddHhcLineFolder,
+      canAddSyncSourceHere,
+      handleOpenHhcLinePicker,
+      hhcLineActionLabel,
       handleAddLocalSyncFolder,
       handleAddOneDrive,
       hasOneDriveConnection,
@@ -881,7 +899,6 @@ export default function FilesPage(): React.JSX.Element {
           className="mx-3 mt-3"
           status={persistenceStatus}
           error={persistenceError}
-          pendingCount={pendingPersistenceCount}
           isInitialized={isFolderStoreInitialized}
           onRetryInitialization={retryInitialization}
           onRetryPersistence={retryPersistence}
@@ -910,8 +927,10 @@ export default function FilesPage(): React.JSX.Element {
           canAddLocalSyncFolder ? () => void handleAddLocalSyncFolder() : undefined
         }
         onAddOneDrive={canAddOneDriveFolder ? () => void handleAddOneDrive() : undefined}
-        onAddHhcLine={canAddHhcLineFolder ? () => setIsHhcLinePickerOpen(true) : undefined}
+        onAddHhcLine={canAddSyncSourceHere ? handleOpenHhcLinePicker : undefined}
         isAddOneDriveDisabled={!hasOneDriveConnection}
+        isAddHhcLineDisabled={!canAddHhcLineFolder}
+        hhcLineLabel={hhcLineActionLabel}
         isReadOnly={isCurrentFolderReadOnly}
       />
       <CloudFolderPickerDialog

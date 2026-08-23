@@ -121,6 +121,23 @@ function currentStoredRecord(): { installationId: string; refreshToken?: string 
   }
 }
 
+function deferNextCredentialWrite(): Promise<() => void> {
+  return new Promise((writeStarted) => {
+    mockRename.mockImplementationOnce(
+      (source: string, target: string) =>
+        new Promise<void>((resolve) => {
+          writeStarted(() => {
+            const value = temporaryFiles.get(source)
+            if (!value) throw new Error('Missing deferred credential')
+            if (target === credentialPath) disk = value
+            temporaryFiles.delete(source)
+            resolve()
+          })
+        })
+    )
+  })
+}
+
 function callbackFromOpenedUrl(): { kind: 'account-auth'; code: string; state: string } {
   const opened = new URL(mockOpenExternal.mock.calls.at(-1)?.[0] as string)
   return {
@@ -132,6 +149,16 @@ function callbackFromOpenedUrl(): { kind: 'account-auth'; code: string; state: s
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: {} } as Electron.IpcMainInvokeEvent
+}
+
+async function seedAccessWithoutSession(service: HhcAuthService): Promise<void> {
+  await service.begin()
+  mockNetFetch
+    .mockResolvedValueOnce(tokenResponse('refresh-1'))
+    .mockResolvedValueOnce(jsonResponse({}, 503))
+  await expect(service.completeProtocolCallback(callbackFromOpenedUrl())).rejects.toThrow(
+    'HHC account request failed'
+  )
 }
 
 beforeEach(() => {
@@ -184,7 +211,10 @@ beforeEach(() => {
     if (target === credentialPath) disk = value
     temporaryFiles.delete(source)
   })
-  mockRm.mockImplementation(async (path: string) => void temporaryFiles.delete(path))
+  mockRm.mockImplementation(async (path: string) => {
+    if (path === credentialPath) disk = null
+    temporaryFiles.delete(path)
+  })
   mockOpenExternal.mockResolvedValue(undefined)
   vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mainWindow as never)
 })
@@ -234,21 +264,125 @@ describe('HhcAuthService authorization', () => {
     })
   })
 
-  it('rejects a second active begin without replacing state and keeps mismatches non-destructive', async () => {
+  it('returns shared expiry metadata and replaces an unconsumed transaction immediately', async () => {
     const service = createHhcAuthService({ now: () => now })
-    await service.begin()
-    const callback = callbackFromOpenedUrl()
+    await expect(service.begin()).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
+    const abandonedCallback = callbackFromOpenedUrl()
 
-    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
+    await expect(service.begin()).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
+    const replacementCallback = callbackFromOpenedUrl()
     await expect(
-      service.completeProtocolCallback({ ...callback, state: 'wrong-state' })
+      service.completeProtocolCallback({ ...replacementCallback, state: 'wrong-state' })
     ).resolves.toBe(false)
+    await expect(service.completeProtocolCallback(abandonedCallback)).resolves.toBe(false)
 
     mockNetFetch
       .mockResolvedValueOnce(tokenResponse('refresh-1'))
       .mockResolvedValueOnce(profileResponse())
-    await expect(service.completeProtocolCallback(callback)).resolves.toBe(true)
-    expect(mockOpenExternal).toHaveBeenCalledTimes(1)
+    await expect(service.completeProtocolCallback(replacementCallback)).resolves.toBe(true)
+    expect(mockOpenExternal).toHaveBeenCalledTimes(2)
+  })
+
+  it('lets cancel win while openExternal is pending and ignores the late callback', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    let finishOpen!: () => void
+    mockOpenExternal.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishOpen = resolve
+        })
+    )
+    const beginning = service.begin()
+    await vi.waitFor(() => expect(mockOpenExternal).toHaveBeenCalledOnce())
+    const cancelledCallback = callbackFromOpenedUrl()
+
+    await service.cancelSignIn()
+    finishOpen()
+    await beginning
+
+    await expect(service.completeProtocolCallback(cancelledCallback)).resolves.toBe(false)
+    expect(mockNetFetch).not.toHaveBeenCalled()
+  })
+
+  it('replaces a transaction while its openExternal call is still pending', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    let finishAbandonedOpen!: () => void
+    mockOpenExternal.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishAbandonedOpen = resolve
+        })
+    )
+    const abandonedBegin = service.begin()
+    await vi.waitFor(() => expect(mockOpenExternal).toHaveBeenCalledOnce())
+    const abandonedCallback = callbackFromOpenedUrl()
+
+    await service.begin()
+    const replacementCallback = callbackFromOpenedUrl()
+    await expect(service.completeProtocolCallback(abandonedCallback)).resolves.toBe(false)
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('replacement-refresh'))
+      .mockResolvedValueOnce(profileResponse())
+    await expect(service.completeProtocolCallback(replacementCallback)).resolves.toBe(true)
+
+    finishAbandonedOpen()
+    await abandonedBegin
+  })
+
+  it('shares first credential initialization across cancel and immediate retry', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    let rejectInitialRead!: (reason: Error) => void
+    mockReadFile.mockImplementationOnce(
+      () =>
+        new Promise<Buffer>((_resolve, reject) => {
+          rejectInitialRead = reject
+        })
+    )
+
+    const abandonedBegin = service.begin()
+    await vi.waitFor(() => expect(mockReadFile).toHaveBeenCalledOnce())
+    await service.cancelSignIn()
+    const replacementBegin = service.begin()
+    await Promise.resolve()
+    await Promise.resolve()
+    rejectInitialRead(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+
+    await Promise.all([abandonedBegin, replacementBegin])
+    expect(mockReadFile).toHaveBeenCalledOnce()
+    expect(mockWriteFile).toHaveBeenCalledOnce()
+    expect(mockOpenExternal).toHaveBeenCalledOnce()
+  })
+
+  it('invalidates a transaction cancelled after the system browser opens', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    const cancelledCallback = callbackFromOpenedUrl()
+
+    await service.cancelSignIn()
+
+    await expect(service.completeProtocolCallback(cancelledCallback)).resolves.toBe(false)
+    expect(mockNetFetch).not.toHaveBeenCalled()
+  })
+
+  it('keeps token completion exclusive from replacement sign-in', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    const callback = callbackFromOpenedUrl()
+    let resolveToken!: (response: Response) => void
+    mockNetFetch
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (resolveToken = resolve)))
+      .mockResolvedValueOnce(profileResponse())
+
+    const completion = service.completeProtocolCallback(callback)
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledOnce())
+
+    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
+    resolveToken(tokenResponse('refresh-1'))
+    await expect(completion).resolves.toBe(true)
   })
 
   it('expires state after five minutes and consumes a match before network completion', async () => {
@@ -258,7 +392,9 @@ describe('HhcAuthService authorization', () => {
     now += 5 * 60_000 + 1
 
     await expect(service.completeProtocolCallback(expiredCallback)).resolves.toBe(false)
-    await expect(service.begin()).resolves.toBeUndefined()
+    await expect(service.begin()).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
     const activeCallback = callbackFromOpenedUrl()
 
     let resolveToken!: (response: Response) => void
@@ -290,6 +426,7 @@ describe('HhcAuthService authorization', () => {
     const signOut = service.signOut().finally(() => {
       signOutSettled = true
     })
+    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
     await expect(service.completeProtocolCallback(callback)).resolves.toBe(false)
     await Promise.resolve()
     expect(signOutSettled).toBe(false)
@@ -325,7 +462,9 @@ describe('HhcAuthService authorization', () => {
       try {
         const service = createHhcAuthService({ now: () => now })
 
-        await expect(service.begin()).resolves.toBeUndefined()
+        await expect(service.begin()).resolves.toEqual({
+          expiresAt: now + 300_000
+        })
         expect(mockGetSelectedStorageBackend).not.toHaveBeenCalled()
       } finally {
         platformSpy.mockRestore()
@@ -349,7 +488,9 @@ describe('HhcAuthService authorization', () => {
         expect(mockWriteFile).not.toHaveBeenCalled()
         expect(mockOpenExternal).not.toHaveBeenCalled()
       } else {
-        await expect(beginning).resolves.toBeUndefined()
+        await expect(beginning).resolves.toEqual({
+          expiresAt: now + 300_000
+        })
       }
     } finally {
       platformSpy.mockRestore()
@@ -440,6 +581,247 @@ describe('HhcAuthService credentials and session', () => {
     mockNetFetch.mockResolvedValueOnce(profileResponse())
     await expect(service.getAccessToken()).resolves.toBeTruthy()
     expect(mockNetFetch.mock.calls[2][0]).toBe('https://account.alive.org.tw/api/account/v1/me')
+  })
+
+  it('does not publish a deferred profile after local data clearing begins', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    const listener = vi.fn()
+    service.subscribe(listener)
+    await seedAccessWithoutSession(service)
+
+    let resolveProfile!: (response: Response) => void
+    mockNetFetch
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => void (resolveProfile = resolve))
+      )
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledTimes(3))
+
+    const clear = service.clearLocalData()
+    resolveProfile(profileResponse())
+    const [profileResult, clearResult] = await Promise.allSettled([profile, clear])
+
+    expect(profileResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC authentication changed' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    expect(listener.mock.calls.some(([session]) => session !== null)).toBe(false)
+    await expect(service.getSession()).resolves.toBeNull()
+    await expect(service.getAccessToken()).resolves.toBeNull()
+    expect(disk).toBeNull()
+  })
+
+  it('does not recreate credentials from a deferred identity mismatch', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await seedAccessWithoutSession(service)
+
+    let resolveProfile!: (response: Response) => void
+    mockNetFetch
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => void (resolveProfile = resolve))
+      )
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledTimes(3))
+    const writesBeforeClear = mockWriteFile.mock.calls.length
+
+    const clear = service.clearLocalData()
+    resolveProfile(profileResponse('other-user'))
+    const [profileResult, clearResult] = await Promise.allSettled([profile, clear])
+
+    expect(profileResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC authentication changed' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    expect(mockWriteFile).toHaveBeenCalledTimes(writesBeforeClear)
+    expect(disk).toBeNull()
+  })
+
+  it('waits for identity-mismatch credential cleanup before the final wipe', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await seedAccessWithoutSession(service)
+
+    const credentialWrite = deferNextCredentialWrite()
+    mockNetFetch
+      .mockResolvedValueOnce(profileResponse('other-user'))
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    const finishCredentialWrite = await credentialWrite
+
+    let clearSettled = false
+    const clear = service.clearLocalData().then(
+      () => void (clearSettled = true),
+      () => void (clearSettled = true)
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const clearSettledBeforeCredentialWrite = clearSettled
+    finishCredentialWrite()
+    const [profileResult, clearResult] = await Promise.allSettled([profile, clear])
+
+    expect(clearSettledBeforeCredentialWrite).toBe(false)
+    expect(profileResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC account identity mismatch' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    const revokeCalls = mockNetFetch.mock.calls.filter(([url]) =>
+      String(url).endsWith('/oauth/revoke')
+    )
+    expect(revokeCalls).toHaveLength(1)
+    const revokeBody = revokeCalls[0]?.[1]?.body
+    expect(revokeBody).toBeInstanceOf(URLSearchParams)
+    expect(Object.fromEntries(revokeBody as URLSearchParams)).toEqual({
+      token: 'refresh-1',
+      client_id: 'hhc-desktop',
+      token_type_hint: 'refresh_token'
+    })
+    expect(disk).toBeNull()
+  })
+
+  it('captures a completed authorization token before mismatched profile cleanup', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+
+    let resolveProfile!: (response: Response) => void
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('authorization-refresh'))
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => void (resolveProfile = resolve))
+      )
+      .mockResolvedValueOnce(jsonResponse({}))
+    const completion = service.completeProtocolCallback(callbackFromOpenedUrl())
+    await vi.waitFor(() =>
+      expect(currentStoredRecord()).toMatchObject({ refreshToken: 'authorization-refresh' })
+    )
+
+    const credentialWrite = deferNextCredentialWrite()
+    resolveProfile(profileResponse('other-user'))
+    const finishCredentialWrite = await credentialWrite
+
+    let clearSettled = false
+    const clear = service.clearLocalData().finally(() => {
+      clearSettled = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(clearSettled).toBe(false)
+    finishCredentialWrite()
+    const [completionResult, clearResult] = await Promise.allSettled([completion, clear])
+
+    expect(completionResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC account identity mismatch' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    const revokeCalls = mockNetFetch.mock.calls.filter(([url]) =>
+      String(url).endsWith('/oauth/revoke')
+    )
+    expect(revokeCalls).toHaveLength(1)
+    const revokeBody = revokeCalls[0]?.[1]?.body
+    expect(revokeBody).toBeInstanceOf(URLSearchParams)
+    expect((revokeBody as URLSearchParams).get('token')).toBe('authorization-refresh')
+    expect(disk).toBeNull()
+    await expect(service.getSession()).resolves.toBeNull()
+    await expect(service.getAccessToken()).resolves.toBeNull()
+  })
+
+  it('captures a rotated refresh token before mismatched profile cleanup', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    now += 2 * 60 * 60_000
+
+    let resolveProfile!: (response: Response) => void
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-2'))
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => void (resolveProfile = resolve))
+      )
+      .mockResolvedValueOnce(jsonResponse({}))
+    const refresh = service.getAccessToken()
+    await vi.waitFor(() =>
+      expect(currentStoredRecord()).toMatchObject({ refreshToken: 'refresh-2' })
+    )
+
+    const credentialWrite = deferNextCredentialWrite()
+    resolveProfile(profileResponse('other-user'))
+    const finishCredentialWrite = await credentialWrite
+
+    let clearSettled = false
+    const clear = service.clearLocalData().finally(() => {
+      clearSettled = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(clearSettled).toBe(false)
+    finishCredentialWrite()
+    const [refreshResult, clearResult] = await Promise.allSettled([refresh, clear])
+
+    expect(refreshResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC account identity mismatch' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    const revokeCalls = mockNetFetch.mock.calls.filter(([url]) =>
+      String(url).endsWith('/oauth/revoke')
+    )
+    expect(revokeCalls).toHaveLength(1)
+    const revokeBody = revokeCalls[0]?.[1]?.body
+    expect(revokeBody).toBeInstanceOf(URLSearchParams)
+    expect((revokeBody as URLSearchParams).get('token')).toBe('refresh-2')
+    expect(disk).toBeNull()
+    await expect(service.getSession()).resolves.toBeNull()
+    await expect(service.getAccessToken()).resolves.toBeNull()
+  })
+
+  it('waits for refresh persistence before choosing the revocation token', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    const listener = vi.fn()
+    service.subscribe(listener)
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    listener.mockClear()
+    now += 2 * 60 * 60_000
+
+    let resolveRefresh!: (response: Response) => void
+    mockNetFetch.mockImplementation((url: string) => {
+      if (url.endsWith('/oauth/token')) {
+        return new Promise<Response>((resolve) => void (resolveRefresh = resolve))
+      }
+      if (url.endsWith('/me')) return Promise.resolve(profileResponse())
+      if (url.endsWith('/oauth/revoke')) return Promise.resolve(jsonResponse({}))
+      throw new Error(`Unexpected HHC request: ${url}`)
+    })
+    const refresh = service.getAccessToken()
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledTimes(3))
+
+    const clear = service.clearLocalData()
+    await Promise.resolve()
+    expect(mockRm).not.toHaveBeenCalledWith(credentialPath, { force: true })
+    resolveRefresh(tokenResponse('refresh-2'))
+    const [refreshResult, clearResult] = await Promise.allSettled([refresh, clear])
+
+    expect(refreshResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC authentication changed' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    const revokeCalls = mockNetFetch.mock.calls.filter(([url]) =>
+      String(url).endsWith('/oauth/revoke')
+    )
+    expect(revokeCalls).toHaveLength(1)
+    const revokeBody = revokeCalls[0]?.[1]?.body
+    expect(revokeBody).toBeInstanceOf(URLSearchParams)
+    expect((revokeBody as URLSearchParams).get('token')).toBe('refresh-2')
+    expect(listener.mock.calls.some(([session]) => session !== null)).toBe(false)
+    expect(disk).toBeNull()
   })
 
   it('coalesces refresh, rotates atomically, and restores the same installation id', async () => {
@@ -575,6 +957,32 @@ describe('HhcAuthService credentials and session', () => {
     expect(currentStoredRecord()).not.toHaveProperty('refreshToken')
   })
 
+  it('waits for a standalone profile cleanup before sign-out allows another sign-in', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await seedAccessWithoutSession(service)
+    const installationId = currentStoredRecord().installationId
+    const credentialWrite = deferNextCredentialWrite()
+    mockNetFetch
+      .mockResolvedValueOnce(profileResponse('other-user'))
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    const finishCredentialWrite = await credentialWrite
+
+    let signOutSettled = false
+    const signOut = service.signOut().finally(() => {
+      signOutSettled = true
+    })
+    await Promise.resolve()
+
+    expect(signOutSettled).toBe(false)
+    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
+    finishCredentialWrite()
+    await expect(profile).rejects.toThrow('HHC account identity mismatch')
+    await expect(signOut).resolves.toBeUndefined()
+    await expect(service.begin()).resolves.toEqual({ expiresAt: now + 300_000 })
+    expect(currentStoredRecord()).toEqual({ installationId })
+  })
+
   it('keeps callback completion single-flight until sign-out cleanup', async () => {
     const service = createHhcAuthService({ now: () => now })
     await service.begin()
@@ -645,17 +1053,130 @@ describe('HhcAuthService credentials and session', () => {
     await expect(service.signOut()).rejects.toThrow('local write failed')
     expect(currentStoredRecord()).toHaveProperty('refreshToken', 'refresh-1')
   })
+
+  it('removes the complete credential record and cached session', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+      .mockResolvedValueOnce(jsonResponse({}))
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    await expect(service.getSession()).resolves.toMatchObject({ userId: 'user-1' })
+    expect(currentStoredRecord()).toMatchObject({ refreshToken: 'refresh-1' })
+
+    await service.clearLocalData()
+
+    expect(mockNetFetch.mock.calls[2][0]).toBe(
+      'https://account.alive.org.tw/api/account/v1/oauth/revoke'
+    )
+    expect(bodyAt(2).get('token')).toBe('refresh-1')
+    expect(disk).toBeNull()
+    await expect(service.getAccessToken()).resolves.toBeNull()
+    await expect(service.getSession()).resolves.toBeNull()
+  })
+
+  it('deletes local credentials before waiting for remote revoke during data clear', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    let finishRevoke!: (response: Response) => void
+    mockNetFetch.mockImplementationOnce(
+      () => new Promise<Response>((resolve) => void (finishRevoke = resolve))
+    )
+
+    const clearing = service.clearLocalData()
+
+    await vi.waitFor(() => expect(mockRm).toHaveBeenCalledWith(credentialPath, { force: true }))
+    expect(disk).toBeNull()
+    const revokeOptions = mockNetFetch.mock.calls[2][1]
+    expect(revokeOptions.signal).toBeInstanceOf(AbortSignal)
+    finishRevoke(jsonResponse({}))
+    await expect(clearing).resolves.toBeUndefined()
+  })
+
+  it('invalidates a pending completion after capturing its persisted token', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    const listener = vi.fn()
+    service.subscribe(listener)
+    await service.begin()
+    const callback = callbackFromOpenedUrl()
+    let resolveToken!: (response: Response) => void
+    mockNetFetch.mockImplementation((url: string) => {
+      if (url.endsWith('/oauth/token')) {
+        return new Promise<Response>((resolve) => {
+          resolveToken = resolve
+        })
+      }
+      if (url.endsWith('/me')) return Promise.resolve(profileResponse())
+      if (url.endsWith('/oauth/revoke')) return Promise.resolve(jsonResponse({}))
+      throw new Error(`Unexpected HHC request: ${url}`)
+    })
+
+    const completion = service.completeProtocolCallback(callback)
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledOnce())
+    const clear = service.clearLocalData()
+    await Promise.resolve()
+    expect(mockRm).not.toHaveBeenCalledWith(credentialPath, { force: true })
+
+    resolveToken(tokenResponse('late-refresh'))
+    await expect(completion).rejects.toThrow('HHC authentication changed')
+    await expect(clear).resolves.toBeUndefined()
+    expect(mockNetFetch).toHaveBeenCalledTimes(2)
+    expect(mockNetFetch.mock.calls[1][0]).toBe(
+      'https://account.alive.org.tw/api/account/v1/oauth/revoke'
+    )
+    expect(bodyAt(1).get('token')).toBe('late-refresh')
+    expect(listener.mock.calls.some(([session]) => session !== null)).toBe(false)
+    expect(disk).toBeNull()
+  })
+
+  it('deletes local credentials when remote revocation fails', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    mockNetFetch.mockRejectedValueOnce(new Error('offline'))
+
+    await expect(service.clearLocalData()).resolves.toBeUndefined()
+    expect(mockNetFetch.mock.calls[2][0]).toBe(
+      'https://account.alive.org.tw/api/account/v1/oauth/revoke'
+    )
+    expect(disk).toBeNull()
+  })
+
+  it('reports credential deletion failure after clearing memory', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+      .mockResolvedValueOnce(jsonResponse({}))
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    mockRm.mockRejectedValueOnce(new Error('local delete failed'))
+
+    await expect(service.clearLocalData()).rejects.toThrow('local delete failed')
+    await expect(service.getAccessToken()).resolves.toBeNull()
+    await expect(service.getSession()).resolves.toBeNull()
+  })
 })
 
 describe('HHC auth IPC', () => {
   function fakeService(): HhcAuthService {
     return {
-      begin: vi.fn().mockResolvedValue(undefined),
+      begin: vi.fn().mockResolvedValue({ expiresAt: now + 300_000 }),
+      cancelSignIn: vi.fn().mockResolvedValue(undefined),
       completeProtocolCallback: vi.fn().mockResolvedValue(false),
       getAccessToken: vi.fn().mockResolvedValue('access-token'),
       refreshAccessToken: vi.fn().mockResolvedValue('refreshed-access-token'),
       getSession: vi.fn().mockResolvedValue(null),
       signOut: vi.fn().mockResolvedValue(undefined),
+      clearLocalData: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(() => () => undefined)
     }
   }
@@ -673,6 +1194,7 @@ describe('HHC auth IPC', () => {
 
       for (const channel of [
         'hhc-auth:begin',
+        'hhc-auth:cancel',
         'hhc-auth:get-access-token',
         'hhc-auth:refresh-access-token',
         'hhc-auth:get-session',
@@ -699,7 +1221,10 @@ describe('HHC auth IPC', () => {
     } as unknown as WindowManager
     registerHhcAuthIpc(wm, service)
 
-    await expect(handlers.get('hhc-auth:begin')!(makeEvent())).resolves.toBeUndefined()
+    await expect(handlers.get('hhc-auth:begin')!(makeEvent())).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
+    await expect(handlers.get('hhc-auth:cancel')!(makeEvent())).resolves.toBeUndefined()
     await expect(handlers.get('hhc-auth:get-access-token')!(makeEvent())).resolves.toBe(
       'access-token'
     )

@@ -4,13 +4,31 @@ import {
   runRecoveryAction,
   sortRecoveryIssues
 } from '@renderer/lib/recovery-center'
+import { scanMediaStorageIntegrity } from '@renderer/lib/media-storage-integrity'
 
-const { mockRetryResourceCleanup, mockRepairMediaStorageIntegrity } = vi.hoisted(() => ({
+const {
+  integrityIssues,
+  mockCreateMediaStorageDiagnosticsReport,
+  mockRetryResourceCleanup,
+  mockRepairMediaStorageIntegrity,
+  mockStringifyRedactedDiagnostics
+} = vi.hoisted(() => ({
+  integrityIssues: [
+    {
+      kind: 'file-item-missing-blob',
+      severity: 'error',
+      resourceId: 'file-1',
+      relatedId: 'blob-1',
+      message: 'raw path must not appear here'
+    }
+  ],
+  mockCreateMediaStorageDiagnosticsReport: vi.fn(async () => ({ schemaVersion: 1 })),
   mockRetryResourceCleanup: vi.fn(async () => undefined),
   mockRepairMediaStorageIntegrity: vi.fn(async () => ({
     correctedRefCounts: [],
     cleanupJournalIds: []
-  }))
+  })),
+  mockStringifyRedactedDiagnostics: vi.fn(() => '{"redacted":true}')
 }))
 
 vi.mock('@renderer/lib/media-work-db', () => ({
@@ -32,16 +50,8 @@ vi.mock('@renderer/lib/media-storage-integrity', () => ({
   repairMediaStorageIntegrity: mockRepairMediaStorageIntegrity,
   scanMediaStorageIntegrity: vi.fn(async () => ({
     checkedAt: 30,
-    issueCount: 1,
-    issues: [
-      {
-        kind: 'file-item-missing-blob',
-        severity: 'error',
-        resourceId: 'file-1',
-        relatedId: 'blob-1',
-        message: 'raw path must not appear here'
-      }
-    ]
+    issueCount: integrityIssues.length,
+    issues: integrityIssues
   }))
 }))
 
@@ -69,7 +79,8 @@ vi.mock('@renderer/lib/media-job-queue', () => ({
 }))
 
 vi.mock('@renderer/lib/media-storage-diagnostics', () => ({
-  createMediaStorageDiagnosticsReport: vi.fn(async () => ({}))
+  createMediaStorageDiagnosticsReport: mockCreateMediaStorageDiagnosticsReport,
+  stringifyRedactedDiagnostics: mockStringifyRedactedDiagnostics
 }))
 
 vi.mock('@renderer/lib/resource-cleanup-journal', () => ({
@@ -98,6 +109,41 @@ it('collects current actionable issues with stable ids', async () => {
   expect(issues.every((issue) => issue.titleKey.startsWith('recovery.'))).toBe(true)
 })
 
+it('offers repair only for unreferenced blobs and ref-count mismatches', async () => {
+  integrityIssues.splice(
+    0,
+    integrityIssues.length,
+    ...[
+      'file-item-missing-blob',
+      'file-blob-unreferenced',
+      'file-blob-ref-count-mismatch',
+      'derived-asset-missing-source',
+      'sync-entry-missing-blob'
+    ].map((kind, index) => ({
+      kind,
+      severity: 'warning',
+      resourceId: `resource-${index}`,
+      relatedId: `related-${index}`,
+      message: 'redacted summary'
+    }))
+  )
+
+  const issues = (await collectRecoveryIssues()).filter((issue) =>
+    issue.id.startsWith('storage-integrity:')
+  )
+  const actionsByKind = Object.fromEntries(
+    issues.map((issue) => [issue.id.split(':')[1], issue.actions.map((action) => action.type)])
+  )
+
+  expect(actionsByKind).toEqual({
+    'file-item-missing-blob': ['export-diagnostics'],
+    'file-blob-unreferenced': ['run-integrity-repair', 'export-diagnostics'],
+    'file-blob-ref-count-mismatch': ['run-integrity-repair', 'export-diagnostics'],
+    'derived-asset-missing-source': ['export-diagnostics'],
+    'sync-entry-missing-blob': ['export-diagnostics']
+  })
+})
+
 it('retries the selected resource cleanup record', async () => {
   await runRecoveryAction('retry-resource-cleanup', 'cleanup-1')
 
@@ -108,6 +154,92 @@ it('runs an actual integrity repair instead of a scan-only action', async () => 
   await runRecoveryAction('run-integrity-repair')
 
   expect(mockRepairMediaStorageIntegrity).toHaveBeenCalledTimes(1)
+})
+
+it('downloads redacted diagnostics through a Blob URL and revokes it', async () => {
+  const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:diagnostics')
+  const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+  let clickedDownload: Pick<HTMLAnchorElement, 'download' | 'href'> | undefined
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement
+  ) {
+    clickedDownload = { download: this.download, href: this.href }
+  })
+
+  await runRecoveryAction('export-diagnostics')
+
+  expect(mockStringifyRedactedDiagnostics).toHaveBeenCalledWith({ schemaVersion: 1 })
+  expect(createObjectURL).toHaveBeenCalledOnce()
+  const blob = createObjectURL.mock.calls[0][0] as Blob
+  expect(blob).toBeInstanceOf(Blob)
+  expect(blob.type).toBe('application/json')
+  await expect(
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(blob)
+    })
+  ).resolves.toBe('{"redacted":true}')
+  expect(clickedDownload).toEqual({
+    download: 'librepresenter-diagnostics.json',
+    href: 'blob:diagnostics'
+  })
+  expect(revokeObjectURL).toHaveBeenCalledWith('blob:diagnostics')
+})
+
+it('shares one physical scan and coalesces distinct in-flight events into one trailing scan', async () => {
+  vi.mocked(scanMediaStorageIntegrity).mockClear()
+  const emptyReport = { checkedAt: 60, issueCount: 0, issues: [] }
+  let resolveSlowScan: ((report: typeof emptyReport) => void) | undefined
+  vi.mocked(scanMediaStorageIntegrity)
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSlowScan = resolve
+      })
+    )
+    .mockResolvedValueOnce(emptyReport)
+  const firstEvent = new Event('hhc:recovery-source-changed')
+  const trailingEvent = new Event('hhc:recovery-source-changed')
+
+  const first = collectRecoveryIssues(firstEvent)
+  const concurrent = collectRecoveryIssues(firstEvent)
+  const trailing = collectRecoveryIssues(trailingEvent)
+  const duplicateTrailing = collectRecoveryIssues(trailingEvent)
+  const callsBeforeResolve = vi.mocked(scanMediaStorageIntegrity).mock.calls.length
+  resolveSlowScan?.(emptyReport)
+  await Promise.allSettled([first, concurrent, trailing, duplicateTrailing])
+
+  expect(concurrent).toBe(first)
+  expect(trailing).toBe(first)
+  expect(duplicateTrailing).toBe(first)
+  expect(callsBeforeResolve).toBe(1)
+  expect(scanMediaStorageIntegrity).toHaveBeenCalledTimes(2)
+})
+
+it('continues to a queued trailing scan after the active scan rejects', async () => {
+  vi.mocked(scanMediaStorageIntegrity).mockClear()
+  const emptyReport = { checkedAt: 70, issueCount: 0, issues: [] }
+  vi.mocked(scanMediaStorageIntegrity)
+    .mockRejectedValueOnce(new Error('first scan failed'))
+    .mockResolvedValueOnce(emptyReport)
+  const firstEvent = new Event('hhc:recovery-source-changed')
+  const trailingEvent = new Event('hhc:recovery-source-changed')
+
+  const scan = collectRecoveryIssues(firstEvent)
+  expect(collectRecoveryIssues(trailingEvent)).toBe(scan)
+
+  await expect(scan).resolves.toEqual(expect.any(Array))
+  expect(scanMediaStorageIntegrity).toHaveBeenCalledTimes(2)
+})
+
+it('allows a subsequent scan after a terminal rejection', async () => {
+  vi.mocked(scanMediaStorageIntegrity).mockClear()
+  vi.mocked(scanMediaStorageIntegrity).mockRejectedValueOnce(new Error('scan failed'))
+
+  await expect(collectRecoveryIssues()).rejects.toThrow('scan failed')
+
+  await expect(collectRecoveryIssues()).resolves.toEqual(expect.any(Array))
 })
 
 it('sorts errors before warnings and newest within severity', () => {

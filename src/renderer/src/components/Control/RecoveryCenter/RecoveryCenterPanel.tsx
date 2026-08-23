@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import { collectRecoveryIssues, runRecoveryAction } from '@renderer/lib/recovery-center'
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { RECOVERY_SOURCE_CHANGED_EVENT } from '@renderer/lib/recovery-source-events'
 import type {
   RecoveryFilter,
   RecoveryIssue,
@@ -31,29 +32,50 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
   const [issues, setIssues] = useState<RecoveryIssue[]>([])
+  const [unavailable, setUnavailable] = useState(false)
   const dismissedIssueIds = useRecoveryCenterStore((state) => state.dismissedIssueIds)
   const dismissIssue = useRecoveryCenterStore((state) => state.dismissIssue)
   const pruneDismissedIssues = useRecoveryCenterStore((state) => state.pruneDismissedIssues)
   const filter = useRecoveryCenterStore((state) => state.filter)
   const setFilter = useRecoveryCenterStore((state) => state.setFilter)
+  const refreshGeneration = useRef(0)
 
-  const refresh = useCallback(async (): Promise<void> => {
-    const nextIssues = await collectRecoveryIssues()
-    setIssues(nextIssues)
-    pruneDismissedIssues(nextIssues.map((issue) => issue.id))
-  }, [pruneDismissedIssues])
+  const refresh = useCallback(
+    async (event?: Event): Promise<void> => {
+      const generation = ++refreshGeneration.current
+      try {
+        const nextIssues = await collectRecoveryIssues(event)
+        if (generation !== refreshGeneration.current) return
+        setIssues(nextIssues)
+        setUnavailable(false)
+        pruneDismissedIssues(nextIssues.map((issue) => issue.id))
+      } catch {
+        if (generation !== refreshGeneration.current) return
+        setIssues([])
+        setUnavailable(true)
+      }
+    },
+    [pruneDismissedIssues]
+  )
 
   useEffect(() => {
-    let cancelled = false
-    void collectRecoveryIssues().then((nextIssues) => {
-      if (cancelled) return
-      setIssues(nextIssues)
-      pruneDismissedIssues(nextIssues.map((issue) => issue.id))
+    const generationRef = refreshGeneration
+    const generation = ++generationRef.current
+    queueMicrotask(() => {
+      if (generation === generationRef.current) void refresh()
     })
     return () => {
-      cancelled = true
+      generationRef.current++
     }
-  }, [pruneDismissedIssues])
+  }, [refresh])
+
+  useEffect(() => {
+    const handleRefresh = (event: Event): void => void refresh(event)
+    window.addEventListener(RECOVERY_SOURCE_CHANGED_EVENT, handleRefresh)
+    return () => {
+      window.removeEventListener(RECOVERY_SOURCE_CHANGED_EVENT, handleRefresh)
+    }
+  }, [refresh])
 
   const visibleIssues = useMemo(
     () =>
@@ -80,7 +102,7 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
       return
     }
     await runRecoveryAction(action.type, issue.sourceId)
-    await refresh()
+    await refresh(new Event(RECOVERY_SOURCE_CHANGED_EVENT))
   }
 
   return (
@@ -101,7 +123,9 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
         ))}
       </div>
 
-      {visibleIssues.length === 0 ? (
+      {unavailable ? (
+        <p className="text-sm text-danger">{t('recovery.unavailable')}</p>
+      ) : visibleIssues.length === 0 ? (
         <p className="text-sm text-muted">{t('recovery.empty')}</p>
       ) : (
         <ul className="space-y-2">

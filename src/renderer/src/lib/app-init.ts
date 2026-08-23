@@ -10,9 +10,7 @@ import i18n from '@renderer/i18n'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
 import { startSyncRuntime, type SyncRuntimeOptions } from '@renderer/lib/sync-runtime'
-import { backfillImportedMediaAssets } from '@renderer/lib/local-sync-import'
 import { retryPendingResourceCleanups } from '@renderer/lib/resource-cleanup-journal'
-import { deleteDerivedAssetsByKind } from '@renderer/lib/media-work-db'
 
 let earlyInitStarted = false
 let subscriptionsInitialized = false
@@ -37,10 +35,8 @@ export function startEarlyInit(): void {
   useBibleFolderStore.getState().initialize()
   useFileExplorerStore.getState().initialize()
   void mediaJobQueue
-    .recoverStaleJobs()
+    .recoverStaleJobs(Date.now(), isElectron() ? 0 : 5 * 60 * 1000)
     .then(() => mediaJobQueue.removeExpiredHistory())
-    .then(() => deleteDerivedAssetsByKind('editable-presentation-document'))
-    .then(() => backfillImportedMediaAssets())
     .catch(() => undefined)
 }
 

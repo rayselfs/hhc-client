@@ -115,13 +115,13 @@ const DB_NAME = 'hhc-media-work'
 export const MEDIA_WORK_DB_VERSION = 1
 
 let dbPromise: Promise<IDBPDatabase<MediaWorkDBSchema>> | null = null
-const mediaJobListeners = new Set<() => void>()
+const mediaJobListeners = new Set<(job?: MediaJobRecord) => void>()
 
-function notifyMediaJobListeners(): void {
-  mediaJobListeners.forEach((listener) => listener())
+function notifyMediaJobListeners(job?: MediaJobRecord): void {
+  mediaJobListeners.forEach((listener) => listener(job))
 }
 
-export function subscribeMediaJobs(listener: () => void): () => void {
+export function subscribeMediaJobs(listener: (job?: MediaJobRecord) => void): () => void {
   mediaJobListeners.add(listener)
   return () => mediaJobListeners.delete(listener)
 }
@@ -165,9 +165,21 @@ export async function listMediaJobs(): Promise<MediaJobRecord[]> {
   return (await getMediaWorkDB()).getAll('jobs')
 }
 
+export async function countFailedOrBlockedMediaJobs(
+  excludedJobIds: readonly string[]
+): Promise<number> {
+  const db = await getMediaWorkDB()
+  const [failedJobIds, blockedJobIds] = await Promise.all([
+    db.getAllKeysFromIndex('jobs', 'by-status', 'failed'),
+    db.getAllKeysFromIndex('jobs', 'by-status', 'blocked')
+  ])
+  const excluded = new Set(excludedJobIds)
+  return [...failedJobIds, ...blockedJobIds].filter((id) => !excluded.has(id)).length
+}
+
 export async function putMediaJob(job: MediaJobRecord): Promise<void> {
   await (await getMediaWorkDB()).put('jobs', job)
-  notifyMediaJobListeners()
+  notifyMediaJobListeners(job)
 }
 
 export async function findMediaJobByDedupeKey(
@@ -243,15 +255,6 @@ export async function deleteDerivedAssetsForSource(sourceBlobId: string): Promis
 
 export async function listDerivedAssets(): Promise<DerivedAssetRecord[]> {
   return (await getMediaWorkDB()).getAll('derived-assets')
-}
-
-export async function deleteDerivedAssetsByKind(kind: DerivedAssetKind): Promise<number> {
-  const db = await getMediaWorkDB()
-  const assets = (await db.getAll('derived-assets')).filter((asset) => asset.kind === kind)
-  const tx = db.transaction('derived-assets', 'readwrite')
-  await Promise.all(assets.map((asset) => tx.store.delete(asset.id)))
-  await tx.done
-  return assets.length
 }
 
 export async function listCustomCoverOverrides(): Promise<CustomCoverOverrideRecord[]> {

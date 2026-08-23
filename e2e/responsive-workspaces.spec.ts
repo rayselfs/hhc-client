@@ -61,10 +61,8 @@ test('keeps media navigator usable without horizontal overflow at each breakpoin
     .locator('input[type="file"]:not([webkitdirectory])')
     .first()
     .setInputFiles({ name: 'Responsive.png', mimeType: 'image/png', buffer: png })
-  await page.getByText('Responsive.png').dblclick()
-
   const projectionPromise = context.waitForEvent('page')
-  await page.getByTestId('preview-present').click()
+  await page.getByText('Responsive.png').dblclick()
   const projection = await projectionPromise
   await expect(page).toHaveURL(/#\/media$/)
 

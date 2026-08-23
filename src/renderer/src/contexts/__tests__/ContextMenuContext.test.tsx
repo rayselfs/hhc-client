@@ -352,10 +352,12 @@ describe('ContextMenuContext', () => {
 
     renderWithProvider(<TestComponent />)
     const trigger = screen.getByTestId('trigger')
+    const focus = vi.spyOn(trigger, 'focus')
     trigger.focus()
 
     fireEvent.contextMenu(trigger, { clientX: 50, clientY: 50 })
     expect(screen.getByRole('menu')).toBeInTheDocument()
+    focus.mockClear()
 
     act(() => {
       fireEvent.keyDown(document, { key: 'Escape' })
@@ -363,6 +365,7 @@ describe('ContextMenuContext', () => {
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(document.activeElement).toBe(trigger)
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true })
   })
 
   it('closes menu on window resize', () => {

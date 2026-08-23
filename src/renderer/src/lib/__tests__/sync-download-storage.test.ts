@@ -238,6 +238,57 @@ describe('saveWebOneDriveDownloadedContent', () => {
     ).resolves.toBeUndefined()
   })
 
+  it('publishes recovery change only after cancelled Web Blob cleanup settles', async () => {
+    const db = await openFileExplorerDB()
+    const originalDelete = db.delete.bind(db)
+    const cleanupStarted = deferred<void>()
+    const releaseCleanup = deferred<void>()
+    const deleteSpy = vi.spyOn(db, 'delete').mockImplementationOnce(async (...args) => {
+      cleanupStarted.resolve()
+      await releaseCleanup.promise
+      return originalDelete(...args)
+    })
+    const cancellationCheckStarted = deferred<void>()
+    const releaseCancellation = deferred<boolean>()
+    const canCommit = vi.fn(async () => {
+      const entry = await getSyncEntryByRemoteItem(
+        request.providerConnectionId,
+        request.remoteItemId
+      )
+      if (!entry?.blobId) return true
+      cancellationCheckStarted.resolve()
+      return releaseCancellation.promise
+    })
+    const recoveryScan = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', recoveryScan)
+    const saving = saveWebOneDriveDownloadedContent(
+      request,
+      new Response(new Uint8Array(13), { headers: { 'Content-Length': '13' } }),
+      metadata,
+      canCommit
+    )
+
+    await cancellationCheckStarted.promise
+    recoveryScan.mockClear()
+    releaseCancellation.resolve(false)
+    await cleanupStarted.promise
+    await vi.waitFor(async () => {
+      expect(
+        await getSyncEntryByRemoteItem(request.providerConnectionId, request.remoteItemId)
+      ).toBeUndefined()
+    })
+    const scansBeforeCleanup = recoveryScan.mock.calls.length
+    releaseCleanup.resolve()
+    const failure = await saving.catch((error: unknown) => error)
+    window.removeEventListener('hhc:recovery-source-changed', recoveryScan)
+    deleteSpy.mockRestore()
+
+    expect(scansBeforeCleanup).toBe(0)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toBe('Sync download cancelled')
+    expect(recoveryScan).toHaveBeenCalledOnce()
+  })
+
   it('rejects downloads above the Web 2GB product limit', async () => {
     const response = new Response('', {
       headers: { 'Content-Length': String(MAX_FILE_SIZE_WEB + 1) }
@@ -406,6 +457,45 @@ describe('saveWebOneDriveDownloadedContent', () => {
     await expect(
       getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
     ).resolves.toBeUndefined()
+  })
+
+  it('waits for cancelled Electron cleanup and surfaces its failure before recovery refresh', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    const cleanupStarted = deferred<void>()
+    const releaseCleanup = deferred<void>()
+    const cleanupFailure = new Error('native cleanup failed')
+    vi.mocked(window.api.nativeFs.delete).mockImplementationOnce(async () => {
+      cleanupStarted.resolve()
+      await releaseCleanup.promise
+      throw cleanupFailure
+    })
+    const releaseCancellation = deferred<boolean>()
+    let checks = 0
+    const canCommit = vi.fn(() => {
+      checks += 1
+      return checks === 3 ? releaseCancellation.promise : true
+    })
+    const recoveryScan = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', recoveryScan)
+    const saving = saveElectronOneDriveDownloadedContent(
+      request,
+      '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+      metadata,
+      canCommit
+    )
+
+    await vi.waitFor(() => expect(canCommit).toHaveBeenCalledTimes(3))
+    recoveryScan.mockClear()
+    releaseCancellation.resolve(false)
+    await cleanupStarted.promise
+    const scansBeforeCleanup = recoveryScan.mock.calls.length
+    releaseCleanup.resolve()
+    const failure = await saving.catch((error: unknown) => error)
+    window.removeEventListener('hhc:recovery-source-changed', recoveryScan)
+
+    expect(scansBeforeCleanup).toBe(0)
+    expect(failure).toBe(cleanupFailure)
+    expect(recoveryScan).toHaveBeenCalledOnce()
   })
 
   it('does not recreate a sync entry when native progress is cancelled during persistence', async () => {

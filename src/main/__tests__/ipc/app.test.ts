@@ -1,15 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import path from 'path'
 
-const { ipcHandlers, protocolHandlers, mockReadFileSync, mockRmSync, mockClearData } = vi.hoisted(
-  () => ({
-    ipcHandlers: new Map<string, (...args: unknown[]) => unknown>(),
-    protocolHandlers: new Map<string, (request: Request) => Response>(),
-    mockReadFileSync: vi.fn(),
-    mockRmSync: vi.fn(),
-    mockClearData: vi.fn()
-  })
-)
+const {
+  ipcHandlers,
+  protocolHandlers,
+  mockReadFileSync,
+  mockRmSync,
+  mockClearData,
+  mockClearHhcLocalData,
+  mockRelaunch,
+  mockExit
+} = vi.hoisted(() => ({
+  ipcHandlers: new Map<string, (...args: unknown[]) => unknown>(),
+  protocolHandlers: new Map<string, (request: Request) => Response>(),
+  mockReadFileSync: vi.fn(),
+  mockRmSync: vi.fn(),
+  mockClearData: vi.fn(),
+  mockClearHhcLocalData: vi.fn(),
+  mockRelaunch: vi.fn(),
+  mockExit: vi.fn()
+}))
 
 const mockMainWindow = { id: 1 }
 const mockProjectionWindow = { id: 2 }
@@ -20,7 +30,7 @@ const mockWindowManager = {
 }
 
 vi.mock('electron', () => ({
-  app: { relaunch: vi.fn(), exit: vi.fn(), getPath: vi.fn(() => '/tmp/hhc-user-data') },
+  app: { relaunch: mockRelaunch, exit: mockExit, getPath: vi.fn(() => '/tmp/hhc-user-data') },
   BrowserWindow: { fromWebContents: vi.fn() },
   dialog: { showOpenDialog: vi.fn() },
   ipcMain: {
@@ -62,9 +72,11 @@ vi.mock('@electron-toolkit/utils', () => ({
 
 import { BrowserWindow } from 'electron'
 import type { WindowManager } from '../../windowManager'
+import type { HhcAuthService } from '../../ipc/hhc-auth'
 import { registerAppIpc, registerLocalModelProtocol } from '../../ipc/app'
 
 const wm = mockWindowManager as unknown as WindowManager
+const hhcAuthService = { clearLocalData: mockClearHhcLocalData } as unknown as HhcAuthService
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: {} } as Electron.IpcMainInvokeEvent
@@ -73,23 +85,58 @@ function makeEvent(): Electron.IpcMainInvokeEvent {
 beforeEach(() => {
   vi.clearAllMocks()
   mockClearData.mockResolvedValue(undefined)
+  mockClearHhcLocalData.mockResolvedValue(undefined)
   ipcHandlers.clear()
   protocolHandlers.clear()
-  registerAppIpc(wm)
+  registerAppIpc(wm, hhcAuthService)
   registerLocalModelProtocol()
 })
 
 describe('model IPC security', () => {
-  it('clears native uploaded files from app user data', async () => {
+  it('waits for HHC credential deletion before clearing app user data', async () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    let finishHhcClear!: () => void
+    mockClearHhcLocalData.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishHhcClear = resolve
+      })
+    )
 
-    await ipcHandlers.get('app:clear-user-data')!(makeEvent())
+    const clearing = ipcHandlers.get('app:clear-user-data')!(makeEvent()) as Promise<void>
+    await Promise.resolve()
+    expect(mockRmSync).not.toHaveBeenCalled()
+    expect(mockClearData).not.toHaveBeenCalled()
+
+    finishHhcClear()
+    await clearing
 
     expect(mockRmSync).toHaveBeenCalledWith(path.join('/tmp/hhc-user-data', 'native-files'), {
       force: true,
       recursive: true
     })
     expect(mockClearData).toHaveBeenCalledWith()
+  })
+
+  it('rejects local credential deletion failure before session clearing or relaunch', async () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    mockClearHhcLocalData.mockRejectedValueOnce(new Error('local delete failed'))
+
+    await expect(ipcHandlers.get('app:clear-user-data')!(makeEvent())).rejects.toThrow(
+      'local delete failed'
+    )
+    expect(mockRmSync).not.toHaveBeenCalled()
+    expect(mockClearData).not.toHaveBeenCalled()
+    expect(mockRelaunch).not.toHaveBeenCalled()
+    expect(mockExit).not.toHaveBeenCalled()
+  })
+
+  it('ignores clear-data requests outside the main window', async () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
+
+    await expect(ipcHandlers.get('app:clear-user-data')!(makeEvent())).resolves.toBeUndefined()
+    expect(mockClearHhcLocalData).not.toHaveBeenCalled()
+    expect(mockRmSync).not.toHaveBeenCalled()
+    expect(mockClearData).not.toHaveBeenCalled()
   })
 
   it('rejects relative model directories', () => {

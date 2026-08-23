@@ -15,7 +15,6 @@ const mockUnsubscribeFileExplorer = vi.fn()
 const mockRecoverStaleJobs = vi.fn().mockResolvedValue(0)
 const mockRemoveExpiredHistory = vi.fn().mockResolvedValue(0)
 const mockRegisterExecutor = vi.fn()
-const mockBackfillImportedMediaAssets = vi.fn().mockResolvedValue(undefined)
 const mockRecoverPendingSyncResourceCleanups = vi.fn().mockResolvedValue({
   folderIds: [],
   itemIds: [],
@@ -27,6 +26,7 @@ const mockRetryPendingResourceCleanups = vi.fn().mockResolvedValue({
 })
 const mockStopSyncRuntime = vi.fn()
 const mockStartSyncRuntime = vi.fn(() => mockStopSyncRuntime)
+const mockIsElectron = vi.fn(() => false)
 
 const bibleState = {
   isInitialized: false,
@@ -99,6 +99,10 @@ vi.mock('@renderer/lib/bible-search', () => ({
   initializeSearchIndexes: mockInitializeSearchIndexes
 }))
 
+vi.mock('@renderer/lib/env', () => ({
+  isElectron: mockIsElectron
+}))
+
 vi.mock('@renderer/lib/media-job-queue', () => ({
   mediaJobQueue: {
     recoverStaleJobs: mockRecoverStaleJobs,
@@ -109,10 +113,6 @@ vi.mock('@renderer/lib/media-job-queue', () => ({
 
 vi.mock('@renderer/lib/sync-unlink', () => ({
   recoverPendingSyncResourceCleanups: mockRecoverPendingSyncResourceCleanups
-}))
-
-vi.mock('@renderer/lib/local-sync-import', () => ({
-  backfillImportedMediaAssets: mockBackfillImportedMediaAssets
 }))
 
 vi.mock('@renderer/lib/resource-cleanup-journal', () => ({
@@ -127,7 +127,27 @@ describe('startEarlyInit', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    mockIsElectron.mockReturnValue(false)
     window.location.hash = ''
+  })
+
+  it('recovers every persisted running job immediately in Electron', async () => {
+    mockIsElectron.mockReturnValue(true)
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+
+    expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 0)
+  })
+
+  it('keeps the five-minute recovery lease in the browser', async () => {
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+
+    expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 5 * 60 * 1000)
   })
 
   it('skips control-window initialization on the projection route', async () => {
@@ -141,7 +161,6 @@ describe('startEarlyInit', () => {
     expect(mockFolderInitialize).not.toHaveBeenCalled()
     expect(mockFileExplorerInitialize).not.toHaveBeenCalled()
     expect(mockRecoverStaleJobs).not.toHaveBeenCalled()
-    expect(mockBackfillImportedMediaAssets).not.toHaveBeenCalled()
   })
 
   it('replays pending resource cleanup after File Explorer initialization', async () => {

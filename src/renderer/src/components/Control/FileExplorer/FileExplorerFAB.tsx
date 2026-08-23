@@ -15,6 +15,8 @@ export interface FileExplorerFABProps {
   onAddOneDrive?: () => void
   onAddHhcLine?: () => void
   isAddOneDriveDisabled?: boolean
+  isAddHhcLineDisabled?: boolean
+  hhcLineLabel?: string
   isReadOnly?: boolean
 }
 
@@ -26,6 +28,8 @@ export default function FileExplorerFAB({
   onAddOneDrive,
   onAddHhcLine,
   isAddOneDriveDisabled = false,
+  isAddHhcLineDisabled = false,
+  hhcLineLabel,
   isReadOnly = false
 }: FileExplorerFABProps): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -97,7 +101,7 @@ export default function FileExplorerFAB({
                 if (key === 'uploadFolder' && !isReadOnly) onUploadFolder?.()
                 if (key === 'addLocalSyncFolder') onAddLocalSyncFolder?.()
                 if (key === 'addOneDrive' && !isAddOneDriveDisabled) onAddOneDrive?.()
-                if (key === 'addHhcLine') onAddHhcLine?.()
+                if (key === 'addHhcLine' && !isAddHhcLineDisabled) onAddHhcLine?.()
               }}
             >
               {!isReadOnly && (
@@ -160,10 +164,11 @@ export default function FileExplorerFAB({
                   {onAddHhcLine && (
                     <Dropdown.Item
                       id="addHhcLine"
+                      isDisabled={isAddHhcLineDisabled}
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
                       <Cloud size={16} />
-                      {t('fileExplorer.contextMenu.addHhcLine')}
+                      {hhcLineLabel ?? t('fileExplorer.contextMenu.addHhcLine')}
                     </Dropdown.Item>
                   )}
                 </Dropdown.Section>

@@ -1,17 +1,39 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  deleteDerivedAssetsByKind,
   deleteDerivedAssetsForSource,
   getCustomCoverOverride,
   getDerivedAsset,
   putCustomCoverOverride,
   putDerivedAsset,
+  putMediaJob,
+  subscribeMediaJobs,
   resetMediaWorkDBForTests
 } from '../media-work-db'
 
 describe('media-work-db', () => {
   beforeEach(async () => {
     await resetMediaWorkDBForTests()
+  })
+
+  it('notifies subscribers with the updated media job', async () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeMediaJobs(listener)
+    const job = {
+      id: 'job-1',
+      type: 'pdf-pages' as const,
+      sourceBlobId: 'blob-1',
+      itemId: 'item-1',
+      priority: 0,
+      status: 'completed' as const,
+      attempt: 1,
+      createdAt: 1,
+      updatedAt: 2
+    }
+
+    await putMediaJob(job)
+
+    expect(listener).toHaveBeenCalledWith(job)
+    unsubscribe()
   })
 
   it('upserts a unique derived asset for each source, kind, and variant', async () => {
@@ -87,30 +109,5 @@ describe('media-work-db', () => {
     await expect(getDerivedAsset('blob-1', 'cover-thumbnail')).resolves.toBeUndefined()
     await expect(getDerivedAsset('blob-1', 'pdf-page-thumbnails')).resolves.toBeUndefined()
     await expect(getDerivedAsset('blob-1', 'video-poster')).resolves.toBeUndefined()
-  })
-
-  it('removes legacy editable mirrors without deleting other derived assets', async () => {
-    await putDerivedAsset({
-      sourceBlobId: 'blob-1',
-      kind: 'editable-presentation-document',
-      variant: 'document:deck-1',
-      storage: 'indexed-db',
-      mimeType: 'application/json',
-      status: 'ready'
-    })
-    await putDerivedAsset({
-      sourceBlobId: 'blob-1',
-      kind: 'cover-thumbnail',
-      variant: 'default',
-      storage: 'indexed-db',
-      mimeType: 'image/svg+xml',
-      status: 'ready'
-    })
-
-    await expect(deleteDerivedAssetsByKind('editable-presentation-document')).resolves.toBe(1)
-    await expect(
-      getDerivedAsset('blob-1', 'editable-presentation-document', 'document:deck-1')
-    ).resolves.toBeUndefined()
-    await expect(getDerivedAsset('blob-1', 'cover-thumbnail')).resolves.toBeDefined()
   })
 })

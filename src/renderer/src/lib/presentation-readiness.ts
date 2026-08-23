@@ -10,6 +10,7 @@ import {
 import { getProviderConnection, getSyncEntryByLocalItem } from './sync-db'
 import { getFileBlobRecord, isFileBlobAvailable } from './file-explorer-db'
 import { ensureSourceMediaMetadata } from './media-metadata'
+import { ensurePdfPageJob } from './pdf-page-jobs'
 
 export type PresentationReadinessStatus =
   | 'ready'
@@ -261,6 +262,14 @@ async function analyzePresentationItem(
       status: syncEntry ? 'preparing' : 'missing',
       reason: syncEntry ? 'sync-missing-source' : 'missing-source',
       support
+    }
+  }
+
+  if (capability.kind === 'pdf') {
+    try {
+      await ensurePdfPageJob({ sourceBlobId: blobId, itemId: item.id })
+    } catch (error) {
+      console.warn('[pdf-pages] Failed to enqueue page thumbnails', { blobId, error })
     }
   }
 

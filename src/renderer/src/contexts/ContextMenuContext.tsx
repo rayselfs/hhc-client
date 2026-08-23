@@ -38,7 +38,7 @@ export function ContextMenuProvider({
   const close = useCallback(() => {
     setMenu(null)
     if (triggerRef.current instanceof HTMLElement) {
-      triggerRef.current.focus()
+      triggerRef.current.focus({ preventScroll: true })
     }
     triggerRef.current = null
   }, [])

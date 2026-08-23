@@ -3,7 +3,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { APP_CONFIG } from '@shared/app-config'
-import type { HhcSession } from '@shared/hhc-auth'
+import {
+  HHC_AUTH_TRANSACTION_TTL_MS,
+  type HhcPendingSignIn,
+  type HhcSession
+} from '@shared/hhc-auth'
 import type { LibrePresenterProtocolAction } from '../protocol-router'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
@@ -11,7 +15,7 @@ import { isMainWindow } from './validate'
 const CLIENT_ID = 'hhc-desktop'
 const REDIRECT_URI = 'librepresenter://auth/account'
 const SCOPE = 'openid profile'
-const TRANSACTION_TTL_MS = 5 * 60_000
+const REVOKE_TIMEOUT_MS = 5000
 
 type AccountAuthAction = Extract<LibrePresenterProtocolAction, { kind: 'account-auth' }>
 
@@ -31,6 +35,7 @@ type Transaction = {
   state: string
   codeVerifier: string
   expiresAt: number
+  generation: number
 }
 
 type HhcAuthServiceOptions = {
@@ -38,12 +43,14 @@ type HhcAuthServiceOptions = {
 }
 
 export interface HhcAuthService {
-  begin(): Promise<void>
+  begin(): Promise<HhcPendingSignIn>
+  cancelSignIn(): Promise<void>
   completeProtocolCallback(action: AccountAuthAction): Promise<boolean>
   getAccessToken(): Promise<string | null>
   refreshAccessToken(): Promise<string | null>
   getSession(): Promise<HhcSession | null>
   signOut(): Promise<void>
+  clearLocalData(): Promise<void>
   subscribe(listener: (session: HhcSession | null) => void): () => void
 }
 
@@ -116,11 +123,16 @@ class MainHhcAuthService implements HhcAuthService {
   private readonly credentialPath = join(app.getPath('userData'), 'hhc-auth.enc')
   private readonly now: () => number
   private readonly listeners = new Set<(session: HhcSession | null) => void>()
+  private readonly beginsInFlight = new Set<Promise<HhcPendingSignIn>>()
+  private readonly tokenPersistenceInFlight = new Set<Promise<unknown>>()
+  private readonly profileLoadsInFlight = new Set<Promise<HhcSession>>()
   private transaction: Transaction | null = null
-  private beginInFlight: Promise<void> | null = null
+  private authGeneration = 0
   private completionInFlight: Promise<boolean> | null = null
   private refreshInFlight: Promise<string | null> | null = null
   private signOutInFlight: Promise<void> | null = null
+  private clearLocalDataInFlight: Promise<void> | null = null
+  private credentialLoadInFlight: Promise<StoredCredential | null> | null = null
   private storedCredential: StoredCredential | null = null
   private storedCredentialLoaded = false
   private accessCredential: AccessCredential | null = null
@@ -130,27 +142,35 @@ class MainHhcAuthService implements HhcAuthService {
     this.now = options.now ?? Date.now
   }
 
-  async begin(): Promise<void> {
-    if (
-      this.beginInFlight ||
-      this.completionInFlight ||
-      this.signOutInFlight ||
-      (this.transaction && this.transaction.expiresAt > this.now())
-    ) {
+  async begin(): Promise<HhcPendingSignIn> {
+    if (this.completionInFlight || this.signOutInFlight || this.clearLocalDataInFlight) {
       throw new Error('HHC sign-in is already in progress')
     }
-    if (this.transaction) this.transaction = null
+    const generation = ++this.authGeneration
+    this.transaction = null
+    const request = this.startAuthorization(generation)
+    this.beginsInFlight.add(request)
+    void request.then(
+      () => this.beginsInFlight.delete(request),
+      () => this.beginsInFlight.delete(request)
+    )
+    return request
+  }
 
-    this.beginInFlight = this.startAuthorization().finally(() => {
-      this.beginInFlight = null
-    })
-    return this.beginInFlight
+  cancelSignIn(): Promise<void> {
+    this.authGeneration += 1
+    this.transaction = null
+    return Promise.resolve()
   }
 
   completeProtocolCallback(action: AccountAuthAction): Promise<boolean> {
-    if (this.signOutInFlight) return Promise.resolve(false)
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return Promise.resolve(false)
     const transaction = this.transaction
-    if (!transaction || transaction.expiresAt <= this.now()) {
+    if (
+      !transaction ||
+      transaction.generation !== this.authGeneration ||
+      transaction.expiresAt <= this.now()
+    ) {
       this.transaction = null
       return Promise.resolve(false)
     }
@@ -168,6 +188,15 @@ class MainHhcAuthService implements HhcAuthService {
     action: AccountAuthAction,
     transaction: Transaction
   ): Promise<boolean> {
+    await this.trackTokenPersistence(this.persistProtocolCallbackToken(action, transaction))
+    await this.loadSessionFromAccessToken()
+    return true
+  }
+
+  private async persistProtocolCallbackToken(
+    action: AccountAuthAction,
+    transaction: Transaction
+  ): Promise<void> {
     const credential = await this.loadCredential(true)
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -180,12 +209,10 @@ class MainHhcAuthService implements HhcAuthService {
     })
     const data = await this.requestToken(body)
     await this.acceptTokenResponse(data, credential)
-    await this.loadSessionFromAccessToken()
-    return true
   }
 
   async getAccessToken(): Promise<string | null> {
-    if (this.signOutInFlight) return null
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     if (this.accessCredential && this.accessCredential.expiresAt > this.now()) {
       if (!this.session) await this.loadSessionFromAccessToken()
       return this.accessCredential.token
@@ -200,10 +227,10 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   async refreshAccessToken(): Promise<string | null> {
-    if (this.signOutInFlight) return null
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     const completion = this.completionInFlight
     if (completion) await completion
-    if (this.signOutInFlight) return null
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     if (this.refreshInFlight) return this.refreshInFlight
 
     this.refreshInFlight = this.refreshStoredCredential().finally(() => {
@@ -213,6 +240,7 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   async getSession(): Promise<HhcSession | null> {
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     if (this.session && this.accessCredential && this.accessCredential.expiresAt > this.now()) {
       return this.session
     }
@@ -224,51 +252,98 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   signOut(): Promise<void> {
+    if (this.clearLocalDataInFlight) return this.clearLocalDataInFlight
     if (this.signOutInFlight) return this.signOutInFlight
+    this.authGeneration += 1
     this.transaction = null
-    const beginInFlight = this.beginInFlight
+    const beginsInFlight = [...this.beginsInFlight]
     const completionInFlight = this.completionInFlight
-    this.signOutInFlight = this.performSignOut(beginInFlight, completionInFlight).finally(() => {
+    this.signOutInFlight = this.performSignOut(beginsInFlight, completionInFlight).finally(() => {
       this.signOutInFlight = null
     })
     return this.signOutInFlight
   }
 
   private async performSignOut(
-    beginInFlight: Promise<void> | null,
+    beginsInFlight: Promise<HhcPendingSignIn>[],
     completionInFlight: Promise<boolean> | null
   ): Promise<void> {
-    if (beginInFlight) await beginInFlight.catch(() => undefined)
+    await Promise.allSettled(beginsInFlight)
     this.transaction = null
     if (completionInFlight) await completionInFlight.catch(() => false)
     if (this.refreshInFlight) await this.refreshInFlight.catch(() => null)
+    await Promise.allSettled([...this.profileLoadsInFlight])
     const credential = await this.loadCredential(false)
     if (!credential) {
       this.clearMemory()
       return
     }
 
-    if (credential.refreshToken) {
-      try {
-        await net.fetch(`${this.accountApi}/oauth/revoke`, {
-          method: 'POST',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            token: credential.refreshToken,
-            client_id: CLIENT_ID,
-            token_type_hint: 'refresh_token'
-          })
-        })
-      } catch {
-        // Local sign-out remains authoritative when the remote service is unavailable.
-      }
-    }
+    await this.revokeRefreshToken(credential)
 
     await this.saveCredential({ installationId: credential.installationId })
     this.clearMemory()
+  }
+
+  clearLocalData(): Promise<void> {
+    if (this.clearLocalDataInFlight) return this.clearLocalDataInFlight
+    this.authGeneration += 1
+    this.transaction = null
+    const clearing = this.performClearLocalData(
+      [...this.beginsInFlight],
+      [...this.tokenPersistenceInFlight],
+      this.completionInFlight,
+      this.refreshInFlight,
+      this.signOutInFlight
+    ).finally(() => {
+      if (this.clearLocalDataInFlight === clearing) this.clearLocalDataInFlight = null
+    })
+    this.clearLocalDataInFlight = clearing
+    return clearing
+  }
+
+  private async performClearLocalData(
+    beginsInFlight: Promise<HhcPendingSignIn>[],
+    tokenPersistenceInFlight: Promise<unknown>[],
+    completionInFlight: Promise<boolean> | null,
+    refreshInFlight: Promise<string | null> | null,
+    signOutInFlight: Promise<void> | null
+  ): Promise<void> {
+    await Promise.allSettled(beginsInFlight)
+    this.transaction = null
+    await Promise.allSettled(tokenPersistenceInFlight)
+    const credential = await this.loadCredential(false).catch(() => null)
+    if (completionInFlight) await completionInFlight.catch(() => false)
+    if (refreshInFlight) await refreshInFlight.catch(() => null)
+    if (signOutInFlight) await signOutInFlight.catch(() => undefined)
+    await Promise.allSettled([...this.profileLoadsInFlight])
+
+    this.storedCredential = null
+    this.storedCredentialLoaded = true
+    this.clearMemory()
+    await fs.rm(this.credentialPath, { force: true })
+    if (credential) await this.revokeRefreshToken(credential)
+  }
+
+  private async revokeRefreshToken(credential: StoredCredential): Promise<void> {
+    if (!credential.refreshToken) return
+    try {
+      await net.fetch(`${this.accountApi}/oauth/revoke`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          token: credential.refreshToken,
+          client_id: CLIENT_ID,
+          token_type_hint: 'refresh_token'
+        }),
+        signal: AbortSignal.timeout(REVOKE_TIMEOUT_MS)
+      })
+    } catch {
+      // Local credential removal remains authoritative when the remote service is unavailable.
+    }
   }
 
   subscribe(listener: (session: HhcSession | null) => void): () => void {
@@ -276,8 +351,10 @@ class MainHhcAuthService implements HhcAuthService {
     return () => this.listeners.delete(listener)
   }
 
-  private async startAuthorization(): Promise<void> {
+  private async startAuthorization(generation: number): Promise<HhcPendingSignIn> {
+    const pending = { expiresAt: this.now() + HHC_AUTH_TRANSACTION_TTL_MS }
     await this.loadCredential(true)
+    if (generation !== this.authGeneration) return pending
     const codeVerifier = randomBytes(32).toString('base64url')
     const state = randomBytes(32).toString('base64url')
     const url = new URL(`${this.accountApi}/oauth/authorize`)
@@ -290,13 +367,14 @@ class MainHhcAuthService implements HhcAuthService {
       scope: SCOPE,
       state
     }).toString()
-    this.transaction = { state, codeVerifier, expiresAt: this.now() + TRANSACTION_TTL_MS }
+    this.transaction = { state, codeVerifier, expiresAt: pending.expiresAt, generation }
     try {
       await shell.openExternal(url.toString())
     } catch (error) {
-      this.transaction = null
+      if (this.transaction?.generation === generation) this.transaction = null
       throw error
     }
+    return pending
   }
 
   private async refresh(credential: StoredCredential): Promise<string> {
@@ -320,13 +398,19 @@ class MainHhcAuthService implements HhcAuthService {
       }
       throw error
     }
-    await this.loadSessionFromAccessToken()
     return this.accessCredential!.token
   }
 
-  private async refreshStoredCredential(): Promise<string | null> {
+  private async persistStoredCredentialRefresh(): Promise<string | null> {
     const credential = await this.loadCredential(false)
     return credential?.refreshToken ? this.refresh(credential) : null
+  }
+
+  private async refreshStoredCredential(): Promise<string | null> {
+    const token = await this.trackTokenPersistence(this.persistStoredCredentialRefresh())
+    if (!token) return null
+    await this.loadSessionFromAccessToken()
+    return token
   }
 
   private async requestToken(body: URLSearchParams): Promise<Record<string, unknown>> {
@@ -358,8 +442,32 @@ class MainHhcAuthService implements HhcAuthService {
     this.session = null
   }
 
-  private async loadSessionFromAccessToken(): Promise<HhcSession> {
-    const access = this.accessCredential
+  private trackTokenPersistence<T>(request: Promise<T>): Promise<T> {
+    this.tokenPersistenceInFlight.add(request)
+    void request.then(
+      () => this.tokenPersistenceInFlight.delete(request),
+      () => this.tokenPersistenceInFlight.delete(request)
+    )
+    return request
+  }
+
+  private loadSessionFromAccessToken(): Promise<HhcSession> {
+    if (this.clearLocalDataInFlight) {
+      return Promise.reject(new Error('HHC authentication changed'))
+    }
+    const request = this.fetchSessionFromAccessToken(this.authGeneration, this.accessCredential)
+    this.profileLoadsInFlight.add(request)
+    void request.then(
+      () => this.profileLoadsInFlight.delete(request),
+      () => this.profileLoadsInFlight.delete(request)
+    )
+    return request
+  }
+
+  private async fetchSessionFromAccessToken(
+    generation: number,
+    access: AccessCredential | null
+  ): Promise<HhcSession> {
     if (!access || access.expiresAt <= this.now()) throw new Error('HHC access token expired')
     const data = await responseJson(
       await net.fetch(`${this.accountApi}/me`, {
@@ -367,8 +475,10 @@ class MainHhcAuthService implements HhcAuthService {
         headers: { accept: 'application/json', authorization: `Bearer ${access.token}` }
       })
     )
+    this.assertCurrentAccess(generation, access)
     if (typeof data.id !== 'string' || data.id !== access.subject) {
       const credential = await this.loadCredential(false)
+      this.assertCurrentAccess(generation, access)
       if (credential) await this.clearStoredRefreshToken(credential)
       this.clearMemory()
       throw new Error('HHC account identity mismatch')
@@ -392,9 +502,32 @@ class MainHhcAuthService implements HhcAuthService {
     return this.session
   }
 
+  private assertCurrentAccess(generation: number, access: AccessCredential): void {
+    if (generation !== this.authGeneration || access !== this.accessCredential) {
+      throw new Error('HHC authentication changed')
+    }
+  }
+
   private async loadCredential(create: true): Promise<StoredCredential>
   private async loadCredential(create: false): Promise<StoredCredential | null>
   private async loadCredential(create: boolean): Promise<StoredCredential | null> {
+    const existing = this.credentialLoadInFlight
+    if (existing) {
+      const credential = await existing
+      if (credential || !create) return credential
+      return this.loadCredential(true)
+    }
+
+    const request = this.loadCredentialOnce(create)
+    this.credentialLoadInFlight = request
+    try {
+      return await request
+    } finally {
+      if (this.credentialLoadInFlight === request) this.credentialLoadInFlight = null
+    }
+  }
+
+  private async loadCredentialOnce(create: boolean): Promise<StoredCredential | null> {
     if (this.storedCredentialLoaded) {
       if (this.storedCredential) return this.storedCredential
       if (!create) return null
@@ -471,6 +604,10 @@ export function registerHhcAuthIpc(wm: WindowManager, service: HhcAuthService): 
   ipcMain.handle(
     'hhc-auth:begin',
     authorized(() => service.begin())
+  )
+  ipcMain.handle(
+    'hhc-auth:cancel',
+    authorized(() => service.cancelSignIn())
   )
   ipcMain.handle(
     'hhc-auth:get-access-token',

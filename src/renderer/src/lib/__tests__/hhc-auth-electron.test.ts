@@ -13,7 +13,8 @@ describe('ElectronHhcAuthAdapter', () => {
   beforeEach(() => {
     window.api = {
       hhcAuth: {
-        begin: vi.fn().mockResolvedValue(undefined),
+        begin: vi.fn().mockResolvedValue({ expiresAt: 301_000 }),
+        cancel: vi.fn().mockResolvedValue(undefined),
         getAccessToken: vi.fn().mockResolvedValue('access-token'),
         refreshAccessToken: vi.fn().mockResolvedValue('refreshed-access-token'),
         getSession: vi.fn().mockResolvedValue(session),
@@ -29,15 +30,20 @@ describe('ElectronHhcAuthAdapter', () => {
     await expect(adapter.getSession()).resolves.toEqual(session)
     await expect(adapter.getAccessToken()).resolves.toBe('access-token')
     await expect(adapter.refreshAccessToken()).resolves.toBe('refreshed-access-token')
-    await expect(adapter.signIn()).resolves.toBeUndefined()
+    await expect(adapter.signIn()).resolves.toEqual({
+      expiresAt: 301_000
+    })
+    await expect(adapter.cancelSignIn()).resolves.toBeUndefined()
     await expect(adapter.signOut()).resolves.toBeUndefined()
 
     expect(window.api.hhcAuth.getSession).toHaveBeenCalledOnce()
     expect(window.api.hhcAuth.getAccessToken).toHaveBeenCalledOnce()
     expect(window.api.hhcAuth.begin).toHaveBeenCalledOnce()
+    expect(window.api.hhcAuth.cancel).toHaveBeenCalledOnce()
     expect(window.api.hhcAuth.signOut).toHaveBeenCalledOnce()
     expect(Object.keys(window.api.hhcAuth).sort()).toEqual([
       'begin',
+      'cancel',
       'getAccessToken',
       'getSession',
       'onSessionChanged',
@@ -69,5 +75,40 @@ describe('ElectronHhcAuthAdapter', () => {
 
     expect(firstCleanup).toHaveBeenCalledOnce()
     expect(secondCleanup).toHaveBeenCalledOnce()
+    expect(window.api.hhcAuth.cancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels its owned sign-in when disposed before begin settles', async () => {
+    let resolveBegin!: (pending: { expiresAt: number }) => void
+    vi.mocked(window.api.hhcAuth.begin).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveBegin = resolve
+      })
+    )
+    const adapter = createElectronHhcAuthAdapter()
+
+    const signingIn = adapter.signIn()
+    adapter.dispose()
+    adapter.dispose()
+    resolveBegin({ expiresAt: 301_000 })
+
+    await expect(signingIn).resolves.toEqual({ expiresAt: 301_000 })
+    expect(window.api.hhcAuth.cancel).toHaveBeenCalledOnce()
+  })
+
+  it('does not cancel a completed sign-in when disposed', async () => {
+    let sessionChanged!: (session: HhcSession | null) => void
+    vi.mocked(window.api.hhcAuth.onSessionChanged).mockImplementationOnce((listener) => {
+      sessionChanged = listener
+      return vi.fn()
+    })
+    const adapter = createElectronHhcAuthAdapter()
+    adapter.subscribe(vi.fn())
+
+    await adapter.signIn()
+    sessionChanged(session)
+    adapter.dispose()
+
+    expect(window.api.hhcAuth.cancel).not.toHaveBeenCalled()
   })
 })

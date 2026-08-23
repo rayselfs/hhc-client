@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MediaJobBlockedError, MediaJobQueue } from '../media-job-queue'
 import {
+  countFailedOrBlockedMediaJobs,
   getMediaJob,
   listMediaJobs,
   putMediaJob,
@@ -102,6 +103,25 @@ describe('MediaJobQueue', () => {
     const queue = new MediaJobQueue()
     await expect(queue.recoverStaleJobs(now, 1000)).resolves.toBe(1)
     await expect(getMediaJob('stale-job')).resolves.toMatchObject({ status: 'queued' })
+  })
+
+  it('counts only failed or blocked jobs not explicitly excluded', async () => {
+    const now = Date.now()
+    await Promise.all(
+      (['failed', 'blocked', 'running'] as const).map((status) =>
+        putMediaJob({
+          id: status,
+          type: 'import',
+          priority: 0,
+          status,
+          attempt: 1,
+          createdAt: now,
+          updatedAt: now
+        })
+      )
+    )
+
+    await expect(countFailedOrBlockedMediaJobs(['failed'])).resolves.toBe(1)
   })
 
   it('runs boosted pending jobs before lower-priority work', async () => {

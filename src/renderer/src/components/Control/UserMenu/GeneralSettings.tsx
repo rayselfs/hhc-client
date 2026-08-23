@@ -10,6 +10,7 @@ import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 import type { DisplayInfo } from '@shared/ipc-channels'
 
 interface GeneralSettingsProps {
@@ -36,6 +37,7 @@ export default function GeneralSettings({
   const resetSettings = useSettingsStore((s) => s.resetSettings)
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
   const confirm = useConfirm()
+  const { signOut } = useHhcAuth()
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const externalDisplays = displays.filter((display) => !display.isPrimary)
   const selectedProjectionDisplayId = externalDisplays.length > 0 ? projectionDisplayId : ''
@@ -86,6 +88,7 @@ export default function GeneralSettings({
     onClearingAllDataChange?.(true)
     try {
       if (isElectron()) await window.api.app.clearUserData()
+      else await signOut()
       await resetToDefaults()
     } catch (error) {
       console.warn('[settings] Failed to clear app data', error)

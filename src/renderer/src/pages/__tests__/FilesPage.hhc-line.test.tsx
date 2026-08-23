@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HhcSession } from '@shared/hhc-auth'
@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     importFolder: vi.fn(),
     refreshFolder: vi.fn()
   })),
+  showEmptyAreaMenu: vi.fn(),
   fileState: {
     currentFolderId: 'file-root',
     folders: {},
@@ -69,14 +70,35 @@ vi.mock('@renderer/components/Control/FileExplorer', () => ({
     showItemMenu: vi.fn(),
     showFolderMenu: vi.fn(),
     showMultiSelectMenu: vi.fn(),
-    showEmptyAreaMenu: vi.fn()
+    showEmptyAreaMenu: mocks.showEmptyAreaMenu
   })
 }))
 
-vi.mock('@renderer/components/Control/FileExplorer/FileBrowser', () => ({ default: () => null }))
+vi.mock('@renderer/components/Control/FileExplorer/FileBrowser', () => ({
+  default: ({
+    onEmptyAreaContextMenu
+  }: {
+    onEmptyAreaContextMenu: (event: React.MouseEvent) => void
+  }) => (
+    <button onClick={() => onEmptyAreaContextMenu({} as React.MouseEvent)}>
+      Open file context menu
+    </button>
+  )
+}))
 vi.mock('@renderer/components/Control/FileExplorer/FileExplorerFAB', () => ({
-  default: ({ onAddHhcLine }: { onAddHhcLine?: () => void }) =>
-    onAddHhcLine ? <button onClick={onAddHhcLine}>Add HHC LINE</button> : null
+  default: ({
+    onAddHhcLine,
+    isAddHhcLineDisabled,
+    hhcLineLabel
+  }: {
+    onAddHhcLine?: () => void
+    isAddHhcLineDisabled?: boolean
+    hhcLineLabel?: string
+  }) => (
+    <button disabled={isAddHhcLineDisabled} onClick={onAddHhcLine}>
+      {hhcLineLabel}
+    </button>
+  )
 }))
 vi.mock('@renderer/components/Control/FileExplorer/CloudFolderPickerDialog', () => ({
   default: ({ provider, isOpen }: { provider: { providerType: string }; isOpen: boolean }) =>
@@ -122,6 +144,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     mocks.getAccessToken.mockReset()
     mocks.refreshAccessToken.mockReset()
     mocks.getCloudProviderAdapter.mockReset()
+    mocks.showEmptyAreaMenu.mockReset()
     mocks.getCloudProviderAdapter.mockImplementation((providerId: string) => ({
       id: providerId,
       supportsFolderNavigation: providerId === 'hhc-line' ? false : undefined,
@@ -132,7 +155,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     }))
   })
 
-  it('shows the action only after one claims refresh for the current user', async () => {
+  it('keeps HHC LINE visible and disabled while claims for the current user resolve', async () => {
     let resolveToken!: (token: string | null) => void
     mocks.getAccessToken.mockReturnValue(
       new Promise((resolve) => {
@@ -141,7 +164,9 @@ describe('FilesPage HHC LINE role resolution', () => {
     )
     const view = render(<FilesPage />)
 
-    expect(screen.queryByRole('button', { name: 'Add HHC LINE' })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Add HHC LINE — Checking HHC LINE access…' })
+    ).toBeDisabled()
     expect(mocks.getAccessToken).toHaveBeenCalledTimes(1)
 
     await act(async () => resolveToken('token'))
@@ -157,35 +182,44 @@ describe('FilesPage HHC LINE role resolution', () => {
     )
   })
 
-  it('hides and resolves again when the account changes', async () => {
+  it('keeps HHC LINE visible and disabled when the account lacks the media sync role', async () => {
     mocks.getAccessToken.mockResolvedValue('token')
     const view = render(<FilesPage />)
-    await screen.findByRole('button', { name: 'Add HHC LINE' })
-
-    mocks.session = {
-      userId: 'user-2',
-      displayName: 'Grace',
-      roles: ['reader']
-    }
+    mocks.session = { userId: 'user-1', displayName: 'Ada', roles: ['reader'] }
     view.rerender(<FilesPage />)
 
-    await waitFor(() => expect(mocks.getAccessToken).toHaveBeenCalledTimes(2))
-    expect(screen.queryByRole('button', { name: 'Add HHC LINE' })).not.toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', {
+        name: 'Add HHC LINE — Your HHC account needs media sync access.'
+      })
+    ).toBeDisabled()
   })
 
-  it('closes an open HHC picker as soon as the current account loses eligibility', async () => {
+  it('keeps HHC LINE visible and disabled while signed out', () => {
+    mocks.session = null
+    render(<FilesPage />)
+
+    expect(
+      screen.getByRole('button', { name: 'Add HHC LINE — Sign in to HHC first.' })
+    ).toBeDisabled()
+  })
+
+  it('does not open the picker from a disabled folder context action', async () => {
+    mocks.session = null
+    render(<FilesPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open file context menu' }))
+    const options = mocks.showEmptyAreaMenu.mock.calls[0][0]
+    options.onAddHhcLine()
+
+    expect(screen.queryByText('HHC picker open')).not.toBeInTheDocument()
+  })
+
+  it('opens the picker from the authorized root FAB', async () => {
     mocks.getAccessToken.mockResolvedValue('token')
-    const view = render(<FilesPage />)
+    render(<FilesPage />)
+
     await userEvent.click(await screen.findByRole('button', { name: 'Add HHC LINE' }))
     expect(screen.getByText('HHC picker open')).toBeInTheDocument()
-
-    mocks.session = {
-      userId: 'user-2',
-      displayName: 'Grace',
-      roles: ['reader']
-    }
-    view.rerender(<FilesPage />)
-
-    await waitFor(() => expect(screen.queryByText('HHC picker open')).not.toBeInTheDocument())
   })
 })

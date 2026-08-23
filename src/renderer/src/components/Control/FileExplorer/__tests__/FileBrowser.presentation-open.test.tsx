@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileBrowser from '../FileBrowser'
 import {
@@ -24,7 +24,8 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-vi.mock('@renderer/lib/projection-actions', () => ({
+vi.mock('@renderer/lib/projection-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@renderer/lib/projection-actions')>()),
   startMediaProjection: mocks.startMediaProjection
 }))
 
@@ -131,17 +132,76 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
-  it('opens ordinary media in the safe preview without projecting', async () => {
-    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
-    await renderWithItems([image])
+  it.each([
+    { kind: 'image', name: 'Photo.png', mimeType: 'image/png' },
+    { kind: 'video', name: 'Clip.mp4', mimeType: 'video/mp4' }
+  ])('starts a ready $kind projection and enters Media when double-clicked', async (media) => {
+    const item = makeFile({ id: `${media.kind}-1`, name: media.name, mimeType: media.mimeType })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: [
+        {
+          itemId: item.id,
+          blobId: item.id,
+          status: 'ready',
+          reason: 'ready',
+          support: 'native'
+        }
+      ]
+    })
+    await renderWithItems([item])
 
-    act(() => {
-      fireEvent.doubleClick(screen.getByText('Photo.png'))
+    await act(async () => {
+      fireEvent.doubleClick(screen.getByText(media.name))
+      await Promise.resolve()
     })
 
-    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
+    expect(mocks.startMediaProjection).toHaveBeenCalledWith([item], 0, expect.any(Object), {
+      prioritizeStartItem: true
+    })
     expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
-    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/image-1')
+  })
+
+  it('keeps the current route when image projection has no ready items', async () => {
+    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 0, preparing: 0, unsupported: 1, missing: 0, failed: 0 },
+      items: []
+    })
+    await renderWithItems([image])
+
+    await act(async () => {
+      fireEvent.doubleClick(screen.getByText('Photo.png'))
+      await Promise.resolve()
+    })
+
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it('keeps the current route when image projection preparation rejects', async () => {
+    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    mocks.startMediaProjection.mockRejectedValue(new Error('preparation failed'))
+    await renderWithItems([image])
+
+    await act(async () => {
+      fireEvent.doubleClick(screen.getByText('Photo.png'))
+      await Promise.resolve()
+    })
+
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it('opens a PDF in the safe preview when double-clicked', async () => {
+    const pdf = makeFile({ id: 'pdf-1', name: 'Program.pdf', mimeType: 'application/pdf' })
+    await renderWithItems([pdf])
+
+    act(() => {
+      fireEvent.doubleClick(screen.getByText('Program.pdf'))
+    })
+
+    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/pdf-1')
+    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
   it('opens an editable presentation in the presentation workspace', async () => {
@@ -175,6 +235,43 @@ describe('FileBrowser presentation open behavior', () => {
     expect(usePresentationWorkspaceStore.getState().activeItemId).toBeNull()
     expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { name: 'Photo.png', mimeType: 'image/png' },
+    { name: 'Clip.mp4', mimeType: 'video/mp4' }
+  ])('projects a ready search result for $mimeType instead of opening preview', async (media) => {
+    const item = makeFile({ id: 'search-media', name: media.name, mimeType: media.mimeType })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: [
+        {
+          itemId: item.id,
+          blobId: item.id,
+          status: 'ready',
+          reason: 'ready',
+          support: 'native'
+        }
+      ]
+    })
+    act(() => useFileExplorerSearch.setState({ searchQuery: media.name }))
+    await renderWithItems([item])
+
+    await act(async () => {
+      fireEvent.doubleClick(screen.getByText(media.name))
+      await Promise.resolve()
+    })
+
+    expect(mocks.startMediaProjection).toHaveBeenCalledWith(
+      [item],
+      0,
+      {},
+      {
+        prioritizeStartItem: true
+      }
+    )
+    expect(mocks.navigate).toHaveBeenCalledWith('/media')
+    expect(mocks.navigate).not.toHaveBeenCalledWith('/files/preview/search-media')
   })
 
   it('shows safe error health for an access-revoked sync root', async () => {

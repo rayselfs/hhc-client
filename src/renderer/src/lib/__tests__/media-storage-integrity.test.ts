@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { repairMediaStorageIntegrity, scanMediaStorageIntegrity } from '../media-storage-integrity'
 import { listDerivedAssets, putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
@@ -235,5 +235,35 @@ describe('scanMediaStorageIntegrity', () => {
     const report = await scanMediaStorageIntegrity()
 
     expect(report.issues).toEqual([])
+  })
+
+  it('publishes a semantic recovery change after a ref-count-only repair commits', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'blob-1',
+      blob: new Blob(['source']),
+      refCount: 5
+    })
+    await db.put('folder-items', {
+      id: 'item-1',
+      parentId: 'root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'clip.mp4',
+      mimeType: 'video/mp4',
+      size: 6,
+      url: 'blob:blob-1'
+    })
+    const changed = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', changed)
+
+    const result = await repairMediaStorageIntegrity()
+
+    window.removeEventListener('hhc:recovery-source-changed', changed)
+    expect(result).toEqual({ correctedRefCounts: ['blob-1'], cleanupJournalIds: [] })
+    expect(changed).toHaveBeenCalledOnce()
+    await expect(db.get('file-blobs', 'blob-1')).resolves.toMatchObject({ refCount: 1 })
   })
 })

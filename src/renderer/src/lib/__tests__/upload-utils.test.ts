@@ -22,6 +22,7 @@ vi.mock('@renderer/lib/thumbnail-generator', () => ({
 }))
 
 vi.mock('@renderer/lib/thumbnail-db', () => ({
+  getPdfPageThumbs: vi.fn(),
   saveThumbnail: vi.fn(),
   savePdfPageThumbs: vi.fn()
 }))
@@ -43,6 +44,9 @@ import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { isWeb } from '@renderer/lib/env'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
+import { ensurePdfPageJob } from '../pdf-page-jobs'
+import i18n from '@renderer/i18n'
 
 function makeFile(name: string, size: number, type = 'image/png'): File {
   const file = new File([], name, { type })
@@ -62,7 +66,8 @@ function setStorageEstimate(estimate?: StorageEstimate): void {
   })
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
   vi.clearAllMocks()
   vi.mocked(addFileItemToStore).mockResolvedValue('mock-id')
   vi.mocked(useFileExplorerStore.getState).mockReturnValue({
@@ -70,7 +75,29 @@ beforeEach(() => {
     getChildFolders: vi.fn(() => [])
   } as never)
   vi.mocked(mediaJobQueue.enqueue).mockResolvedValue({ id: 'job-id' } as never)
+  vi.mocked(getPdfPageThumbs).mockResolvedValue([])
   setStorageEstimate()
+})
+
+describe('ensurePdfPageJob', () => {
+  it('skips cached pages and enqueues cache misses with the durable dedupe key', async () => {
+    const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    vi.mocked(getPdfPageThumbs)
+      .mockResolvedValueOnce(['blob:cached-page'])
+      .mockResolvedValueOnce([])
+
+    await ensurePdfPageJob({ sourceBlobId: 'cached-blob', itemId: 'cached-item' })
+    await ensurePdfPageJob({ sourceBlobId: 'missing-blob', itemId: 'missing-item' })
+
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:cached-page')
+    expect(mediaJobQueue.enqueue).toHaveBeenCalledOnce()
+    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+      type: 'pdf-pages',
+      sourceBlobId: 'missing-blob',
+      itemId: 'missing-item',
+      dedupeKey: 'pdf-pages:missing-blob'
+    })
+  })
 })
 
 describe('uploadFiles web preflight', () => {

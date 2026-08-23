@@ -59,6 +59,17 @@ function api(): HhcAssetApi {
   }
 }
 
+function deferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+} {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 beforeEach(async () => {
   await resetFileExplorerDBForTests()
   await resetSyncDBForTests()
@@ -376,5 +387,57 @@ describe('HHC LINE read-only provider', () => {
     expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob_1')
     await expect((await openFileExplorerDB()).get('file-blobs', 'blob_1')).resolves.toBeUndefined()
     await expect(getSyncEntryByRemoteItem('hhc-line:user_1', item.id)).resolves.toBeUndefined()
+  })
+
+  it('publishes recovery change only after cancelled HHC LINE cleanup settles', async () => {
+    const client = api()
+    vi.mocked(client.downloadContent).mockResolvedValue({
+      fileId: 'blob_1',
+      size: 42,
+      mimeType: 'image/jpeg'
+    })
+    const cleanupStarted = deferred<void>()
+    const releaseCleanup = deferred<void>()
+    vi.mocked(window.api.nativeFs.delete).mockImplementationOnce(async () => {
+      cleanupStarted.resolve()
+      await releaseCleanup.promise
+    })
+    const releaseCancellation = deferred<boolean>()
+    let checks = 0
+    const canCommit = vi.fn(() => {
+      checks += 1
+      return checks === 3 ? releaseCancellation.promise : true
+    })
+    const recoveryScan = vi.fn()
+    window.addEventListener('hhc:recovery-source-changed', recoveryScan)
+    const provider = new HhcLineReadonlyProvider({ api: client, getSession: vi.fn() })
+    const saving = provider.downloadContent(
+      {
+        providerConnectionId: 'hhc-line:user_1',
+        rootRemoteFolderId: collection.id,
+        remoteItemId: item.id,
+        targetBlobId: 'blob_1',
+        offlinePolicy: 'on-demand'
+      },
+      new AbortController().signal,
+      canCommit
+    )
+
+    await vi.waitFor(() => expect(canCommit).toHaveBeenCalledTimes(3))
+    recoveryScan.mockClear()
+    releaseCancellation.resolve(false)
+    await cleanupStarted.promise
+    await vi.waitFor(async () => {
+      expect(await getSyncEntryByRemoteItem('hhc-line:user_1', item.id)).toBeUndefined()
+    })
+    const scansBeforeCleanup = recoveryScan.mock.calls.length
+    releaseCleanup.resolve()
+    const failure = await saving.catch((error: unknown) => error)
+    window.removeEventListener('hhc:recovery-source-changed', recoveryScan)
+
+    expect(scansBeforeCleanup).toBe(0)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toBe('Sync download cancelled')
+    expect(recoveryScan).toHaveBeenCalledOnce()
   })
 })

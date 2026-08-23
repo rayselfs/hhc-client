@@ -5,7 +5,6 @@ import type { FolderPersistenceStatus } from '@renderer/stores/folder'
 type FolderPersistenceStatusProps = {
   status: FolderPersistenceStatus
   error: string | null
-  pendingCount: number
   isInitialized: boolean
   onRetryInitialization: () => Promise<void>
   onRetryPersistence: () => Promise<void>
@@ -15,7 +14,6 @@ type FolderPersistenceStatusProps = {
 export function FolderPersistenceStatus({
   status,
   error,
-  pendingCount,
   isInitialized,
   onRetryInitialization,
   onRetryPersistence,
@@ -23,7 +21,7 @@ export function FolderPersistenceStatus({
 }: FolderPersistenceStatusProps): React.JSX.Element | null {
   const { t } = useTranslation()
 
-  if (status === 'ready') return null
+  if (status === 'ready' || status === 'saving') return null
 
   const isLoadFailure = status === 'degraded' && !isInitialized
   const isWriteFailure = status === 'degraded' && isInitialized
@@ -31,20 +29,16 @@ export function FolderPersistenceStatus({
     ? t('folder.persistence.loadFailed')
     : isWriteFailure
       ? t('folder.persistence.saveFailed')
-      : status === 'saving'
-        ? t('folder.persistence.saving')
-        : t('folder.persistence.loading')
+      : t('folder.persistence.loading')
   const description =
     status === 'degraded'
       ? error || t('folder.persistence.unknownError')
-      : status === 'saving'
-        ? t('folder.persistence.pending', { count: pendingCount })
-        : t('folder.persistence.loadingDescription')
+      : t('folder.persistence.loadingDescription')
 
   return (
     <Alert className={className} status={status === 'degraded' ? 'danger' : 'accent'}>
       <Alert.Indicator>
-        {status === 'saving' || status === 'initializing' ? <Spinner size="sm" /> : undefined}
+        {status === 'initializing' ? <Spinner size="sm" /> : undefined}
       </Alert.Indicator>
       <Alert.Content>
         <Alert.Title>{title}</Alert.Title>

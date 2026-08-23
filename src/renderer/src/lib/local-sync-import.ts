@@ -317,15 +317,33 @@ async function saveImportedRecords(
   ])
 }
 
+let activeImportedMediaPreparations = 0
+const pendingImportedMediaPreparations: Array<() => void> = []
+
+async function acquireImportedMediaPreparationSlot(): Promise<void> {
+  if (activeImportedMediaPreparations < 3) {
+    activeImportedMediaPreparations += 1
+    return
+  }
+  await new Promise<void>((resolve) => pendingImportedMediaPreparations.push(resolve))
+}
+
+function releaseImportedMediaPreparationSlot(): void {
+  const next = pendingImportedMediaPreparations.shift()
+  if (next) next()
+  else activeImportedMediaPreparations -= 1
+}
+
 export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promise<void> {
   await Promise.all(
     items.map(async (item) => {
+      await acquireImportedMediaPreparationSlot()
       try {
         if (!item.url.startsWith('blob:')) return
         const blobId = getBlobId(item)
         const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
         if (!capability) return
-        void ensureSourceMediaMetadata(blobId, item.mimeType).catch((error) => {
+        await ensureSourceMediaMetadata(blobId, item.mimeType).catch((error) => {
           console.warn('[sync] Failed to store synced media metadata', {
             itemId: item.id,
             error
@@ -362,22 +380,10 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
           itemId: item.id,
           error
         })
+      } finally {
+        releaseImportedMediaPreparationSlot()
       }
     })
-  )
-}
-
-export async function backfillImportedMediaAssets(): Promise<void> {
-  const db = await openFileExplorerDB()
-  const [items, fileBlobs] = await Promise.all([db.getAll('folder-items'), db.getAll('file-blobs')])
-  const availableBlobIds = await collectAvailableFileBlobIds(fileBlobs)
-  await refreshImportedMediaAssets(
-    items.filter(
-      (item): item is FileItemRecord =>
-        item.type === 'file' &&
-        item.url.startsWith('blob:') &&
-        availableBlobIds.has(getBlobId(item))
-    )
   )
 }
 

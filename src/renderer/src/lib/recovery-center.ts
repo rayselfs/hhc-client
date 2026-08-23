@@ -4,7 +4,10 @@ import {
   repairMediaStorageIntegrity,
   scanMediaStorageIntegrity
 } from '@renderer/lib/media-storage-integrity'
-import { createMediaStorageDiagnosticsReport } from '@renderer/lib/media-storage-diagnostics'
+import {
+  createMediaStorageDiagnosticsReport,
+  stringifyRedactedDiagnostics
+} from '@renderer/lib/media-storage-diagnostics'
 import { listSyncEntries, putSyncEntry } from '@renderer/lib/sync-db'
 import {
   listResourceCleanupRecords,
@@ -24,7 +27,7 @@ export function sortRecoveryIssues(issues: RecoveryIssue[]): RecoveryIssue[] {
   )
 }
 
-export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
+async function collectRecoveryIssuesSnapshot(): Promise<RecoveryIssue[]> {
   const [jobs, integrity, syncEntries, cleanupRecords] = await Promise.all([
     listMediaJobs(),
     scanMediaStorageIntegrity(),
@@ -54,6 +57,15 @@ export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
   }
 
   for (const issue of integrity.issues) {
+    const actions: RecoveryIssue['actions'] = [
+      { type: 'export-diagnostics', labelKey: 'recovery.actions.exportDiagnostics' }
+    ]
+    if (issue.kind === 'file-blob-unreferenced' || issue.kind === 'file-blob-ref-count-mismatch') {
+      actions.unshift({
+        type: 'run-integrity-repair',
+        labelKey: 'recovery.actions.runIntegrityRepair'
+      })
+    }
     issues.push({
       id: `storage-integrity:${issue.kind}:${issue.resourceId}`,
       kind: issue.kind === 'file-item-missing-blob' ? 'media-missing' : 'storage-integrity',
@@ -64,10 +76,7 @@ export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
       itemId: issue.kind === 'file-item-missing-blob' ? issue.resourceId : undefined,
       blobId: issue.relatedId,
       occurredAt: integrity.checkedAt,
-      actions: [
-        { type: 'run-integrity-repair', labelKey: 'recovery.actions.runIntegrityRepair' },
-        { type: 'export-diagnostics', labelKey: 'recovery.actions.exportDiagnostics' }
-      ]
+      actions
     })
   }
 
@@ -115,6 +124,53 @@ export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
   return sortRecoveryIssues(issues)
 }
 
+let recoveryScanPromise: Promise<RecoveryIssue[]> | null = null
+let activeRecoveryRequest: Event | undefined
+let trailingRecoveryRequest: Event | undefined
+let recoveryScanTrailing = false
+
+export function collectRecoveryIssues(request?: Event): Promise<RecoveryIssue[]> {
+  if (recoveryScanPromise) {
+    if (request && request !== activeRecoveryRequest && request !== trailingRecoveryRequest) {
+      recoveryScanTrailing = true
+      trailingRecoveryRequest = request
+    }
+    return recoveryScanPromise
+  }
+
+  activeRecoveryRequest = request
+  recoveryScanPromise = (async () => {
+    let issues: RecoveryIssue[] = []
+    try {
+      while (true) {
+        recoveryScanTrailing = false
+        trailingRecoveryRequest = undefined
+        let failed = false
+        let failure: unknown
+        try {
+          issues = await collectRecoveryIssuesSnapshot()
+        } catch (error) {
+          failed = true
+          failure = error
+        }
+
+        if (recoveryScanTrailing) {
+          activeRecoveryRequest = trailingRecoveryRequest
+          continue
+        }
+        if (failed) throw failure
+        return issues
+      }
+    } finally {
+      recoveryScanPromise = null
+      activeRecoveryRequest = undefined
+      trailingRecoveryRequest = undefined
+      recoveryScanTrailing = false
+    }
+  })()
+  return recoveryScanPromise
+}
+
 export async function runRecoveryAction(
   type: RecoveryActionType,
   sourceId?: string
@@ -157,6 +213,17 @@ export async function runRecoveryAction(
   }
 
   if (type === 'export-diagnostics') {
-    await createMediaStorageDiagnosticsReport()
+    const report = await createMediaStorageDiagnosticsReport()
+    const url = URL.createObjectURL(
+      new Blob([stringifyRedactedDiagnostics(report)], { type: 'application/json' })
+    )
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'librepresenter-diagnostics.json'
+      link.click()
+    } finally {
+      URL.revokeObjectURL(url)
+    }
   }
 }

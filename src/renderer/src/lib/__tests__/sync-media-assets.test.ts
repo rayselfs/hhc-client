@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { FileItemRecord } from '@shared/types/folder'
 
 const { mockEnsureSourceMediaMetadata, mockGenerateThumbnail, mockSaveThumbnail } = vi.hoisted(
   () => ({
@@ -21,9 +22,36 @@ vi.mock('../thumbnail-db', () => ({
 }))
 
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
-import { backfillImportedMediaAssets, refreshImportedMediaAssets } from '../local-sync-import'
+import { refreshImportedMediaAssets } from '../local-sync-import'
 
 describe('refreshImportedMediaAssets', () => {
+  async function createImageItems(count: number): Promise<FileItemRecord[]> {
+    const db = await openFileExplorerDB()
+    const images = Array.from({ length: count }, (_, index) => ({
+      id: `image-${index}`,
+      parentId: 'folder-1',
+      type: 'file' as const,
+      sortIndex: index,
+      createdAt: 1,
+      expiresAt: null,
+      name: `photo-${index}.png`,
+      url: `blob:image-${index}`,
+      size: 3,
+      mimeType: 'image/png'
+    }))
+    await Promise.all(
+      images.map((item) =>
+        db.put('file-blobs', {
+          id: item.id,
+          blob: new Blob(['png'], { type: 'image/png' }),
+          storage: 'indexed-db',
+          refCount: 1
+        })
+      )
+    )
+    return images
+  }
+
   beforeEach(async () => {
     vi.clearAllMocks()
     await resetFileExplorerDBForTests()
@@ -71,68 +99,77 @@ describe('refreshImportedMediaAssets', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-source')
   })
 
-  it('backfills image and PDF assets only when the local blob exists', async () => {
-    const db = await openFileExplorerDB()
-    await db.put('file-blobs', {
-      id: 'image-1',
-      blob: new Blob(['png'], { type: 'image/png' }),
-      storage: 'indexed-db',
-      refCount: 1
-    })
-    await db.put('file-blobs', {
-      id: 'pdf-1',
-      blob: new Blob(['pdf'], { type: 'application/pdf' }),
-      storage: 'indexed-db',
-      refCount: 1
-    })
-    await db.put('folder-items', {
-      id: 'image-1',
-      parentId: 'folder-1',
-      type: 'file',
-      sortIndex: 0,
-      createdAt: 1,
-      expiresAt: null,
-      name: 'photo.png',
-      url: 'blob:image-1',
-      size: 3,
-      mimeType: 'image/png'
-    })
-    await db.put('folder-items', {
-      id: 'missing-1',
-      parentId: 'folder-1',
-      type: 'file',
-      sortIndex: 1,
-      createdAt: 1,
-      expiresAt: null,
-      name: 'missing.png',
-      url: 'blob:missing-1',
-      size: 3,
-      mimeType: 'image/png'
-    })
-    await db.put('folder-items', {
-      id: 'pdf-1',
-      parentId: 'folder-1',
-      type: 'file',
-      sortIndex: 2,
-      createdAt: 1,
-      expiresAt: null,
-      name: 'slides.pdf',
-      url: 'blob:pdf-1',
-      size: 3,
-      mimeType: 'application/pdf'
+  it('prepares at most three imported media assets concurrently', async () => {
+    const images = await createImageItems(5)
+
+    let active = 0
+    let maxActive = 0
+    const releases: Array<() => void> = []
+    mockGenerateThumbnail.mockImplementation(async () => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise<void>((resolve) => releases.push(resolve))
+      active -= 1
+      return null
     })
 
-    await backfillImportedMediaAssets()
+    const refresh = refreshImportedMediaAssets([
+      ...Array.from({ length: 3 }, (_, index) => ({
+        ...images[index],
+        id: `remote-${index}`,
+        url: `https://example.com/remote-${index}.png`
+      })),
+      ...images
+    ])
 
-    expect(mockEnsureSourceMediaMetadata.mock.calls.map((call) => call[0]).sort()).toEqual([
-      'image-1',
-      'pdf-1'
-    ])
-    expect(mockGenerateThumbnail.mock.calls.map((call) => call[1])).toEqual([
-      'image/png',
-      'application/pdf'
-    ])
-    expect(mockSaveThumbnail).toHaveBeenCalledWith('image-1', 'data:image/jpeg;base64,thumb')
-    expect(mockSaveThumbnail).toHaveBeenCalledWith('pdf-1', 'data:image/jpeg;base64,thumb')
+    await vi.waitFor(() => expect(mockGenerateThumbnail).toHaveBeenCalledTimes(3))
+    expect(maxActive).toBe(3)
+
+    releases.shift()?.()
+    await vi.waitFor(() => expect(mockGenerateThumbnail).toHaveBeenCalledTimes(4))
+    releases.shift()?.()
+    await vi.waitFor(() => expect(mockGenerateThumbnail).toHaveBeenCalledTimes(5))
+    releases.splice(0).forEach((release) => release())
+
+    await refresh
+    expect(maxActive).toBe(3)
+  })
+
+  it('limits overlapping invocations to three and releases a failed slot', async () => {
+    const images = await createImageItems(5)
+    let active = 0
+    let maxActive = 0
+    const pending: Array<{ resolve: () => void; reject: (error: Error) => void }> = []
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mockGenerateThumbnail.mockImplementation(async () => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      try {
+        await new Promise<void>((resolve, reject) => pending.push({ resolve, reject }))
+      } finally {
+        active -= 1
+      }
+      return null
+    })
+
+    const firstRefresh = refreshImportedMediaAssets(images.slice(0, 3))
+    const secondRefresh = refreshImportedMediaAssets(images.slice(3))
+
+    await vi.waitFor(() => expect(mockGenerateThumbnail).toHaveBeenCalledTimes(3))
+    expect(maxActive).toBe(3)
+
+    pending.shift()?.reject(new Error('thumbnail failed'))
+    await vi.waitFor(() => expect(mockGenerateThumbnail).toHaveBeenCalledTimes(4))
+    pending.shift()?.resolve()
+    await vi.waitFor(() => expect(mockGenerateThumbnail).toHaveBeenCalledTimes(5))
+    pending.splice(0).forEach(({ resolve }) => resolve())
+
+    await Promise.all([firstRefresh, secondRefresh])
+    expect(maxActive).toBe(3)
+    expect(warn).toHaveBeenCalledWith(
+      '[sync] Failed to refresh synced media asset',
+      expect.objectContaining({ error: expect.any(Error) })
+    )
+    warn.mockRestore()
   })
 })

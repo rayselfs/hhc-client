@@ -86,7 +86,9 @@ describe('browser HHC auth', () => {
   it('opens a blank popup synchronously and navigates it to the exact authorization URL', async () => {
     const { adapter, open } = createAdapter()
 
-    await adapter.signIn()
+    await expect(adapter.signIn()).resolves.toEqual({
+      expiresAt: 301_000
+    })
 
     expect(open).toHaveBeenCalledWith('', 'hhc-account-auth', 'popup,width=520,height=720')
     const opened = open.mock.results[0]?.value as Window
@@ -109,11 +111,180 @@ describe('browser HHC auth', () => {
     await expect(adapter.signIn()).rejects.toThrow('Sign-in popup was blocked')
   })
 
-  it('reuses the active popup without creating a second transaction', async () => {
+  it('replaces an active popup and rejects the abandoned callback', async () => {
     const { adapter, open } = createAdapter()
     await adapter.signIn()
+    const abandoned = open.mock.results[0]?.value as Window
+    const abandonedState = new URL(String(abandoned.location.href)).searchParams.get('state')!
     await adapter.signIn()
-    expect(open).toHaveBeenCalledTimes(1)
+    const replacement = open.mock.results[1]?.value as Window
+    const replacementState = new URL(String(replacement.location.href)).searchParams.get('state')!
+
+    expect(open).toHaveBeenCalledTimes(2)
+    expect(abandoned.close).toHaveBeenCalledOnce()
+    expect(replacementState).not.toBe(abandonedState)
+  })
+
+  it('cancels the owned popup and ignores its late message', async () => {
+    const fetcher = vi.fn()
+    const { adapter, open, target } = createAdapter({ fetcher })
+    await adapter.signIn()
+    const opened = open.mock.results[0]?.value as Window
+    const state = new URL(String(opened.location.href)).searchParams.get('state')!
+
+    await adapter.cancelSignIn()
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        origin: CLIENT_ORIGIN,
+        source: opened,
+        data: { code: 'late-code', state }
+      })
+    )
+    await Promise.resolve()
+
+    expect(opened.close).toHaveBeenCalledOnce()
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('closes and invalidates an expired popup transaction', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetcher = vi.fn()
+      let now = 1_000
+      const { adapter, open, target } = createAdapter({ fetcher, now: () => now })
+      await adapter.signIn()
+      const opened = open.mock.results[0]?.value as Window
+      const state = new URL(String(opened.location.href)).searchParams.get('state')!
+
+      now += 300_000
+      await vi.advanceTimersByTimeAsync(300_000)
+      target.dispatchEvent(
+        new MessageEvent('message', {
+          origin: CLIENT_ORIGIN,
+          source: opened,
+          data: { code: 'late-code', state }
+        })
+      )
+      await Promise.resolve()
+
+      expect(opened.close).toHaveBeenCalledOnce()
+      expect(fetcher).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps token completion exclusive from replacement sign-in', async () => {
+    let resolveToken!: (value: Response) => void
+    const fetcher = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/oauth/token')) {
+        return new Promise<Response>((resolve) => {
+          resolveToken = resolve
+        })
+      }
+      if (String(input).endsWith('/session')) {
+        return Promise.resolve(
+          response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        )
+      }
+      throw new Error(`Unexpected URL: ${String(input)}`)
+    })
+    const { adapter, open, target } = createAdapter({ fetcher })
+    await adapter.signIn()
+    const opened = open.mock.results[0]?.value as Window
+    const state = new URL(String(opened.location.href)).searchParams.get('state')!
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        origin: CLIENT_ORIGIN,
+        source: opened,
+        data: { code: 'code-1', state }
+      })
+    )
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce())
+
+    await expect(adapter.signIn()).rejects.toThrow('HHC sign-in is already in progress')
+
+    resolveToken(
+      response({
+        access_token: jwt({ sub: 'user-1', roles: [], exp: 9_999_999_999 })
+      })
+    )
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+  })
+
+  it('keeps sign-out exclusive from replacement sign-in', async () => {
+    let resolveLogout!: (value: Response) => void
+    const fetcher = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith('/csrf-token')) {
+        return Promise.resolve(response({ csrf_token: 'csrf-sign-out' }))
+      }
+      if (String(input).endsWith('/session/logout')) {
+        return new Promise<Response>((resolve) => {
+          resolveLogout = resolve
+        })
+      }
+      throw new Error(`Unexpected URL: ${String(input)}`)
+    })
+    const { adapter } = createAdapter({ fetcher })
+    const signingOut = adapter.signOut()
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+
+    await expect(adapter.signIn()).rejects.toThrow('HHC sign-in is already in progress')
+
+    resolveLogout(response({}))
+    await signingOut
+  })
+
+  it('waits for token completion before clearing the cookie session', async () => {
+    const requests: string[] = []
+    let resolveToken!: (value: Response) => void
+    let resolveLogout!: (value: Response) => void
+    const fetcher = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/oauth/token')) {
+        requests.push('token')
+        return new Promise<Response>((resolve) => {
+          resolveToken = resolve
+        })
+      }
+      if (url.endsWith('/csrf-token')) {
+        requests.push('csrf')
+        return Promise.resolve(response({ csrf_token: 'csrf-after-completion' }))
+      }
+      if (url.endsWith('/session/logout')) {
+        requests.push('logout')
+        return new Promise<Response>((resolve) => {
+          resolveLogout = resolve
+        })
+      }
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const { adapter, open, target } = createAdapter({ fetcher })
+    await adapter.signIn()
+    const opened = open.mock.results[0]?.value as Window
+    const state = new URL(String(opened.location.href)).searchParams.get('state')!
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        origin: CLIENT_ORIGIN,
+        source: opened,
+        data: { code: 'code-before-sign-out', state }
+      })
+    )
+    await vi.waitFor(() => expect(requests).toEqual(['token']))
+
+    const signingOut = adapter.signOut()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(requests).toEqual(['token'])
+
+    resolveToken(
+      response({
+        access_token: jwt({ sub: 'user-1', roles: [], exp: 9_999_999_999 })
+      })
+    )
+    await vi.waitFor(() => expect(requests).toEqual(['token', 'csrf', 'logout']))
+    resolveLogout(response({}))
+    await signingOut
   })
 
   it('exchanges only an exact-origin, matching-popup, matching-state callback once', async () => {

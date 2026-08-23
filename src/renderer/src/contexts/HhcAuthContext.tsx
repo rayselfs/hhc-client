@@ -3,11 +3,15 @@ import type { HhcAuthAdapter, HhcSession } from '@shared/hhc-auth'
 import { createHhcAuthAdapter } from '@renderer/lib/hhc-auth'
 
 export type HhcAuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'unavailable'
+export type HhcSignInStatus = 'idle' | 'pending' | 'cancelled' | 'expired'
 
 type HhcAuthContextValue = {
   status: HhcAuthStatus
   session: HhcSession | null
+  signInStatus: HhcSignInStatus
+  pendingSignInExpiresAt: number | null
   signIn(): Promise<void>
+  cancelSignIn(): Promise<void>
   signOut(): Promise<void>
   endSession(): Promise<void>
   getAuthGeneration(): number
@@ -20,10 +24,13 @@ const HhcAuthContext = createContext<HhcAuthContextValue | null>(null)
 export function HhcAuthProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [status, setStatus] = useState<HhcAuthStatus>('loading')
   const [session, setSession] = useState<HhcSession | null>(null)
+  const [signInStatus, setSignInStatus] = useState<HhcSignInStatus>('idle')
+  const [pendingSignInExpiresAt, setPendingSignInExpiresAt] = useState<number | null>(null)
   const adapterRef = useRef<HhcAuthAdapter | null>(null)
   const sessionRef = useRef<HhcSession | null>(null)
   const sessionEpochRef = useRef(0)
   const authGenerationRef = useRef(0)
+  const signInAttemptRef = useRef(0)
   const signOutPendingRef = useRef(false)
   const accessTokenPromiseRef = useRef<Promise<string | null> | null>(null)
   const refreshTokenPromiseRef = useRef<Promise<string | null> | null>(null)
@@ -109,6 +116,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
 
         unsubscribe = createdAdapter.subscribe((nextSession) => {
           if (!active) return
+          if (nextSession) {
+            signInAttemptRef.current += 1
+            setSignInStatus('idle')
+            setPendingSignInExpiresAt(null)
+          }
           if (cleanupUserId) {
             pendingSession = nextSession
             if (!cleanupInFlight) beginCleanup(cleanupUserId)
@@ -154,6 +166,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
       unsubscribe?.()
       if (adapterRef.current === adapter) adapterRef.current = null
       sessionRef.current = null
+      signInAttemptRef.current += 1
       signOutPendingRef.current = false
       sessionTransitionPromiseRef.current = Promise.resolve()
       invalidateTokenRequests()
@@ -165,27 +178,77 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     const adapter = adapterRef.current
     if (!adapter) throw new Error('HHC account is unavailable')
     const previousSession = sessionRef.current
+    const attempt = ++signInAttemptRef.current
+    setSignInStatus('pending')
+    setPendingSignInExpiresAt(null)
     sessionRef.current = null
     signOutPendingRef.current = false
     invalidateTokenRequests()
     try {
       const generation = authGenerationRef.current
-      await adapter.signIn()
-      if (adapterRef.current === adapter && authGenerationRef.current === generation) {
+      const pending = await adapter.signIn()
+      if (adapterRef.current === adapter && signInAttemptRef.current === attempt) {
+        setPendingSignInExpiresAt(pending.expiresAt)
+      }
+      if (
+        adapterRef.current === adapter &&
+        signInAttemptRef.current === attempt &&
+        authGenerationRef.current === generation
+      ) {
         authGenerationRef.current += 1
       }
     } catch (error) {
-      if (adapterRef.current === adapter && !sessionRef.current) {
+      if (adapterRef.current !== adapter || signInAttemptRef.current !== attempt) return
+      setSignInStatus('idle')
+      setPendingSignInExpiresAt(null)
+      if (!sessionRef.current) {
         sessionRef.current = previousSession
       }
       throw error
     }
   }, [invalidateTokenRequests])
 
+  const cancelSignIn = useCallback(async (): Promise<void> => {
+    const adapter = adapterRef.current
+    if (!adapter) throw new Error('HHC account is unavailable')
+    const attempt = ++signInAttemptRef.current
+    await adapter.cancelSignIn()
+    if (adapterRef.current === adapter && signInAttemptRef.current === attempt) {
+      setSignInStatus('cancelled')
+      setPendingSignInExpiresAt(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (signInStatus !== 'pending' || pendingSignInExpiresAt === null) return
+    const attempt = signInAttemptRef.current
+    const timer = window.setTimeout(
+      () => {
+        const adapter = adapterRef.current
+        if (!adapter || signInAttemptRef.current !== attempt) return
+        signInAttemptRef.current += 1
+        setPendingSignInExpiresAt(null)
+        void adapter
+          .cancelSignIn()
+          .catch(() => undefined)
+          .finally(() => {
+            if (adapterRef.current === adapter && signInAttemptRef.current === attempt + 1) {
+              setSignInStatus('expired')
+            }
+          })
+      },
+      Math.max(0, pendingSignInExpiresAt - Date.now())
+    )
+    return () => window.clearTimeout(timer)
+  }, [pendingSignInExpiresAt, signInStatus])
+
   const signOut = useCallback(async (): Promise<void> => {
     const adapter = adapterRef.current
     if (!adapter) throw new Error('HHC account is unavailable')
     const departingUserId = sessionRef.current?.userId
+    signInAttemptRef.current += 1
+    setSignInStatus('idle')
+    setPendingSignInExpiresAt(null)
     signOutPendingRef.current = true
     invalidateTokenRequests()
     try {
@@ -277,14 +340,28 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     () => ({
       status,
       session,
+      signInStatus,
+      pendingSignInExpiresAt,
       signIn,
+      cancelSignIn,
       signOut,
       endSession: signOut,
       getAuthGeneration,
       getAccessToken,
       refreshAccessToken
     }),
-    [getAccessToken, getAuthGeneration, refreshAccessToken, session, signIn, signOut, status]
+    [
+      cancelSignIn,
+      getAccessToken,
+      getAuthGeneration,
+      pendingSignInExpiresAt,
+      refreshAccessToken,
+      session,
+      signIn,
+      signInStatus,
+      signOut,
+      status
+    ]
   )
 
   return <HhcAuthContext.Provider value={value}>{children}</HhcAuthContext.Provider>

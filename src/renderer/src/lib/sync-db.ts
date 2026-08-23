@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { SyncOfflinePolicy, SyncProviderType } from '@shared/types/folder'
 import type { SyncDownloadCommitGuard, SyncRetryClassification } from './sync-provider'
+import { dispatchRecoverySourceChanged } from './recovery-source-events'
 
 export type SyncEntryKind = 'folder' | 'file'
 export type SyncEntryStatus =
@@ -15,6 +16,14 @@ export type SyncEntryStatus =
 
 export const SYNC_ENTRY_CHANGED_EVENT = 'hhc:sync-entry-changed'
 const alwaysCanCommit: SyncDownloadCommitGuard = () => true
+
+function isRecoverySyncEntry(entry: SyncEntryRecord | undefined): boolean {
+  return entry?.status === 'failed' || entry?.status === 'insufficient-storage'
+}
+
+function affectsRecoverySource(entry: SyncEntryRecord | undefined): boolean {
+  return isRecoverySyncEntry(entry) || Boolean(entry?.blobId)
+}
 
 export interface ProviderConnectionRecord {
   id: string
@@ -237,7 +246,10 @@ export async function listHhcLineProviderConnectionsByAccountUser(
 }
 
 export async function deleteProviderConnection(id: string): Promise<void> {
-  await (await getSyncDB()).delete('provider-connections', id)
+  const db = await getSyncDB()
+  const existing = await db.get('provider-connections', id)
+  await db.delete('provider-connections', id)
+  if (existing) dispatchRecoverySourceChanged()
 }
 
 export async function putSyncCursor(
@@ -283,6 +295,12 @@ export async function putSyncEntry(
   await tx.store.put(value)
   await tx.done
   dispatchSyncEntryChanged(value)
+  const recoveryStatusChanged =
+    (isRecoverySyncEntry(existing) || isRecoverySyncEntry(value)) &&
+    (existing?.status !== value.status || existing?.errorKind !== value.errorKind)
+  if (recoveryStatusChanged || existing?.blobId !== value.blobId) {
+    dispatchRecoverySourceChanged()
+  }
   return value
 }
 
@@ -359,14 +377,22 @@ export async function deleteSyncEntriesByProviderConnection(
   const tx = db.transaction('sync-entries', 'readwrite')
   await Promise.all(entries.map((entry) => tx.store.delete(entry.id)))
   await tx.done
+  if (entries.some(affectsRecoverySource)) dispatchRecoverySourceChanged()
 }
 
-export async function deleteSyncEntries(ids: string[]): Promise<void> {
+export async function deleteSyncEntries(
+  ids: string[],
+  options: { notifyRecovery?: boolean } = {}
+): Promise<void> {
   if (ids.length === 0) return
   const db = await getSyncDB()
   const tx = db.transaction('sync-entries', 'readwrite')
+  const entries = await Promise.all(ids.map((id) => tx.store.get(id)))
   await Promise.all(ids.map((id) => tx.store.delete(id)))
   await tx.done
+  if (options.notifyRecovery !== false && entries.some(affectsRecoverySource)) {
+    dispatchRecoverySourceChanged()
+  }
 }
 
 export async function putSyncEntryPreference(

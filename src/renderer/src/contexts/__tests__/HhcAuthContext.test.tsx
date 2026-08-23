@@ -48,7 +48,8 @@ function createAdapter(session: HhcSession | null | Error = null): TestAdapter {
       if (session instanceof Error) throw session
       return session
     }),
-    signIn: vi.fn(async () => undefined),
+    signIn: vi.fn(async () => ({ expiresAt: Date.now() + 300_000 })),
+    cancelSignIn: vi.fn(async () => undefined),
     getAccessToken: vi.fn(async () => 'access-token'),
     refreshAccessToken: vi.fn(async () => 'refreshed-access-token'),
     signOut: vi.fn(async () => undefined),
@@ -142,6 +143,60 @@ describe('HhcAuthContext', () => {
     expect(adapter.signOut).toHaveBeenCalledOnce()
     act(() => adapter.emit(null))
     await waitFor(() => expect(result.current.status).toBe('anonymous'))
+  })
+
+  it('reports pending sign-in metadata and explicit cancellation', async () => {
+    const adapter = createAdapter(null)
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+
+    await act(() => result.current.signIn())
+    expect(result.current.signInStatus).toBe('pending')
+    expect(result.current.pendingSignInExpiresAt).toBeGreaterThan(Date.now())
+
+    await act(() => result.current.cancelSignIn())
+    expect(adapter.cancelSignIn).toHaveBeenCalledOnce()
+    expect(result.current.signInStatus).toBe('cancelled')
+    expect(result.current.pendingSignInExpiresAt).toBeNull()
+  })
+
+  it('expires pending sign-in and ignores its late begin result after cancellation', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    try {
+      const adapter = createAdapter(null)
+      let rejectSignIn!: (reason: Error) => void
+      vi.mocked(adapter.signIn).mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          rejectSignIn = reject
+        })
+      )
+      authFactory.adapters.push(adapter)
+      const { result } = renderHook(() => useHhcAuth(), { wrapper })
+      await act(async () => Promise.resolve())
+      expect(result.current.status).toBe('anonymous')
+
+      const signingIn = result.current.signIn()
+      await act(async () => Promise.resolve())
+      expect(result.current.signInStatus).toBe('pending')
+      expect(result.current.pendingSignInExpiresAt).toBeNull()
+
+      await act(() => result.current.cancelSignIn())
+      rejectSignIn(new Error('late openExternal failure'))
+      await expect(signingIn).resolves.toBeUndefined()
+      expect(result.current.signInStatus).toBe('cancelled')
+
+      vi.mocked(adapter.signIn).mockResolvedValueOnce({
+        expiresAt: 301_000
+      })
+      await act(() => result.current.signIn())
+      await act(async () => vi.advanceTimersByTimeAsync(300_000))
+      expect(result.current.signInStatus).toBe('expired')
+      expect(adapter.cancelSignIn).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps account B unusable until departing account A cleanup completes', async () => {
@@ -238,7 +293,10 @@ describe('HhcAuthContext', () => {
 
   it('advances the runtime generation for re-auth and identity changes, not same-user updates', async () => {
     const adapter = createAdapter(SESSION)
-    vi.mocked(adapter.signIn).mockImplementationOnce(async () => adapter.emit(SESSION))
+    vi.mocked(adapter.signIn).mockImplementationOnce(async () => {
+      adapter.emit(SESSION)
+      return { expiresAt: Date.now() + 300_000 }
+    })
     vi.mocked(adapter.signOut).mockImplementationOnce(async () => adapter.emit(null))
     authFactory.adapters.push(adapter)
     const { result } = renderHook(() => useHhcAuth(), { wrapper })
@@ -260,7 +318,10 @@ describe('HhcAuthContext', () => {
 
   it('advances the runtime generation once when explicit sign-in emits an identity', async () => {
     const adapter = createAdapter(null)
-    vi.mocked(adapter.signIn).mockImplementationOnce(async () => adapter.emit(SESSION))
+    vi.mocked(adapter.signIn).mockImplementationOnce(async () => {
+      adapter.emit(SESSION)
+      return { expiresAt: Date.now() + 300_000 }
+    })
     authFactory.adapters.push(adapter)
     const { result } = renderHook(() => useHhcAuth(), { wrapper })
     await waitFor(() => expect(result.current.status).toBe('anonymous'))
@@ -395,6 +456,7 @@ describe('HhcAuthContext', () => {
     const adapter = createAdapter(null)
     vi.mocked(adapter.signIn).mockImplementationOnce(async () => {
       adapter.emit(SESSION)
+      return { expiresAt: Date.now() + 300_000 }
     })
     authFactory.adapters.push(adapter)
     const { result } = renderHook(() => useHhcAuth(), { wrapper })
@@ -539,6 +601,8 @@ describe('HhcAuthContext', () => {
     expect(authFactory.create).toHaveBeenCalledTimes(2)
     expect(first.dispose).toHaveBeenCalledOnce()
     expect(second.dispose).toHaveBeenCalledOnce()
+    expect(first.cancelSignIn).not.toHaveBeenCalled()
+    expect(second.cancelSignIn).not.toHaveBeenCalled()
     expect(first.unsubscribe).toHaveBeenCalledTimes(vi.mocked(first.subscribe).mock.calls.length)
     expect(second.unsubscribe).toHaveBeenCalledTimes(vi.mocked(second.subscribe).mock.calls.length)
   })

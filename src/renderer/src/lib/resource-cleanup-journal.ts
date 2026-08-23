@@ -2,6 +2,7 @@ import { openFileExplorerDB, type ResourceCleanupJournalRecord } from './file-ex
 import { isElectron } from './env'
 import { deleteDerivedAssetsForSource } from './media-work-db'
 import { deletePdfPageThumbs, deleteThumbnail } from './thumbnail-db'
+import { dispatchRecoverySourceChanged } from './recovery-source-events'
 
 type ResourceCleanupRecordInput = Omit<
   ResourceCleanupJournalRecord,
@@ -37,6 +38,7 @@ export async function putResourceCleanupRecord(
 ): Promise<void> {
   const db = await openFileExplorerDB()
   await db.put('resource-cleanup-journal', record)
+  dispatchRecoverySourceChanged()
 }
 
 export async function getResourceCleanupRecord(
@@ -75,6 +77,7 @@ export async function retryResourceCleanup(id: string): Promise<void> {
   try {
     await processResourceCleanup(record)
     await db.delete('resource-cleanup-journal', id)
+    dispatchRecoverySourceChanged()
   } catch (error) {
     await db.put('resource-cleanup-journal', {
       ...record,
@@ -83,6 +86,7 @@ export async function retryResourceCleanup(id: string): Promise<void> {
       lastError: getErrorMessage(error),
       updatedAt: Date.now()
     })
+    dispatchRecoverySourceChanged()
     throw error
   }
 }

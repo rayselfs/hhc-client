@@ -92,6 +92,12 @@ export async function clearStaleNativeMediaLeases(): Promise<void> {
   await fs.rm(getNativeMediaLeaseDir(), { recursive: true, force: true })
 }
 
+export async function clearStaleNativeMediaLeasesOnStartup(): Promise<void> {
+  await clearStaleNativeMediaLeases().catch((error) => {
+    console.warn('[MAIN] Failed to clear stale native media leases', error)
+  })
+}
+
 type ByteRange = {
   start: number
   end: number
@@ -148,6 +154,7 @@ async function createNativeMediaResponse(
   const stream = createReadStream(filePath, { start: range.start, end: range.end })
   const headers = new Headers({
     'Accept-Ranges': 'bytes',
+    'Cache-Control': 'no-store',
     'Content-Length': String(contentLength),
     'Content-Type': mimeType
   })

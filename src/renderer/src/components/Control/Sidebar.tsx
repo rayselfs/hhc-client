@@ -178,6 +178,7 @@ export default function Sidebar(): React.JSX.Element {
 
       <div className="mt-auto">
         <UserMenu
+          isExpanded={!isCollapsed}
           onOpenPreferences={() => {
             setInitialPreferenceRoute('general')
             setPrefsOpen(true)
