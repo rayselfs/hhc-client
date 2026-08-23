@@ -88,15 +88,13 @@ vi.mock('@renderer/components/Control/FileExplorer/FileBrowser', () => ({
 vi.mock('@renderer/components/Control/FileExplorer/FileExplorerFAB', () => ({
   default: ({
     onAddHhcLine,
-    isAddHhcLineDisabled,
-    hhcLineLabel
+    isAddHhcLineDisabled
   }: {
     onAddHhcLine?: () => void
     isAddHhcLineDisabled?: boolean
-    hhcLineLabel?: string
   }) => (
     <button disabled={isAddHhcLineDisabled} onClick={onAddHhcLine}>
-      {hhcLineLabel}
+      Add LINE media folder
     </button>
   )
 }))
@@ -164,13 +162,11 @@ describe('FilesPage HHC LINE role resolution', () => {
     )
     const view = render(<FilesPage />)
 
-    expect(
-      screen.getByRole('button', { name: 'Add HHC LINE — Checking HHC LINE access…' })
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add LINE media folder' })).toBeDisabled()
     expect(mocks.getAccessToken).toHaveBeenCalledTimes(1)
 
     await act(async () => resolveToken('token'))
-    expect(await screen.findByRole('button', { name: 'Add HHC LINE' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Add LINE media folder' })).toBeEnabled()
     view.rerender(<FilesPage />)
     expect(mocks.getAccessToken).toHaveBeenCalledTimes(1)
     expect(mocks.getCloudProviderAdapter).toHaveBeenCalledWith(
@@ -182,26 +178,22 @@ describe('FilesPage HHC LINE role resolution', () => {
     )
   })
 
-  it('keeps HHC LINE visible and disabled when the account lacks the media sync role', async () => {
-    mocks.getAccessToken.mockResolvedValue('token')
-    const view = render(<FilesPage />)
+  it('allows the Asset API to resolve folder access without a client-side role gate', async () => {
     mocks.session = { userId: 'user-1', displayName: 'Ada', roles: ['reader'] }
-    view.rerender(<FilesPage />)
+    mocks.getAccessToken.mockResolvedValue('token')
+    render(<FilesPage />)
 
-    expect(
-      await screen.findByRole('button', {
-        name: 'Add HHC LINE — Your HHC account needs media sync access.'
-      })
-    ).toBeDisabled()
+    const action = await screen.findByRole('button', { name: 'Add LINE media folder' })
+    expect(action).toBeEnabled()
+    await userEvent.click(action)
+    expect(screen.getByText('HHC picker open')).toBeInTheDocument()
   })
 
   it('keeps HHC LINE visible and disabled while signed out', () => {
     mocks.session = null
     render(<FilesPage />)
 
-    expect(
-      screen.getByRole('button', { name: 'Add HHC LINE — Sign in to HHC first.' })
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add LINE media folder' })).toBeDisabled()
   })
 
   it('does not open the picker from a disabled folder context action', async () => {
@@ -219,7 +211,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     mocks.getAccessToken.mockResolvedValue('token')
     render(<FilesPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Add HHC LINE' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Add LINE media folder' }))
     expect(screen.getByText('HHC picker open')).toBeInTheDocument()
   })
 })

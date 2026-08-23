@@ -32,7 +32,7 @@ describe('createFolderContextMenu HHC LINE action', () => {
     expect(onAddHhcLine).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps an unavailable HHC LINE action visible with its reason in the label', () => {
+  it('keeps the plain HHC LINE action label while unavailable', () => {
     showMenu.mockClear()
     const { result } = renderHook(() => createFolderContextMenu()())
 
@@ -42,14 +42,13 @@ describe('createFolderContextMenu HHC LINE action', () => {
       onPaste: vi.fn(),
       onNewFolder: vi.fn(),
       onAddHhcLine: vi.fn(),
-      isAddHhcLineDisabled: true,
-      hhcLineLabel: 'Add HHC LINE — Checking HHC LINE access…'
+      isAddHhcLineDisabled: true
     })
 
     const entries = showMenu.mock.calls[0][0]
     const action = entries.find((entry: { id?: string }) => entry?.id === 'add-hhc-line')
     expect(action).toMatchObject({
-      label: 'Add HHC LINE — Checking HHC LINE access…',
+      label: 'folder.contextMenu.addHhcLine',
       disabled: true
     })
   })
