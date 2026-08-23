@@ -83,6 +83,14 @@ describe('startPresentation', () => {
       sourceUrl: 'blob:source-blob'
     })
   })
+
+  it('increments the session revision for every explicit start', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    expect(useMediaProjectionStore.getState().sessionRevision).toBe(1)
+
+    useMediaProjectionStore.getState().startPresentation(files, 1)
+    expect(useMediaProjectionStore.getState().sessionRevision).toBe(2)
+  })
 })
 
 describe('startPresentationWithReadiness', () => {
@@ -116,6 +124,7 @@ describe('startPresentationWithReadiness', () => {
     expect(state.isPresenting).toBe(false)
     expect(state.playlist).toEqual([])
     expect(state.lastReadinessReport).toBe(report)
+    expect(state.sessionRevision).toBe(0)
   })
 
   it('starts a presentation with its requested slide state atomically', async () => {
@@ -222,6 +231,15 @@ describe('next / prev', () => {
     useMediaProjectionStore.setState({ currentIndex: 2 })
     useMediaProjectionStore.getState().next()
     expect(useMediaProjectionStore.getState().currentIndex).toBe(2)
+  })
+
+  it('next() on the end screen keeps the live session for an explicit close', () => {
+    useMediaProjectionStore.setState({ currentIndex: 2 })
+    useMediaProjectionStore.getState().next()
+    useMediaProjectionStore.getState().next()
+
+    expect(useMediaProjectionStore.getState().isPresenting).toBe(true)
+    expect(useMediaProjectionStore.getState().isEnded).toBe(true)
   })
 
   it('prev() decrements index', () => {

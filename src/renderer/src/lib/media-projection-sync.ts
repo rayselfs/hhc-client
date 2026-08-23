@@ -281,7 +281,8 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
 
-      const started = !prev.isPresenting && state.isPresenting
+      const started =
+        (!prev.isPresenting && state.isPresenting) || state.sessionRevision !== prev.sessionRevision
       if (!started && activeOwner !== 'media') return
       const indexChanged = state.currentIndex !== prev.currentIndex
       const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
@@ -307,11 +308,10 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
       if (prev.isPresenting && !state.isPresenting) {
         projectSequenceRef.current += 1
         clearRemoteSource()
-        void stopProjection()
       }
     })
     return unsub
-  }, [clearRemoteSource, stopProjection])
+  }, [clearRemoteSource])
 
   useEffect(() => {
     const unsubscribe = useFileExplorerStore.subscribe((state) => {

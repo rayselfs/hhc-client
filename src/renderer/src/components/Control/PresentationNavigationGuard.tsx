@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { useBeforeUnload, useBlocker } from 'react-router-dom'
+import { toast } from '@heroui/react/toast'
+import { useTranslation } from 'react-i18next'
+import { useBeforeUnload, useBlocker, useLocation } from 'react-router-dom'
 import { usePresentationCloseDecision } from '@renderer/contexts/PresentationCloseDecisionContext'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import {
   usePresentationSessionRegistry,
   type PresentationSessionRegistry
 } from '@renderer/contexts/PresentationSessionRegistryContext'
+import { closeProjectionAndMediaSession } from '@renderer/lib/projection-actions'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 type RequestCloseDecision = ReturnType<typeof usePresentationCloseDecision>
 
@@ -49,16 +54,22 @@ export function usePresentationSafeAction(): (
 }
 
 export default function PresentationNavigationGuard(): null {
+  const { t } = useTranslation()
+  const location = useLocation()
+  const { stopProjection } = useProjection()
   const registry = usePresentationSessionRegistry()
   const requestCloseDecision = usePresentationCloseDecision()
+  const isMediaPresenting = useMediaProjectionStore((state) => state.isPresenting)
+  const endLiveSession = useMediaProjectionStore((state) => state.endLiveSession)
   const isProcessingRef = useRef(false)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      registry.hasUnsafeWork() && currentLocation.pathname !== nextLocation.pathname
+      currentLocation.pathname !== nextLocation.pathname &&
+      (registry.hasUnsafeWork() || (currentLocation.pathname === '/media' && isMediaPresenting))
   )
 
   useBeforeUnload((event) => {
-    if (!registry.hasUnsafeWork()) return
+    if (!registry.hasUnsafeWork() && !isMediaPresenting) return
     event.preventDefault()
     event.returnValue = ''
   })
@@ -66,19 +77,43 @@ export default function PresentationNavigationGuard(): null {
   useEffect(() => {
     if (blocker.state !== 'blocked' || isProcessingRef.current) return
     isProcessingRef.current = true
-    void resolveUnsafePresentationWork(registry, requestCloseDecision)
-      .then((canLeave) => {
-        if (canLeave) {
-          blocker.proceed()
-        } else {
+    const isLeavingMedia = location.pathname === '/media' && isMediaPresenting
+    void (async () => {
+      if (
+        registry.hasUnsafeWork() &&
+        !(await resolveUnsafePresentationWork(registry, requestCloseDecision))
+      ) {
+        blocker.reset()
+        return
+      }
+      if (isLeavingMedia) {
+        try {
+          await closeProjectionAndMediaSession({
+            closeProjection: stopProjection,
+            endLiveSession
+          })
+        } catch {
+          toast.danger(t('toast.projectionCloseFailed'))
           blocker.reset()
+          return
         }
-      })
+      }
+      blocker.proceed()
+    })()
       .catch(() => blocker.reset())
       .finally(() => {
         isProcessingRef.current = false
       })
-  }, [blocker, registry, requestCloseDecision])
+  }, [
+    blocker,
+    endLiveSession,
+    isMediaPresenting,
+    location.pathname,
+    registry,
+    requestCloseDecision,
+    stopProjection,
+    t
+  ])
 
   return null
 }

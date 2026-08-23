@@ -702,6 +702,22 @@ describe('ProjectionContext Electron recovery', () => {
     expect(mockAdapter.getGeneration()).toBe(0)
   })
 
+  it('retains the active projection session when Electron close fails', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    mockClose.mockRejectedValue(new Error('close failed'))
+
+    await expect(
+      act(async () => {
+        await result.current.closeProjection()
+      })
+    ).rejects.toThrow('close failed')
+
+    expect(result.current.getProjectionSnapshot()?.owner).toBe('media')
+    expect(mockAdapter.getGeneration()).toBe(4)
+  })
+
   it('unsubscribes from lifecycle events on cleanup', () => {
     const { unmount } = renderProjection()
     unmount()

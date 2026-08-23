@@ -378,7 +378,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const closeProjection = useCallback(async (): Promise<void> => {
     const coordinator = getCoordinator()
     const adapter = getAdapter(adapterRef, browserSessionId)
-    coordinator.endSession()
     if (isElectron()) {
       await window.api.projection.close()
     } else {
@@ -387,6 +386,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionWindowRef.current = null
       stopPolling()
     }
+    coordinator.endSession()
     adapter.setGeneration(0)
     updateOpen(false)
   }, [browserSessionId, getCoordinator, stopPolling, updateOpen])

@@ -8,12 +8,14 @@ interface MediaPreviewProps {
   currentItem: FileItemRecord | null
   descriptor: MediaTypeDescriptor | null
   isEnded?: boolean
+  onExit: () => void
 }
 
 export default function MediaPreview({
   currentItem,
   descriptor,
-  isEnded = false
+  isEnded = false,
+  onExit
 }: MediaPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const previewBoxRef = useRef<HTMLDivElement>(null)
@@ -22,7 +24,7 @@ export default function MediaPreview({
   const panDragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0, w: 1, h: 1, zoom: 1 })
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
-  const { next, exit } = useMediaProjectionStore.getState()
+  const { next } = useMediaProjectionStore.getState()
 
   useEffect(() => {
     const el = previewBoxRef.current
@@ -98,7 +100,7 @@ export default function MediaPreview({
         className="aspect-video w-full overflow-hidden relative rounded-2xl bg-surface-secondary border border-default-300"
         onClick={() => {
           if (isEnded) {
-            exit()
+            onExit()
             return
           }
           if (descriptor?.clickToAdvance && zoomLevel <= 1) next()
