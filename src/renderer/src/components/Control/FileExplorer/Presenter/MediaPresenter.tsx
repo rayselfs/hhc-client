@@ -208,7 +208,12 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
             stage={
               <StageViewport className="h-full">
                 <PresenterHeader onExit={onExit} />
-                <MediaPreview currentItem={currentItem} descriptor={descriptor} isEnded={isEnded} />
+                <MediaPreview
+                  currentItem={currentItem}
+                  descriptor={descriptor}
+                  isEnded={isEnded}
+                  onExit={onExit}
+                />
                 <MediaToolbar onToggleGrid={toggleGridWithMediaPause} />
                 <div className="flex-1" />
                 <PresenterNavigation />

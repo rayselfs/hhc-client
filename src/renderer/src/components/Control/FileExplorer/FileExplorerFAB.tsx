@@ -16,7 +16,6 @@ export interface FileExplorerFABProps {
   onAddHhcLine?: () => void
   isAddOneDriveDisabled?: boolean
   isAddHhcLineDisabled?: boolean
-  hhcLineLabel?: string
   isReadOnly?: boolean
 }
 
@@ -29,7 +28,6 @@ export default function FileExplorerFAB({
   onAddHhcLine,
   isAddOneDriveDisabled = false,
   isAddHhcLineDisabled = false,
-  hhcLineLabel,
   isReadOnly = false
 }: FileExplorerFABProps): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -168,7 +166,7 @@ export default function FileExplorerFAB({
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
                       <Cloud size={16} />
-                      {hhcLineLabel ?? t('fileExplorer.contextMenu.addHhcLine')}
+                      {t('fileExplorer.contextMenu.addHhcLine')}
                     </Dropdown.Item>
                   )}
                 </Dropdown.Section>

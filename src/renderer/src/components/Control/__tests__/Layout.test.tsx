@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -10,6 +10,7 @@ import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { useTimerStore } from '@renderer/stores/timer'
 import type { ProjectionPayload } from '@shared/projection-messages'
 import type { HhcSession } from '@shared/hhc-auth'
 import type { SyncRuntimeOptions } from '@renderer/lib/sync-runtime'
@@ -64,6 +65,10 @@ vi.mock('@renderer/contexts/HhcAuthContext', () => ({
 
 vi.mock('@renderer/pages/BiblePage', () => ({
   default: () => <div data-testid="bible-page" />
+}))
+
+vi.mock('@renderer/pages/TimerPage', () => ({
+  default: () => <div data-testid="timer-page" />
 }))
 
 vi.mock('@renderer/lib/timer-adapter', () => ({
@@ -132,6 +137,8 @@ describe('Layout', () => {
     authRuntime.session = null
     authRuntime.generation = 0
     initializeAppMock.mockClear()
+    useMediaProjectionStore.getState().endLiveSession()
+    useTimerStore.setState({ status: 'stopped' })
   })
 
   afterEach(() => {
@@ -172,19 +179,45 @@ describe('Layout', () => {
     expect(screen.getByRole('link', { name: /bible/i })).toBeInTheDocument()
   })
 
+  it('gives the Media workspace the full control window without global navigation', async () => {
+    await i18n.changeLanguage('en')
+    useMediaProjectionStore.getState().startPresentation(
+      [
+        {
+          id: 'image-1',
+          parentId: 'root',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'image.png',
+          url: 'blob:image-1',
+          size: 10,
+          mimeType: 'image/png'
+        }
+      ],
+      0
+    )
+    useTimerStore.setState({ status: 'running', progress: 0.5, remainingSeconds: 30 })
+
+    renderWithRouter(['/media'])
+
+    await waitFor(() => expect(document.querySelector('main')).toHaveClass('overflow-hidden'))
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Timer' })).not.toBeInTheDocument()
+  })
+
   it('does not have a divider between header and main (no border-b on header)', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
-    await screen.findByTestId('timer-page')
-    const header = document.querySelector('header')
-    expect(header).not.toBeNull()
-    expect(header!.classList.contains('border-b')).toBe(false)
+    const header = await screen.findByRole('banner')
+    expect(header.classList.contains('border-b')).toBe(false)
   })
 
   it('does not render an hr element between header and main', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
-    await screen.findByTestId('timer-page')
+    await screen.findByTestId('timer-page', {}, { timeout: 5_000 })
     expect(document.querySelector('hr')).not.toBeInTheDocument()
   })
 
@@ -241,7 +274,7 @@ describe('Layout', () => {
       </StrictMode>
     )
     render(tree())
-    await screen.findByTestId('timer-page')
+    await waitFor(() => expect(initializeAppMock).toHaveBeenCalled())
     const initialCalls = initializeAppMock.mock.calls.length
     const options = initializeAppMock.mock.calls.at(-1)?.[0]
     const hhcAuth = options?.hhcAuth

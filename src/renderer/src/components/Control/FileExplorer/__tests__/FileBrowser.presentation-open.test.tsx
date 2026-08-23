@@ -192,6 +192,30 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
+  it('enters Media after Shift+F5 starts a ready projection', async () => {
+    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: []
+    })
+    await renderWithItems([image])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5', shiftKey: true })
+
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
+  })
+
+  it('stays in Files when Shift+F5 preparation fails', async () => {
+    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    mocks.startMediaProjection.mockRejectedValue(new Error('preparation failed'))
+    await renderWithItems([image])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5', shiftKey: true })
+    await act(async () => Promise.resolve())
+
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
   it('opens a PDF in the safe preview when double-clicked', async () => {
     const pdf = makeFile({ id: 'pdf-1', name: 'Program.pdf', mimeType: 'application/pdf' })
     await renderWithItems([pdf])

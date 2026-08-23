@@ -395,7 +395,7 @@ test('restores the HHC account session without storing the access token', async 
 
   await page.getByRole('link', { name: /files/i }).click()
   await page.getByLabel('New').click()
-  await page.getByRole('menuitem', { name: 'Add HHC LINE' }).click()
+  await page.getByRole('menuitem', { name: 'Add LINE media folder' }).click()
   await page.getByRole('button', { name: collection.name }).click()
   await page.getByRole('button', { name: 'Add Folder' }).click()
   const importedCollection = page.locator(`span[title="${collection.name}"]`)
@@ -485,7 +485,7 @@ test('restores the HHC account session without storing the access token', async 
   expect(persistedFileBlobs).toBe(0)
 })
 
-test('keeps Media live through Files navigation and closes from the Header', async ({
+test('uses full-window Media controls and closes from the control workspace', async ({
   page,
   context
 }) => {
@@ -508,6 +508,7 @@ test('keeps Media live through Files navigation and closes from the Header', asy
   const projection = await projectionPromise
   await expect(page).toHaveURL(/#\/media$/)
   await expect(projection.getByRole('img', { name: 'First.png' })).toBeVisible()
+  await expect(page.getByRole('navigation')).toHaveCount(0)
   await page.waitForTimeout(500)
   await expect(page).toHaveURL(/#\/media$/)
 
@@ -530,17 +531,20 @@ test('keeps Media live through Files navigation and closes from the Header', asy
 
   await page.getByTestId('media-back-to-files').click()
   await expect(page).toHaveURL(/#\/files$/)
+  await expect.poll(() => projection.isClosed()).toBe(true)
+
   await upload.setInputFiles({ name: 'Second.png', mimeType: 'image/png', buffer: png })
   await expect(page.getByText('Second.png')).toBeVisible()
-  await page.getByText('Second.png').dblclick()
+  const headerProjectionPromise = context.waitForEvent('page')
+  await page.getByRole('button', { name: /Start projection|開始投影/ }).click()
+  const headerProjection = await headerProjectionPromise
   await expect(page).toHaveURL(/#\/media$/)
-  await expect(projection.getByRole('img', { name: 'Second.png' })).toBeVisible()
+  await expect(headerProjection.getByRole('img', { name: 'First.png' })).toBeVisible()
   expect(context.pages()).toHaveLength(2)
 
-  await page.getByTestId('media-back-to-files').click()
+  await page.keyboard.press('Escape')
   await expect(page).toHaveURL(/#\/files$/)
-  await page.getByRole('button', { name: /Stop projection|停止投影/ }).click()
-  await expect.poll(() => projection.isClosed()).toBe(true)
+  await expect.poll(() => headerProjection.isClosed()).toBe(true)
 })
 
 test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ page }) => {

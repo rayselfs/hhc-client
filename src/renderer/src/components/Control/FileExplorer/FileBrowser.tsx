@@ -1010,6 +1010,10 @@ export function FileBrowser({
             { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
             { prioritizeStartItem: true }
           )
+            .then((report) => {
+              if (report.summary.ready > 0) navigate('/media')
+            })
+            .catch(() => undefined)
         },
         preventDefault: true
       }

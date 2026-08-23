@@ -98,7 +98,8 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
       { path: '/', element },
       { path: '/timer', element },
       { path: '/bible', element },
-      { path: '/files', element }
+      { path: '/files', element },
+      { path: '/media', element: <div data-testid="media-workspace" /> }
     ],
     { initialEntries }
   )
@@ -263,6 +264,7 @@ describe('Header', () => {
       [expect.objectContaining({ id: 'image-1' })],
       0
     )
+    expect(await screen.findByTestId('media-workspace')).toBeInTheDocument()
   })
 
   it('starts current folder presentation with F5 from the files route', async () => {
@@ -288,6 +290,7 @@ describe('Header', () => {
         0
       )
     )
+    expect(await screen.findByTestId('media-workspace')).toBeInTheDocument()
   })
 
   it('renders stop projection button with correct aria-label in English when open', async () => {

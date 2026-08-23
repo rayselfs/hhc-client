@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useCallback, useMemo } from 'react'
 import { ButtonGroup } from '@heroui/react/button-group'
@@ -42,6 +42,7 @@ import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
+  const navigate = useNavigate()
   const { isProjectionOpen, startProjection, stopProjection } = useProjection()
   const mode = useTimerStore((s) => s.mode)
 
@@ -117,7 +118,7 @@ export default function Header(): React.JSX.Element {
 
   const startCurrentRouteProjection = useCallback(async (): Promise<void> => {
     if (isProjectionOpen || projectionHeaderState.disabled) return
-    await startProjectionForRoute({
+    const started = await startProjectionForRoute({
       pathname: location.pathname,
       startProjection,
       biblePayloads,
@@ -126,12 +127,14 @@ export default function Header(): React.JSX.Element {
         useMediaProjectionStore.getState().startPresentationWithReadiness(items, startIndex),
       onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
     })
+    if (started && isFilesRoute(location.pathname)) navigate('/media')
   }, [
     biblePayloads,
     isProjectionOpen,
     location.pathname,
     presentableItems,
     projectionHeaderState.disabled,
+    navigate,
     startProjection,
     t
   ])

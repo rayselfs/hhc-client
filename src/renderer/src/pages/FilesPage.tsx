@@ -207,19 +207,7 @@ export default function FilesPage(): React.JSX.Element {
   const canAddLocalSyncFolder = isElectron() && canAddSyncSourceHere
   const canAddOneDriveFolder = canAddSyncSourceHere
   const canAddHhcLineFolder =
-    canAddSyncSourceHere &&
-    claimsResolvedUserId === session?.userId &&
-    session.roles.includes('media_sync_user')
-  const hhcLineDisabledReason = !session
-    ? t('fileExplorer.syncSources.hhcLineSignInRequired')
-    : claimsResolvedUserId !== session.userId
-      ? t('fileExplorer.syncSources.hhcLineClaimsLoading')
-      : !session.roles.includes('media_sync_user')
-        ? t('fileExplorer.syncSources.hhcLineRoleRequired')
-        : null
-  const hhcLineActionLabel = hhcLineDisabledReason
-    ? t('fileExplorer.contextMenu.addHhcLineUnavailable', { reason: hhcLineDisabledReason })
-    : t('fileExplorer.contextMenu.addHhcLine')
+    canAddSyncSourceHere && Boolean(session && claimsResolvedUserId === session.userId)
 
   useEffect(() => {
     if (!canAddHhcLineFolder) setIsHhcLinePickerOpen(false)
@@ -851,7 +839,6 @@ export default function FilesPage(): React.JSX.Element {
         onAddHhcLine: canAddSyncSourceHere ? handleOpenHhcLinePicker : undefined,
         isAddOneDriveDisabled: !hasOneDriveConnection,
         isAddHhcLineDisabled: !canAddHhcLineFolder,
-        hhcLineLabel: hhcLineActionLabel,
         isReadOnly: isCurrentFolderReadOnly
       })
     },
@@ -868,7 +855,6 @@ export default function FilesPage(): React.JSX.Element {
       canAddHhcLineFolder,
       canAddSyncSourceHere,
       handleOpenHhcLinePicker,
-      hhcLineActionLabel,
       handleAddLocalSyncFolder,
       handleAddOneDrive,
       hasOneDriveConnection,
@@ -930,7 +916,6 @@ export default function FilesPage(): React.JSX.Element {
         onAddHhcLine={canAddSyncSourceHere ? handleOpenHhcLinePicker : undefined}
         isAddOneDriveDisabled={!hasOneDriveConnection}
         isAddHhcLineDisabled={!canAddHhcLineFolder}
-        hhcLineLabel={hhcLineActionLabel}
         isReadOnly={isCurrentFolderReadOnly}
       />
       <CloudFolderPickerDialog

@@ -275,54 +275,54 @@ Treat projection as a replayable session rather than a best-effort stream of tra
       control/projection lifecycle smoke passed. macOS packaged recovery remains enforced by
       release CI because it cannot run on this Windows host.
 
-## R4 — Persistent Media and projection workspace
+## R4 — Full-window Media projection controls
 
 ### Goal
 
-Let operators continue searching and preparing content while live output remains uninterrupted.
+Keep the Media projection window and its full-window operator controls in one explicit, reliable
+lifecycle.
 
 ### Work
 
-- Replace the full-app fixed Presenter modal with a routed workspace.
-- Decouple Presenter unmount from projection stop.
-- Add a global `Now Projecting` mini bar with connection and current-content state.
-- Separate:
-  - return to Files;
-  - stop current content;
-  - close the projection window.
-- Make double-click open a safe preview/inspector instead of implicitly presenting a folder.
-- Require an explicit Present action to replace live content.
-- Expose `Opening`, `Connected`, `Projecting`, `Degraded`, and `Failed` session states.
-- Preserve search/browse context when opening and closing previews.
+- Use routed `/media` as the only live Media control workspace.
+- Hide the app Header, Sidebar, and Floating Timer while the workspace is active.
+- Route every explicit Media start into the workspace after readiness succeeds.
+- Treat workspace close as one transaction: close projection first, then clear Media state and
+  return to Files.
+- Keep controls and Media state intact when projection close fails.
+- Use the same transaction for browser history/navigation away from live Media controls.
+- Reclaim projection ownership on every explicit Media start, including a restart of retained
+  Media state after an unexpected owner change.
+- Keep `NowProjectingBar`, blackout/resume controls, and background Media navigation out of the
+  product.
 
 ### Acceptance gates
 
-- The operator can return to Files and locate new media without interrupting projection.
-- Preview never changes projection ownership.
-- Replacing live content is an explicit, visible action.
-- Popup/readiness failure cannot look like a successful projection session.
+- Header, F5, Shift+F5, double-click, preview Present, and context-menu Present all enter `/media`
+  after at least one item is ready.
+- `/media` has no app Header, Sidebar, Floating Timer, or `NowProjectingBar`.
+- Header close, final `Escape`, end-screen click, and browser navigation close the projection before
+  clearing the Media session.
+- A close failure remains on `/media`, preserves the playlist and resource locks, and reports the
+  existing close error.
+- An externally closed projection clears Media state and returns an empty `/media` route to Files.
+- An explicit Media restart reclaims `media` ownership and foregrounds projection.
 
-### Progress — 2026-07-27
+### Progress — 2026-08-23
 
-- [x] Media Presenter is a routed `/media` workspace, while a route-independent bridge keeps
-      playback synchronization active when the operator returns to Files, Bible, or Timer.
-- [x] Files use a nested safe preview route. Image, video, PDF, and imported presentation preview
-      remain local until the operator presses the explicit Present action.
-- [x] Editable presentations continue to open in the editor instead of entering projection.
-- [x] The global Now Projecting bar reports connection, projection, degraded, and failed states
-      and provides distinct Return to Media, Stop Content, Resume Content, Retry, and Close
-      Projection actions.
-- [x] Stop Content creates a replayable blackout without closing or foregrounding the projection
-      window. Resume restores the retained session; Close clears the live Media session only after
-      the projection window closes successfully.
-- [x] Browser production E2E covers Media preview, live navigation away from Media, blackout
-      replay after projection reload, resume, and explicit close.
-- [x] Full Windows-hosted regression: 202 files and 2,087 tests passed.
-- [x] Node/Web typechecks, ESLint with zero warnings, production Electron/Vite build, PWA
-      precache, font, and largest-JS bundle budgets passed.
-- [x] Fresh Windows unpacked packaging, native VLC/FFmpeg runtime validation, and packaged
-      control/projection lifecycle smoke passed. macOS packaged behavior remains enforced by
-      release CI because it cannot run on this Windows host.
+- [x] Media Presenter is a routed full-window `/media` workspace with route-independent projection
+      synchronization only for the active Media owner.
+- [x] Files previews remain local until an explicit Present action; editable presentations still
+      open in the editor.
+- [x] All Files/Header/shortcut Media starts enter `/media` after readiness succeeds.
+- [x] Workspace exit and browser navigation use close-first transactional cleanup; failure retains
+      controls and session state.
+- [x] End-screen advance no longer clears the live session outside the close transaction.
+- [x] Explicit Media restarts use a session revision to reclaim ownership after owner drift.
+- [x] `NowProjectingBar`, blackout/resume controls, and background browse-while-projecting behavior
+      remain intentionally absent.
+- [ ] Fresh packaged Electron/Windows lifecycle smoke is required before describing this change as
+      release-verified.
 
 ## R5 — PowerPoint-like Presentation Workspace
 

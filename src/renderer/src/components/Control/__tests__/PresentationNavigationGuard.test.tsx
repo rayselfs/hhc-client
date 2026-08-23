@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import PresentationNavigationGuard from '../PresentationNavigationGuard'
 import type { PresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 const mocks = vi.hoisted(() => ({
   registry: null as PresentationSessionRegistry | null,
-  requestCloseDecision: vi.fn()
+  requestCloseDecision: vi.fn(),
+  stopProjection: vi.fn<() => Promise<void>>(),
+  danger: vi.fn()
 }))
 
 vi.mock('@renderer/contexts/PresentationSessionRegistryContext', async () => {
@@ -23,6 +26,19 @@ vi.mock('@renderer/contexts/PresentationCloseDecisionContext', () => ({
   usePresentationCloseDecision: () => mocks.requestCloseDecision
 }))
 
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: () => ({ stopProjection: mocks.stopProjection })
+}))
+
+vi.mock('@heroui/react/toast', () => ({
+  toast: { danger: mocks.danger }
+}))
+
+vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  useTranslation: () => ({ t: (key: string) => key })
+}))
+
 function createRegistry(): PresentationSessionRegistry {
   return {
     open: vi.fn(),
@@ -37,7 +53,9 @@ function createRegistry(): PresentationSessionRegistry {
   }
 }
 
-function createRouter(): ReturnType<typeof createMemoryRouter> {
+function createRouter(
+  initialPath = '/presentations/deck-1'
+): ReturnType<typeof createMemoryRouter> {
   return createMemoryRouter(
     [
       {
@@ -50,7 +68,7 @@ function createRouter(): ReturnType<typeof createMemoryRouter> {
         )
       }
     ],
-    { initialEntries: ['/presentations/deck-1'] }
+    { initialEntries: [initialPath] }
   )
 }
 
@@ -59,6 +77,8 @@ describe('PresentationNavigationGuard', () => {
     vi.clearAllMocks()
     mocks.registry = createRegistry()
     mocks.requestCloseDecision.mockResolvedValue('keep-editing')
+    mocks.stopProjection.mockResolvedValue(undefined)
+    useMediaProjectionStore.getState().endLiveSession()
   })
 
   it('flushes before proceeding to another route', async () => {
@@ -129,5 +149,32 @@ describe('PresentationNavigationGuard', () => {
     window.dispatchEvent(event)
 
     expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('closes projection before browser navigation leaves live Media controls', async () => {
+    vi.mocked(mocks.registry!.hasUnsafeWork).mockReturnValue(false)
+    useMediaProjectionStore.setState({ isPresenting: true })
+    const router = createRouter('/media')
+    render(<RouterProvider router={router} />)
+
+    await act(() => router.navigate('/files'))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/files'))
+    expect(mocks.stopProjection).toHaveBeenCalledOnce()
+    expect(useMediaProjectionStore.getState().isPresenting).toBe(false)
+  })
+
+  it('keeps Media controls and state when browser navigation cannot close projection', async () => {
+    vi.mocked(mocks.registry!.hasUnsafeWork).mockReturnValue(false)
+    mocks.stopProjection.mockRejectedValue(new Error('close failed'))
+    useMediaProjectionStore.setState({ isPresenting: true })
+    const router = createRouter('/media')
+    render(<RouterProvider router={router} />)
+
+    await act(() => router.navigate('/files'))
+
+    await waitFor(() => expect(mocks.danger).toHaveBeenCalledWith('toast.projectionCloseFailed'))
+    expect(router.state.location.pathname).toBe('/media')
+    expect(useMediaProjectionStore.getState().isPresenting).toBe(true)
   })
 })

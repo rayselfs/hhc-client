@@ -48,22 +48,16 @@ describe('FileExplorerFAB HHC LINE action', () => {
     const onAddHhcLine = vi.fn()
     render(<FileExplorerFAB onAddHhcLine={onAddHhcLine} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add HHC LINE' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add LINE media folder' }))
 
     expect(onAddHhcLine).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps HHC LINE visible with an accessible reason while unavailable', async () => {
+  it('keeps the plain LINE media folder label while unavailable', async () => {
     const onAddHhcLine = vi.fn()
-    render(
-      <FileExplorerFAB
-        onAddHhcLine={onAddHhcLine}
-        isAddHhcLineDisabled
-        hhcLineLabel="Add HHC LINE — Sign in to HHC first."
-      />
-    )
+    render(<FileExplorerFAB onAddHhcLine={onAddHhcLine} isAddHhcLineDisabled />)
 
-    const action = screen.getByRole('button', { name: 'Add HHC LINE — Sign in to HHC first.' })
+    const action = screen.getByRole('button', { name: 'Add LINE media folder' })
     await userEvent.click(action)
 
     expect(onAddHhcLine).not.toHaveBeenCalled()

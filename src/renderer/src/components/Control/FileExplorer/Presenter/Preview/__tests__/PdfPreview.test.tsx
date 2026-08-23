@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react'
+import { cleanup, render, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import { presentPreviewItem } from '@renderer/lib/projection-actions'
@@ -155,6 +155,7 @@ describe('PdfPreview scroll mode lazy rendering', () => {
   })
 
   afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
   })
 
@@ -266,6 +267,7 @@ describe('PdfPreview slide sidebar', () => {
   })
 
   afterEach(() => {
+    cleanup()
     mockStoreState.typeStates.pdf.viewMode = 'scroll'
     vi.unstubAllGlobals()
   })

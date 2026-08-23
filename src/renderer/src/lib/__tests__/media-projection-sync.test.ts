@@ -1017,7 +1017,23 @@ describe('media projection sync', () => {
     })
   })
 
-  it('does not close projection when Media workspace state becomes inactive', () => {
+  it('reclaims Media ownership when an explicit start replaces retained Media controls', () => {
+    projectionState.activeOwner = 'timer'
+    renderSync()
+    mockStartProjection.mockClear()
+
+    act(() => {
+      useMediaProjectionStore
+        .getState()
+        .startPresentation([makeFile('replacement', 'replacement.png')], 0)
+    })
+
+    expect(mockStartProjection).toHaveBeenCalledWith('media', expect.any(Array), {
+      bringToFront: true
+    })
+  })
+
+  it('does not close projection after the Media close transaction already ended the session', () => {
     renderSync()
     mockStopProjection.mockClear()
 

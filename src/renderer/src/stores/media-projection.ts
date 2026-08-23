@@ -22,6 +22,7 @@ export interface MediaProjectionStore {
   playlist: FileItemRecord[]
   currentIndex: number
   isPresenting: boolean
+  sessionRevision: number
   isEnded: boolean
   showGrid: boolean
   lastReadinessReport: PresentationReadinessReport | null
@@ -66,6 +67,7 @@ const initialState = {
   playlist: [] as FileItemRecord[],
   currentIndex: 0,
   isPresenting: false,
+  sessionRevision: 0,
   isEnded: false,
   showGrid: false,
   lastReadinessReport: null as PresentationReadinessReport | null,
@@ -119,17 +121,8 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   canNext: () => {
-    const state = get()
-    const { currentIndex, playlist, isEnded } = state
-    const presentation = getCurrentPresentationState(state)
-    if (
-      presentation &&
-      presentation.slideCount !== undefined &&
-      presentation.slideIndex < presentation.slideCount - 1
-    ) {
-      return true
-    }
-    return !isEnded && currentIndex < playlist.length - 1
+    const { playlist, isEnded } = get()
+    return !isEnded && playlist.length > 0
   },
 
   canPrev: () => {
@@ -159,6 +152,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       playlist: files,
       currentIndex: startIndex,
       isPresenting: true,
+      sessionRevision: get().sessionRevision + 1,
       lastReadinessReport: null,
       snapshot,
       typeStates: initialTypeStates
@@ -216,6 +210,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       playlist: readyFiles,
       currentIndex: resolvedIndex,
       isPresenting: true,
+      sessionRevision: get().sessionRevision + 1,
       lastReadinessReport: report,
       isEnded: false,
       showGrid: false,
@@ -243,10 +238,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
 
   next: () => {
     const s = get()
-    if (s.isEnded) {
-      s.exit()
-      return
-    }
+    if (s.isEnded) return
     const presentation = getCurrentPresentationState(s)
     if (
       presentation &&

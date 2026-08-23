@@ -212,21 +212,25 @@ export async function startProjectionForRoute({
   presentableItems,
   startMediaPresentation,
   onNoProjectableFiles
-}: StartProjectionForRouteInput): Promise<void> {
+}: StartProjectionForRouteInput): Promise<boolean> {
   if (isTimerRoute(pathname)) {
     await startTimerProjection({ startProjection })
-    return
+    return true
   }
 
   if (isBibleRoute(pathname)) {
-    if (biblePayloads) await startBibleProjection(biblePayloads, { startProjection })
-    return
+    if (!biblePayloads) return false
+    await startBibleProjection(biblePayloads, { startProjection })
+    return true
   }
 
   if (isFilesRoute(pathname) && presentableItems.length > 0) {
-    await startMediaProjection(presentableItems, 0, {
+    const report = await startMediaProjection(presentableItems, 0, {
       startMediaPresentation,
       onNoProjectableFiles
     })
+    return report.summary.ready > 0
   }
+
+  return false
 }

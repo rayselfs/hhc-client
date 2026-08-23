@@ -111,7 +111,7 @@ export default function Layout(): React.JSX.Element {
                 <PresentationSessionRegistryProvider>
                   <PresentationCloseDecisionProvider>
                     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-                      <Sidebar />
+                      {!isMediaWorkspace && <Sidebar />}
                       <div className="flex flex-1 flex-col min-h-0">
                         {isPresentationWorkspace ? (
                           <PresentationWorkspaceHeader />
@@ -128,7 +128,7 @@ export default function Layout(): React.JSX.Element {
                           <Outlet />
                         </main>
                       </div>
-                      <FloatingTimer />
+                      {!isMediaWorkspace && <FloatingTimer />}
                     </div>
                     <ConfirmDialog />
                     <PresentationCloseDecisionDialog />
