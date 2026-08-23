@@ -10,7 +10,7 @@ import {
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import type { FileItemRecord } from '@shared/types/folder'
-import { presentPreviewItem } from '@renderer/lib/projection-actions'
+import { presentMediaItem } from '@renderer/lib/projection-actions'
 
 const { mockLoadEditablePresentation, mockRegistryGet, mockSetTypeState, mockPptxSource } =
   vi.hoisted(() => ({
@@ -86,7 +86,7 @@ function makePptxItem(): FileItemRecord {
 async function presentRemotePptx(item: FileItemRecord, sourceUrl: string): Promise<void> {
   const navigate = vi.fn()
   await expect(
-    presentPreviewItem({
+    presentMediaItem({
       item,
       playlist: [item],
       start: async () => {

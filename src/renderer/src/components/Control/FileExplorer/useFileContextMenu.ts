@@ -8,7 +8,7 @@ import type { UseFolderContextMenu } from '@renderer/lib/createFolderContextMenu
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { getPresentableItems, isPresentable } from '@renderer/lib/presentability'
-import { presentPreviewItem, startMediaProjection } from '@renderer/lib/projection-actions'
+import { presentMediaItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import { isFileItem, type FolderItem, type FolderRecord } from '@shared/types/folder'
 
 export type {
@@ -35,7 +35,7 @@ function project(
   if (prioritizeStartItem) {
     const item = presentableFiles[Math.max(startIndex, 0)]
     if (!item) return
-    void presentPreviewItem({
+    void presentMediaItem({
       item,
       playlist: presentableFiles,
       start: (files, index, _, options) =>

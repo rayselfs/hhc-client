@@ -43,8 +43,8 @@ import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
-import { getMediaType, isPresentable, getPresentableItems } from '@renderer/lib/presentability'
-import { presentPreviewItem, startMediaProjection } from '@renderer/lib/projection-actions'
+import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
+import { presentMediaItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 import {
@@ -57,10 +57,7 @@ import { deriveSyncFolderHealth, type SyncFolderHealth } from '@renderer/lib/syn
 import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { isWeb } from '@renderer/lib/env'
-import {
-  getPresentationWorkspacePath,
-  isEditablePresentationMimeType
-} from '@renderer/lib/presentation-media'
+import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 
 export interface FileBrowserProps {
@@ -760,16 +757,14 @@ export function FileBrowser({
         return
       }
       const file = fileItems.find((entry) => entry.id === itemId)
-      if (file && isEditablePresentationMimeType(file.mimeType)) {
+      if (file && isPresentationItem(file)) {
         openPresentationDocument(file)
         navigate(getPresentationWorkspacePath(file.id))
         return
       }
-      const isImageOrVideo =
-        file && (file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/'))
-      if (file && isImageOrVideo && getMediaType(file.mimeType)) {
+      if (file && isPresentable(file.mimeType)) {
         const presentableFiles = getPresentableItems(sortedFileItems)
-        void presentPreviewItem({
+        void presentMediaItem({
           item: file,
           playlist: presentableFiles,
           start: (items, startIndex, _, options) =>
@@ -781,10 +776,6 @@ export function FileBrowser({
             ),
           navigate
         }).catch(() => undefined)
-        return
-      }
-      if (file && isPresentable(file.mimeType)) {
-        navigate(`/files/preview/${encodeURIComponent(file.id)}`)
       }
     },
     [
@@ -1155,17 +1146,14 @@ export function FileBrowser({
 
   if (searchQuery.trim()) {
     const handleSearchFileClick = (result: SearchResult & { kind: 'file' }): void => {
-      if (isEditablePresentationMimeType(result.item.mimeType)) {
+      if (isPresentationItem(result.item)) {
         openPresentationDocument(result.item)
         navigate(getPresentationWorkspacePath(result.item.id))
         setSearchQuery('')
         return
       }
-      if (
-        (result.item.mimeType.startsWith('image/') || result.item.mimeType.startsWith('video/')) &&
-        getMediaType(result.item.mimeType)
-      ) {
-        void presentPreviewItem({
+      if (isPresentable(result.item.mimeType)) {
+        void presentMediaItem({
           item: result.item,
           playlist: [result.item],
           start: startMediaProjection,
@@ -1174,11 +1162,6 @@ export function FileBrowser({
             setSearchQuery('')
           }
         }).catch(() => undefined)
-        return
-      }
-      if (isPresentable(result.item.mimeType)) {
-        navigate(`/files/preview/${encodeURIComponent(result.item.id)}`)
-        setSearchQuery('')
         return
       }
       void navigateToFolder(result.item.parentId)

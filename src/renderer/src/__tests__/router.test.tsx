@@ -34,10 +34,6 @@ vi.mock('@renderer/pages/FilesPage', () => ({
   )
 }))
 
-vi.mock('@renderer/components/Control/FileExplorer/Preview/FilePreviewInspector', () => ({
-  default: () => <div data-testid="file-preview" />
-}))
-
 vi.mock('@renderer/pages/MediaWorkspacePage', () => ({
   default: () => <div data-testid="media-presenter" />
 }))
@@ -127,13 +123,6 @@ describe('Router', () => {
     renderWithRouter(['/media'])
 
     expect(await screen.findByTestId('media-presenter')).toBeInTheDocument()
-  })
-
-  it('keeps Files mounted under the nested safe preview route', async () => {
-    renderWithRouter(['/files/preview/image-1'])
-
-    expect(await screen.findByTestId('files-page')).toBeInTheDocument()
-    expect(await screen.findByTestId('file-preview')).toBeInTheDocument()
   })
 
   it('navigates from timer to bible via sidebar link', async () => {

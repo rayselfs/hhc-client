@@ -8,9 +8,6 @@ import WelcomePage from '@renderer/pages/WelcomePage'
 const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
 const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
 const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
-const FilePreviewRoute = lazy(
-  () => import('@renderer/components/Control/FileExplorer/Preview/FilePreviewInspector')
-)
 const MediaWorkspacePage = lazy(() => import('@renderer/pages/MediaWorkspacePage'))
 const PresentationWorkspacePage = lazy(() => import('@renderer/pages/PresentationWorkspacePage'))
 const FavoritesPage = lazy(() => import('@renderer/pages/FavoritesPage'))
@@ -60,18 +57,7 @@ const routes = [
             <FilesPage />
           </Suspense>
         ),
-        ErrorBoundary: RouteError,
-        children: [
-          {
-            path: 'preview/:itemId',
-            element: (
-              <Suspense fallback={null}>
-                <FilePreviewRoute />
-              </Suspense>
-            ),
-            ErrorBoundary: RouteError
-          }
-        ]
+        ErrorBoundary: RouteError
       },
       {
         path: 'media',
