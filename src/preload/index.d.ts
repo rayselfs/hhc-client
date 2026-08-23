@@ -6,7 +6,7 @@ import type {
 } from '../shared/projection-messages'
 import type {
   DisplayInfo,
-  UpdateStatus,
+  IpcMainToRendererMap,
   WhisperModel,
   WhisperDownloadProgress,
   WhisperDirInfo,
@@ -119,7 +119,7 @@ interface UpdateAPI {
   checkForUpdates: () => Promise<{ updateAvailable: boolean; version?: string }>
   downloadAndInstall: () => Promise<void>
   onStatusChanged: (
-    callback: (data: { status: UpdateStatus; version?: string; error?: string }) => void
+    callback: (...data: IpcMainToRendererMap['update:status-changed']) => void
   ) => () => void
 }
 
