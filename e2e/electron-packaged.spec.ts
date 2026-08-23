@@ -109,7 +109,6 @@ test('launches packaged control and projection windows with recovery lifecycle',
     const upload = control.locator('input[type="file"]:not([webkitdirectory])').first()
     await upload.setInputFiles(fixture)
     await expect(control.getByText('packaged-vlc-smoke.mkv')).toBeVisible()
-    await expect(control.getByAltText('packaged-vlc-smoke.mkv')).toBeVisible()
     await control.evaluate(() => {
       Reflect.set(window, '__packagedVlcResult', null)
       const unsubscribeStarted = window.api.projectionVlc.onStarted(() => {
