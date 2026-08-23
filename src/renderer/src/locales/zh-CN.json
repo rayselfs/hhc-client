@@ -746,6 +746,7 @@
     "updateAvailable": "更新 {{version}}",
     "checking": "检查中...",
     "downloadingUpdate": "下载中...",
+    "downloadingUpdateProgress": "下载中 {{percent}}%",
     "keyboardShortcuts": "键盘快捷键",
     "closeApp": "关闭应用程序",
     "closeAppTitle": "关闭应用程序",

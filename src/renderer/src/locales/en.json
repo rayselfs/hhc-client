@@ -746,6 +746,7 @@
     "updateAvailable": "Update {{version}}",
     "checking": "Checking...",
     "downloadingUpdate": "Downloading...",
+    "downloadingUpdateProgress": "Downloading {{percent}}%",
     "keyboardShortcuts": "Keyboard Shortcuts",
     "closeApp": "Close App",
     "closeAppTitle": "Close Application",

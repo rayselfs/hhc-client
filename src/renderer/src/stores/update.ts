@@ -5,13 +5,14 @@ export interface UpdateState {
   status: UpdateStatus
   availableVersion: string | null
   error: string | null
+  downloadPercent: number | null
 }
 
 export interface UpdateActions {
   check(): void
   setAvailable(version: string): void
   setNotAvailable(): void
-  setDownloading(): void
+  setDownloading(percent?: number): void
   setDownloaded(): void
   setError(message: string): void
   reset(): void
@@ -23,32 +24,33 @@ export const useUpdateStore = create<UpdateStore>()((set) => ({
   status: 'idle',
   availableVersion: null,
   error: null,
+  downloadPercent: null,
 
   check: () => {
-    set({ status: 'checking' })
+    set({ status: 'checking', downloadPercent: null })
   },
 
   setAvailable: (version: string) => {
-    set({ status: 'available', availableVersion: version, error: null })
+    set({ status: 'available', availableVersion: version, error: null, downloadPercent: null })
   },
 
   setNotAvailable: () => {
-    set({ status: 'not-available', availableVersion: null, error: null })
+    set({ status: 'not-available', availableVersion: null, error: null, downloadPercent: null })
   },
 
-  setDownloading: () => {
-    set({ status: 'downloading' })
+  setDownloading: (percent) => {
+    set({ status: 'downloading', downloadPercent: percent ?? null })
   },
 
   setDownloaded: () => {
-    set({ status: 'downloaded' })
+    set({ status: 'downloaded', downloadPercent: null })
   },
 
   setError: (message: string) => {
-    set({ status: 'error', error: message })
+    set({ status: 'error', error: message, downloadPercent: null })
   },
 
   reset: () => {
-    set({ status: 'idle', availableVersion: null, error: null })
+    set({ status: 'idle', availableVersion: null, error: null, downloadPercent: null })
   }
 }))

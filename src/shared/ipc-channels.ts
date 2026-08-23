@@ -364,7 +364,9 @@ export interface IpcMainToRendererMap {
   'projection-vlc:started': [generation: number, itemId: string]
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
-  'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
+  'update:status-changed': [
+    { status: UpdateStatus; version?: string; error?: string; percent?: number }
+  ]
   'app:download-progress': [WhisperDownloadProgress]
   'app:close-requested': []
   'onedrive:download-progress': [OneDriveNativeDownloadProgress]

@@ -11,6 +11,8 @@ import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { collectRecoveryIssues } from '@renderer/lib/recovery-center'
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
 import type { RecoveryIssue } from '@renderer/types/recovery-center'
+import { isElectron } from '@renderer/lib/env'
+import { useUpdateStore } from '@renderer/stores/update'
 
 const auth = vi.hoisted(() => ({
   value: {
@@ -38,6 +40,8 @@ vi.mock('@heroui/react/toast', async (importOriginal) => {
 vi.mock('@renderer/lib/recovery-center', () => ({
   collectRecoveryIssues: vi.fn(async () => [])
 }))
+
+vi.mock('@renderer/lib/env', () => ({ isElectron: vi.fn(() => false) }))
 
 const recoveryIssue = {
   id: 'storage-integrity:orphan:blob-1',
@@ -80,6 +84,8 @@ beforeEach(async () => {
   auth.value.signOut = vi.fn(async () => undefined)
   auth.value.getAccessToken = vi.fn(async () => null)
   toastDanger.mockClear()
+  vi.mocked(isElectron).mockReturnValue(false)
+  useUpdateStore.getState().reset()
   vi.mocked(collectRecoveryIssues).mockResolvedValue([])
   useRecoveryCenterStore.setState({ dismissedIssueIds: [], filter: 'all' })
 })
@@ -152,6 +158,18 @@ describe('UserMenu', () => {
   it('hides update item in web mode', () => {
     renderUserMenu()
     expect(screen.queryByText('Up to Date')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [null, 'Downloading...'],
+    [42, 'Downloading 42%']
+  ])('shows updater download progress %s in Electron mode', (downloadPercent, label) => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    useUpdateStore.setState({ status: 'downloading', downloadPercent })
+
+    renderUserMenu()
+
+    expect(screen.getByText(label)).toBeInTheDocument()
   })
 
   it('enables Login for an anonymous session', () => {

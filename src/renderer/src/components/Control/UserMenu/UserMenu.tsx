@@ -53,6 +53,7 @@ export default function UserMenu({
   const updateStatus = useUpdateStore(selectUpdateStatus)
   const isUpdateAvailable = useUpdateStore(selectIsUpdateAvailable)
   const availableVersion = useUpdateStore(selectAvailableVersion)
+  const downloadPercent = useUpdateStore((state) => state.downloadPercent)
   const { status, session, signInStatus, signIn, cancelSignIn, signOut } = useHhcAuth()
   const accountLabel =
     status === 'authenticated' && session ? session.displayName : t('userMenu.guest')
@@ -207,7 +208,9 @@ export default function UserMenu({
                   : updateStatus === 'checking'
                     ? t('userMenu.checking')
                     : updateStatus === 'downloading'
-                      ? t('userMenu.downloadingUpdate')
+                      ? downloadPercent === null
+                        ? t('userMenu.downloadingUpdate')
+                        : t('userMenu.downloadingUpdateProgress', { percent: downloadPercent })
                       : t('userMenu.upToDate')}
               </Dropdown.Item>
             )}

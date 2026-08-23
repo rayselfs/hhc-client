@@ -12,6 +12,7 @@ export function registerUpdateService(wm: WindowManager): void {
     status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
     version?: string
     error?: string
+    percent?: number
   }): void => {
     wm.sendToMain('update:status-changed', payload)
   }
@@ -28,8 +29,8 @@ export function registerUpdateService(wm: WindowManager): void {
     sendStatus({ status: 'not-available' })
   })
 
-  autoUpdater.on('download-progress', () => {
-    sendStatus({ status: 'downloading' })
+  autoUpdater.on('download-progress', (progress) => {
+    sendStatus({ status: 'downloading', percent: Math.round(progress.percent) })
   })
 
   autoUpdater.on('update-downloaded', () => {

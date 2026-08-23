@@ -4,7 +4,6 @@ import type {
   IpcInvokeMap,
   IpcMainToRendererChannel,
   IpcMainToRendererMap,
-  UpdateStatus,
   WhisperModel,
   WhisperDownloadProgress,
   WhisperDirInfo
@@ -100,9 +99,8 @@ const appApi = {
 const updateApi = {
   checkForUpdates: () => typedInvoke('update:check'),
   downloadAndInstall: () => typedInvoke('update:download-and-install'),
-  onStatusChanged: (
-    callback: (data: { status: UpdateStatus; version?: string; error?: string }) => void
-  ) => typedOn('update:status-changed', callback)
+  onStatusChanged: (callback: (...data: IpcMainToRendererMap['update:status-changed']) => void) =>
+    typedOn('update:status-changed', callback)
 }
 
 const speechApi = {
