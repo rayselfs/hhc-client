@@ -136,7 +136,6 @@ test('launches packaged control and projection windows with recovery lifecycle',
     })
 
     await control.getByTestId('media-back-to-files').click()
-    await control.getByRole('button', { name: /Stop projection|停止投影/ }).click()
     await expect.poll(() => electronApp?.windows().length ?? 0).toBe(1)
     await control.evaluate(() => {
       const unsubscribes = Reflect.get(window, '__packagedVlcUnsubscribe')
