@@ -210,10 +210,8 @@ describe('Layout', () => {
   it('does not have a divider between header and main (no border-b on header)', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
-    await screen.findByTestId('timer-page')
-    const header = document.querySelector('header')
-    expect(header).not.toBeNull()
-    expect(header!.classList.contains('border-b')).toBe(false)
+    const header = await screen.findByRole('banner')
+    expect(header.classList.contains('border-b')).toBe(false)
   })
 
   it('does not render an hr element between header and main', async () => {
@@ -276,7 +274,7 @@ describe('Layout', () => {
       </StrictMode>
     )
     render(tree())
-    await screen.findByTestId('timer-page')
+    await waitFor(() => expect(initializeAppMock).toHaveBeenCalled())
     const initialCalls = initializeAppMock.mock.calls.length
     const options = initializeAppMock.mock.calls.at(-1)?.[0]
     const hhcAuth = options?.hhcAuth
