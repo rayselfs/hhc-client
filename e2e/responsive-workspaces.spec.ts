@@ -44,7 +44,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   )
 })
 
-test('keeps media navigator usable without horizontal overflow at each breakpoint', async ({
+test('keeps the media sidebar on the right without horizontal overflow at each breakpoint', async ({
   page,
   context
 }) => {
@@ -66,22 +66,27 @@ test('keeps media navigator usable without horizontal overflow at each breakpoin
   const projection = await projectionPromise
   await expect(page).toHaveURL(/#\/media$/)
 
-  const navigator = page.locator('.workspace-navigator-slot')
-  const navigatorTrigger = page.locator('.workspace-navigator-trigger')
-  await expect(navigator).toBeVisible()
+  const mediaBack = page.getByTestId('media-back-to-files')
+  const notes = page.getByRole('textbox')
+  const expectRightSidebar = async (): Promise<void> => {
+    await expect(notes).toBeVisible()
+    const mediaBackBox = await mediaBack.boundingBox()
+    const notesBox = await notes.boundingBox()
+    expect(mediaBackBox).not.toBeNull()
+    expect(notesBox).not.toBeNull()
+    expect(notesBox!.x).toBeGreaterThan(mediaBackBox!.x)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+  }
+
+  await expectRightSidebar()
 
   await page.setViewportSize({ width: 1024, height: 800 })
-  await expect(navigator).toBeVisible()
-  await expect(navigatorTrigger).toBeHidden()
+  await expectRightSidebar()
 
   await page.setViewportSize({ width: 700, height: 800 })
-  await expect(navigator).toBeHidden()
-  await expect(navigatorTrigger).toBeVisible()
-  await navigatorTrigger.click()
-  await expect(navigator).toBeVisible()
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true
-  )
+  await expectRightSidebar()
 
   await projection.close()
 })

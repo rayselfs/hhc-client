@@ -47,6 +47,7 @@ import {
   WorkspaceShell
 } from '@renderer/components/Common/WorkspacePrimitives'
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
+import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 import {
   addElementToSlide,
   applySlideBackgroundToAllSlides,
@@ -79,6 +80,8 @@ import {
   type EditableSlideBackground,
   type EditableTextInsertFrame
 } from '@renderer/lib/editable-presentation'
+import type { HhcLineCloudAuth } from '@renderer/lib/cloud-provider'
+import { prepareHhcLinePresentationSource } from '@renderer/lib/hhc-line-connect'
 import {
   alignElements,
   distributeElements,
@@ -279,6 +282,23 @@ async function getPresentationSourceItem(itemId: string): Promise<FileItemRecord
   throw new Error('Presentation source is unavailable')
 }
 
+async function withPresentationSource<T>(
+  auth: HhcLineCloudAuth,
+  item: FileItemRecord,
+  consumeSource: (sourceItem: FileItemRecord) => Promise<T>
+): Promise<T> {
+  const prepared = await prepareHhcLinePresentationSource(auth, item)
+  try {
+    return await consumeSource(prepared ? { ...item, url: prepared.source.url } : item)
+  } finally {
+    if (prepared?.source.kind === 'native-lease') {
+      await window.api?.hhcAssets
+        ?.releaseContentLease(prepared.source.leaseId)
+        .catch(() => undefined)
+    }
+  }
+}
+
 export function PptxDocumentView({
   deck
 }: {
@@ -286,6 +306,18 @@ export function PptxDocumentView({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { session, getAccessToken, getAuthGeneration, refreshAccessToken, endSession } =
+    useHhcAuth()
+  const hhcAuth = useMemo<HhcLineCloudAuth>(
+    () => ({
+      getSession: () => session,
+      getAuthGeneration,
+      getAccessToken,
+      refreshAccessToken,
+      endSession
+    }),
+    [endSession, getAccessToken, getAuthGeneration, refreshAccessToken, session]
+  )
   const openDocument = usePresentationWorkspaceStore((state) => state.openDocument)
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
   const setActiveSlideId = usePresentationWorkspaceStore((state) => state.setActiveSlideId)
@@ -294,7 +326,6 @@ export function PptxDocumentView({
   )
   const activeSlide = getPptxSlideIndex(activeSlideId)
   const deckItemId = deck.itemId
-  const deckMimeType = deck.mimeType
   const deckUrl = deck.url
   const canvasRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<PptxViewerHandle | null>(null)
@@ -319,11 +350,12 @@ export function PptxDocumentView({
       setStatus('loading')
       setError(null)
       try {
-        const buffer = await readPresentationArrayBuffer({
-          id: deckItemId,
-          url: deckUrl,
-          mimeType: deckMimeType
-        })
+        const sourceItem = await getPresentationSourceItem(deckItemId)
+        const buffer = await withPresentationSource(
+          hhcAuth,
+          sourceItem,
+          readPresentationArrayBuffer
+        )
         if (cancelled) return
         const handle = await openPptxViewer(buffer, container, { renderMode: 'slide' })
         if (cancelled) {
@@ -357,7 +389,7 @@ export function PptxDocumentView({
       viewerRef.current?.destroy()
       viewerRef.current = null
     }
-  }, [deckItemId, deckMimeType, deckUrl, setActiveSlideId, setSlideCount])
+  }, [deckItemId, deckUrl, hhcAuth, setActiveSlideId, setSlideCount])
 
   useEffect(() => {
     const current = viewerRef.current
@@ -378,7 +410,11 @@ export function PptxDocumentView({
     setIsConverting(true)
     try {
       const item = await getPresentationSourceItem(deck.itemId)
-      const createdItem = await convertPptxToEditablePresentation(item)
+      const createdItem = await withPresentationSource(
+        hhcAuth,
+        item,
+        convertPptxToEditablePresentation
+      )
       openDocument(createdItem)
       navigate(getPresentationWorkspacePath(createdItem.id))
     } catch (conversionError) {
