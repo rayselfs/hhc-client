@@ -1,6 +1,16 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile, access, chmod } from 'node:fs/promises'
+import {
+  access,
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  utimes,
+  writeFile
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -22,10 +32,19 @@ async function writeFileIn(root: string, path: string): Promise<void> {
   await writeFile(absolutePath, '')
 }
 
-async function createArchive(root: string): Promise<{ url: string; sha256: string }> {
+async function createArchive(
+  root: string,
+  timestamp?: Date
+): Promise<{ url: string; sha256: string }> {
   const source = join(root, 'source')
   const archive = join(root, 'runtime.tar')
   await writeFileIn(source, 'runtime/libvlc.dylib')
+  await writeFileIn(source, 'runtime/plugins/libvideo_plugin.dylib')
+  await writeFileIn(source, 'runtime/plugins/plugins.dat')
+  if (timestamp) {
+    await utimes(join(source, 'runtime/plugins/libvideo_plugin.dylib'), timestamp, timestamp)
+    await utimes(join(source, 'runtime/plugins/plugins.dat'), timestamp, timestamp)
+  }
 
   await execFileAsync('tar', ['-cf', archive, '-C', source, '.'])
 
@@ -102,6 +121,35 @@ describe('download video engine runtime script', () => {
     await expect(
       access(join(root, '.local-runtimes/vlc/darwin-arm64/libvlc.dylib'))
     ).resolves.toBeUndefined()
+  })
+
+  it('preserves VLC plugin timestamps so the downloaded cache stays valid', async () => {
+    const root = await createTempRoot()
+    const timestamp = new Date('2020-01-02T03:04:05.000Z')
+    const archive = await createArchive(root, timestamp)
+
+    await runDownloader(root, archive.url, archive.sha256)
+
+    await expect(
+      stat(join(root, '.local-runtimes/vlc/darwin-arm64/plugins/libvideo_plugin.dylib'))
+    ).resolves.toMatchObject({ mtimeMs: timestamp.getTime() })
+    await expect(
+      stat(join(root, '.local-runtimes/vlc/darwin-arm64/plugins/plugins.dat'))
+    ).resolves.toMatchObject({ mtimeMs: timestamp.getTime() })
+
+    const downloader = await readFile(scriptPath, 'utf8')
+    expect(downloader).toContain('preserveTimestamps: true')
+  })
+
+  it('preserves VLC timestamps when copying the macOS DMG runtime', async () => {
+    const workflow = await readFile(
+      resolve(process.cwd(), '.github/workflows/build-release.yml'),
+      'utf8'
+    )
+
+    expect(workflow).toContain(
+      'cp -pR "${VLC_MOUNT}/VLC.app/Contents/MacOS/." .local-runtimes/vlc/darwin-arm64/'
+    )
   })
 
   it('rejects runtime archives with an invalid checksum', async () => {
