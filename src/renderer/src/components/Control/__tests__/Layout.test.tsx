@@ -245,9 +245,7 @@ describe('Layout', () => {
     })
 
     renderWithRouter(['/timer'])
-    await screen.findByTestId('timer-page')
-
-    expect(projectionEvents.playback).not.toBeNull()
+    await waitFor(() => expect(projectionEvents.playback).not.toBeNull())
     projectionEvents.playback?.({
       itemId: 'video-1',
       currentTime: 12,
