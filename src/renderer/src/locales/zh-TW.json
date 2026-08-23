@@ -542,6 +542,7 @@
     "renameFolder": "重新命名資料夾",
     "blobLoadFailed": "檔案載入失敗，已跳過",
     "syncSources": {
+      "hhcLineName": "LINE 媒體",
       "localSyncConnected": "已連接 {{name}}，匯入 {{count}} 個檔案。",
       "localSyncConnectFailed": "無法連接同步資料夾。",
       "oneDriveFolderImported": "已加入 {{name}}，匯入 {{count}} 個項目。",
