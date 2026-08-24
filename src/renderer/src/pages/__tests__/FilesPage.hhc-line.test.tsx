@@ -99,8 +99,16 @@ vi.mock('@renderer/components/Control/FileExplorer/FileExplorerFAB', () => ({
   )
 }))
 vi.mock('@renderer/components/Control/FileExplorer/CloudFolderPickerDialog', () => ({
-  default: ({ provider, isOpen }: { provider: { providerType: string }; isOpen: boolean }) =>
-    provider.providerType === 'hhc-line' && isOpen ? <div>HHC picker open</div> : null
+  default: ({
+    provider,
+    isOpen
+  }: {
+    provider: { providerType: string; displayName: string }
+    isOpen: boolean
+  }) =>
+    provider.providerType === 'hhc-line' && isOpen ? (
+      <div>{provider.displayName} picker open</div>
+    ) : null
 }))
 vi.mock('@renderer/components/Control/Folder/FolderModal', () => ({ FolderModal: () => null }))
 vi.mock('@renderer/components/Common/FolderPersistenceStatus', () => ({
@@ -186,7 +194,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     const action = await screen.findByRole('button', { name: 'Add LINE media folder' })
     expect(action).toBeEnabled()
     await userEvent.click(action)
-    expect(screen.getByText('HHC picker open')).toBeInTheDocument()
+    expect(screen.getByText('LINE media picker open')).toBeInTheDocument()
   })
 
   it('keeps HHC LINE visible and disabled while signed out', () => {
@@ -204,7 +212,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     const options = mocks.showEmptyAreaMenu.mock.calls[0][0]
     options.onAddHhcLine()
 
-    expect(screen.queryByText('HHC picker open')).not.toBeInTheDocument()
+    expect(screen.queryByText('LINE media picker open')).not.toBeInTheDocument()
   })
 
   it('opens the picker from the authorized root FAB', async () => {
@@ -212,6 +220,6 @@ describe('FilesPage HHC LINE role resolution', () => {
     render(<FilesPage />)
 
     await userEvent.click(await screen.findByRole('button', { name: 'Add LINE media folder' }))
-    expect(screen.getByText('HHC picker open')).toBeInTheDocument()
+    expect(screen.getByText('LINE media picker open')).toBeInTheDocument()
   })
 })

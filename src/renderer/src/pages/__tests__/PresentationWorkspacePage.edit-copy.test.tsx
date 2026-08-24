@@ -24,7 +24,23 @@ const mocks = vi.hoisted(() => ({
   toastDanger: vi.fn(),
   toastWarning: vi.fn(),
   readPresentationArrayBuffer: vi.fn(),
-  openPptxViewer: vi.fn()
+  openPptxViewer: vi.fn(),
+  prepareHhcLinePresentationSource: vi.fn(),
+  session: null as { userId: string; displayName: string; roles: string[] } | null
+}))
+
+vi.mock('@renderer/contexts/HhcAuthContext', () => ({
+  useHhcAuth: () => ({
+    session: mocks.session,
+    getAuthGeneration: vi.fn(() => 0),
+    getAccessToken: vi.fn(async () => null),
+    refreshAccessToken: vi.fn(async () => null),
+    endSession: vi.fn(async () => undefined)
+  })
+}))
+
+vi.mock('@renderer/lib/hhc-line-connect', () => ({
+  prepareHhcLinePresentationSource: mocks.prepareHhcLinePresentationSource
 }))
 
 vi.mock('react-i18next', async () => {
@@ -143,6 +159,9 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     mocks.toastDanger.mockReset()
     mocks.toastWarning.mockReset()
     mocks.readPresentationArrayBuffer.mockResolvedValue(new ArrayBuffer(8))
+    mocks.prepareHhcLinePresentationSource.mockReset()
+    mocks.prepareHhcLinePresentationSource.mockResolvedValue(null)
+    mocks.session = null
     mocks.openPptxViewer.mockResolvedValue({
       slideCount: 1,
       slideWidth: 1280,
@@ -183,6 +202,33 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     })
     expect(mocks.navigate).toHaveBeenCalledWith('/presentations/editable-1')
     expect(mocks.toastDanger).not.toHaveBeenCalled()
+  })
+
+  it('loads an online LINE PPTX through its ephemeral source', async () => {
+    const sourceItem = makeFile({ url: 'unsupported:hhc-line-online' })
+    mocks.session = { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    mocks.prepareHhcLinePresentationSource.mockResolvedValue({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      rootRemoteFolderId: 'collection-1',
+      source: {
+        kind: 'ticket',
+        url: 'https://www.alive.org.tw/api/assets/content?ticket=pptx-secret',
+        expiresAt: Date.now() + 60_000,
+        etag: 'etag-1'
+      }
+    })
+
+    renderReadOnlyDeck(sourceItem)
+
+    await waitFor(() =>
+      expect(mocks.readPresentationArrayBuffer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: sourceItem.id,
+          url: 'https://www.alive.org.tw/api/assets/content?ticket=pptx-secret'
+        })
+      )
+    )
   })
 
   it('toasts and keeps the original read-only deck active when Edit a copy fails', async () => {

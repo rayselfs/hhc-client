@@ -94,7 +94,15 @@ vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
 const mockStartPresentation = vi.fn()
 const mockStartPresentationWithReadiness = vi.fn().mockResolvedValue({
   summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
-  items: []
+  items: [
+    {
+      itemId: 'file-1',
+      blobId: 'file-1',
+      status: 'ready',
+      reason: 'ready',
+      support: 'native'
+    }
+  ]
 })
 
 vi.mock('@renderer/stores/media-projection', () => ({
@@ -259,7 +267,7 @@ describe('FileBrowser slow-click inline rename', () => {
     expect(screen.getByLabelText('Rename file')).toHaveValue('slides')
   })
 
-  it('does not start rename when the selected file name is double-clicked', () => {
+  it('projects instead of renaming when the selected file name is double-clicked', () => {
     renderFileBrowser()
 
     const fileName = screen.getByText('slides.pdf')
@@ -277,8 +285,7 @@ describe('FileBrowser slow-click inline rename', () => {
     flushRenameDelay()
 
     expect(screen.queryByLabelText('Rename file')).toBeNull()
-    expect(mockStartPresentationWithReadiness).not.toHaveBeenCalled()
-    expect(screen.getByTestId('location')).toHaveTextContent('/files/preview/file-1')
+    expect(mockStartPresentationWithReadiness).toHaveBeenCalledOnce()
   })
 
   it('does not start rename after pointer movement', () => {

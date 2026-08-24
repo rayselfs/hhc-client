@@ -1,6 +1,6 @@
 {
   "name": "libre-presenter",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "Open-source presentation software for churches and live events",
   "license": "GPL-3.0-or-later",
   "main": "./out/main/index.js",
@@ -12,6 +12,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
+    "predev": "npm run prepare:video-engine",
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build && npm run check:bundle",
     "check:bundle": "node scripts/check-bundle-budget.mjs",

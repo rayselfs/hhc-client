@@ -3,6 +3,7 @@ import {
   access,
   mkdir,
   mkdtemp,
+  readFile,
   readlink,
   rm,
   stat,
@@ -49,6 +50,14 @@ afterEach(async () => {
 describe('prepare video engine runtime script', () => {
   it('allows non-strict preparation without local runtime binaries', async () => {
     await expect(runPrepare(await createTempRoot())).resolves.toBeUndefined()
+  })
+
+  it('prepares the video runtime before development starts', async () => {
+    const packageJson = JSON.parse(
+      await readFile(resolve(process.cwd(), 'package.json'), 'utf8')
+    ) as { scripts: Record<string, string> }
+
+    expect(packageJson.scripts.predev).toBe('npm run prepare:video-engine')
   })
 
   it('requires only the current platform runtime in strict mode', async () => {

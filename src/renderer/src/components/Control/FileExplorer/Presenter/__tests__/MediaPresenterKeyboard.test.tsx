@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaPresenter from '../MediaPresenter'
 import type { ShortcutHandler } from '@renderer/hooks/useKeyboardShortcuts'
@@ -131,13 +131,13 @@ vi.mock('../PresenterNavigation', () => ({
   default: () => <div />
 }))
 vi.mock('../PresenterSidebar', () => ({
-  default: () => <div />
+  default: () => <div data-testid="presenter-sidebar" />
 }))
 vi.mock('../PresenterGrid', () => ({
   default: () => <div />
 }))
 vi.mock('../Preview/MediaPreview', () => ({
-  default: () => <div />
+  default: () => <div data-testid="media-preview" />
 }))
 vi.mock('../MediaToolbar', () => ({
   default: () => <div />
@@ -172,6 +172,14 @@ beforeEach(() => {
 })
 
 describe('MediaPresenter video keyboard behavior', () => {
+  it('keeps next-item preview and notes to the right of the media controls', () => {
+    render(<MediaPresenter onExit={mockExit} />)
+
+    expect(screen.getByTestId('media-preview')).toAppearBefore(
+      screen.getByTestId('presenter-sidebar')
+    )
+  })
+
   it('does not stop live output when the workspace unmounts', () => {
     const { unmount } = render(<MediaPresenter onExit={mockExit} />)
 

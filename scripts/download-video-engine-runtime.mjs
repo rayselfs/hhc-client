@@ -148,7 +148,11 @@ async function main() {
     const runtimeRoot = await findRuntimeRoot(extractRoot)
     await rm(destination, { recursive: true, force: true })
     await mkdir(dirname(destination), { recursive: true })
-    await cp(runtimeRoot, destination, { recursive: true, force: true })
+    await cp(runtimeRoot, destination, {
+      recursive: true,
+      force: true,
+      preserveTimestamps: true
+    })
     console.log(`ready: ${component} ${platform}-${arch}`)
   } finally {
     await rm(tempRoot, { recursive: true, force: true })

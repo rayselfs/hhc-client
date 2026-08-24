@@ -52,7 +52,7 @@ interface StartMediaProjectionDeps {
   onNoProjectableFiles?: () => void
 }
 
-interface PresentPreviewInput {
+interface PresentMediaItemInput {
   item: FileItemRecord
   playlist: FileItemRecord[]
   start: (
@@ -188,12 +188,12 @@ export async function closeProjectionAndMediaSession({
   endLiveSession()
 }
 
-export async function presentPreviewItem({
+export async function presentMediaItem({
   item,
   playlist,
   start,
   navigate
-}: PresentPreviewInput): Promise<string | null> {
+}: PresentMediaItemInput): Promise<string | null> {
   const startIndex = playlist.findIndex((entry) => entry.id === item.id)
   if (startIndex < 0) return 'not-presentable'
 

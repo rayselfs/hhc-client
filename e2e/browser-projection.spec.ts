@@ -438,8 +438,8 @@ test('restores the HHC account session without storing the access token', async 
   for (const item of media.filter(({ id }) => id !== 'video-1')) {
     await page.getByTestId('media-back-to-files').click()
     await page.getByText(item.displayName, { exact: true }).dblclick()
-    if (!item.mimeType.startsWith('image/')) await page.getByTestId('preview-present').click()
-    await expect(page).toHaveURL(/#\/media$/)
+    const isPresentation = item.mimeType.includes('presentationml.presentation')
+    await expect(page).toHaveURL(isPresentation ? /#\/presentations\// : /#\/media$/)
     await expect
       .poll(() => ticketRequests.filter((url) => url.endsWith(`ticket-${item.id}`)).length)
       .toBe(1)
@@ -513,21 +513,23 @@ test('uses full-window Media controls and closes from the control workspace', as
   await expect(page).toHaveURL(/#\/media$/)
 
   await page.setViewportSize({ width: 900, height: 800 })
-  const playlistTrigger = page.getByRole('button', { name: 'Playlist' })
   const mediaBack = page.getByTestId('media-back-to-files')
-  await expect(playlistTrigger).toBeVisible()
+  const nextItem = page.getByText('Next', { exact: true })
+  const notes = page.getByRole('textbox')
   await expect(mediaBack).toBeVisible()
-  const playlistBox = await playlistTrigger.boundingBox()
+  await expect(nextItem).toBeVisible()
+  await expect(notes).toBeVisible()
   const mediaBackBox = await mediaBack.boundingBox()
-  expect(playlistBox).not.toBeNull()
+  const nextItemBox = await nextItem.boundingBox()
+  const notesBox = await notes.boundingBox()
   expect(mediaBackBox).not.toBeNull()
-  expect(playlistBox!.y + playlistBox!.height).toBeLessThanOrEqual(mediaBackBox!.y)
+  expect(nextItemBox).not.toBeNull()
+  expect(notesBox).not.toBeNull()
+  expect(nextItemBox!.x).toBeGreaterThan(mediaBackBox!.x)
+  expect(notesBox!.x).toBeGreaterThan(mediaBackBox!.x)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   )
-  await playlistTrigger.click()
-  await page.getByRole('button', { name: 'Close Playlist' }).click()
-  await expect(playlistTrigger).toBeFocused()
 
   await page.getByTestId('media-back-to-files').click()
   await expect(page).toHaveURL(/#\/files$/)

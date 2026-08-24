@@ -16,12 +16,7 @@ import PresenterSidebar from './PresenterSidebar'
 import PresenterGrid from './PresenterGrid'
 import MediaPreview from './Preview/MediaPreview'
 import MediaToolbar from './MediaToolbar'
-import {
-  NavigatorRail,
-  ResponsivePanelGroup,
-  StageViewport,
-  WorkspaceShell
-} from '@renderer/components/Common/WorkspacePrimitives'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
@@ -196,37 +191,34 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
   return (
     <PresenterCommandContext.Provider value={{ sendCommand }}>
       <PreviewCacheProvider pdfPageThumbs={pdfPageThumbs}>
-        <WorkspaceShell className="media-presenter bg-surface" data-testid="media-presenter">
-          <ResponsivePanelGroup
-            navigatorWidth={360}
-            navigatorLabel="Playlist"
-            navigator={
-              <NavigatorRail className="h-full border-r border-divider">
-                <PresenterSidebar previewCache={coverThumbnails} />
-              </NavigatorRail>
-            }
-            stage={
-              <StageViewport className="h-full">
-                <PresenterHeader onExit={onExit} />
-                <MediaPreview
-                  currentItem={currentItem}
-                  descriptor={descriptor}
-                  isEnded={isEnded}
-                  onExit={onExit}
-                />
-                <MediaToolbar onToggleGrid={toggleGridWithMediaPause} />
-                <div className="flex-1" />
-                <PresenterNavigation />
-              </StageViewport>
-            }
-          />
+        <div className="media-presenter h-full min-h-0 bg-surface" data-testid="media-presenter">
+          <div className="flex h-full">
+            <div className="flex-3 lg:flex-2 min-w-0 flex flex-col h-full">
+              <PresenterHeader onExit={onExit} />
+              <MediaPreview
+                currentItem={currentItem}
+                descriptor={descriptor}
+                isEnded={isEnded}
+                onExit={onExit}
+              />
+              <MediaToolbar onToggleGrid={toggleGridWithMediaPause} />
+              <div className="flex-1" />
+              <PresenterNavigation />
+            </div>
+
+            <GlassDivider vertical />
+
+            <div className="flex-2 lg:flex-1 min-w-0 h-full">
+              <PresenterSidebar previewCache={coverThumbnails} />
+            </div>
+          </div>
 
           {showGrid && (
             <ShortcutScope name="grid">
               <PresenterGrid previewCache={coverThumbnails} />
             </ShortcutScope>
           )}
-        </WorkspaceShell>
+        </div>
       </PreviewCacheProvider>
     </PresenterCommandContext.Provider>
   )

@@ -118,7 +118,7 @@ describe('FileBrowser presentation open behavior', () => {
     })
   })
 
-  it('opens an imported PPTX in the safe preview when double-clicked', async () => {
+  it('opens an imported PPTX in the presentation workspace when double-clicked', async () => {
     const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
     await renderWithItems([deck])
 
@@ -126,9 +126,8 @@ describe('FileBrowser presentation open behavior', () => {
       fireEvent.doubleClick(screen.getByText('Deck.pptx'))
     })
 
-    expect(usePresentationWorkspaceStore.getState().activeItemId).toBeNull()
-    expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
-    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/deck-1')
+    expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('deck-1')
+    expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
@@ -216,16 +215,31 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
-  it('opens a PDF in the safe preview when double-clicked', async () => {
+  it('starts PDF projection when double-clicked', async () => {
     const pdf = makeFile({ id: 'pdf-1', name: 'Program.pdf', mimeType: 'application/pdf' })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: [
+        {
+          itemId: pdf.id,
+          blobId: pdf.id,
+          status: 'ready',
+          reason: 'ready',
+          support: 'native'
+        }
+      ]
+    })
     await renderWithItems([pdf])
 
-    act(() => {
+    await act(async () => {
       fireEvent.doubleClick(screen.getByText('Program.pdf'))
+      await Promise.resolve()
     })
 
-    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/pdf-1')
-    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
+    expect(mocks.startMediaProjection).toHaveBeenCalledWith([pdf], 0, expect.any(Object), {
+      prioritizeStartItem: true
+    })
   })
 
   it('opens an editable presentation in the presentation workspace', async () => {
@@ -245,7 +259,7 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
-  it('opens an imported PPTX search result in the safe preview', async () => {
+  it('opens an imported PPTX search result in the presentation workspace', async () => {
     const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
     act(() => {
       useFileExplorerSearch.setState({ searchQuery: 'Deck' })
@@ -256,8 +270,8 @@ describe('FileBrowser presentation open behavior', () => {
       fireEvent.doubleClick(screen.getByText('Deck.pptx'))
     })
 
-    expect(usePresentationWorkspaceStore.getState().activeItemId).toBeNull()
-    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/deck-1')
+    expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('deck-1')
+    expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
@@ -295,7 +309,6 @@ describe('FileBrowser presentation open behavior', () => {
       }
     )
     expect(mocks.navigate).toHaveBeenCalledWith('/media')
-    expect(mocks.navigate).not.toHaveBeenCalledWith('/files/preview/search-media')
   })
 
   it('shows safe error health for an access-revoked sync root', async () => {

@@ -166,13 +166,13 @@ export default function FilesPage(): React.JSX.Element {
   const hhcLinePickerProvider = useMemo<CloudFolderPickerProvider>(
     () => ({
       providerType: 'hhc-line',
-      displayName: 'HHC LINE',
+      displayName: t('fileExplorer.syncSources.hhcLineName'),
       icon: React.createElement(Cloud, { className: 'size-5' }),
       supportsFolderNavigation: false,
       listFolders: hhcLineProvider.listFolders,
       importFolder: hhcLineProvider.importFolder
     }),
-    [hhcLineProvider]
+    [hhcLineProvider, t]
   )
 
   useEffect(() => {

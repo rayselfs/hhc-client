@@ -118,7 +118,7 @@ jobs:
           mkdir -p "${VLC_MOUNT}" .local-runtimes/vlc/darwin-arm64
           hdiutil attach -nobrowse -readonly -mountpoint "${VLC_MOUNT}" "${VLC_DMG}"
           trap 'hdiutil detach "${VLC_MOUNT}" >/dev/null 2>&1 || true' EXIT
-          cp -R "${VLC_MOUNT}/VLC.app/Contents/MacOS/." .local-runtimes/vlc/darwin-arm64/
+          cp -pR "${VLC_MOUNT}/VLC.app/Contents/MacOS/." .local-runtimes/vlc/darwin-arm64/
           hdiutil detach "${VLC_MOUNT}"
           trap - EXIT
 

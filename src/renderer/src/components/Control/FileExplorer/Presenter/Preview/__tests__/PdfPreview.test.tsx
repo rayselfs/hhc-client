@@ -1,7 +1,7 @@
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
-import { presentPreviewItem } from '@renderer/lib/projection-actions'
+import { presentMediaItem } from '@renderer/lib/projection-actions'
 import PdfPreview from '../PdfPreview'
 
 const { getPageMock, mockGetDocument, mockGetFileSource } = vi.hoisted(() => {
@@ -110,7 +110,7 @@ function makeItem(overrides: Partial<FileItemRecord> = {}): FileItemRecord {
 async function presentRemotePdf(item: FileItemRecord, sourceUrl: string): Promise<void> {
   const navigate = vi.fn()
   await expect(
-    presentPreviewItem({
+    presentMediaItem({
       item,
       playlist: [item],
       start: async () => {

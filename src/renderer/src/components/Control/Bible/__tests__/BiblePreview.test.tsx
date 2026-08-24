@@ -11,7 +11,6 @@ const mockNavigateTo = vi.fn()
 const mockNextChapter = vi.fn()
 const mockPrevChapter = vi.fn()
 const mockRetry = vi.fn()
-const mockAddCue = vi.fn()
 
 const storeSingleton: BibleStore = {
   versions: [],
@@ -131,14 +130,6 @@ vi.mock('@renderer/stores/bible-history', () => ({
   )
 }))
 
-vi.mock('@renderer/stores/service-playlist', () => ({
-  useServicePlaylistStore: Object.assign(vi.fn(), {
-    getState: () => ({
-      addCue: mockAddCue
-    })
-  })
-}))
-
 vi.mock('@renderer/lib/bible-utils', () => ({
   formatVerseReferenceShort: vi.fn(
     (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
@@ -179,7 +170,8 @@ vi.mock('react-i18next', () => ({
         'bible.chapterUnit.default': '章',
         'bible.chapterUnit.psa': '篇',
         'bible.preview.noContent': '尚未載入經文內容',
-        'bible.contextMenu.addToService': '加入流程'
+        'bible.contextMenu.addToService': '加入流程',
+        'bible.contextMenu.addToFolder': '加入資料夾'
       }
       return map[key] ?? key
     },
@@ -299,27 +291,14 @@ describe('BiblePreview', () => {
     expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
   })
 
-  it('adds a verse to the service playlist', () => {
+  it('only shows the custom-folder quick action for each verse', () => {
     renderBiblePreview()
-    const addButtons = screen.getAllByLabelText('加入流程')
-    fireEvent.click(addButtons[0])
-    expect(mockAddCue).toHaveBeenCalledWith({
-      type: 'bible',
-      title: 'MockBook 1:1',
-      bookNumber: 1,
-      chapter: 1,
-      verse: 1,
-      reference: 'MockBook 1:1',
-      notes: ''
-    })
-  })
-
-  it('renders two quick actions per verse', () => {
-    renderBiblePreview()
+    expect(screen.queryAllByLabelText('加入流程')).toHaveLength(0)
+    expect(screen.getAllByLabelText('加入資料夾')).toHaveLength(2)
     const verseRow = screen
       .getByText('In the beginning God created the heavens and the earth.')
       .closest('.group') as HTMLElement
-    expect(within(verseRow).getAllByRole('button')).toHaveLength(3)
+    expect(within(verseRow).getAllByRole('button')).toHaveLength(2)
   })
 
   it('calls nextChapter when next chapter button pressed', () => {

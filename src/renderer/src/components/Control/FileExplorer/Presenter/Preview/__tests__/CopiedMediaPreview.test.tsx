@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
-import { presentPreviewItem } from '@renderer/lib/projection-actions'
+import { presentMediaItem } from '@renderer/lib/projection-actions'
 import ImagePreview from '../ImagePreview'
 import VideoPreview from '../VideoPreview'
 
@@ -122,7 +122,7 @@ function setPendingRemoteSource(): void {
 async function presentRemoteItem(item: FileItemRecord, sourceUrl: string): Promise<void> {
   const navigate = vi.fn()
   await expect(
-    presentPreviewItem({
+    presentMediaItem({
       item,
       playlist: [item],
       start: async () => {
