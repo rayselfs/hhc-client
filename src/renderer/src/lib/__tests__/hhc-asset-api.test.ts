@@ -175,6 +175,7 @@ describe('browser HHC Asset API', () => {
 
   it.each([
     [403, 'access-revoked'],
+    [404, 'access-revoked'],
     [429, 'retryable'],
     [503, 'retryable']
   ] as const)('classifies HTTP %s as %s', async (status, classification) => {
@@ -185,7 +186,7 @@ describe('browser HHC Asset API', () => {
       fetcher: vi.fn(async () => jsonResponse({ secret: 'must-not-leak' }, status))
     })
 
-    await expect(api.listCollections()).rejects.toMatchObject({ classification })
+    await expect(api.listCollections()).rejects.toMatchObject({ classification, status })
   })
 
   it('classifies network failures as retryable', async () => {
@@ -299,10 +300,11 @@ describe('Electron HHC Asset API', () => {
   })
 
   it.each([
-    ['HHC_ASSET_AUTH_REQUIRED', 'auth-required'],
-    ['HHC_ASSET_ACCESS_REVOKED', 'access-revoked'],
-    ['HHC_ASSET_RETRYABLE', 'retryable']
-  ] as const)('maps main error %s as %s', async (message, classification) => {
+    ['HHC_ASSET_AUTH_REQUIRED', 'auth-required', 401],
+    ['HHC_ASSET_ACCESS_REVOKED', 'access-revoked', 403],
+    ['HHC_ASSET_ACCESS_REVOKED:404', 'access-revoked', 404],
+    ['HHC_ASSET_RETRYABLE', 'retryable', undefined]
+  ] as const)('maps main error %s as %s', async (message, classification, status) => {
     window.api = {
       hhcAssets: {
         listCollections: vi.fn(async () => {
@@ -312,7 +314,8 @@ describe('Electron HHC Asset API', () => {
     } as unknown as typeof window.api
 
     await expect(createElectronHhcAssetApi().listCollections()).rejects.toMatchObject({
-      classification
+      classification,
+      status
     })
   })
 })

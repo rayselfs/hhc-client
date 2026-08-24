@@ -137,36 +137,51 @@ describe('HHC LINE access owner', () => {
     expect(mocks.unlinkRoot).not.toHaveBeenCalled()
   })
 
-  it('marks and purges only the addressed root after an item-scoped 403', async () => {
+  it('does not purge every HHC root for an account-scoped 404', async () => {
     await handleHhcLineAccessError(
       auth(),
-      {
-        kind: 'root',
-        providerConnectionId: 'hhc-line:user-a',
-        remoteItemId: 'item-a1'
-      },
-      new HhcAssetApiError('access-revoked', 403)
+      { kind: 'account', accountUserId: 'user-a' },
+      new HhcAssetApiError('access-revoked', 404)
     )
 
-    const folders = useFileExplorerStore.getState().folders
-    expect(folders['root-a1'].syncLink?.status).toBe('access-revoked')
-    expect(folders['root-a2'].syncLink?.status).toBe('active')
-    expect(folders['root-b'].syncLink?.status).toBe('active')
-    expect(folders.onedrive.syncLink?.providerType).toBe('onedrive')
-    expect(mocks.putFolder).toHaveBeenCalledWith(
-      'folder-records',
-      expect.objectContaining({
-        id: 'root-a1',
-        syncLink: expect.objectContaining({ status: 'access-revoked' })
-      })
-    )
-    expect(mocks.cancelAndWait).toHaveBeenCalledWith({
-      providerConnectionId: 'hhc-line:user-a',
-      rootRemoteFolderId: 'collection-a1'
-    })
-    expect(mocks.unlinkRoot).toHaveBeenCalledWith(expect.objectContaining({ id: 'root-a1' }))
-    expect(window.api.hhcAssets.clearContentLeases).not.toHaveBeenCalled()
+    expect(mocks.unlinkAccount).not.toHaveBeenCalled()
+    expect(mocks.unlinkRoot).not.toHaveBeenCalled()
+    expect(useFileExplorerStore.getState().folders['root-a1'].syncLink?.status).toBe('active')
   })
+
+  it.each([403, 404] as const)(
+    'marks and purges only the addressed root after an item-scoped %s',
+    async (status) => {
+      await handleHhcLineAccessError(
+        auth(),
+        {
+          kind: 'root',
+          providerConnectionId: 'hhc-line:user-a',
+          remoteItemId: 'item-a1'
+        },
+        new HhcAssetApiError('access-revoked', status)
+      )
+
+      const folders = useFileExplorerStore.getState().folders
+      expect(folders['root-a1'].syncLink?.status).toBe('access-revoked')
+      expect(folders['root-a2'].syncLink?.status).toBe('active')
+      expect(folders['root-b'].syncLink?.status).toBe('active')
+      expect(folders.onedrive.syncLink?.providerType).toBe('onedrive')
+      expect(mocks.putFolder).toHaveBeenCalledWith(
+        'folder-records',
+        expect.objectContaining({
+          id: 'root-a1',
+          syncLink: expect.objectContaining({ status: 'access-revoked' })
+        })
+      )
+      expect(mocks.cancelAndWait).toHaveBeenCalledWith({
+        providerConnectionId: 'hhc-line:user-a',
+        rootRemoteFolderId: 'collection-a1'
+      })
+      expect(mocks.unlinkRoot).toHaveBeenCalledWith(expect.objectContaining({ id: 'root-a1' }))
+      expect(window.api.hhcAssets.clearContentLeases).not.toHaveBeenCalled()
+    }
+  )
 
   it('preserves the root and cached state for retryable failures', async () => {
     await handleHhcLineAccessError(

@@ -85,6 +85,7 @@ function cursor(value: unknown): string | undefined {
 function codeForStatus(status: number): string {
   if (status === 401) return 'HHC_ASSET_AUTH_REQUIRED'
   if (status === 403) return 'HHC_ASSET_ACCESS_REVOKED'
+  if (status === 404) return 'HHC_ASSET_ACCESS_REVOKED:404'
   if (status === 408 || status === 409 || status === 423 || status === 429 || status >= 500) {
     return 'HHC_ASSET_RETRYABLE'
   }

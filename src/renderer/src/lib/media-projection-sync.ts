@@ -216,7 +216,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           }
           if (
             classified.classification === 'access-revoked' &&
-            classified.status === 403 &&
+            (classified.status === 403 || classified.status === 404) &&
             classified.providerConnectionId &&
             classified.remoteItemId
           ) {

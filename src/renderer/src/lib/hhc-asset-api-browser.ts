@@ -54,7 +54,7 @@ function classification(
   status: number
 ): 'retryable' | 'auth-required' | 'access-revoked' | 'fatal' {
   if (status === 401) return 'auth-required'
-  if (status === 403) return 'access-revoked'
+  if (status === 403 || status === 404) return 'access-revoked'
   if (status === 408 || status === 409 || status === 423 || status === 429 || status >= 500) {
     return 'retryable'
   }
