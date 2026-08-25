@@ -166,7 +166,7 @@ describe('HHC Asset IPC', () => {
     })
 
     expect(mockFetch.mock.calls.map(([url]) => String(url))).toEqual([
-      'https://www.alive.org.tw/api/assets/collections?limit=500&cursor=cursor+%2F+1',
+      'https://www.alive.org.tw/api/assets/collections?limit=100&cursor=cursor+%2F+1',
       'https://www.alive.org.tw/api/assets/collections/collection_1/changes?cursor=revision+%2F+1'
     ])
     for (const [, init] of mockFetch.mock.calls) {

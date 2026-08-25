@@ -242,7 +242,7 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
   ipcMain.handle(
     'hhc-assets:list-collections',
     authorized(async (rawCursor?: unknown): Promise<HhcAssetCollectionPage> => {
-      const params = new URLSearchParams({ limit: '500' })
+      const params = new URLSearchParams({ limit: '100' })
       const validatedCursor = cursor(rawCursor)
       if (validatedCursor) params.set('cursor', validatedCursor)
       return json(auth, `/api/assets/collections?${params}`, projectHhcAssetCollectionPage)
