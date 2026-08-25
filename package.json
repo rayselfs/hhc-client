@@ -1,6 +1,6 @@
 {
   "name": "libre-presenter",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "description": "Open-source presentation software for churches and live events",
   "license": "GPL-3.0-or-later",
   "main": "./out/main/index.js",
