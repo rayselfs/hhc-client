@@ -22,3 +22,25 @@ describe('CI workflow dependency installation policy', () => {
     }
   )
 })
+
+describe('release contract', () => {
+  test('keeps package versions aligned and the media sync runbook ACL-only', () => {
+    const packageManifest = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+      version: string
+    }
+    const lockManifest = JSON.parse(readFileSync(resolve('package-lock.json'), 'utf8')) as {
+      version: string
+      packages: { '': { version: string } }
+    }
+    const runbook = readFileSync(resolve('docs/release/media-sync-runbook.md'), 'utf8')
+
+    expect(lockManifest.version).toBe(packageManifest.version)
+    expect(lockManifest.packages[''].version).toBe(packageManifest.version)
+    expect(runbook).not.toContain('media_sync_user')
+    expect(runbook).not.toMatch(/\bPR #\d+\b/)
+    expect(runbook).not.toMatch(/revoke[^\n]*403/i)
+    expect(runbook).toContain('direct-user ACL')
+    expect(runbook).toContain('role-UUID ACL')
+    expect(runbook).toContain('scoped `404`')
+  })
+})
