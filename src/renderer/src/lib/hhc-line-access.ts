@@ -129,11 +129,12 @@ export async function handleHhcLineAccessError(
     await auth.endSession()
     return
   }
-  if (classified.classification !== 'access-revoked' || classified.status !== 403) return
+  if (classified.classification !== 'access-revoked') return
   if (scope.kind === 'account') {
-    await cleanupHhcLineAccountAccess(scope.accountUserId)
+    if (classified.status === 403) await cleanupHhcLineAccountAccess(scope.accountUserId)
     return
   }
+  if (classified.status !== 403 && classified.status !== 404) return
   await revokeHhcLineRootAccess(scope)
 }
 

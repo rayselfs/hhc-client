@@ -16,6 +16,9 @@ async function invoke<T>(request: Promise<T>): Promise<T> {
     if (message.includes('HHC_ASSET_AUTH_REQUIRED')) {
       throw new HhcAssetApiError('auth-required', 401)
     }
+    if (message.includes('HHC_ASSET_ACCESS_REVOKED:404')) {
+      throw new HhcAssetApiError('access-revoked', 404)
+    }
     if (message.includes('HHC_ASSET_ACCESS_REVOKED')) {
       throw new HhcAssetApiError('access-revoked', 403)
     }

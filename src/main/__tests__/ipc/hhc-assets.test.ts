@@ -409,6 +409,7 @@ describe('HHC Asset IPC', () => {
 
   it.each([
     [403, 'HHC_ASSET_ACCESS_REVOKED'],
+    [404, 'HHC_ASSET_ACCESS_REVOKED:404'],
     [429, 'HHC_ASSET_RETRYABLE'],
     [503, 'HHC_ASSET_RETRYABLE']
   ] as const)('maps HTTP %s without exposing response bodies', async (status, code) => {

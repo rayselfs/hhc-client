@@ -355,34 +355,37 @@ describe('startSyncRuntime', () => {
     }
   )
 
-  it('triggers access-revoked once and continues an independent sibling root', async () => {
-    const sessionRef = { current: session() }
-    const targetConnection = connection('hhc-runtime-revoked')
-    const revoked = root('root-revoked', targetConnection.id)
-    const sibling = root('root-revoked-sibling', targetConnection.id)
-    hhcMocks.connections = [targetConnection]
-    hhcMocks.folders = { [revoked.id]: revoked, [sibling.id]: sibling }
-    hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) => {
-      if (rootFolderId === revoked.id) throw { classification: 'access-revoked', status: 403 }
-      return idleSummary(targetConnection.id, rootFolderId)
-    })
-    const onHhcAccessRevoked = vi.fn(async () => {
-      delete hhcMocks.folders[revoked.id]
-    })
+  it.each([403, 404] as const)(
+    'triggers access-revoked once and continues an independent sibling root after %s',
+    async (status) => {
+      const sessionRef = { current: session() }
+      const targetConnection = connection('hhc-runtime-revoked')
+      const revoked = root('root-revoked', targetConnection.id)
+      const sibling = root('root-revoked-sibling', targetConnection.id)
+      hhcMocks.connections = [targetConnection]
+      hhcMocks.folders = { [revoked.id]: revoked, [sibling.id]: sibling }
+      hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) => {
+        if (rootFolderId === revoked.id) throw { classification: 'access-revoked', status }
+        return idleSummary(targetConnection.id, rootFolderId)
+      })
+      const onHhcAccessRevoked = vi.fn(async () => {
+        delete hhcMocks.folders[revoked.id]
+      })
 
-    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
-    await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id))
-    expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
-    expect(onHhcAccessRevoked).toHaveBeenCalledWith({
-      connectionId: targetConnection.id,
-      rootFolderId: revoked.id
-    })
+      const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
+      await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id))
+      expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
+      expect(onHhcAccessRevoked).toHaveBeenCalledWith({
+        connectionId: targetConnection.id,
+        rootFolderId: revoked.id
+      })
 
-    await vi.advanceTimersByTimeAsync(60_000)
-    expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
-    expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
-    stop()
-  })
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
+      stop()
+    }
+  )
 
   it('does not purge a root for a forged access-revoked classification without HTTP 403', async () => {
     const sessionRef = { current: session() }

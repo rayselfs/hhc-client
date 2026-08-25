@@ -418,54 +418,57 @@ describe('media projection sync', () => {
     vi.useRealTimers()
   })
 
-  it('stops projection and clears current remote sources and leases after an exact 403', async () => {
-    vi.useFakeTimers()
-    const clearContentLeases = vi.fn(async () => undefined)
-    Object.defineProperty(window, 'api', {
-      configurable: true,
-      value: { hhcAssets: { clearContentLeases } }
-    })
-    const onAccessRevoked = vi.fn(async () => undefined)
-    const item = setRemotePresentationItem('remote.mp4', 'video/mp4')
-    remoteMocks.prepare
-      .mockResolvedValueOnce({
-        providerConnectionId: 'hhc-line:user-1',
-        remoteItemId: 'asset-1',
-        rootRemoteFolderId: 'collection-1',
-        source: {
-          kind: 'ticket',
-          url: 'https://www.alive.org.tw/api/assets/content?ticket=current',
-          expiresAt: Date.now() + 60_000,
-          etag: 'etag-1'
-        }
+  it.each([403, 404] as const)(
+    'stops projection and clears current remote sources and leases after an exact %s',
+    async (status) => {
+      vi.useFakeTimers()
+      const clearContentLeases = vi.fn(async () => undefined)
+      Object.defineProperty(window, 'api', {
+        configurable: true,
+        value: { hhcAssets: { clearContentLeases } }
       })
-      .mockRejectedValueOnce(
-        Object.assign(new HhcAssetApiError('access-revoked', 403), {
+      const onAccessRevoked = vi.fn(async () => undefined)
+      const item = setRemotePresentationItem('remote.mp4', 'video/mp4')
+      remoteMocks.prepare
+        .mockResolvedValueOnce({
           providerConnectionId: 'hhc-line:user-1',
-          remoteItemId: 'asset-1'
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1',
+          source: {
+            kind: 'ticket',
+            url: 'https://www.alive.org.tw/api/assets/content?ticket=current',
+            expiresAt: Date.now() + 60_000,
+            etag: 'etag-1'
+          }
         })
-      )
+        .mockRejectedValueOnce(
+          Object.assign(new HhcAssetApiError('access-revoked', status), {
+            providerConnectionId: 'hhc-line:user-1',
+            remoteItemId: 'asset-1'
+          })
+        )
 
-    renderSync({
-      auth: {
-        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
-        getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn(),
-        endSession: vi.fn()
-      },
-      onAccessRevoked
-    })
-    await act(async () => Promise.resolve())
+      renderSync({
+        auth: {
+          getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+          getAccessToken: vi.fn(),
+          refreshAccessToken: vi.fn(),
+          endSession: vi.fn()
+        },
+        onAccessRevoked
+      })
+      await act(async () => Promise.resolve())
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000)
-    })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000)
+      })
 
-    expect(useMediaProjectionStore.getState().snapshot?.entries[0].sourceUrl).toBe(item.url)
-    expect(clearContentLeases).not.toHaveBeenCalled()
-    expect(mockStopProjection).toHaveBeenCalledOnce()
-    expect(onAccessRevoked).toHaveBeenCalledOnce()
-  })
+      expect(useMediaProjectionStore.getState().snapshot?.entries[0].sourceUrl).toBe(item.url)
+      expect(clearContentLeases).not.toHaveBeenCalled()
+      expect(mockStopProjection).toHaveBeenCalledOnce()
+      expect(onAccessRevoked).toHaveBeenCalledOnce()
+    }
+  )
 
   it('keeps a sibling root source active and releases only the revoked root source', async () => {
     const releaseContentLease = vi.fn(async () => undefined)

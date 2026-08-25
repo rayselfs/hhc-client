@@ -120,7 +120,11 @@ function classifyHhcError(
     ) {
       return classification
     }
-    if (classification === 'access-revoked' && 'status' in error && error.status === 403) {
+    if (
+      classification === 'access-revoked' &&
+      'status' in error &&
+      (error.status === 403 || error.status === 404)
+    ) {
       return classification
     }
   }
