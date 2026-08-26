@@ -73,50 +73,102 @@ function publishOneDriveRootFolder(root: FolderRecord): void {
 
 function collectOneDriveRootEntries(
   entries: SyncEntryRecord[],
-  rootRemoteFolderId: string,
+  providerConnectionId: string,
   rootFolderId: string,
   folders: FolderRecord[],
-  items: Array<{ id: string; parentId: string }>
+  items: Array<{ id: string; parentId: string; deletedAt?: number }>
 ): SyncEntryRecord[] {
-  const remoteItemIds = new Set([rootRemoteFolderId])
-  const localFolderIds = new Set([rootFolderId])
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const entry of entries) {
-      if (
-        entry.parentRemoteItemId &&
-        remoteItemIds.has(entry.parentRemoteItemId) &&
-        !remoteItemIds.has(entry.remoteItemId)
-      ) {
-        remoteItemIds.add(entry.remoteItemId)
-        changed = true
+  const rootCandidates = folders.flatMap((folder) => {
+    const syncLink = folder.syncLink
+    return folder.deletedAt == null &&
+      folder.parentId === FILE_EXPLORER_ROOT_ID &&
+      syncLink?.providerType === 'onedrive' &&
+      syncLink.providerConnectionId === providerConnectionId
+      ? [{ folderId: folder.id, remoteFolderId: syncLink.remoteFolderId }]
+      : []
+  })
+  if (!rootCandidates.some((root) => root.folderId === rootFolderId)) return []
+
+  const remoteChildren = new Map<string, string[]>()
+  for (const entry of entries) {
+    if (!entry.parentRemoteItemId) continue
+    const children = remoteChildren.get(entry.parentRemoteItemId) ?? []
+    children.push(entry.remoteItemId)
+    remoteChildren.set(entry.parentRemoteItemId, children)
+  }
+  const remoteOwners = new Map<string, Set<string>>()
+  for (const root of rootCandidates) {
+    const remoteIds = [root.remoteFolderId]
+    const seen = new Set(remoteIds)
+    for (let index = 0; index < remoteIds.length; index++) {
+      for (const childId of remoteChildren.get(remoteIds[index]) ?? []) {
+        if (seen.has(childId)) continue
+        seen.add(childId)
+        remoteIds.push(childId)
       }
     }
-    for (const folder of folders) {
-      if (
-        folder.parentId &&
-        localFolderIds.has(folder.parentId) &&
-        !localFolderIds.has(folder.id)
-      ) {
-        localFolderIds.add(folder.id)
-        changed = true
-      }
+    for (const remoteId of remoteIds) {
+      const owners = remoteOwners.get(remoteId) ?? new Set<string>()
+      owners.add(root.folderId)
+      remoteOwners.set(remoteId, owners)
     }
   }
 
-  const foldersById = new Map(folders.map((folder) => [folder.id, folder]))
-  const itemsById = new Map(items.map((item) => [item.id, item]))
+  const activeFolders = folders.filter((folder) => folder.deletedAt == null)
+  const activeFoldersById = new Map(activeFolders.map((folder) => [folder.id, folder]))
+  const activeItemsById = new Map(
+    items.filter((item) => item.deletedAt == null).map((item) => [item.id, item])
+  )
+  const localChildren = new Map<string, string[]>()
+  for (const folder of activeFolders) {
+    if (!folder.parentId) continue
+    const children = localChildren.get(folder.parentId) ?? []
+    children.push(folder.id)
+    localChildren.set(folder.parentId, children)
+  }
+  const localFolderOwners = new Map<string, Set<string>>()
+  for (const root of rootCandidates) {
+    const folderIds = [root.folderId]
+    const seen = new Set(folderIds)
+    for (let index = 0; index < folderIds.length; index++) {
+      for (const childId of localChildren.get(folderIds[index]) ?? []) {
+        if (seen.has(childId)) continue
+        seen.add(childId)
+        folderIds.push(childId)
+      }
+    }
+    for (const folderId of folderIds) {
+      const owners = localFolderOwners.get(folderId) ?? new Set<string>()
+      owners.add(root.folderId)
+      localFolderOwners.set(folderId, owners)
+    }
+  }
+
+  const localReferenceCounts = new Map<string, number>()
+  for (const entry of entries) {
+    const id = entry.kind === 'folder' ? entry.folderId : entry.itemId
+    if (!id) continue
+    const key = `${entry.kind}\0${id}`
+    localReferenceCounts.set(key, (localReferenceCounts.get(key) ?? 0) + 1)
+  }
+
   return entries.filter((entry) => {
-    if (entry.kind === 'folder' && entry.folderId) {
-      const folder = foldersById.get(entry.folderId)
-      if (folder) return localFolderIds.has(folder.id)
-    }
-    if (entry.kind === 'file' && entry.itemId) {
-      const item = itemsById.get(entry.itemId)
-      if (item) return localFolderIds.has(item.parentId)
-    }
-    return remoteItemIds.has(entry.remoteItemId)
+    const localId = entry.kind === 'folder' ? entry.folderId : entry.itemId
+    if (localId && (localReferenceCounts.get(`${entry.kind}\0${localId}`) ?? 0) > 1) return false
+
+    const entryRemoteOwners = remoteOwners.get(entry.remoteItemId)
+    const entryLocalOwners =
+      entry.kind === 'folder' && entry.folderId && activeFoldersById.has(entry.folderId)
+        ? localFolderOwners.get(entry.folderId)
+        : entry.kind === 'file' && entry.itemId
+          ? localFolderOwners.get(activeItemsById.get(entry.itemId)?.parentId ?? '')
+          : undefined
+    if ((entryRemoteOwners?.size ?? 0) > 1 || (entryLocalOwners?.size ?? 0) > 1) return false
+
+    const remoteOwner = entryRemoteOwners?.values().next().value
+    const localOwner = entryLocalOwners?.values().next().value
+    if (remoteOwner && localOwner && remoteOwner !== localOwner) return false
+    return (remoteOwner ?? localOwner) === rootFolderId
   })
 }
 
@@ -811,7 +863,7 @@ async function runOneDriveFolderRefresh(
   const accountEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
   const existingEntries = collectOneDriveRootEntries(
     accountEntries,
-    syncLink.remoteFolderId,
+    syncLink.providerConnectionId,
     rootFolder.id,
     folders,
     allItems
