@@ -71,6 +71,28 @@ function publishOneDriveRootFolder(root: FolderRecord): void {
   })
 }
 
+function collectOneDriveRootEntries(
+  entries: SyncEntryRecord[],
+  rootRemoteFolderId: string
+): SyncEntryRecord[] {
+  const remoteItemIds = new Set([rootRemoteFolderId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const entry of entries) {
+      if (
+        entry.parentRemoteItemId &&
+        remoteItemIds.has(entry.parentRemoteItemId) &&
+        !remoteItemIds.has(entry.remoteItemId)
+      ) {
+        remoteItemIds.add(entry.remoteItemId)
+        changed = true
+      }
+    }
+  }
+  return entries.filter((entry) => remoteItemIds.has(entry.remoteItemId))
+}
+
 interface TokenResponse {
   access_token: string
   refresh_token: string
@@ -759,7 +781,15 @@ async function runOneDriveFolderRefresh(
 
   const provider = createStoredOneDriveProvider(syncLink.providerConnectionId)
   const cursor = await getSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
-  const existingEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
+  const accountEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
+  const existingEntries = collectOneDriveRootEntries(accountEntries, syncLink.remoteFolderId)
+  const existingFolderIds = new Set([
+    rootFolder.id,
+    ...existingEntries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))
+  ])
+  const existingItemIds = new Set(
+    existingEntries.flatMap((entry) => (entry.itemId ? [entry.itemId] : []))
+  )
 
   let scan: Awaited<ReturnType<typeof scanOneDriveFolder>>
   let fullScanFallback = false
@@ -787,8 +817,10 @@ async function runOneDriveFolderRefresh(
     rootRemoteFolderId: syncLink.remoteFolderId,
     offlinePolicy,
     platform: getOneDriveMediaPlatform(),
-    existingFolders: folders,
-    existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
+    existingFolders: folders.filter((folder) => existingFolderIds.has(folder.id)),
+    existingItems: allItems.filter(
+      (item): item is FileItemRecord => item.type === 'file' && existingItemIds.has(item.id)
+    ),
     existingEntries,
     existingBlobIds: await collectAvailableFileBlobIds(fileBlobs),
     forceRetry: options.forceRetry
