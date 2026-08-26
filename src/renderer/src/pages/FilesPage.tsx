@@ -18,7 +18,7 @@ import {
 } from '@renderer/stores/file-explorer'
 import { useSoundboardStore } from '@renderer/stores/soundboard'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
-import { Cloud, Presentation, RefreshCw, Unlink } from 'lucide-react'
+import { Presentation, RefreshCw, Unlink } from 'lucide-react'
 import { createEditablePresentation } from '@renderer/lib/editable-presentation'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
@@ -46,7 +46,7 @@ import {
   validateDisplayName
 } from '@renderer/lib/file-naming'
 import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
-import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
+import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
 import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
@@ -55,7 +55,10 @@ const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
   providerType: 'onedrive',
   displayName: 'OneDrive',
-  icon: React.createElement(OneDriveIcon, { className: 'size-5' }),
+  icon: React.createElement(SyncProviderIcon, {
+    providerType: 'onedrive',
+    className: 'size-5'
+  }),
   listFolders: ONE_DRIVE_PROVIDER.listFolders,
   importFolder: ONE_DRIVE_PROVIDER.importFolder
 }
@@ -167,7 +170,10 @@ export default function FilesPage(): React.JSX.Element {
     () => ({
       providerType: 'hhc-line',
       displayName: t('fileExplorer.syncSources.hhcLineName'),
-      icon: React.createElement(Cloud, { className: 'size-5' }),
+      icon: React.createElement(SyncProviderIcon, {
+        providerType: 'hhc-line',
+        className: 'size-5'
+      }),
       supportsFolderNavigation: false,
       listFolders: hhcLineProvider.listFolders,
       importFolder: hhcLineProvider.importFolder

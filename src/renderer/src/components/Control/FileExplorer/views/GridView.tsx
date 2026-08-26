@@ -1,20 +1,12 @@
 import React from 'react'
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Folder,
-  FolderSync,
-  Loader2,
-  Star,
-  XCircle
-} from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Folder, Loader2, Star, XCircle } from 'lucide-react'
 import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { getFileIcon } from './getFileIcon'
 import { canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 import { InlineRenameInput } from '../InlineRenameInput'
 import { splitFileName } from '@renderer/lib/file-naming'
-import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
+import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import type { SyncEntryStatus } from '@renderer/lib/sync-db'
 import type { SyncProviderType } from '@shared/types/folder'
 import { SyncStatusIcon } from './SyncStatusBadge'
@@ -70,12 +62,10 @@ function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
 
 function renderSyncProviderIcon(providerType?: SyncProviderType): React.ReactNode {
   if (!providerType) return null
-  const icon =
-    providerType === 'onedrive' ? (
-      <OneDriveIcon className="size-[18px]" />
-    ) : (
-      <FolderSync size={18} />
-    )
+  const icon = <SyncProviderIcon providerType={providerType} className="size-5" />
+  if (providerType === 'hhc-line') {
+    return <span className="absolute inset-0 flex items-center justify-center">{icon}</span>
+  }
   return (
     <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow-sm">
       <span className="rounded-full bg-primary/90 p-1">{icon}</span>
