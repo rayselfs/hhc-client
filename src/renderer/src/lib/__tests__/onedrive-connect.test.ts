@@ -13,13 +13,19 @@ import type { OneDriveReadonlyProvider } from '../onedrive-provider'
 import type { SyncChangePage } from '../sync-provider'
 import { openFileExplorerDB } from '../file-explorer-db'
 import { refreshImportedMediaAssets } from '../local-sync-import'
-import { listProviderConnectionsByType, putSyncEntry } from '../sync-db'
+import {
+  getSyncCursor,
+  listProviderConnectionsByType,
+  listSyncEntriesByProviderConnection,
+  putSyncEntry
+} from '../sync-db'
 import { getSyncEntryByLocalItem } from '../sync-db'
 import { resetSyncDownloadQueueForTests } from '../sync-download-queue'
 
 const providerMocks = vi.hoisted(() => ({
   connect: vi.fn(),
   initialScan: vi.fn(),
+  incrementalChanges: vi.fn(),
   downloadContent: vi.fn()
 }))
 
@@ -81,6 +87,7 @@ vi.mock('../onedrive-provider', () => {
   class MockOneDriveReadonlyProvider {
     connect = providerMocks.connect
     initialScan = providerMocks.initialScan
+    incrementalChanges = providerMocks.incrementalChanges
     downloadContent = providerMocks.downloadContent
   }
   return {
@@ -470,6 +477,111 @@ describe('refreshOneDriveFolder', () => {
     expect(putSyncEntry).toHaveBeenCalledWith(
       expect.objectContaining({ remoteItemId: 'remote-file-1', status: 'queued' })
     )
+  })
+
+  it('full-scans an empty delta to reconcile existing remote-only files as always-offline', async () => {
+    const rootFolder = {
+      id: 'onedrive-root',
+      name: 'OneDrive',
+      parentId: FILE_EXPLORER_ROOT_ID,
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'onedrive:account-1',
+        remoteFolderId: 'remote-folder-1',
+        providerType: 'onedrive' as const,
+        offlinePolicy: 'on-demand' as const
+      }
+    }
+    const existingItem = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'photo.jpg',
+      type: 'file' as const,
+      parentId: rootFolder.id,
+      url: 'blob:11111111-1111-4111-8111-111111111111',
+      size: 10,
+      mimeType: 'image/jpeg',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null
+    }
+    const existingEntry = {
+      id: 'entry-1',
+      providerConnectionId: 'onedrive:account-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: 'remote-folder-1',
+      kind: 'file' as const,
+      name: 'photo.jpg',
+      itemId: existingItem.id,
+      mimeType: 'image/jpeg',
+      size: 10,
+      status: 'remote-only' as const,
+      createdAt: 1,
+      updatedAt: 1
+    }
+    fileStoreMocks.state.folders = { [rootFolder.id]: rootFolder }
+    vi.mocked(getSyncCursor).mockResolvedValueOnce({
+      id: 'cursor-record',
+      providerConnectionId: 'onedrive:account-1',
+      remoteFolderId: 'remote-folder-1',
+      cursor: 'cursor-1',
+      updatedAt: 1
+    })
+    vi.mocked(listSyncEntriesByProviderConnection).mockResolvedValueOnce([existingEntry])
+    vi.mocked(openFileExplorerDB).mockResolvedValue({
+      getAll: vi.fn(async (store: string) => {
+        if (store === 'folder-records') return [rootFolder]
+        if (store === 'folder-items') return [existingItem]
+        return []
+      }),
+      put: vi.fn(async () => undefined),
+      transaction: () => ({
+        objectStore: () => ({
+          delete: vi.fn(async () => undefined),
+          get: vi.fn(async () => undefined),
+          getAll: vi.fn(async () => []),
+          put: vi.fn(async () => undefined)
+        }),
+        done: Promise.resolve()
+      })
+    } as never)
+    providerMocks.incrementalChanges.mockResolvedValueOnce({
+      items: [],
+      nextCursor: 'cursor-2',
+      hasMore: false
+    })
+    providerMocks.initialScan.mockResolvedValueOnce({
+      items: [
+        {
+          remoteItemId: 'remote-folder-1',
+          parentRemoteItemId: null,
+          kind: 'folder',
+          name: 'OneDrive'
+        },
+        {
+          remoteItemId: 'remote-file-1',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          size: 10
+        }
+      ],
+      nextCursor: 'cursor-full',
+      hasMore: false
+    })
+    providerMocks.downloadContent.mockResolvedValueOnce({
+      blobId: existingItem.id,
+      size: 10,
+      mimeType: 'image/jpeg'
+    })
+
+    const summary = await refreshOneDriveFolder(rootFolder.id)
+
+    expect(summary.fullScanFallback).toBe(true)
+    await vi.waitFor(() => expect(providerMocks.downloadContent).toHaveBeenCalledOnce())
+    expect(providerMocks.initialScan).toHaveBeenCalledOnce()
   })
 
   it('coalesces concurrent refreshes for the same root folder', async () => {

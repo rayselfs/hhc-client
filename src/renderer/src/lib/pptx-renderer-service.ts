@@ -96,17 +96,11 @@ async function elementToJpegDataUrl(
     '</foreignObject>',
     '</svg>'
   ].join('')
-  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }))
-
-  try {
-    const image = await loadImage(url)
-    context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, width, height)
-    context.drawImage(image, 0, 0, width, height)
-    return canvas.toDataURL('image/jpeg', PPTX_THUMBNAIL_QUALITY)
-  } finally {
-    URL.revokeObjectURL(url)
-  }
+  const image = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`)
+  context.fillStyle = '#ffffff'
+  context.fillRect(0, 0, width, height)
+  context.drawImage(image, 0, 0, width, height)
+  return canvas.toDataURL('image/jpeg', PPTX_THUMBNAIL_QUALITY)
 }
 
 export async function generatePptxFirstSlideThumbnail(file: File): Promise<string | null> {

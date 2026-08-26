@@ -1025,6 +1025,22 @@ describe('HHC LINE collection connection', () => {
           hasMore: false,
           reset: false
         })
+        .mockResolvedValueOnce({
+          collection: collection('collection-1', 'Sunday'),
+          items: [remoteItem],
+          tombstones: [],
+          cursor: 'reset-barrier-2',
+          hasMore: true,
+          reset: true
+        })
+        .mockResolvedValueOnce({
+          collection: collection('collection-1', 'Sunday'),
+          items: [],
+          tombstones: [],
+          cursor: 'revision-3',
+          hasMore: false,
+          reset: false
+        })
     })
     const sessionRef = {
       current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
@@ -1052,6 +1068,44 @@ describe('HHC LINE collection connection', () => {
       syncLink: { offlinePolicy: 'always-offline' }
     })
     expect(fileEntry?.status).toBe('queued')
+  })
+
+  it('full-scans an empty delta to reconcile existing remote-only files as always-offline', async () => {
+    mocks.electron = true
+    const remoteItem = {
+      id: 'policy-item',
+      collectionId: 'policy-collection',
+      remoteItemId: 'policy-source',
+      displayName: 'photo.jpg',
+      sourceRevision: 'sha256:one',
+      createdRevision: 1,
+      mimeType: 'image/jpeg',
+      sizeBytes: 42,
+      etag: 'etag-1',
+      createdAt: '2026-08-17T00:00:00Z'
+    }
+    mocks.api = api({ getCollectionChanges: resetChanges([remoteItem]) })
+    const sessionRef = {
+      current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    }
+    const enqueue = vi.spyOn(syncDownloadQueue, 'enqueueSyncDownload').mockResolvedValue(null)
+
+    mocks.offlinePolicy = 'on-demand'
+    await importHhcLineCollection(auth(sessionRef), {
+      remoteItemId: 'policy-collection',
+      name: 'Sunday',
+      parentRemoteItemId: null
+    })
+    const [root] = await (await openFileExplorerDB()).getAll('folder-records')
+    await expect(getSyncEntryByRemoteItem('hhc-line:user-1', 'policy-item')).resolves.toMatchObject(
+      { status: 'remote-only' }
+    )
+
+    mocks.offlinePolicy = 'always-offline'
+    const summary = await refreshHhcLineFolder(auth(sessionRef), root.id)
+
+    expect(summary.fullScanFallback).toBe(true)
+    expect(enqueue.mock.calls.map(([job]) => job.request.remoteItemId)).toContain('policy-item')
   })
 
   it('keeps multiple imported collections independent', async () => {
