@@ -42,6 +42,7 @@ export const MEDIA_JOB_HISTORY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
 interface ActiveJob {
   controller: AbortController
   type: MediaJobType
+  completion?: Promise<void>
 }
 
 export class MediaJobQueue {
@@ -161,6 +162,18 @@ export class MediaJobQueue {
     this.active.get(id)?.controller.abort()
   }
 
+  async cancelAndWait(predicate: (job: MediaJobRecord) => boolean): Promise<number> {
+    const jobs = (await listMediaJobs()).filter(predicate)
+    await Promise.all(jobs.map((job) => this.cancel(job.id)))
+    await Promise.allSettled(
+      jobs.flatMap((job) => {
+        const completion = this.active.get(job.id)?.completion
+        return completion ? [completion] : []
+      })
+    )
+    return jobs.length
+  }
+
   async removeExpiredHistory(
     retentionMs = MEDIA_JOB_HISTORY_RETENTION_MS,
     now = Date.now()
@@ -187,7 +200,10 @@ export class MediaJobQueue {
         ).length
         if (activeForType >= this.concurrency[job.type]) continue
         if (this.active.has(job.id)) continue
-        void this.run(job)
+        const completion = this.run(job)
+        const active = this.active.get(job.id)
+        if (active) active.completion = completion
+        void completion
       }
     } finally {
       this.pumping = false

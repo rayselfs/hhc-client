@@ -1,6 +1,19 @@
 import { APP_CONFIG } from '@shared/app-config'
-import type { HhcAuthAdapter } from '@shared/hhc-auth'
+import type { HhcAuthAdapter, HhcSession } from '@shared/hhc-auth'
 import { isElectron } from './env'
+
+let sessionOwner: (() => HhcSession | null) | undefined
+
+export function registerHhcSessionOwner(owner: () => HhcSession | null): () => void {
+  sessionOwner = owner
+  return () => {
+    if (sessionOwner === owner) sessionOwner = undefined
+  }
+}
+
+export function getCurrentHhcSession(): HhcSession | null {
+  return sessionOwner?.() ?? null
+}
 
 export const HHC_AUTH = {
   accountApi: `${APP_CONFIG.hhcAccountOrigin}/api/account/v1`,

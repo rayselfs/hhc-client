@@ -19,8 +19,21 @@ const accessMocks = vi.hoisted(() => ({
   cleanupAccount: vi.fn<(userId: string) => Promise<void>>(async () => undefined)
 }))
 
+const sessionOwnerMocks = vi.hoisted(() => ({
+  owner: null as (() => HhcSession | null) | null,
+  unregister: vi.fn(),
+  register: vi.fn((owner: () => HhcSession | null) => {
+    sessionOwnerMocks.owner = owner
+    return () => {
+      if (sessionOwnerMocks.owner === owner) sessionOwnerMocks.owner = null
+      sessionOwnerMocks.unregister()
+    }
+  })
+}))
+
 vi.mock('@renderer/lib/hhc-auth', () => ({
-  createHhcAuthAdapter: authFactory.create
+  createHhcAuthAdapter: authFactory.create,
+  registerHhcSessionOwner: sessionOwnerMocks.register
 }))
 
 vi.mock('@renderer/lib/hhc-line-access', () => ({
@@ -74,6 +87,9 @@ beforeEach(() => {
   authFactory.create.mockClear()
   accessMocks.cleanupAccount.mockReset()
   accessMocks.cleanupAccount.mockResolvedValue(undefined)
+  sessionOwnerMocks.register.mockClear()
+  sessionOwnerMocks.unregister.mockClear()
+  sessionOwnerMocks.owner = null
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: { hhcAssets: { clearContentLeases: vi.fn(async () => undefined) } }
@@ -138,9 +154,11 @@ describe('HhcAuthContext', () => {
     act(() => adapter.emit(SESSION))
     expect(result.current.status).toBe('authenticated')
     expect(result.current.session).toEqual(SESSION)
+    expect(sessionOwnerMocks.owner?.()).toEqual(SESSION)
 
     await act(() => result.current.signOut())
     expect(adapter.signOut).toHaveBeenCalledOnce()
+    expect(sessionOwnerMocks.owner?.()).toBeNull()
     act(() => adapter.emit(null))
     await waitFor(() => expect(result.current.status).toBe('anonymous'))
   })
@@ -217,11 +235,13 @@ describe('HhcAuthContext', () => {
     expect(window.api.hhcAssets.clearContentLeases).toHaveBeenCalledOnce()
     expect(result.current.status).toBe('loading')
     expect(result.current.session).toBeNull()
+    expect(sessionOwnerMocks.owner?.()).toBeNull()
     await expect(result.current.getAccessToken()).resolves.toBeNull()
 
     await act(async () => resolveCleanup())
     await waitFor(() => expect(result.current.session?.userId).toBe('user-2'))
     expect(result.current.status).toBe('authenticated')
+    expect(sessionOwnerMocks.owner?.()?.userId).toBe('user-2')
   })
 
   it('keeps account B blocked and retries a failed departing-account cleanup', async () => {
@@ -605,5 +625,7 @@ describe('HhcAuthContext', () => {
     expect(second.cancelSignIn).not.toHaveBeenCalled()
     expect(first.unsubscribe).toHaveBeenCalledTimes(vi.mocked(first.subscribe).mock.calls.length)
     expect(second.unsubscribe).toHaveBeenCalledTimes(vi.mocked(second.subscribe).mock.calls.length)
+    expect(sessionOwnerMocks.register).toHaveBeenCalledTimes(2)
+    expect(sessionOwnerMocks.unregister).toHaveBeenCalledTimes(2)
   })
 })

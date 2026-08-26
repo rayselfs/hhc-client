@@ -1,9 +1,14 @@
 import type { FolderRecord } from '@shared/types/folder'
 import { isElectron } from './env'
-import { cleanupFileResources, type CleanupResult } from './file-resource-cleanup'
+import {
+  cleanupFileResources,
+  listFileResourceCleanupItemIds,
+  type CleanupResult
+} from './file-resource-cleanup'
 import { openFileExplorerDB } from './file-explorer-db'
 import { removeCleanedEntriesFromStore } from '@renderer/stores/file-explorer'
 import { cancelSyncDownloadsAndWait } from './sync-download-queue'
+import { cancelVideoPosterJobsAndWait, fenceVideoPosterScope } from './video-poster-jobs'
 import {
   deleteProviderConnection,
   deleteSyncCursor,
@@ -17,6 +22,7 @@ import {
   listSyncEntriesByProviderConnection,
   listSyncTombstones,
   putSyncTombstone,
+  SYNC_CONNECTION_UNLINK_MARKER,
   type SyncEntryRecord,
   type SyncTombstoneRecord
 } from './sync-db'
@@ -65,53 +71,83 @@ async function listTombstonesForScope(
   )
 }
 
+async function cleanupSyncFileResources(
+  input: {
+    folderIds: string[]
+    itemIds: string[]
+  },
+  extraCancellationItemIds: string[] = []
+): Promise<CleanupResult> {
+  const itemIds = [
+    ...new Set([...(await listFileResourceCleanupItemIds(input)), ...extraCancellationItemIds])
+  ]
+  await cancelVideoPosterJobsAndWait(itemIds)
+  return cleanupFileResources(input)
+}
+
 export async function unlinkSyncConnectionFromApp(
   providerConnectionId: string
 ): Promise<UnlinkSyncConnectionResult> {
-  await cancelSyncDownloadsAndWait({ providerConnectionId })
-  const entries = await listSyncEntriesByProviderConnection(providerConnectionId)
-  const folderIds = entries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))
-  const itemIds = entries.flatMap((entry) => (entry.itemId ? [entry.itemId] : []))
-
-  await Promise.all(
-    entries.map((entry) =>
-      putSyncTombstone({
-        providerConnectionId,
-        remoteItemId: entry.remoteItemId,
-        itemId: entry.itemId,
-        folderId: entry.folderId,
-        blobId: entry.blobId,
-        reason: 'unlink'
-      })
+  const releaseFence = fenceVideoPosterScope(providerConnectionId)
+  try {
+    await cancelSyncDownloadsAndWait({ providerConnectionId })
+    const entries = await listSyncEntriesByProviderConnection(providerConnectionId)
+    const linkedRoots = (await (await openFileExplorerDB()).getAll('folder-records')).filter(
+      (folder) => folder.syncLink?.providerConnectionId === providerConnectionId
     )
-  )
+    const folderIds = linkedRoots.map((folder) => folder.id)
 
-  const tombstones = await listTombstonesForScope(providerConnectionId)
-  const cleanupResult = await cleanupFileResources({
-    folderIds: [
-      ...new Set([
+    await Promise.all(
+      [
+        ...entries.map((entry) => ({
+          providerConnectionId,
+          remoteItemId: entry.remoteItemId,
+          itemId: entry.itemId,
+          blobId: entry.blobId,
+          reason: 'unlink' as const
+        })),
+        ...linkedRoots.map((folder) => ({
+          providerConnectionId,
+          remoteItemId: folder.syncLink!.remoteFolderId,
+          folderId: folder.id,
+          unlinkScope: 'root' as const,
+          reason: 'unlink' as const
+        }))
+      ].map((record) => putSyncTombstone(record))
+    )
+    await putSyncTombstone({
+      providerConnectionId,
+      remoteItemId: SYNC_CONNECTION_UNLINK_MARKER,
+      unlinkScope: 'connection',
+      reason: 'unlink'
+    })
+
+    const tombstones = await listTombstonesForScope(providerConnectionId)
+    const cleanupResult = await cleanupSyncFileResources({
+      folderIds: [
         ...folderIds,
-        ...tombstones.flatMap((record) => (record.folderId ? [record.folderId] : []))
-      ])
-    ],
-    itemIds: [
-      ...new Set([
-        ...itemIds,
-        ...tombstones.flatMap((record) => (record.itemId ? [record.itemId] : []))
-      ])
-    ]
-  })
-  removeCleanedEntriesFromStore(cleanupResult)
+        ...tombstones.flatMap((record) =>
+          record.reason !== 'unlink' && record.folderId ? [record.folderId] : []
+        )
+      ],
+      itemIds: tombstones.flatMap((record) =>
+        record.reason !== 'unlink' && record.itemId ? [record.itemId] : []
+      )
+    })
+    removeCleanedEntriesFromStore(cleanupResult)
 
-  await deleteSyncEntryPreferencesByProviderConnection(providerConnectionId)
-  await deleteSyncCursorsByProviderConnection(providerConnectionId)
-  await deleteSyncEntriesByProviderConnection(providerConnectionId)
-  await deleteProviderConnection(providerConnectionId)
-  await deleteSyncTombstones(tombstones.map((record) => record.id))
+    await deleteSyncEntryPreferencesByProviderConnection(providerConnectionId)
+    await deleteSyncCursorsByProviderConnection(providerConnectionId)
+    await deleteSyncEntriesByProviderConnection(providerConnectionId)
+    await deleteProviderConnection(providerConnectionId)
+    await deleteSyncTombstones(tombstones.map((record) => record.id))
 
-  return {
-    ...cleanupResult,
-    tombstoneCount: entries.length
+    return {
+      ...cleanupResult,
+      tombstoneCount: entries.length
+    }
+  } finally {
+    releaseFence()
   }
 }
 
@@ -129,58 +165,58 @@ export async function unlinkSyncRootFolderFromApp(
     return result
   }
 
-  await cancelSyncDownloadsAndWait({
-    providerConnectionId: syncLink.providerConnectionId,
-    rootRemoteFolderId: syncLink.remoteFolderId
-  })
-  const entries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
-  const targetEntries = collectEntrySubtree(entries, syncLink.remoteFolderId)
-  const folderIds = targetEntries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))
-  const itemIds = targetEntries.flatMap((entry) => (entry.itemId ? [entry.itemId] : []))
+  const releaseFence = fenceVideoPosterScope(syncLink.providerConnectionId, syncLink.remoteFolderId)
+  try {
+    await cancelSyncDownloadsAndWait({
+      providerConnectionId: syncLink.providerConnectionId,
+      rootRemoteFolderId: syncLink.remoteFolderId
+    })
+    const entries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
+    const targetEntries = collectEntrySubtree(entries, syncLink.remoteFolderId)
 
-  await Promise.all(
-    targetEntries.map((entry) =>
-      putSyncTombstone({
-        providerConnectionId: entry.providerConnectionId,
-        remoteItemId: entry.remoteItemId,
-        itemId: entry.itemId,
-        folderId: entry.folderId,
-        blobId: entry.blobId,
-        reason: 'unlink'
-      })
+    await Promise.all(
+      targetEntries.map((entry) =>
+        putSyncTombstone({
+          providerConnectionId: entry.providerConnectionId,
+          remoteItemId: entry.remoteItemId,
+          itemId: entry.itemId,
+          blobId: entry.blobId,
+          reason: 'unlink'
+        })
+      )
     )
-  )
 
-  const tombstones = await listTombstonesForScope(
-    syncLink.providerConnectionId,
-    new Set(targetEntries.map((entry) => entry.remoteItemId))
-  )
-  const cleanupResult = await cleanupFileResources({
-    folderIds: [
-      ...new Set([
-        ...folderIds,
-        ...tombstones.flatMap((record) => (record.folderId ? [record.folderId] : []))
-      ])
-    ],
-    itemIds: [
-      ...new Set([
-        ...itemIds,
-        ...tombstones.flatMap((record) => (record.itemId ? [record.itemId] : []))
-      ])
-    ]
-  })
-  removeCleanedEntriesFromStore(cleanupResult)
-  await deleteSyncEntryPreferences(
-    syncLink.providerConnectionId,
-    targetEntries.map((entry) => entry.remoteItemId)
-  )
-  await deleteSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
-  await deleteSyncEntries(targetEntries.map((entry) => entry.id))
-  await deleteSyncTombstones(tombstones.map((record) => record.id))
+    await putSyncTombstone({
+      providerConnectionId: syncLink.providerConnectionId,
+      remoteItemId: syncLink.remoteFolderId,
+      folderId: rootFolder.id,
+      unlinkScope: 'root',
+      reason: 'unlink'
+    })
 
-  return {
-    ...cleanupResult,
-    tombstoneCount: targetEntries.length
+    const tombstones = await listTombstonesForScope(
+      syncLink.providerConnectionId,
+      new Set([syncLink.remoteFolderId, ...targetEntries.map((entry) => entry.remoteItemId)])
+    )
+    const cleanupResult = await cleanupSyncFileResources({
+      folderIds: [rootFolder.id],
+      itemIds: []
+    })
+    removeCleanedEntriesFromStore(cleanupResult)
+    await deleteSyncEntryPreferences(
+      syncLink.providerConnectionId,
+      targetEntries.map((entry) => entry.remoteItemId)
+    )
+    await deleteSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
+    await deleteSyncEntries(targetEntries.map((entry) => entry.id))
+    await deleteSyncTombstones(tombstones.map((record) => record.id))
+
+    return {
+      ...cleanupResult,
+      tombstoneCount: targetEntries.length
+    }
+  } finally {
+    releaseFence()
   }
 }
 
@@ -242,19 +278,41 @@ export async function recoverPendingSyncResourceCleanups(): Promise<SyncResource
     }
   }
 
-  const folderIds = tombstones.flatMap((tombstone) =>
-    tombstone.folderId ? [tombstone.folderId] : []
+  const db = await openFileExplorerDB()
+  const folders = new Map((await db.getAll('folder-records')).map((folder) => [folder.id, folder]))
+  const folderIds = tombstones.flatMap((tombstone) => {
+    if (!tombstone.folderId) return []
+    if (tombstone.reason !== 'unlink') return [tombstone.folderId]
+    if (tombstone.unlinkScope !== 'root') return []
+    const folder = folders.get(tombstone.folderId)
+    return folder?.syncLink?.providerConnectionId === tombstone.providerConnectionId &&
+      folder.syncLink.remoteFolderId === tombstone.remoteItemId
+      ? [tombstone.folderId]
+      : []
+  })
+  const itemIds = tombstones.flatMap((tombstone) =>
+    tombstone.reason !== 'unlink' && tombstone.itemId ? [tombstone.itemId] : []
   )
-  const itemIds = tombstones.flatMap((tombstone) => (tombstone.itemId ? [tombstone.itemId] : []))
-  const cleanupResult =
-    folderIds.length > 0 || itemIds.length > 0
-      ? await cleanupFileResources({ folderIds, itemIds })
-      : { folderIds: [], itemIds: [] }
+  const cancellationItemIds = tombstones.flatMap((tombstone) =>
+    tombstone.itemId ? [tombstone.itemId] : []
+  )
+  const releaseFences = [
+    ...new Set(tombstones.map((tombstone) => tombstone.providerConnectionId))
+  ].map((providerConnectionId) => fenceVideoPosterScope(providerConnectionId))
+  try {
+    const cleanupResult =
+      folderIds.length > 0 || itemIds.length > 0
+        ? await cleanupSyncFileResources({ folderIds, itemIds }, cancellationItemIds)
+        : { folderIds: [], itemIds: [] }
+    removeCleanedEntriesFromStore(cleanupResult)
 
-  await deleteSyncTombstones(tombstones.map((tombstone) => tombstone.id))
+    await deleteSyncTombstones(tombstones.map((tombstone) => tombstone.id))
 
-  return {
-    ...cleanupResult,
-    tombstoneCount: tombstones.length
+    return {
+      ...cleanupResult,
+      tombstoneCount: tombstones.length
+    }
+  } finally {
+    releaseFences.forEach((release) => release())
   }
 }

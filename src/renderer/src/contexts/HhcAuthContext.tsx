@@ -1,6 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 import type { HhcAuthAdapter, HhcSession } from '@shared/hhc-auth'
-import { createHhcAuthAdapter } from '@renderer/lib/hhc-auth'
+import { createHhcAuthAdapter, registerHhcSessionOwner } from '@renderer/lib/hhc-auth'
 
 export type HhcAuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'unavailable'
 export type HhcSignInStatus = 'idle' | 'pending' | 'cancelled' | 'expired'
@@ -36,6 +45,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const refreshTokenPromiseRef = useRef<Promise<string | null> | null>(null)
   const sessionTransitionPromiseRef = useRef<Promise<void>>(Promise.resolve())
   const departingAccountCleanupRef = useRef(new Map<string, Promise<void>>())
+
+  useLayoutEffect(
+    () => registerHhcSessionOwner(() => (signOutPendingRef.current ? null : sessionRef.current)),
+    []
+  )
 
   const invalidateTokenRequests = useCallback((): void => {
     sessionEpochRef.current += 1

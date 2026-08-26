@@ -3,8 +3,9 @@ import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import type { HhcLineCloudAuth } from './cloud-provider'
 import { openFileExplorerDB } from './file-explorer-db'
 import { cancelSyncDownloadsAndWait } from './sync-download-queue'
-import { getSyncEntryByRemoteItem } from './sync-db'
+import { getSyncEntryByRemoteItem, listSyncTombstones } from './sync-db'
 import { unlinkHhcLineAccountFromApp, unlinkSyncRootFolderFromApp } from './sync-unlink'
+import { getCurrentHhcSession } from './hhc-auth'
 
 type HhcLineAccessScope =
   | { kind: 'account'; accountUserId: string }
@@ -146,4 +147,25 @@ export async function isHhcLineRootAuthorized(
   const session = auth.getSession()
   if (!session || providerConnectionId !== `hhc-line:${session.userId}`) return false
   return findRoot(providerConnectionId, rootRemoteFolderId)?.syncLink?.status === 'active'
+}
+
+export async function canCommitHhcLinePoster(
+  providerConnectionId: string,
+  rootRemoteFolderId: string
+): Promise<boolean> {
+  if (
+    !(await isHhcLineRootAuthorized(
+      { getSession: getCurrentHhcSession },
+      providerConnectionId,
+      rootRemoteFolderId
+    ))
+  ) {
+    return false
+  }
+  return !(await listSyncTombstones()).some(
+    (record) =>
+      record.providerConnectionId === providerConnectionId &&
+      record.remoteItemId === rootRemoteFolderId &&
+      record.reason === 'unlink'
+  )
 }

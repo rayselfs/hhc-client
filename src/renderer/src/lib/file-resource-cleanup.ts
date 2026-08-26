@@ -9,7 +9,7 @@ export interface CleanupResult {
   itemIds: string[]
 }
 
-interface CleanupRequest {
+export interface CleanupRequest {
   folderIds?: string[]
   itemIds?: string[]
 }
@@ -38,6 +38,20 @@ function collectDescendantFolderIds(rootIds: string[], folders: FolderRecord[]):
     }
   }
   return result
+}
+
+export async function listFileResourceCleanupItemIds(request: CleanupRequest): Promise<string[]> {
+  const db = await openFileExplorerDB()
+  const [folders, items] = await Promise.all([
+    db.getAll('folder-records'),
+    db.getAll('folder-items')
+  ])
+  const folderIds = collectDescendantFolderIds(request.folderIds ?? [], folders)
+  const requestedItemIds = new Set(request.itemIds ?? [])
+  for (const item of items) {
+    if (folderIds.has(item.parentId)) requestedItemIds.add(item.id)
+  }
+  return [...requestedItemIds]
 }
 
 function makeCleanupRecord(

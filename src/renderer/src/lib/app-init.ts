@@ -15,6 +15,7 @@ import { retryPendingResourceCleanups } from '@renderer/lib/resource-cleanup-jou
 let earlyInitStarted = false
 let subscriptionsInitialized = false
 let resourceCleanupReplayStarted = false
+let earlyRecoveryPromise: Promise<void> | null = null
 let chunksReadyPromise: Promise<void> | null = null
 let routePrefetchScheduled = false
 
@@ -33,11 +34,13 @@ export function startEarlyInit(): void {
 
   useBibleStore.getState().initialize()
   useBibleFolderStore.getState().initialize()
-  useFileExplorerStore.getState().initialize()
-  void mediaJobQueue
-    .recoverStaleJobs(Date.now(), isElectron() ? 0 : 5 * 60 * 1000)
+  const fileExplorerInitialization = useFileExplorerStore.getState().initialize()
+  earlyRecoveryPromise = Promise.resolve(fileExplorerInitialization)
+    .then(() => recoverPendingSyncResourceCleanups())
+    .then(() => mediaJobQueue.recoverStaleJobs(Date.now(), isElectron() ? 0 : 5 * 60 * 1000))
     .then(() => mediaJobQueue.removeExpiredHistory())
-    .catch(() => undefined)
+    .then(() => undefined)
+  void earlyRecoveryPromise.catch(() => undefined)
 }
 
 function loadRouteChunks(): Promise<void> {
@@ -96,7 +99,13 @@ export function initializeApp(options: SyncRuntimeOptions = {}): () => void {
   subscriptionsInitialized = true
 
   void initWhisperModelDir()
-  const stopSyncRuntime = startSyncRuntime(options)
+  let disposed = false
+  let stopSyncRuntime = (): void => undefined
+  void (earlyRecoveryPromise ?? Promise.resolve())
+    .then(() => {
+      if (!disposed) stopSyncRuntime = startSyncRuntime(options)
+    })
+    .catch(() => undefined)
 
   let prevModelDir = useSettingsStore.getState().speech.whisper.modelDir
   const unsubWhisper = useSettingsStore.subscribe((state) => {
@@ -171,6 +180,7 @@ export function initializeApp(options: SyncRuntimeOptions = {}): () => void {
     unsubWhisper()
     unsubBibleFolders()
     unsubFileExplorer()
+    disposed = true
     stopSyncRuntime()
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
