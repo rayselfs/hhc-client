@@ -13,6 +13,6 @@ export function SyncProviderIcon({
   className
 }: SyncProviderIconProps): React.JSX.Element {
   if (providerType === 'onedrive') return <OneDriveIcon className={className} />
-  if (providerType === 'hhc-line') return <LineBrandIcon className={className} />
+  if (providerType === 'hhc-line') return <LineBrandIcon />
   return <FolderSync className={className} />
 }
