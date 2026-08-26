@@ -17,6 +17,7 @@ import {
   getSyncCursor,
   listProviderConnectionsByType,
   listSyncEntriesByProviderConnection,
+  putSyncCursor,
   putSyncEntry,
   putSyncTombstone,
   type SyncEntryRecord
@@ -904,6 +905,103 @@ describe('refreshOneDriveFolder', () => {
       expect.objectContaining({ remoteItemId: 'remote-file-a', itemId: itemA.id })
     )
     expect(cleanupFileResources).toHaveBeenCalledWith({ folderIds: [], itemIds: [itemA.id] })
+  })
+
+  it('protects the selected root from a malformed file entry with a folder reference', async () => {
+    const { rootA } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true,
+      mutate: ({ rootA, entries }) => {
+        entries.find((entry) => entry.id === 'entry-file-a')!.folderId = rootA.id
+      }
+    })
+    providerMocks.initialScan.mockResolvedValueOnce(rootAOnlySnapshot())
+
+    const summary = await refreshOneDriveFolder(rootA.id)
+
+    expect(summary).toMatchObject({ removedFolderCount: 0, removedItemCount: 0 })
+    expect(putSyncTombstone).not.toHaveBeenCalled()
+    expect(cleanupFileResources).toHaveBeenCalledOnce()
+    const cleanup = vi.mocked(cleanupFileResources).mock.calls[0]![0]
+    expect(cleanup).toEqual({ folderIds: [], itemIds: [] })
+    expect([...(cleanup.folderIds ?? []), ...(cleanup.itemIds ?? [])]).not.toContain(rootA.id)
+    expect(fileStoreMocks.state.folders).toHaveProperty(rootA.id)
+  })
+
+  it('protects a malformed folder entry carrying an item reference under the selected root', async () => {
+    const { rootA } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true,
+      mutate: ({ entries }) => {
+        entries.find((entry) => entry.id === 'entry-file-a')!.kind = 'folder'
+      }
+    })
+    providerMocks.initialScan.mockResolvedValueOnce(rootAOnlySnapshot())
+
+    const summary = await refreshOneDriveFolder(rootA.id)
+
+    expect(summary).toMatchObject({ removedFolderCount: 0, removedItemCount: 0 })
+    expect(putSyncTombstone).not.toHaveBeenCalled()
+    expect(cleanupFileResources).toHaveBeenCalledOnce()
+    const cleanup = vi.mocked(cleanupFileResources).mock.calls[0]![0]
+    expect(cleanup).toEqual({ folderIds: [], itemIds: [] })
+    expect([...(cleanup.folderIds ?? []), ...(cleanup.itemIds ?? [])]).not.toContain(rootA.id)
+    expect(fileStoreMocks.state.folders).toHaveProperty(rootA.id)
+  })
+
+  it('retains the previous cursor when malformed ownership protects removals', async () => {
+    const { rootA } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true,
+      mutate: ({ rootA, entries }) => {
+        entries.find((entry) => entry.id === 'entry-file-a')!.folderId = rootA.id
+      }
+    })
+    vi.mocked(getSyncCursor).mockResolvedValueOnce({
+      id: 'cursor-record',
+      providerConnectionId: 'onedrive:account-1',
+      remoteFolderId: 'remote-root-a',
+      cursor: 'cursor-old',
+      updatedAt: 1
+    })
+    providerMocks.incrementalChanges.mockResolvedValueOnce({
+      items: [],
+      nextCursor: 'cursor-next',
+      hasMore: false
+    })
+
+    await refreshOneDriveFolder(rootA.id)
+
+    expect(putSyncCursor).not.toHaveBeenCalled()
+  })
+
+  it('persists the next cursor after an unprotected refresh', async () => {
+    const { rootA } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true
+    })
+    vi.mocked(getSyncCursor).mockResolvedValueOnce({
+      id: 'cursor-record',
+      providerConnectionId: 'onedrive:account-1',
+      remoteFolderId: 'remote-root-a',
+      cursor: 'cursor-old',
+      updatedAt: 1
+    })
+    providerMocks.incrementalChanges.mockResolvedValueOnce({
+      items: [],
+      nextCursor: 'cursor-next',
+      hasMore: false
+    })
+
+    await refreshOneDriveFolder(rootA.id)
+
+    expect(putSyncCursor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerConnectionId: 'onedrive:account-1',
+        remoteFolderId: 'remote-root-a',
+        cursor: 'cursor-next'
+      })
+    )
   })
 
   it('does not guess remote-A/local-B or unowned malformed entries into root A cleanup', async () => {

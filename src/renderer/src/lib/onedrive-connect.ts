@@ -174,7 +174,11 @@ function collectOneDriveRootScope(
     const entryLocalOwners = getLocalOwners(entry)
     const remoteOwner = entryRemoteOwners?.values().next().value
     const localOwner = entryLocalOwners?.values().next().value
+    const hasWrongKindLocalReference =
+      (entry.kind === 'file' && Boolean(entry.folderId)) ||
+      (entry.kind === 'folder' && Boolean(entry.itemId))
     const ambiguous =
+      hasWrongKindLocalReference ||
       Boolean(localId && (localReferenceCounts.get(`${entry.kind}\0${localId}`) ?? 0) > 1) ||
       (entry.kind === 'folder' &&
         entry.folderId === rootFolderId &&
@@ -962,7 +966,7 @@ async function runOneDriveFolderRefresh(
   }
 
   await applySyncRefreshPlan(plan)
-  if (scan.nextCursor) {
+  if (!rootScope.protectRemovals && scan.nextCursor) {
     await putSyncCursor({
       providerConnectionId: syncLink.providerConnectionId,
       remoteFolderId: syncLink.remoteFolderId,
