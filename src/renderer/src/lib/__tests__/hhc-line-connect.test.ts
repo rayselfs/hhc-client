@@ -796,20 +796,24 @@ describe('HHC LINE collection connection', () => {
         onDownloaded: expect.any(Function)
       })
     )
+    const assetCommitGuards: Array<() => boolean | Promise<boolean>> = []
     for (const [queued] of enqueue.mock.calls) {
+      const canCommit = vi.fn(async () => true)
+      assetCommitGuards.push(canCommit)
       await queued.onDownloaded?.(
         {
           blobId: queued.entry.itemId,
           size: queued.entry.size ?? 0,
           mimeType: queued.entry.mimeType!
         },
-        async () => true
+        canCommit
       )
     }
     expect(refreshAssets.mock.calls.map(([items]) => items.map((item) => item.name))).toEqual([
       ['photo.jpg'],
       ['slides.pptx']
     ])
+    expect(refreshAssets.mock.calls.map(([, canCommit]) => canCommit)).toEqual(assetCommitGuards)
   })
 
   it('guards HHC background commits by account generation and active root access', async () => {

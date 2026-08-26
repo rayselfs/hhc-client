@@ -165,16 +165,18 @@ describe('dispatchPlannedSyncDownloads', () => {
       remoteItemId: 'remote-jpg',
       mimeType: 'image/jpeg'
     })
+    const jpgCommitGuard = vi.fn(async () => true)
     await queuedJpg.onDownloaded?.(
       { blobId: 'local-jpg', size: 10, mimeType: 'image/jpeg' },
-      async () => true
+      jpgCommitGuard
     )
     const queuedPptx = vi.mocked(enqueueSyncDownload).mock.calls[1]![0]
+    const pptxCommitGuard = vi.fn(async () => true)
     await queuedPptx.onDownloaded?.(
       { blobId: 'local-pptx', size: 10, mimeType: pptx.mimeType },
-      async () => true
+      pptxCommitGuard
     )
-    expect(onDownloaded).toHaveBeenNthCalledWith(1, jpg)
-    expect(onDownloaded).toHaveBeenNthCalledWith(2, pptx)
+    expect(onDownloaded).toHaveBeenNthCalledWith(1, jpg, jpgCommitGuard)
+    expect(onDownloaded).toHaveBeenNthCalledWith(2, pptx, pptxCommitGuard)
   })
 })

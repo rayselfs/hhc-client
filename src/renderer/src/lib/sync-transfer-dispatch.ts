@@ -1,7 +1,7 @@
 import type { FileItemRecord, SyncOfflinePolicy } from '@shared/types/folder'
 import { enqueueSyncDownload } from './sync-download-queue'
 import type { SyncEntryRecord } from './sync-db'
-import type { ReadOnlySyncProvider, RemoteSyncItem } from './sync-provider'
+import type { ReadOnlySyncProvider, RemoteSyncItem, SyncDownloadCommitGuard } from './sync-provider'
 import type { SyncFileTransfer, SyncRefreshPlan } from './sync-refresh'
 
 export interface DispatchPlannedSyncDownloadsInput {
@@ -14,7 +14,7 @@ export interface DispatchPlannedSyncDownloadsInput {
   existingEntries: SyncEntryRecord[]
   canCommit?: (transfer: SyncFileTransfer) => boolean | Promise<boolean>
   onFailed?: (error: unknown, transfer: SyncFileTransfer) => void | Promise<void>
-  onDownloaded?: (item: FileItemRecord) => void | Promise<void>
+  onDownloaded?: (item: FileItemRecord, canCommit: SyncDownloadCommitGuard) => void | Promise<void>
 }
 
 export function dispatchPlannedSyncDownloads(input: DispatchPlannedSyncDownloadsInput): void {
@@ -53,7 +53,10 @@ export function dispatchPlannedSyncDownloads(input: DispatchPlannedSyncDownloads
       priority: 'background',
       canCommit: input.canCommit ? () => input.canCommit!(transfer) : undefined,
       onFailed: input.onFailed ? (error) => input.onFailed!(error, transfer) : undefined,
-      onDownloaded: input.onDownloaded && item ? () => input.onDownloaded!(item) : undefined
+      onDownloaded:
+        input.onDownloaded && item
+          ? (_result, guard) => input.onDownloaded!(item, guard)
+          : undefined
     })
   }
 }

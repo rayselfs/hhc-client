@@ -246,7 +246,7 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
         error,
         { accountUserId: session.userId, authGeneration }
       ),
-    onDownloaded: () => refreshImportedMediaAssets([item])
+    onDownloaded: (_result, canCommit) => refreshImportedMediaAssets([item], canCommit)
   })
   assertCurrentAccount(auth, session.userId)
   if (!result) {
@@ -496,7 +496,7 @@ async function runImport(
         error,
         { accountUserId: expectedUserId, authGeneration }
       ),
-    onDownloaded: (item) => refreshImportedMediaAssets([item])
+    onDownloaded: (item, canCommit) => refreshImportedMediaAssets([item], canCommit)
   })
 
   return {
@@ -656,7 +656,7 @@ async function runHhcLineFolderRefresh(
         error,
         { accountUserId: session.userId, authGeneration }
       ),
-    onDownloaded: (item) => refreshImportedMediaAssets([item])
+    onDownloaded: (item, canCommit) => refreshImportedMediaAssets([item], canCommit)
   })
 
   return {
