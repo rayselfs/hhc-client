@@ -1,6 +1,7 @@
 import type { HhcSession } from '@shared/hhc-auth'
 import type { FolderRecord } from '@shared/types/folder'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { isElectron } from './env'
 import { refreshLocalSyncConnection } from './local-sync-import'
 import { refreshAllOneDriveFolders, type OneDriveRefreshSummary } from './onedrive-connect'
@@ -281,15 +282,19 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
 
   let stopped = false
   let cloudTimeout: number | undefined
+  let cloudRefreshRunning = false
+  let cloudRefreshPending = false
 
   const scheduleCloudRefresh = (delay: number): void => {
     if (stopped) return
     cloudTimeout = window.setTimeout(() => {
+      cloudTimeout = undefined
       void runCloudRefresh()
     }, delay)
   }
 
   const runCloudRefresh = async (): Promise<void> => {
+    cloudRefreshRunning = true
     const [oneDrive, hhc] = await Promise.all([
       refreshOneDrive()
         .then((summaries) => ({ summaries, retrySoon: false }))
@@ -303,6 +308,12 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
       })
     ])
     const summaries = [...oneDrive.summaries, ...hhc.summaries]
+    cloudRefreshRunning = false
+    if (cloudRefreshPending) {
+      cloudRefreshPending = false
+      scheduleCloudRefresh(0)
+      return
+    }
     scheduleCloudRefresh(
       oneDrive.retrySoon || hhc.retrySoon
         ? ONEDRIVE_ACTIVE_REFRESH_MS
@@ -310,10 +321,24 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
     )
   }
 
+  const unsubscribeOfflinePolicy = useSettingsStore.subscribe((state, previousState) => {
+    if (state.defaultSyncOfflinePolicy === previousState.defaultSyncOfflinePolicy) return
+    if (cloudTimeout !== undefined) {
+      window.clearTimeout(cloudTimeout)
+      cloudTimeout = undefined
+    }
+    if (cloudRefreshRunning) {
+      cloudRefreshPending = true
+      return
+    }
+    scheduleCloudRefresh(0)
+  })
+
   void runCloudRefresh()
 
   return () => {
     stopped = true
+    unsubscribeOfflinePolicy()
     if (localInterval !== undefined) window.clearInterval(localInterval)
     if (cloudTimeout !== undefined) window.clearTimeout(cloudTimeout)
   }

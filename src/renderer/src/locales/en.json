@@ -812,6 +812,7 @@
         "lanRemote": "LAN Remote Control"
       },
       "defaultOfflinePolicy": "Offline Policy",
+      "defaultOfflinePolicyDesc": "Applies to HHC LINE and OneDrive folders.",
       "offlinePolicies": {
         "online-only": "Online only",
         "on-demand": "On demand",

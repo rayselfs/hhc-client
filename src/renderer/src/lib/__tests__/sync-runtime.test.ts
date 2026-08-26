@@ -3,6 +3,7 @@ import type { HhcSession } from '@shared/hhc-auth'
 import type { FolderRecord } from '@shared/types/folder'
 import type { CloudRefreshSummary, HhcLineCloudAuth } from '../cloud-provider'
 import type { ProviderConnectionRecord } from '../sync-db'
+import { useSettingsStore } from '@renderer/stores/settings'
 
 vi.mock('../env', () => ({
   isElectron: vi.fn(() => false)
@@ -118,6 +119,7 @@ function idleSummary(connectionId: string, rootFolderId: string): CloudRefreshSu
 describe('startSyncRuntime', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    useSettingsStore.setState({ defaultSyncOfflinePolicy: 'on-demand' })
     refreshAllOneDriveFoldersMock.mockReset()
     refreshAllOneDriveFoldersMock.mockResolvedValue([])
     hhcMocks.connections = []
@@ -192,6 +194,71 @@ describe('startSyncRuntime', () => {
     expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(2)
 
     stop()
+  })
+
+  it('refreshes existing cloud roots immediately when the offline policy changes', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-policy')
+    const target = root('root-policy', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef) })
+    await flushMicrotasks()
+    expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(1)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+
+    useSettingsStore.getState().setDefaultSyncOfflinePolicy('always-offline')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(2)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+
+    useSettingsStore.getState().setDefaultSyncOfflinePolicy('always-offline')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(2)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+
+    stop()
+  })
+
+  it('coalesces policy changes during a cloud refresh into one follow-up', async () => {
+    let resolveRefresh!: () => void
+    refreshAllOneDriveFoldersMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = () => resolve([])
+          })
+      )
+      .mockResolvedValue([])
+
+    const stop = startSyncRuntime()
+    await vi.waitFor(() => expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(1))
+
+    useSettingsStore.getState().setDefaultSyncOfflinePolicy('always-offline')
+    useSettingsStore.getState().setDefaultSyncOfflinePolicy('online-only')
+    useSettingsStore.getState().setDefaultSyncOfflinePolicy('always-offline')
+    resolveRefresh()
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(2)
+
+    stop()
+  })
+
+  it('unsubscribes from offline policy changes when disposed', () => {
+    const unsubscribe = vi.fn()
+    const subscribe = vi.spyOn(useSettingsStore, 'subscribe').mockReturnValue(unsubscribe)
+
+    const stop = startSyncRuntime()
+    stop()
+
+    expect(subscribe).toHaveBeenCalledOnce()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    subscribe.mockRestore()
   })
 
   it.each([

@@ -213,6 +213,9 @@ export default function MediaSettings({
                 </ListBox>
               </Select.Popover>
             </Select>
+            <p className="mt-2 text-xs text-gray-500">
+              {t('preferences.media.defaultOfflinePolicyDesc')}
+            </p>
           </div>
         </section>
       )}
