@@ -18,6 +18,9 @@ import {
 } from '../sync-db'
 import * as syncDB from '../sync-db'
 import * as syncRefresh from '../sync-refresh'
+import * as syncDownloadQueue from '../sync-download-queue'
+import * as localSyncImport from '../local-sync-import'
+import { isHhcLineRootAuthorized } from '../hhc-line-access'
 import {
   importHhcLineCollection,
   ensureHhcLineDesktopItemAvailableForPresentation,
@@ -738,6 +741,247 @@ describe('HHC LINE collection connection', () => {
     expect(roots[0].syncLink?.offlinePolicy).toBe('always-offline')
     const fileEntry = await getSyncEntryByRemoteItem('hhc-line:user-1', 'item-1')
     expect(fileEntry?.status).toBe('queued')
+  })
+
+  it('queues always-offline HHC imports in the background and refreshes downloaded media', async () => {
+    mocks.electron = true
+    mocks.offlinePolicy = 'always-offline'
+    mocks.api = api({
+      getCollectionChanges: resetChanges([
+        {
+          id: 'jpg-1',
+          collectionId: 'collection-1',
+          remoteItemId: 'source-jpg',
+          displayName: 'photo.jpg',
+          sourceRevision: 'sha256:jpg',
+          createdRevision: 1,
+          mimeType: 'image/jpeg',
+          sizeBytes: 42,
+          etag: 'etag-jpg',
+          createdAt: '2026-08-17T00:00:00Z'
+        },
+        {
+          id: 'pptx-1',
+          collectionId: 'collection-1',
+          remoteItemId: 'source-pptx',
+          displayName: 'slides.pptx',
+          sourceRevision: 'sha256:pptx',
+          createdRevision: 1,
+          mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          sizeBytes: 84,
+          etag: 'etag-pptx',
+          createdAt: '2026-08-17T00:00:00Z'
+        }
+      ])
+    })
+    const enqueue = vi.spyOn(syncDownloadQueue, 'enqueueSyncDownload').mockResolvedValue(null)
+    const refreshAssets = vi
+      .spyOn(localSyncImport, 'refreshImportedMediaAssets')
+      .mockResolvedValue(undefined)
+
+    await importHhcLineCollection(
+      auth({
+        current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+      }),
+      { remoteItemId: 'collection-1', name: 'Sunday', parentRemoteItemId: null }
+    )
+
+    expect(enqueue).toHaveBeenCalledTimes(2)
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({ offlinePolicy: 'always-offline' }),
+        priority: 'background',
+        canCommit: expect.any(Function),
+        onFailed: expect.any(Function),
+        onDownloaded: expect.any(Function)
+      })
+    )
+    for (const [queued] of enqueue.mock.calls) {
+      await queued.onDownloaded?.(
+        {
+          blobId: queued.entry.itemId,
+          size: queued.entry.size ?? 0,
+          mimeType: queued.entry.mimeType!
+        },
+        async () => true
+      )
+    }
+    expect(refreshAssets.mock.calls.map(([items]) => items.map((item) => item.name))).toEqual([
+      ['photo.jpg'],
+      ['slides.pptx']
+    ])
+  })
+
+  it('guards HHC background commits by account generation and active root access', async () => {
+    mocks.offlinePolicy = 'always-offline'
+    mocks.api = api({
+      getCollectionChanges: resetChanges([
+        {
+          id: 'item-1',
+          collectionId: 'collection-1',
+          remoteItemId: 'source-1',
+          displayName: 'photo.jpg',
+          sourceRevision: 'sha256:one',
+          createdRevision: 1,
+          mimeType: 'image/jpeg',
+          sizeBytes: 42,
+          etag: 'etag-1',
+          createdAt: '2026-08-17T00:00:00Z'
+        }
+      ])
+    })
+    const enqueue = vi.spyOn(syncDownloadQueue, 'enqueueSyncDownload').mockResolvedValue(null)
+    const sessionRef: { current: HhcSession | null } = {
+      current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    }
+    const generationRef = { current: 7 }
+    const currentAuth = auth(sessionRef, generationRef)
+
+    await importHhcLineCollection(currentAuth, {
+      remoteItemId: 'collection-1',
+      name: 'Sunday',
+      parentRemoteItemId: null
+    })
+
+    const queued = enqueue.mock.calls[0]![0]
+    expect(await queued.canCommit?.()).toBe(true)
+
+    generationRef.current = 8
+    expect(await queued.canCommit?.()).toBe(false)
+
+    generationRef.current = 7
+    sessionRef.current = { userId: 'user-2', displayName: 'Grace', roles: ['media_sync_user'] }
+    expect(await queued.canCommit?.()).toBe(false)
+
+    sessionRef.current = { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    vi.mocked(isHhcLineRootAuthorized).mockResolvedValueOnce(false)
+    expect(await queued.canCommit?.()).toBe(false)
+
+    for (const status of [403, 404]) {
+      await queued.onFailed?.(
+        Object.assign(new Error('access revoked'), { classification: 'access-revoked', status })
+      )
+    }
+    expect(mocks.handleAccessError).toHaveBeenNthCalledWith(
+      1,
+      currentAuth,
+      {
+        kind: 'root',
+        providerConnectionId: 'hhc-line:user-1',
+        rootRemoteFolderId: 'collection-1',
+        remoteItemId: 'item-1'
+      },
+      expect.objectContaining({ classification: 'access-revoked', status: 403 }),
+      { accountUserId: 'user-1', authGeneration: 7 }
+    )
+    expect(mocks.handleAccessError).toHaveBeenNthCalledWith(
+      2,
+      currentAuth,
+      expect.objectContaining({ kind: 'root', remoteItemId: 'item-1' }),
+      expect.objectContaining({ classification: 'access-revoked', status: 404 }),
+      { accountUserId: 'user-1', authGeneration: 7 }
+    )
+  })
+
+  it('queues only new and changed HHC files during always-offline refresh', async () => {
+    const original = [
+      {
+        id: 'updated-1',
+        collectionId: 'collection-1',
+        remoteItemId: 'source-updated',
+        displayName: 'updated.jpg',
+        sourceRevision: 'sha256:old',
+        createdRevision: 1,
+        mimeType: 'image/jpeg',
+        sizeBytes: 42,
+        etag: 'etag-old',
+        createdAt: '2026-08-17T00:00:00Z'
+      },
+      {
+        id: 'unchanged-1',
+        collectionId: 'collection-1',
+        remoteItemId: 'source-unchanged',
+        displayName: 'unchanged.jpg',
+        sourceRevision: 'sha256:same',
+        createdRevision: 1,
+        mimeType: 'image/jpeg',
+        sizeBytes: 42,
+        etag: 'etag-same',
+        createdAt: '2026-08-17T00:00:00Z'
+      }
+    ]
+    const getCollectionChanges = vi
+      .fn()
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: original,
+        tombstones: [],
+        cursor: 'reset-barrier',
+        hasMore: true,
+        reset: true
+      })
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: [],
+        tombstones: [],
+        cursor: 'revision-1',
+        hasMore: false,
+        reset: false
+      })
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: [
+          { ...original[0], sourceRevision: 'sha256:new', etag: 'etag-new', updatedRevision: 2 },
+          original[1],
+          {
+            id: 'new-1',
+            collectionId: 'collection-1',
+            remoteItemId: 'source-new',
+            displayName: 'new.jpg',
+            sourceRevision: 'sha256:new-file',
+            createdRevision: 2,
+            mimeType: 'image/jpeg',
+            sizeBytes: 42,
+            etag: 'etag-new-file',
+            createdAt: '2026-08-17T00:00:00Z'
+          }
+        ],
+        tombstones: [],
+        cursor: 'revision-2',
+        hasMore: false,
+        reset: false
+      })
+    mocks.api = api({ getCollectionChanges })
+    const sessionRef = {
+      current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    }
+
+    mocks.offlinePolicy = 'on-demand'
+    await importHhcLineCollection(auth(sessionRef), {
+      remoteItemId: 'collection-1',
+      name: 'Sunday',
+      parentRemoteItemId: null
+    })
+    const db = await openFileExplorerDB()
+    const [root] = await db.getAll('folder-records')
+    for (const remoteItemId of ['updated-1', 'unchanged-1']) {
+      const entry = await getSyncEntryByRemoteItem('hhc-line:user-1', remoteItemId)
+      await putSyncEntry({ ...entry!, blobId: entry!.itemId, status: 'available-offline' })
+      await db.put('file-blobs', { id: entry!.itemId!, blob: new Blob([remoteItemId]) })
+    }
+    const enqueue = vi.spyOn(syncDownloadQueue, 'enqueueSyncDownload').mockResolvedValue(null)
+
+    mocks.offlinePolicy = 'always-offline'
+    await refreshHhcLineFolder(auth(sessionRef), root.id)
+
+    expect(enqueue).toHaveBeenCalledTimes(2)
+    expect(enqueue.mock.calls.map(([queued]) => queued.request.remoteItemId).sort()).toEqual([
+      'new-1',
+      'updated-1'
+    ])
+    expect(enqueue.mock.calls.map(([queued]) => queued.request.remoteItemId)).not.toContain(
+      'unchanged-1'
+    )
   })
 
   it('refreshes a persisted HHC root with the selected offline policy', async () => {

@@ -37,6 +37,7 @@ import {
 } from './sync-refresh'
 import { unlinkSyncRootFolderFromApp } from './sync-unlink'
 import { handleHhcLineAccessError, isHhcLineRootAuthorized } from './hhc-line-access'
+import { dispatchPlannedSyncDownloads } from './sync-transfer-dispatch'
 
 const importsInFlight = new Map<string, Promise<CloudImportResult>>()
 const importQueueTails = new Map<string, Promise<void>>()
@@ -363,6 +364,7 @@ async function runImport(
   connectionId: string,
   collection: CloudRemoteFolder
 ): Promise<CloudImportResult> {
+  const authGeneration = auth.getAuthGeneration?.() ?? 0
   const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const store = useFileExplorerStore.getState()
   await store.initialize()
@@ -470,6 +472,32 @@ async function runImport(
     throw error
   }
   publishRootFolder(root)
+  dispatchPlannedSyncDownloads({
+    provider,
+    providerConnectionId: connectionId,
+    rootRemoteFolderId: collection.remoteItemId,
+    offlinePolicy,
+    plan,
+    remoteItems: scan.remoteItems,
+    existingEntries: collectionEntries(entries, collection.remoteItemId),
+    canCommit: () =>
+      (auth.getAuthGeneration?.() ?? 0) === authGeneration &&
+      auth.getSession()?.userId === expectedUserId &&
+      isHhcLineRootAuthorized(auth, connectionId, collection.remoteItemId),
+    onFailed: (error, transfer) =>
+      handleHhcLineAccessError(
+        auth,
+        {
+          kind: 'root',
+          providerConnectionId: connectionId,
+          rootRemoteFolderId: collection.remoteItemId,
+          remoteItemId: transfer.remoteItemId
+        },
+        error,
+        { accountUserId: expectedUserId, authGeneration }
+      ),
+    onDownloaded: (item) => refreshImportedMediaAssets([item])
+  })
 
   return {
     connectionId,
@@ -511,6 +539,7 @@ async function runHhcLineFolderRefresh(
   rootFolderIdValue: string,
   options: { forceRetry?: boolean }
 ): Promise<CloudRefreshSummary> {
+  const authGeneration = auth.getAuthGeneration?.() ?? 0
   const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const session = requireSession(auth)
   const connectionId = createHhcLineProviderConnectionId(session.userId)
@@ -603,6 +632,32 @@ async function runHhcLineFolderRefresh(
     }
     publishRootFolder(refreshedRoot)
   }
+  dispatchPlannedSyncDownloads({
+    provider,
+    providerConnectionId: connectionId,
+    rootRemoteFolderId: root.syncLink.remoteFolderId,
+    offlinePolicy,
+    plan,
+    remoteItems: scan.remoteItems,
+    existingEntries: input.existingEntries,
+    canCommit: () =>
+      (auth.getAuthGeneration?.() ?? 0) === authGeneration &&
+      auth.getSession()?.userId === session.userId &&
+      isHhcLineRootAuthorized(auth, connectionId, root.syncLink!.remoteFolderId),
+    onFailed: (error, transfer) =>
+      handleHhcLineAccessError(
+        auth,
+        {
+          kind: 'root',
+          providerConnectionId: connectionId,
+          rootRemoteFolderId: root.syncLink!.remoteFolderId,
+          remoteItemId: transfer.remoteItemId
+        },
+        error,
+        { accountUserId: session.userId, authGeneration }
+      ),
+    onDownloaded: (item) => refreshImportedMediaAssets([item])
+  })
 
   return {
     connectionId,

@@ -705,6 +705,9 @@ describe('importOneDriveFolder', () => {
 
     await vi.waitFor(() => expect(refreshImportedMediaAssets).toHaveBeenCalledTimes(2))
     expect(
+      providerMocks.downloadContent.mock.calls.map(([request]) => request.remoteItemId)
+    ).toEqual(['file-1', 'file-2'])
+    expect(
       vi
         .mocked(refreshImportedMediaAssets)
         .mock.calls.map(([items]) => items.map((item) => item.name))

@@ -45,6 +45,7 @@ import {
 } from './sync-refresh'
 import { refreshImportedMediaAssets } from './local-sync-import'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
+import { dispatchPlannedSyncDownloads } from './sync-transfer-dispatch'
 
 const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
 const ONEDRIVE_WEB_CALLBACK_STORAGE_KEY = 'libre-presenter:onedrive-callback'
@@ -499,46 +500,6 @@ export function ensureOneDriveItemAvailableForPresentation(item: FileItemRecord)
   return downloadOneDriveItemForPresentation(item)
 }
 
-async function downloadImportedOneDriveItems(input: {
-  connection: ProviderConnectionRecord
-  provider: OneDriveReadonlyProvider
-  remoteItems: RemoteSyncItem[]
-  plan: OneDriveImportPlan
-  rootRemoteFolderId: string
-}): Promise<void> {
-  const remoteById = new Map(input.remoteItems.map((item) => [item.remoteItemId, item]))
-
-  for (const item of input.plan.downloadableItems) {
-    const remoteItem = remoteById.get(item.remoteItemId)
-    if (!remoteItem) continue
-    const downloadedItem = input.plan.items.find((planItem) => planItem.id === item.itemId)
-    void enqueueSyncDownload({
-      provider: input.provider,
-      request: {
-        providerConnectionId: input.connection.id,
-        rootRemoteFolderId: input.rootRemoteFolderId,
-        remoteItemId: item.remoteItemId,
-        targetBlobId: item.itemId,
-        offlinePolicy: 'always-offline'
-      },
-      entry: {
-        providerConnectionId: input.connection.id,
-        remoteItemId: item.remoteItemId,
-        parentRemoteItemId: remoteItem.parentRemoteItemId,
-        kind: 'file',
-        name: remoteItem.name,
-        itemId: item.itemId,
-        mimeType: remoteItem.mimeType,
-        size: remoteItem.size,
-        etag: remoteItem.etag,
-        contentHash: remoteItem.contentHash
-      },
-      priority: 'background',
-      onDownloaded: downloadedItem ? () => refreshImportedMediaAssets([downloadedItem]) : undefined
-    })
-  }
-}
-
 export async function scanOneDriveFolder(
   provider: OneDriveReadonlyProvider,
   connectionId: string,
@@ -702,14 +663,21 @@ export async function importOneDriveFolder(
   mergeImportedRecordsIntoStore(plan.folders, plan.items)
 
   if (defaultSyncOfflinePolicy === 'always-offline') {
-    void downloadImportedOneDriveItems({
-      connection,
+    dispatchPlannedSyncDownloads({
       provider,
+      providerConnectionId: connection.id,
+      rootRemoteFolderId: remoteFolder.remoteItemId,
+      offlinePolicy: defaultSyncOfflinePolicy,
+      plan: {
+        items: plan.items,
+        fileTransfers: plan.downloadableItems.map((transfer) => ({
+          ...transfer,
+          mimeType: plan.items.find((item) => item.id === transfer.itemId)!.mimeType
+        }))
+      },
       remoteItems,
-      plan,
-      rootRemoteFolderId: remoteFolder.remoteItemId
-    }).catch((error) => {
-      console.warn('[onedrive] Failed to finish offline downloads', error)
+      existingEntries: [],
+      onDownloaded: (item) => refreshImportedMediaAssets([item])
     })
   }
 
@@ -854,10 +822,6 @@ async function runOneDriveFolderRefresh(
     publishOneDriveRootFolder(refreshedRoot)
   }
 
-  const remoteById = new Map(scan.remoteItems.map((item) => [item.remoteItemId, item]))
-  const existingEntryByRemoteId = new Map(
-    existingEntries.map((entry) => [entry.remoteItemId, entry])
-  )
   const downloadedCount = 0
   const failedFileCount = 0
   const retryableFileCount = plan.syncEntries.filter(
@@ -869,37 +833,16 @@ async function runOneDriveFolderRefresh(
     .map((entry) => entry.nextRetryAt)
     .filter((value): value is number => typeof value === 'number')
     .sort((a, b) => a - b)[0]
-  for (const transfer of plan.fileTransfers) {
-    const remoteItem = remoteById.get(transfer.remoteItemId)
-    const previousEntry = existingEntryByRemoteId.get(transfer.remoteItemId)
-    if (!remoteItem) continue
-    const downloadedItem = plan.items.find((item) => item.id === transfer.itemId)
-    void enqueueSyncDownload({
-      provider,
-      request: {
-        providerConnectionId: syncLink.providerConnectionId,
-        rootRemoteFolderId: syncLink.remoteFolderId,
-        remoteItemId: transfer.remoteItemId,
-        targetBlobId: transfer.itemId,
-        offlinePolicy
-      },
-      entry: {
-        providerConnectionId: syncLink.providerConnectionId,
-        remoteItemId: transfer.remoteItemId,
-        parentRemoteItemId: remoteItem.parentRemoteItemId,
-        kind: 'file',
-        name: remoteItem.name,
-        itemId: transfer.itemId,
-        mimeType: transfer.mimeType,
-        size: remoteItem.size,
-        etag: remoteItem.etag,
-        contentHash: remoteItem.contentHash
-      },
-      previousEntry,
-      priority: 'background',
-      onDownloaded: downloadedItem ? () => refreshImportedMediaAssets([downloadedItem]) : undefined
-    })
-  }
+  dispatchPlannedSyncDownloads({
+    provider,
+    providerConnectionId: syncLink.providerConnectionId,
+    rootRemoteFolderId: syncLink.remoteFolderId,
+    offlinePolicy,
+    plan,
+    remoteItems: scan.remoteItems,
+    existingEntries,
+    onDownloaded: (item) => refreshImportedMediaAssets([item])
+  })
 
   const changedCount =
     plan.folders.length +
