@@ -7,7 +7,7 @@ import type {
   HhcAssetCollectionChangePage,
   HhcAssetCollectionItem
 } from '@shared/hhc-assets'
-import type { FolderRecord } from '@shared/types/folder'
+import type { FolderRecord, SyncOfflinePolicy } from '@shared/types/folder'
 import type { HhcLineCloudAuth } from '../cloud-provider'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
@@ -29,6 +29,7 @@ import { resetSyncDownloadQueueForTests } from '../sync-download-queue'
 
 const mocks = vi.hoisted(() => ({
   electron: false,
+  offlinePolicy: 'online-only' as SyncOfflinePolicy,
   api: null as HhcAssetApi | null,
   state: {
     folders: {} as Record<string, FolderRecord>,
@@ -68,6 +69,12 @@ vi.mock('@renderer/stores/file-explorer', () => ({
     setState: (update: (state: typeof mocks.state) => Partial<typeof mocks.state>) => {
       Object.assign(mocks.state, update(mocks.state))
     }
+  }
+}))
+
+vi.mock('@renderer/stores/settings', () => ({
+  useSettingsStore: {
+    getState: () => ({ defaultSyncOfflinePolicy: mocks.offlinePolicy })
   }
 }))
 
@@ -120,6 +127,7 @@ beforeEach(async () => {
   await resetFileExplorerDBForTests()
   await resetSyncDBForTests()
   mocks.electron = false
+  mocks.offlinePolicy = 'online-only'
   mocks.api = api()
   Object.assign(mocks.state, {
     folders: {},
@@ -697,8 +705,25 @@ describe('HHC LINE collection connection', () => {
     ])
   })
 
-  it('uses on-demand policy in Electron', async () => {
+  it('uses the selected always-offline policy in Electron imports', async () => {
     mocks.electron = true
+    mocks.offlinePolicy = 'always-offline'
+    mocks.api = api({
+      getCollectionChanges: resetChanges([
+        {
+          id: 'item-1',
+          collectionId: 'collection-1',
+          remoteItemId: 'source-1',
+          displayName: 'photo.jpg',
+          sourceRevision: 'sha256:one',
+          createdRevision: 1,
+          mimeType: 'image/jpeg',
+          sizeBytes: 42,
+          etag: 'etag-1',
+          createdAt: '2026-08-17T00:00:00Z'
+        }
+      ])
+    })
     const sessionRef = {
       current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
     }
@@ -710,7 +735,79 @@ describe('HHC LINE collection connection', () => {
     })
 
     const roots = await (await openFileExplorerDB()).getAll('folder-records')
-    expect(roots[0].syncLink?.offlinePolicy).toBe('on-demand')
+    expect(roots[0].syncLink?.offlinePolicy).toBe('always-offline')
+    const fileEntry = await getSyncEntryByRemoteItem('hhc-line:user-1', 'item-1')
+    expect(fileEntry?.status).toBe('queued')
+  })
+
+  it('refreshes a persisted HHC root with the selected offline policy', async () => {
+    mocks.electron = true
+    const remoteItem = {
+      id: 'item-1',
+      collectionId: 'collection-1',
+      remoteItemId: 'source-1',
+      displayName: 'photo.jpg',
+      sourceRevision: 'sha256:one',
+      createdRevision: 1,
+      mimeType: 'image/jpeg',
+      sizeBytes: 42,
+      etag: 'etag-1',
+      createdAt: '2026-08-17T00:00:00Z'
+    }
+    mocks.api = api({
+      getCollectionChanges: vi
+        .fn()
+        .mockResolvedValueOnce({
+          collection: collection('collection-1', 'Sunday'),
+          items: [remoteItem],
+          tombstones: [],
+          cursor: 'reset-barrier',
+          hasMore: true,
+          reset: true
+        })
+        .mockResolvedValueOnce({
+          collection: collection('collection-1', 'Sunday'),
+          items: [],
+          tombstones: [],
+          cursor: 'revision-1',
+          hasMore: false,
+          reset: false
+        })
+        .mockResolvedValueOnce({
+          collection: collection('collection-1', 'Sunday'),
+          items: [{ ...remoteItem, updatedRevision: 2 }],
+          tombstones: [],
+          cursor: 'revision-2',
+          hasMore: false,
+          reset: false
+        })
+    })
+    const sessionRef = {
+      current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    }
+
+    mocks.offlinePolicy = 'on-demand'
+    await importHhcLineCollection(auth(sessionRef), {
+      remoteItemId: 'collection-1',
+      name: 'Sunday',
+      parentRemoteItemId: null
+    })
+    const [root] = await (await openFileExplorerDB()).getAll('folder-records')
+
+    mocks.offlinePolicy = 'always-offline'
+    await refreshHhcLineFolder(auth(sessionRef), root.id)
+
+    const [refreshedRoot] = await (await openFileExplorerDB()).getAll('folder-records')
+    const fileEntry = await getSyncEntryByRemoteItem('hhc-line:user-1', 'item-1')
+    expect(refreshedRoot).toMatchObject({
+      id: root.id,
+      syncLink: { offlinePolicy: 'always-offline' }
+    })
+    expect(mocks.state.folders[root.id]).toMatchObject({
+      id: root.id,
+      syncLink: { offlinePolicy: 'always-offline' }
+    })
+    expect(fileEntry?.status).toBe('queued')
   })
 
   it('keeps multiple imported collections independent', async () => {

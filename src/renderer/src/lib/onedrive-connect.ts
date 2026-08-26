@@ -50,6 +50,26 @@ const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
 const ONEDRIVE_WEB_CALLBACK_STORAGE_KEY = 'libre-presenter:onedrive-callback'
 const ONEDRIVE_WEB_CALLBACK_TIMEOUT_MS = 2 * 60_000
 
+function publishOneDriveRootFolder(root: FolderRecord): void {
+  useFileExplorerStore.setState((state) => {
+    const folders = { ...state.folders, [root.id]: root }
+    const siblings = [
+      ...(state._childFoldersByParent[root.parentId!] ?? []).filter(
+        (folder) => folder.id !== root.id
+      ),
+      root
+    ].sort((left, right) => left.sortIndex - right.sortIndex)
+    return {
+      folders,
+      _foldersArray: Object.values(folders),
+      _childFoldersByParent: {
+        ...state._childFoldersByParent,
+        [root.parentId!]: siblings
+      }
+    }
+  })
+}
+
 interface TokenResponse {
   access_token: string
   refresh_token: string
@@ -750,6 +770,7 @@ async function runOneDriveFolderRefresh(
   rootFolderId: string,
   options: { forceRetry?: boolean } = {}
 ): Promise<OneDriveRefreshSummary> {
+  const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const store = useFileExplorerStore.getState()
   await store.initialize()
   const db = await openFileExplorerDB()
@@ -763,12 +784,14 @@ async function runOneDriveFolderRefresh(
   if (!rootFolder || !syncLink || syncLink.providerType !== 'onedrive') {
     throw new Error('OneDrive root folder not found')
   }
+  const refreshedRoot =
+    syncLink.offlinePolicy === offlinePolicy
+      ? rootFolder
+      : { ...rootFolder, syncLink: { ...syncLink, offlinePolicy } }
 
   const provider = createStoredOneDriveProvider(syncLink.providerConnectionId)
   const cursor = await getSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
   const existingEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
-  const offlinePolicy =
-    syncLink.offlinePolicy ?? useSettingsStore.getState().defaultSyncOfflinePolicy
 
   let scan: Awaited<ReturnType<typeof scanOneDriveFolder>>
   let fullScanFallback = false
@@ -792,7 +815,7 @@ async function runOneDriveFolderRefresh(
   const basePlanInput = {
     providerConnectionId: syncLink.providerConnectionId,
     providerType: 'onedrive' as const,
-    rootFolder,
+    rootFolder: refreshedRoot,
     rootRemoteFolderId: syncLink.remoteFolderId,
     offlinePolicy,
     platform: getOneDriveMediaPlatform(),
@@ -825,6 +848,10 @@ async function runOneDriveFolderRefresh(
       cursor: scan.nextCursor,
       updatedAt: Date.now()
     })
+  }
+  if (refreshedRoot !== rootFolder) {
+    await db.put('folder-records', refreshedRoot)
+    publishOneDriveRootFolder(refreshedRoot)
   }
 
   const remoteById = new Map(scan.remoteItems.map((item) => [item.remoteItemId, item]))

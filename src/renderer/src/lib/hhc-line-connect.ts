@@ -1,6 +1,7 @@
-import type { FileItemRecord, FolderRecord, SyncOfflinePolicy } from '@shared/types/folder'
+import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { HhcSession } from '@shared/hhc-auth'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { resolveUniqueName } from './file-naming'
 import { createHhcAssetApi } from './hhc-asset-api'
 import { HhcLineReadonlyProvider } from './hhc-line-provider'
@@ -362,6 +363,7 @@ async function runImport(
   connectionId: string,
   collection: CloudRemoteFolder
 ): Promise<CloudImportResult> {
+  const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const store = useFileExplorerStore.getState()
   await store.initialize()
   assertCurrentAccount(auth, expectedUserId)
@@ -395,25 +397,26 @@ async function runImport(
   const current = useFileExplorerStore.getState()
   const roots = current.getChildFolders(FILE_EXPLORER_ROOT_ID)
   const now = Date.now()
-  const offlinePolicy: SyncOfflinePolicy = isElectron() ? 'on-demand' : 'online-only'
-  const root: FolderRecord = existing ?? {
-    id: rootFolderId(connectionId, collection.remoteItemId),
-    name: resolveUniqueName(
-      collection.name,
-      roots.map((folder) => folder.name)
-    ),
-    parentId: FILE_EXPLORER_ROOT_ID,
-    sortIndex: roots.length,
-    createdAt: now,
-    expiresAt: null,
-    syncLink: {
-      providerConnectionId: connectionId,
-      providerType: 'hhc-line',
-      remoteFolderId: collection.remoteItemId,
-      offlinePolicy,
-      status: 'active'
-    }
-  }
+  const root: FolderRecord = existing
+    ? { ...existing, syncLink: { ...existing.syncLink!, offlinePolicy } }
+    : {
+        id: rootFolderId(connectionId, collection.remoteItemId),
+        name: resolveUniqueName(
+          collection.name,
+          roots.map((folder) => folder.name)
+        ),
+        parentId: FILE_EXPLORER_ROOT_ID,
+        sortIndex: roots.length,
+        createdAt: now,
+        expiresAt: null,
+        syncLink: {
+          providerConnectionId: connectionId,
+          providerType: 'hhc-line',
+          remoteFolderId: collection.remoteItemId,
+          offlinePolicy,
+          status: 'active'
+        }
+      }
   const db = await openFileExplorerDB()
   const [entries, fileBlobs] = await Promise.all([
     listSyncEntriesByProviderConnection(connectionId),
@@ -508,6 +511,7 @@ async function runHhcLineFolderRefresh(
   rootFolderIdValue: string,
   options: { forceRetry?: boolean }
 ): Promise<CloudRefreshSummary> {
+  const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const session = requireSession(auth)
   const connectionId = createHhcLineProviderConnectionId(session.userId)
   const store = useFileExplorerStore.getState()
@@ -520,6 +524,10 @@ async function runHhcLineFolderRefresh(
   ) {
     throw new Error('HHC LINE root folder not found')
   }
+  const refreshedRoot =
+    root.syncLink.offlinePolicy === offlinePolicy
+      ? root
+      : { ...root, syncLink: { ...root.syncLink, offlinePolicy } }
 
   const provider = await createProvider(auth, session.userId)
   assertCurrentAccount(auth, session.userId)
@@ -544,9 +552,9 @@ async function runHhcLineFolderRefresh(
   let input = {
     providerConnectionId: connectionId,
     providerType: 'hhc-line' as const,
-    rootFolder: root,
+    rootFolder: refreshedRoot,
     rootRemoteFolderId: root.syncLink.remoteFolderId,
-    offlinePolicy: root.syncLink.offlinePolicy ?? (isElectron() ? 'on-demand' : 'online-only'),
+    offlinePolicy,
     platform: isElectron() ? ('electron' as const) : ('web' as const),
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
@@ -583,6 +591,17 @@ async function runHhcLineFolderRefresh(
   } catch (error) {
     await unlinkSyncRootFolderFromApp(root).catch(() => undefined)
     throw error
+  }
+  if (refreshedRoot !== root) {
+    try {
+      assertCurrentAccount(auth, session.userId)
+      await db.put('folder-records', refreshedRoot)
+      assertCurrentAccount(auth, session.userId)
+    } catch (error) {
+      await unlinkSyncRootFolderFromApp(root).catch(() => undefined)
+      throw error
+    }
+    publishRootFolder(refreshedRoot)
   }
 
   return {

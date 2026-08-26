@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FILE_EXPLORER_ROOT_ID } from '@renderer/stores/file-explorer'
+import type { SyncOfflinePolicy } from '@shared/types/folder'
 import {
   buildOneDriveImportPlan,
   ensureOneDriveItemAvailableForPresentation,
@@ -12,7 +13,7 @@ import type { OneDriveReadonlyProvider } from '../onedrive-provider'
 import type { SyncChangePage } from '../sync-provider'
 import { openFileExplorerDB } from '../file-explorer-db'
 import { refreshImportedMediaAssets } from '../local-sync-import'
-import { listProviderConnectionsByType } from '../sync-db'
+import { listProviderConnectionsByType, putSyncEntry } from '../sync-db'
 import { getSyncEntryByLocalItem } from '../sync-db'
 import { resetSyncDownloadQueueForTests } from '../sync-download-queue'
 
@@ -20,6 +21,10 @@ const providerMocks = vi.hoisted(() => ({
   connect: vi.fn(),
   initialScan: vi.fn(),
   downloadContent: vi.fn()
+}))
+
+const settingsMocks = vi.hoisted(() => ({
+  offlinePolicy: 'always-offline' as SyncOfflinePolicy
 }))
 
 const fileStoreMocks = vi.hoisted(() => ({
@@ -53,7 +58,7 @@ vi.mock('@renderer/stores/file-explorer', () => ({
 vi.mock('@renderer/stores/settings', () => ({
   getEffectiveOneDriveClientId: () => '11111111-2222-3333-4444-555555555555',
   useSettingsStore: {
-    getState: () => ({ defaultSyncOfflinePolicy: 'always-offline' })
+    getState: () => ({ defaultSyncOfflinePolicy: settingsMocks.offlinePolicy })
   }
 }))
 
@@ -154,6 +159,7 @@ function deferred<T>(): {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  settingsMocks.offlinePolicy = 'always-offline'
   resetSyncDownloadQueueForTests()
   fileStoreMocks.state.folders = {}
   fileStoreMocks.state.items = {}
@@ -394,6 +400,78 @@ describe('scanOneDriveFolder', () => {
 })
 
 describe('refreshOneDriveFolder', () => {
+  it('refreshes a persisted OneDrive root with the selected offline policy', async () => {
+    const rootFolder = {
+      id: 'onedrive-root',
+      name: 'OneDrive',
+      parentId: FILE_EXPLORER_ROOT_ID,
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'onedrive:account-1',
+        remoteFolderId: 'remote-folder-1',
+        providerType: 'onedrive' as const,
+        offlinePolicy: 'on-demand' as const
+      }
+    }
+    const put = vi.fn(async () => undefined)
+    fileStoreMocks.state.folders = { [rootFolder.id]: rootFolder }
+    settingsMocks.offlinePolicy = 'always-offline'
+    vi.mocked(openFileExplorerDB).mockResolvedValue({
+      getAll: vi.fn(async (store: string) => (store === 'folder-records' ? [rootFolder] : [])),
+      put,
+      transaction: () => ({
+        objectStore: () => ({
+          delete: vi.fn(async () => undefined),
+          get: vi.fn(async () => undefined),
+          getAll: vi.fn(async () => []),
+          put: vi.fn(async () => undefined)
+        }),
+        done: Promise.resolve()
+      })
+    } as never)
+    providerMocks.initialScan.mockResolvedValueOnce({
+      items: [
+        {
+          remoteItemId: 'remote-folder-1',
+          parentRemoteItemId: null,
+          kind: 'folder',
+          name: 'Selected'
+        },
+        {
+          remoteItemId: 'remote-file-1',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          size: 10
+        }
+      ],
+      nextCursor: 'cursor-1',
+      hasMore: false
+    })
+
+    await refreshOneDriveFolder(rootFolder.id)
+
+    expect(put).toHaveBeenCalledWith(
+      'folder-records',
+      expect.objectContaining({
+        id: rootFolder.id,
+        syncLink: expect.objectContaining({ offlinePolicy: 'always-offline' })
+      })
+    )
+    expect(fileStoreMocks.state.folders).toMatchObject({
+      [rootFolder.id]: {
+        id: rootFolder.id,
+        syncLink: { offlinePolicy: 'always-offline' }
+      }
+    })
+    expect(putSyncEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteItemId: 'remote-file-1', status: 'queued' })
+    )
+  })
+
   it('coalesces concurrent refreshes for the same root folder', async () => {
     const scan = deferred<SyncChangePage>()
     const rootFolder = {
