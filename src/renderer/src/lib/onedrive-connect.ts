@@ -73,9 +73,13 @@ function publishOneDriveRootFolder(root: FolderRecord): void {
 
 function collectOneDriveRootEntries(
   entries: SyncEntryRecord[],
-  rootRemoteFolderId: string
+  rootRemoteFolderId: string,
+  rootFolderId: string,
+  folders: FolderRecord[],
+  items: Array<{ id: string; parentId: string }>
 ): SyncEntryRecord[] {
   const remoteItemIds = new Set([rootRemoteFolderId])
+  const localFolderIds = new Set([rootFolderId])
   let changed = true
   while (changed) {
     changed = false
@@ -89,8 +93,31 @@ function collectOneDriveRootEntries(
         changed = true
       }
     }
+    for (const folder of folders) {
+      if (
+        folder.parentId &&
+        localFolderIds.has(folder.parentId) &&
+        !localFolderIds.has(folder.id)
+      ) {
+        localFolderIds.add(folder.id)
+        changed = true
+      }
+    }
   }
-  return entries.filter((entry) => remoteItemIds.has(entry.remoteItemId))
+
+  const foldersById = new Map(folders.map((folder) => [folder.id, folder]))
+  const itemsById = new Map(items.map((item) => [item.id, item]))
+  return entries.filter((entry) => {
+    if (entry.kind === 'folder' && entry.folderId) {
+      const folder = foldersById.get(entry.folderId)
+      if (folder) return localFolderIds.has(folder.id)
+    }
+    if (entry.kind === 'file' && entry.itemId) {
+      const item = itemsById.get(entry.itemId)
+      if (item) return localFolderIds.has(item.parentId)
+    }
+    return remoteItemIds.has(entry.remoteItemId)
+  })
 }
 
 interface TokenResponse {
@@ -782,7 +809,13 @@ async function runOneDriveFolderRefresh(
   const provider = createStoredOneDriveProvider(syncLink.providerConnectionId)
   const cursor = await getSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
   const accountEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
-  const existingEntries = collectOneDriveRootEntries(accountEntries, syncLink.remoteFolderId)
+  const existingEntries = collectOneDriveRootEntries(
+    accountEntries,
+    syncLink.remoteFolderId,
+    rootFolder.id,
+    folders,
+    allItems
+  )
   const existingFolderIds = new Set([
     rootFolder.id,
     ...existingEntries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))

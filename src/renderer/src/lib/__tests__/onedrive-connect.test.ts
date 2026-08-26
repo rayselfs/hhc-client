@@ -177,6 +177,15 @@ function deferred<T>(): {
 function setupTwoRootRefresh(options: {
   rootAOfflinePolicy: SyncOfflinePolicy
   availableA: boolean
+  mutate?: (fixture: {
+    rootA: FolderRecord
+    rootB: FolderRecord
+    itemA: FileItemRecord
+    itemB: FileItemRecord
+    folders: FolderRecord[]
+    items: FileItemRecord[]
+    entries: SyncEntryRecord[]
+  }) => void
 }): {
   rootA: FolderRecord
   rootB: FolderRecord
@@ -297,14 +306,17 @@ function setupTwoRootRefresh(options: {
     ...(options.availableA ? [{ id: itemA.id, blob: new Blob(['a']), refCount: 1 }] : []),
     { id: itemB.id, blob: new Blob(['b']), refCount: 1 }
   ]
+  const folders = [rootA, rootB]
+  const items = [itemA, itemB]
+  options.mutate?.({ rootA, rootB, itemA, itemB, folders, items, entries })
 
-  fileStoreMocks.state.folders = { [rootA.id]: rootA, [rootB.id]: rootB }
-  fileStoreMocks.state.items = { [itemA.id]: itemA, [itemB.id]: itemB }
+  fileStoreMocks.state.folders = Object.fromEntries(folders.map((folder) => [folder.id, folder]))
+  fileStoreMocks.state.items = Object.fromEntries(items.map((item) => [item.id, item]))
   vi.mocked(listSyncEntriesByProviderConnection).mockResolvedValueOnce(entries)
   vi.mocked(openFileExplorerDB).mockResolvedValue({
     getAll: vi.fn(async (store: string) => {
-      if (store === 'folder-records') return [rootA, rootB]
-      if (store === 'folder-items') return [itemA, itemB]
+      if (store === 'folder-records') return folders
+      if (store === 'folder-items') return items
       if (store === 'file-blobs') return fileBlobs
       return []
     }),
@@ -342,6 +354,14 @@ function rootASnapshot(): SyncChangePage {
         etag: 'etag-a'
       }
     ],
+    nextCursor: 'cursor-full',
+    hasMore: false
+  }
+}
+
+function rootAOnlySnapshot(): SyncChangePage {
+  return {
+    items: [rootASnapshot().items[0]],
     nextCursor: 'cursor-full',
     hasMore: false
   }
@@ -748,6 +768,178 @@ describe('refreshOneDriveFolder', () => {
       expect(cleanupFileResources).toHaveBeenCalledWith({ folderIds: [], itemIds: [] })
     }
   )
+
+  it('uses local item ancestry to clean a root A entry with a missing remote parent', async () => {
+    const { rootA, itemA } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true,
+      mutate: ({ entries }) => {
+        entries.find((entry) => entry.id === 'entry-file-a')!.parentRemoteItemId =
+          'missing-remote-parent'
+      }
+    })
+    providerMocks.initialScan.mockResolvedValueOnce(rootAOnlySnapshot())
+
+    const summary = await refreshOneDriveFolder(rootA.id)
+
+    expect(summary).toMatchObject({ removedFolderCount: 0, removedItemCount: 1 })
+    expect(putSyncTombstone).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteItemId: 'remote-file-a', itemId: itemA.id })
+    )
+    expect(cleanupFileResources).toHaveBeenCalledWith({ folderIds: [], itemIds: [itemA.id] })
+  })
+
+  it('bounds disconnected remote cycles by local root A ancestry and keeps root B safe', async () => {
+    const folderA1: FolderRecord = {
+      id: 'onedrive-folder-a-1',
+      name: 'Folder A1',
+      parentId: 'onedrive-root-a',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'onedrive:account-1',
+        remoteFolderId: 'remote-cycle-a',
+        providerType: 'onedrive',
+        offlinePolicy: 'always-offline'
+      }
+    }
+    const folderA2: FolderRecord = {
+      id: 'onedrive-folder-a-2',
+      name: 'Folder A2',
+      parentId: folderA1.id,
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'onedrive:account-1',
+        remoteFolderId: 'remote-cycle-b',
+        providerType: 'onedrive',
+        offlinePolicy: 'always-offline'
+      }
+    }
+    const { rootA, itemA, itemB } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true,
+      mutate: ({ itemA, items, folders, entries }) => {
+        folders.push(folderA1, folderA2)
+        items.find((item) => item.id === itemA.id)!.parentId = folderA1.id
+        entries.find((entry) => entry.id === 'entry-file-a')!.parentRemoteItemId = 'remote-cycle-a'
+        entries.push(
+          {
+            id: 'entry-cycle-a',
+            providerConnectionId: 'onedrive:account-1',
+            remoteItemId: 'remote-cycle-a',
+            parentRemoteItemId: 'remote-cycle-b',
+            kind: 'folder',
+            name: folderA1.name,
+            folderId: folderA1.id,
+            status: 'available-offline',
+            createdAt: 1,
+            updatedAt: 1
+          },
+          {
+            id: 'entry-cycle-b',
+            providerConnectionId: 'onedrive:account-1',
+            remoteItemId: 'remote-cycle-b',
+            parentRemoteItemId: 'remote-cycle-a',
+            kind: 'folder',
+            name: folderA2.name,
+            folderId: folderA2.id,
+            status: 'available-offline',
+            createdAt: 1,
+            updatedAt: 1
+          }
+        )
+      }
+    })
+    providerMocks.initialScan.mockResolvedValueOnce(rootAOnlySnapshot())
+
+    const summary = await refreshOneDriveFolder(rootA.id)
+
+    expect(summary).toMatchObject({ removedFolderCount: 2, removedItemCount: 1 })
+    expect(cleanupFileResources).toHaveBeenCalledWith({
+      folderIds: expect.arrayContaining([folderA1.id, folderA2.id]),
+      itemIds: [itemA.id]
+    })
+    expect(putSyncTombstone).not.toHaveBeenCalledWith(
+      expect.objectContaining({ remoteItemId: 'remote-root-b' })
+    )
+    expect(putSyncTombstone).not.toHaveBeenCalledWith(
+      expect.objectContaining({ remoteItemId: 'remote-file-b', itemId: itemB.id })
+    )
+  })
+
+  it('still tombstones and cleans an ordinary root A remote deletion', async () => {
+    const { rootA, itemA } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true
+    })
+    providerMocks.initialScan.mockResolvedValueOnce(rootAOnlySnapshot())
+
+    const summary = await refreshOneDriveFolder(rootA.id)
+
+    expect(summary).toMatchObject({ removedFolderCount: 0, removedItemCount: 1 })
+    expect(putSyncTombstone).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteItemId: 'remote-file-a', itemId: itemA.id })
+    )
+    expect(cleanupFileResources).toHaveBeenCalledWith({ folderIds: [], itemIds: [itemA.id] })
+  })
+
+  it('does not guess conflicting or unowned malformed entries into root A cleanup', async () => {
+    const { rootA, itemA, itemB } = setupTwoRootRefresh({
+      rootAOfflinePolicy: 'always-offline',
+      availableA: true,
+      mutate: ({ itemB, entries }) => {
+        entries.push(
+          {
+            id: 'entry-ambiguous',
+            providerConnectionId: 'onedrive:account-1',
+            remoteItemId: 'remote-ambiguous',
+            parentRemoteItemId: 'remote-root-a',
+            kind: 'file',
+            name: 'ambiguous.jpg',
+            itemId: itemB.id,
+            blobId: itemB.id,
+            mimeType: 'image/jpeg',
+            size: 20,
+            status: 'available-offline',
+            createdAt: 1,
+            updatedAt: 1
+          },
+          {
+            id: 'entry-unowned',
+            providerConnectionId: 'onedrive:account-1',
+            remoteItemId: 'remote-unowned',
+            parentRemoteItemId: 'missing-remote-parent',
+            kind: 'file',
+            name: 'unowned.jpg',
+            itemId: 'missing-local-item',
+            blobId: itemB.id,
+            mimeType: 'image/jpeg',
+            size: 20,
+            status: 'available-offline',
+            createdAt: 1,
+            updatedAt: 1
+          }
+        )
+      }
+    })
+    providerMocks.initialScan.mockResolvedValueOnce(rootASnapshot())
+
+    const summary = await refreshOneDriveFolder(rootA.id)
+
+    expect(summary).toMatchObject({ removedFolderCount: 0, removedItemCount: 0 })
+    expect(putSyncTombstone).not.toHaveBeenCalledWith(
+      expect.objectContaining({ remoteItemId: 'remote-ambiguous', itemId: itemB.id })
+    )
+    expect(putSyncTombstone).not.toHaveBeenCalledWith(
+      expect.objectContaining({ remoteItemId: 'remote-unowned', blobId: itemB.id })
+    )
+    expect(cleanupFileResources).toHaveBeenCalledWith({ folderIds: [], itemIds: [] })
+    expect(fileStoreMocks.state.items).toHaveProperty(itemA.id)
+    expect(fileStoreMocks.state.items).toHaveProperty(itemB.id)
+  })
 
   it('coalesces concurrent refreshes for the same root folder', async () => {
     const scan = deferred<SyncChangePage>()
