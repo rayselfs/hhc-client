@@ -275,6 +275,36 @@ describe('scanMediaStorageIntegrity', () => {
     await expect(db.get('file-blobs', 'synced-blob')).resolves.toMatchObject({ refCount: 1 })
   })
 
+  it('does not delete a sync-cached Blob when its folder item is missing', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'sync-only-blob',
+      blob: new Blob(['source']),
+      size: 6,
+      refCount: 1
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'sync-only.jpg',
+      blobId: 'sync-only-blob',
+      status: 'available-offline'
+    })
+
+    const repair = await repairMediaStorageIntegrity()
+    const report = await scanMediaStorageIntegrity()
+
+    expect(repair.cleanupJournalIds).toEqual([])
+    await expect(db.get('file-blobs', 'sync-only-blob')).resolves.toBeDefined()
+    expect(report.issues).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'sync-entry-missing-blob', relatedId: 'sync-only-blob' })
+      ])
+    )
+  })
+
   it('publishes a semantic recovery change after a ref-count-only repair commits', async () => {
     const db = await openFileExplorerDB()
     await db.put('file-blobs', {

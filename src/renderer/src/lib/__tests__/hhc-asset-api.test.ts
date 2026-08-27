@@ -303,7 +303,9 @@ describe('Electron HHC Asset API', () => {
     ['HHC_ASSET_AUTH_REQUIRED', 'auth-required', 401],
     ['HHC_ASSET_ACCESS_REVOKED', 'access-revoked', 403],
     ['HHC_ASSET_ACCESS_REVOKED:404', 'access-revoked', 404],
-    ['HHC_ASSET_RETRYABLE', 'retryable', undefined]
+    ['HHC_ASSET_RETRYABLE', 'retryable', undefined],
+    ['HHC_ASSET_FATAL:INVALID_BODY', 'fatal', undefined],
+    ['HHC_ASSET_FATAL:INVALID_SCHEMA', 'fatal', undefined]
   ] as const)('maps main error %s as %s', async (message, classification, status) => {
     window.api = {
       hhcAssets: {

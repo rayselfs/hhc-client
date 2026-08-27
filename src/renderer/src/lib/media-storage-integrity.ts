@@ -128,9 +128,14 @@ export async function scanMediaStorageIntegrity(
 }
 
 export async function repairMediaStorageIntegrity(): Promise<MediaStorageIntegrityRepairResult> {
-  const [fileBlobs, db] = await Promise.all([listFileBlobRecords(), openFileExplorerDB()])
+  const [fileBlobs, syncEntries, db] = await Promise.all([
+    listFileBlobRecords(),
+    listSyncEntries(),
+    openFileExplorerDB()
+  ])
   const folderItems = await db.getAll('folder-items')
   const expectedRefCounts = new Map<string, number>()
+  const syncBlobIds = new Set(syncEntries.flatMap((entry) => (entry.blobId ? [entry.blobId] : [])))
   for (const item of folderItems) {
     if (isFileItem(item)) incrementReference(expectedRefCounts, getBlobId(item))
   }
@@ -151,6 +156,7 @@ export async function repairMediaStorageIntegrity(): Promise<MediaStorageIntegri
       }
       continue
     }
+    if (syncBlobIds.has(record.id)) continue
 
     if (isMediaResourceLocked(record.id)) {
       if (actualRefCount !== 0) {
