@@ -237,8 +237,25 @@ describe('HHC Asset IPC', () => {
         )
       )
 
-    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow('HHC_ASSET_FATAL')
-    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow('HHC_ASSET_FATAL')
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow(
+      'HHC_ASSET_FATAL:INVALID_BODY'
+    )
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow(
+      'HHC_ASSET_FATAL:INVALID_BODY'
+    )
+  })
+
+  it('distinguishes malformed response bodies from invalid response schemas', async () => {
+    mockFetch
+      .mockResolvedValueOnce(new Response('{'))
+      .mockResolvedValueOnce(json({ collections: 'invalid', hasMore: false }))
+
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow(
+      'HHC_ASSET_FATAL:INVALID_BODY'
+    )
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow(
+      'HHC_ASSET_FATAL:INVALID_SCHEMA'
+    )
   })
 
   it('projects exact DTOs and strips unknown upstream fields before IPC', async () => {

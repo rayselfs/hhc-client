@@ -145,7 +145,7 @@ describe('scanMediaStorageIntegrity', () => {
           kind: 'file-blob-ref-count-mismatch',
           resourceId: 'shared-blob',
           actualRefCount: 9,
-          expectedRefCount: 2
+          expectedRefCount: 1
         }),
         expect.objectContaining({
           kind: 'file-blob-unreferenced',
@@ -235,6 +235,74 @@ describe('scanMediaStorageIntegrity', () => {
     const report = await scanMediaStorageIntegrity()
 
     expect(report.issues).toEqual([])
+  })
+
+  it('does not count sync metadata as an additional Blob owner', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'synced-blob',
+      blob: new Blob(['source']),
+      size: 6,
+      refCount: 1
+    })
+    await db.put('folder-items', {
+      id: 'synced-item',
+      parentId: 'root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'synced.jpg',
+      mimeType: 'image/jpeg',
+      size: 6,
+      url: 'blob:synced-blob'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'synced.jpg',
+      blobId: 'synced-blob',
+      status: 'available-offline'
+    })
+
+    const report = await scanMediaStorageIntegrity()
+    const repair = await repairMediaStorageIntegrity()
+
+    expect(report.issues).toEqual([])
+    expect(repair.correctedRefCounts).toEqual([])
+    await expect(db.get('file-blobs', 'synced-blob')).resolves.toMatchObject({ refCount: 1 })
+  })
+
+  it('does not delete a sync-cached Blob when its folder item is missing', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'sync-only-blob',
+      blob: new Blob(['source']),
+      size: 6,
+      refCount: 1
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'sync-only.jpg',
+      blobId: 'sync-only-blob',
+      status: 'available-offline'
+    })
+
+    const repair = await repairMediaStorageIntegrity()
+    const report = await scanMediaStorageIntegrity()
+
+    expect(repair.cleanupJournalIds).toEqual([])
+    await expect(db.get('file-blobs', 'sync-only-blob')).resolves.toBeDefined()
+    expect(report.issues).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'sync-entry-missing-blob', relatedId: 'sync-only-blob' })
+      ])
+    )
   })
 
   it('publishes a semantic recovery change after a ref-count-only repair commits', async () => {

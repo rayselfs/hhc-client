@@ -74,7 +74,6 @@ export async function scanMediaStorageIntegrity(
 
   for (const entry of syncEntries) {
     if (!entry.blobId) continue
-    incrementReference(expectedRefCounts, entry.blobId)
     if (!blobIds.has(entry.blobId)) {
       issues.push({
         kind: 'sync-entry-missing-blob',
@@ -106,7 +105,7 @@ export async function scanMediaStorageIntegrity(
         kind: 'file-blob-unreferenced',
         severity: 'warning',
         resourceId: record.id,
-        message: 'Blob record is not referenced by any file item or sync entry'
+        message: 'Blob record is not referenced by any file item'
       })
     }
     if (actualRefCount !== expectedRefCount) {
@@ -136,13 +135,10 @@ export async function repairMediaStorageIntegrity(): Promise<MediaStorageIntegri
   ])
   const folderItems = await db.getAll('folder-items')
   const expectedRefCounts = new Map<string, number>()
+  const syncBlobIds = new Set(syncEntries.flatMap((entry) => (entry.blobId ? [entry.blobId] : [])))
   for (const item of folderItems) {
     if (isFileItem(item)) incrementReference(expectedRefCounts, getBlobId(item))
   }
-  for (const entry of syncEntries) {
-    if (entry.blobId) incrementReference(expectedRefCounts, entry.blobId)
-  }
-
   const correctedRefCounts: string[] = []
   const cleanupRecords = []
   const deferredBlobIds: string[] = []
@@ -160,6 +156,7 @@ export async function repairMediaStorageIntegrity(): Promise<MediaStorageIntegri
       }
       continue
     }
+    if (syncBlobIds.has(record.id)) continue
 
     if (isMediaResourceLocked(record.id)) {
       if (actualRefCount !== 0) {
