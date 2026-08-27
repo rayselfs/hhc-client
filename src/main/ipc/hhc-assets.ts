@@ -28,6 +28,8 @@ const MAX_CURSOR_BYTES = 2048
 const MAX_CONTENT_BYTES = 200 * 1024 * 1024
 const MAX_JSON_BYTES = 2 * 1024 * 1024
 const activeDownloads = new Map<string, AbortController>()
+const INVALID_BODY = 'HHC_ASSET_FATAL:INVALID_BODY'
+const INVALID_SCHEMA = 'HHC_ASSET_FATAL:INVALID_SCHEMA'
 
 function requestError(code = 'HHC_ASSET_FATAL'): Error {
   return new Error(code)
@@ -130,10 +132,10 @@ async function readBoundedJson(response: Response): Promise<unknown> {
       declaredLength < 0 ||
       declaredLength > MAX_JSON_BYTES
     ) {
-      throw requestError()
+      throw requestError(INVALID_BODY)
     }
   }
-  if (!response.body) throw requestError()
+  if (!response.body) throw requestError(INVALID_BODY)
 
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -144,21 +146,26 @@ async function readBoundedJson(response: Response): Promise<unknown> {
       if (done) break
       if (!value) continue
       size += value.byteLength
-      if (size > MAX_JSON_BYTES) throw requestError()
+      if (size > MAX_JSON_BYTES) throw requestError(INVALID_BODY)
       chunks.push(value)
     }
   } catch (error) {
     await reader.cancel().catch(() => undefined)
-    throw error
+    if (error instanceof Error && error.message.startsWith('HHC_ASSET_')) throw error
+    throw requestError(INVALID_BODY)
   }
-  if (size === 0) throw requestError()
+  if (size === 0) throw requestError(INVALID_BODY)
   const bytes = new Uint8Array(size)
   let offset = 0
   for (const chunk of chunks) {
     bytes.set(chunk, offset)
     offset += chunk.byteLength
   }
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+  } catch {
+    throw requestError(INVALID_BODY)
+  }
 }
 
 async function json<T>(
@@ -167,11 +174,17 @@ async function json<T>(
   project: (value: unknown) => T,
   init?: RequestInit
 ): Promise<T> {
+  let value: unknown
   try {
-    return project(await readBoundedJson(await fetchAsset(service, path, init)))
+    value = await readBoundedJson(await fetchAsset(service, path, init))
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('HHC_ASSET_')) throw error
     throw requestError()
+  }
+  try {
+    return project(value)
+  } catch {
+    throw requestError(INVALID_SCHEMA)
   }
 }
 

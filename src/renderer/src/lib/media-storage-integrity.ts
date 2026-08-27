@@ -74,7 +74,6 @@ export async function scanMediaStorageIntegrity(
 
   for (const entry of syncEntries) {
     if (!entry.blobId) continue
-    incrementReference(expectedRefCounts, entry.blobId)
     if (!blobIds.has(entry.blobId)) {
       issues.push({
         kind: 'sync-entry-missing-blob',
@@ -106,7 +105,7 @@ export async function scanMediaStorageIntegrity(
         kind: 'file-blob-unreferenced',
         severity: 'warning',
         resourceId: record.id,
-        message: 'Blob record is not referenced by any file item or sync entry'
+        message: 'Blob record is not referenced by any file item'
       })
     }
     if (actualRefCount !== expectedRefCount) {
@@ -129,20 +128,12 @@ export async function scanMediaStorageIntegrity(
 }
 
 export async function repairMediaStorageIntegrity(): Promise<MediaStorageIntegrityRepairResult> {
-  const [fileBlobs, syncEntries, db] = await Promise.all([
-    listFileBlobRecords(),
-    listSyncEntries(),
-    openFileExplorerDB()
-  ])
+  const [fileBlobs, db] = await Promise.all([listFileBlobRecords(), openFileExplorerDB()])
   const folderItems = await db.getAll('folder-items')
   const expectedRefCounts = new Map<string, number>()
   for (const item of folderItems) {
     if (isFileItem(item)) incrementReference(expectedRefCounts, getBlobId(item))
   }
-  for (const entry of syncEntries) {
-    if (entry.blobId) incrementReference(expectedRefCounts, entry.blobId)
-  }
-
   const correctedRefCounts: string[] = []
   const cleanupRecords = []
   const deferredBlobIds: string[] = []
