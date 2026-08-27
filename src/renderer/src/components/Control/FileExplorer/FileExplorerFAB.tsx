@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Plus, FolderPlus, Upload, Folder, FolderSync, Presentation, Cloud } from 'lucide-react'
+import { Plus, FolderPlus, Upload, Folder, Presentation } from 'lucide-react'
 import { Dropdown } from '@heroui/react/dropdown'
 import { useTranslation } from 'react-i18next'
 import { computeExpiresAt, type FolderDuration } from '@shared/types/folder'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
-import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
+import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 
 export interface FileExplorerFABProps {
   onUploadFiles?: () => void
@@ -145,7 +145,7 @@ export default function FileExplorerFAB({
                       id="addLocalSyncFolder"
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
-                      <FolderSync size={16} />
+                      <SyncProviderIcon providerType="local-fs" className="size-4" />
                       {t('fileExplorer.contextMenu.addLocalSyncFolder')}
                     </Dropdown.Item>
                   )}
@@ -155,7 +155,7 @@ export default function FileExplorerFAB({
                       isDisabled={isAddOneDriveDisabled}
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
-                      <OneDriveIcon className="size-4" />
+                      <SyncProviderIcon providerType="onedrive" className="size-4" />
                       {t('fileExplorer.contextMenu.addOneDrive')}
                     </Dropdown.Item>
                   )}
@@ -165,7 +165,9 @@ export default function FileExplorerFAB({
                       isDisabled={isAddHhcLineDisabled}
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
-                      <Cloud size={16} />
+                      <span aria-hidden="true">
+                        <SyncProviderIcon providerType="hhc-line" className="size-5" />
+                      </span>
                       {t('fileExplorer.contextMenu.addHhcLine')}
                     </Dropdown.Item>
                   )}

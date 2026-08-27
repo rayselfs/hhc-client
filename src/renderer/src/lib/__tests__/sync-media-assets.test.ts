@@ -1,13 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 
-const { mockEnsureSourceMediaMetadata, mockGenerateThumbnail, mockSaveThumbnail } = vi.hoisted(
-  () => ({
-    mockEnsureSourceMediaMetadata: vi.fn(),
-    mockGenerateThumbnail: vi.fn(),
-    mockSaveThumbnail: vi.fn()
-  })
-)
+const {
+  mockEnsureSourceMediaMetadata,
+  mockEnqueueVideoPosterJob,
+  mockGenerateThumbnail,
+  mockSaveThumbnail
+} = vi.hoisted(() => ({
+  mockEnsureSourceMediaMetadata: vi.fn(),
+  mockEnqueueVideoPosterJob: vi.fn(),
+  mockGenerateThumbnail: vi.fn(),
+  mockSaveThumbnail: vi.fn()
+}))
+
+vi.mock('../env', () => ({
+  isElectron: vi.fn(() => true),
+  isWeb: vi.fn(() => false)
+}))
+
+vi.mock('../video-poster-jobs', () => ({
+  enqueueVideoPosterJob: mockEnqueueVideoPosterJob
+}))
 
 vi.mock('../media-metadata', () => ({
   ensureSourceMediaMetadata: mockEnsureSourceMediaMetadata
@@ -23,6 +36,14 @@ vi.mock('../thumbnail-db', () => ({
 
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { refreshImportedMediaAssets } from '../local-sync-import'
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
 
 describe('refreshImportedMediaAssets', () => {
   async function createImageItems(count: number): Promise<FileItemRecord[]> {
@@ -66,6 +87,7 @@ describe('refreshImportedMediaAssets', () => {
         })
     )
     mockEnsureSourceMediaMetadata.mockResolvedValue(null)
+    mockEnqueueVideoPosterJob.mockResolvedValue(undefined)
     mockGenerateThumbnail.mockResolvedValue('data:image/jpeg;base64,thumb')
     mockSaveThumbnail.mockResolvedValue(undefined)
   })
@@ -97,6 +119,62 @@ describe('refreshImportedMediaAssets', () => {
     expect(mockGenerateThumbnail).toHaveBeenCalledWith(expect.any(File), 'image/png')
     expect(mockSaveThumbnail).toHaveBeenCalledWith('image-1', 'data:image/jpeg;base64,thumb')
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-source')
+  })
+
+  it('does not commit a thumbnail or ready event after authorization changes during generation', async () => {
+    const [image] = await createImageItems(1)
+    const generated = deferred<string | null>()
+    let authorized = true
+    const canCommit = vi.fn(async () => authorized)
+    const ready = vi.fn()
+    mockGenerateThumbnail.mockReturnValueOnce(generated.promise)
+    window.addEventListener('hhc:thumbnail-ready', ready)
+
+    const refresh = refreshImportedMediaAssets([image], canCommit)
+    await vi.waitFor(() => expect(mockGenerateThumbnail).toHaveBeenCalledOnce())
+    authorized = false
+    generated.resolve('data:image/jpeg;base64,thumb')
+    await refresh
+
+    expect(mockEnsureSourceMediaMetadata).toHaveBeenCalledWith(image.id, image.mimeType, canCommit)
+    expect(mockSaveThumbnail).not.toHaveBeenCalled()
+    expect(ready).not.toHaveBeenCalled()
+    window.removeEventListener('hhc:thumbnail-ready', ready)
+  })
+
+  it('forwards the HHC authorization guard to a deferred video poster', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'video-1',
+      blob: new Blob(['video'], { type: 'video/mp4' }),
+      storage: 'indexed-db',
+      refCount: 1
+    })
+    const canCommit = vi.fn(async () => true)
+
+    await refreshImportedMediaAssets(
+      [
+        {
+          id: 'video-1',
+          parentId: 'folder-1',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'video.mp4',
+          url: 'blob:video-1',
+          size: 5,
+          mimeType: 'video/mp4'
+        }
+      ],
+      canCommit
+    )
+
+    expect(mockEnqueueVideoPosterJob).toHaveBeenCalledWith({
+      sourceBlobId: 'video-1',
+      itemId: 'video-1',
+      canCommit
+    })
   })
 
   it('prepares at most three imported media assets concurrently', async () => {

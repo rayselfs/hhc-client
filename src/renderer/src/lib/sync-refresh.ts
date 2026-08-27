@@ -234,6 +234,24 @@ function isPendingDownload(entry: SyncEntryRecord, forceRetry: boolean): boolean
   return forceRetry || entry.errorKind === 'retryable' || entry.errorKind === 'offline'
 }
 
+function needsOfflinePolicyReconciliation(
+  entry: SyncEntryRecord,
+  offlinePolicy: SyncOfflinePolicy,
+  platform: MediaPlatform
+): boolean {
+  if (
+    offlinePolicy !== 'always-offline' ||
+    entry.kind !== 'file' ||
+    entry.status !== 'remote-only'
+  ) {
+    return false
+  }
+  return (
+    classifyMediaImport({ name: entry.name, mimeType: entry.mimeType }, platform).action ===
+    'accept'
+  )
+}
+
 export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefreshPlan {
   const now = input.now ?? Date.now()
   const forceRetry = input.forceRetry ?? false
@@ -425,7 +443,11 @@ export function buildSyncDeltaRefreshPlan(input: BuildSyncRefreshPlanInput): Syn
   const removedEntryMap = new Map<string, SyncEntryRecord>()
   const ignoredRemoteIds = new Set<string>()
   let disabledCount = 0
-  let needsFullScan = input.existingEntries.some((entry) => isPendingDownload(entry, forceRetry))
+  let needsFullScan = input.existingEntries.some(
+    (entry) =>
+      isPendingDownload(entry, forceRetry) ||
+      needsOfflinePolicyReconciliation(entry, input.offlinePolicy, input.platform)
+  )
 
   function addDeletedEntry(remoteItemId: string): void {
     const deletedRemoteIds = new Set([remoteItemId])

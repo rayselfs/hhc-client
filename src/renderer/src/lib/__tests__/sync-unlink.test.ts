@@ -20,15 +20,21 @@ import {
   putSyncEntry,
   putSyncEntryPreference,
   putSyncTombstone,
-  resetSyncDBForTests
+  resetSyncDBForTests,
+  SYNC_CONNECTION_UNLINK_MARKER
 } from '../sync-db'
 
-const { mockCleanupFileResources } = vi.hoisted(() => ({
-  mockCleanupFileResources: vi.fn()
+const { mockCleanupFileResources, mockListFileResourceCleanupItemIds } = vi.hoisted(() => ({
+  mockCleanupFileResources: vi.fn(),
+  mockListFileResourceCleanupItemIds: vi.fn()
 }))
 
 const { mockCancelSyncDownloadsAndWait } = vi.hoisted(() => ({
   mockCancelSyncDownloadsAndWait: vi.fn()
+}))
+
+const { mockCancelVideoPosterJobsAndWait } = vi.hoisted(() => ({
+  mockCancelVideoPosterJobsAndWait: vi.fn()
 }))
 
 const { mockDeleteSyncEntryPreferences, mockDeleteSyncEntryPreferencesByProviderConnection } =
@@ -38,11 +44,17 @@ const { mockDeleteSyncEntryPreferences, mockDeleteSyncEntryPreferencesByProvider
   }))
 
 vi.mock('../file-resource-cleanup', () => ({
-  cleanupFileResources: mockCleanupFileResources
+  cleanupFileResources: mockCleanupFileResources,
+  listFileResourceCleanupItemIds: mockListFileResourceCleanupItemIds
 }))
 
 vi.mock('../sync-download-queue', () => ({
   cancelSyncDownloadsAndWait: mockCancelSyncDownloadsAndWait
+}))
+
+vi.mock('../video-poster-jobs', () => ({
+  cancelVideoPosterJobsAndWait: mockCancelVideoPosterJobsAndWait,
+  fenceVideoPosterScope: vi.fn(() => vi.fn())
 }))
 
 vi.mock('../sync-db', async () => {
@@ -68,7 +80,9 @@ describe('sync unlink', () => {
       folderIds: ['folder-1'],
       itemIds: ['item-1']
     })
+    mockListFileResourceCleanupItemIds.mockImplementation(async (request) => request.itemIds ?? [])
     mockCancelSyncDownloadsAndWait.mockResolvedValue(0)
+    mockCancelVideoPosterJobsAndWait.mockResolvedValue(0)
   })
 
   it('waits for active downloads before cleaning a connection', async () => {
@@ -125,12 +139,29 @@ describe('sync unlink', () => {
       remoteItemId: 'remote-file-1',
       offlinePolicyOverride: 'always-offline'
     })
+    await (
+      await openFileExplorerDB()
+    ).put('folder-records', {
+      id: 'folder-1',
+      name: 'Media',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'connection-1',
+        providerType: 'onedrive',
+        remoteFolderId: 'remote-folder-1',
+        offlinePolicy: 'always-offline'
+      }
+    })
+    mockListFileResourceCleanupItemIds.mockResolvedValueOnce(['item-1'])
 
     const result = await unlinkSyncConnectionFromApp('connection-1')
 
     expect(mockCleanupFileResources).toHaveBeenCalledWith({
       folderIds: ['folder-1'],
-      itemIds: ['item-1']
+      itemIds: []
     })
     expect(result).toEqual({
       folderIds: ['folder-1'],
@@ -178,18 +209,53 @@ describe('sync unlink', () => {
 
     await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
     await expect(listSyncEntriesByProviderConnection('connection-1')).resolves.toHaveLength(1)
-    await expect(listSyncTombstones()).resolves.toEqual([
-      expect.objectContaining({
-        providerConnectionId: 'connection-1',
-        remoteItemId: 'remote-file-1',
-        reason: 'unlink'
-      })
-    ])
+    await expect(listSyncTombstones()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          providerConnectionId: 'connection-1',
+          remoteItemId: 'remote-file-1',
+          reason: 'unlink'
+        }),
+        expect.objectContaining({
+          providerConnectionId: 'connection-1',
+          remoteItemId: SYNC_CONNECTION_UNLINK_MARKER,
+          reason: 'unlink'
+        })
+      ])
+    )
 
     await unlinkSyncConnectionFromApp('connection-1')
 
     await expect(getProviderConnection('connection-1')).resolves.toBeUndefined()
     await expect(listSyncTombstones()).resolves.toEqual([])
+  })
+
+  it('includes linked orphan roots in connection cleanup when their sync entry is missing', async () => {
+    await (
+      await openFileExplorerDB()
+    ).put('folder-records', {
+      id: 'orphan-root',
+      name: 'Orphan',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'connection-1',
+        providerType: 'local-fs',
+        remoteFolderId: '.',
+        offlinePolicy: 'always-offline'
+      }
+    })
+    mockListFileResourceCleanupItemIds.mockResolvedValueOnce(['orphan-item'])
+
+    await unlinkSyncConnectionFromApp('connection-1')
+
+    expect(mockListFileResourceCleanupItemIds).toHaveBeenCalledWith({
+      folderIds: ['orphan-root'],
+      itemIds: []
+    })
+    expect(mockCancelVideoPosterJobsAndWait).toHaveBeenCalledWith(['orphan-item'])
   })
 
   it('disconnects one OneDrive mounted folder without removing the account connection', async () => {
@@ -276,8 +342,8 @@ describe('sync unlink', () => {
     })
 
     expect(mockCleanupFileResources).toHaveBeenCalledWith({
-      folderIds: expect.arrayContaining(['folder-a', 'folder-child-a']),
-      itemIds: ['item-a']
+      folderIds: ['folder-a'],
+      itemIds: []
     })
     expect(mockCancelSyncDownloadsAndWait).toHaveBeenCalledWith({
       providerConnectionId: 'connection-1',
@@ -294,6 +360,183 @@ describe('sync unlink', () => {
         remoteItemId: 'root-b'
       })
     ])
+  })
+
+  it('fences and waits for root poster jobs before resource cleanup', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-a',
+      remoteItemId: 'collection-a',
+      parentRemoteItemId: null,
+      kind: 'folder',
+      name: 'Collection A',
+      folderId: 'folder-a',
+      status: 'remote-only'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-a',
+      remoteItemId: 'video-a',
+      parentRemoteItemId: 'collection-a',
+      kind: 'file',
+      name: 'video.mp4',
+      itemId: 'item-a',
+      blobId: 'blob-a',
+      mimeType: 'video/mp4',
+      status: 'available-offline'
+    })
+    let releasePosters = (): void => undefined
+    mockListFileResourceCleanupItemIds.mockResolvedValueOnce(['item-a'])
+    mockCancelVideoPosterJobsAndWait.mockImplementationOnce(
+      () =>
+        new Promise<number>((resolve) => {
+          releasePosters = () => resolve(1)
+        })
+    )
+    const unlink = unlinkSyncRootFolderFromApp({
+      id: 'folder-a',
+      name: 'Collection A',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'hhc-line:user-a',
+        remoteFolderId: 'collection-a',
+        providerType: 'hhc-line'
+      }
+    })
+
+    await vi.waitFor(() =>
+      expect(mockCancelVideoPosterJobsAndWait).toHaveBeenCalledWith(['item-a'])
+    )
+    await expect(listSyncTombstones()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ remoteItemId: 'collection-a', reason: 'unlink' })
+      ])
+    )
+    expect(mockCleanupFileResources).not.toHaveBeenCalled()
+
+    releasePosters()
+    await unlink
+    expect(mockCleanupFileResources).toHaveBeenCalledOnce()
+  })
+
+  it('waits for orphan descendant posters in the authoritative cleanup closure', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-a',
+      parentRemoteItemId: null,
+      kind: 'folder',
+      name: 'A',
+      folderId: 'folder-a',
+      status: 'remote-only'
+    })
+    mockListFileResourceCleanupItemIds.mockResolvedValueOnce(['orphan-item'])
+
+    await unlinkSyncRootFolderFromApp({
+      id: 'folder-a',
+      name: 'A',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'connection-1',
+        remoteFolderId: 'root-a',
+        providerType: 'onedrive'
+      }
+    })
+
+    expect(mockListFileResourceCleanupItemIds).toHaveBeenCalledWith({
+      folderIds: ['folder-a'],
+      itemIds: []
+    })
+    expect(mockCancelVideoPosterJobsAndWait).toHaveBeenCalledWith(['orphan-item'])
+  })
+
+  it('does not trust cross-root local references from root sync entries', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-a',
+      parentRemoteItemId: null,
+      kind: 'folder',
+      name: 'A',
+      folderId: 'folder-b',
+      status: 'remote-only'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'file-a',
+      parentRemoteItemId: 'root-a',
+      kind: 'file',
+      name: 'A.mp4',
+      itemId: 'item-b',
+      status: 'available-offline'
+    })
+
+    await unlinkSyncRootFolderFromApp({
+      id: 'folder-a',
+      name: 'A',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'connection-1',
+        remoteFolderId: 'root-a',
+        providerType: 'onedrive'
+      }
+    })
+
+    expect(mockListFileResourceCleanupItemIds).toHaveBeenCalledWith({
+      folderIds: ['folder-a'],
+      itemIds: []
+    })
+    expect(mockCleanupFileResources).toHaveBeenCalledWith({
+      folderIds: ['folder-a'],
+      itemIds: []
+    })
+  })
+
+  it('persists an explicit HHC root fence when the canonical root entry is missing', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-a',
+      remoteItemId: 'video-a',
+      parentRemoteItemId: 'collection-a',
+      kind: 'file',
+      name: 'video.mp4',
+      itemId: 'item-a',
+      status: 'available-offline'
+    })
+    mockCancelVideoPosterJobsAndWait.mockImplementationOnce(async () => {
+      await expect(listSyncTombstones()).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            providerConnectionId: 'hhc-line:user-a',
+            remoteItemId: 'collection-a',
+            folderId: 'folder-a',
+            reason: 'unlink'
+          })
+        ])
+      )
+      return 0
+    })
+
+    await unlinkSyncRootFolderFromApp({
+      id: 'folder-a',
+      name: 'A',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'hhc-line:user-a',
+        remoteFolderId: 'collection-a',
+        providerType: 'hhc-line'
+      }
+    })
+
+    expect(mockCancelVideoPosterJobsAndWait).toHaveBeenCalled()
+    await expect(listSyncTombstones()).resolves.toEqual([])
   })
 
   it('keeps root cleanup fences when metadata deletion fails and completes on retry', async () => {
@@ -335,13 +578,17 @@ describe('sync unlink', () => {
 
     await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
     await expect(getSyncEntryByRemoteItem('connection-1', 'root-a')).resolves.toBeDefined()
-    await expect(listSyncTombstones()).resolves.toEqual([
-      expect.objectContaining({
-        providerConnectionId: 'connection-1',
-        remoteItemId: 'root-a',
-        reason: 'unlink'
-      })
-    ])
+    await expect(listSyncTombstones()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          providerConnectionId: 'connection-1',
+          remoteItemId: 'root-a',
+          folderId: 'folder-a',
+          unlinkScope: 'root',
+          reason: 'unlink'
+        })
+      ])
+    )
 
     await unlinkSyncRootFolderFromApp(rootFolder)
 
@@ -453,6 +700,28 @@ describe('sync unlink', () => {
         reason: 'remote-delete'
       })
     ])
+    const db = await openFileExplorerDB()
+    await Promise.all(
+      [
+        ['folder-a-1', 'collection-a-1'],
+        ['folder-a-2', 'collection-a-2']
+      ].map(([id, remoteFolderId]) =>
+        db.put('folder-records', {
+          id,
+          name: id,
+          parentId: 'file-root',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          syncLink: {
+            providerConnectionId: 'hhc-line:user-a',
+            providerType: 'hhc-line',
+            remoteFolderId,
+            offlinePolicy: 'always-offline'
+          }
+        })
+      )
+    )
 
     await unlinkHhcLineAccountFromApp('user-a')
 
@@ -597,10 +866,27 @@ describe('sync unlink', () => {
   })
 
   it('recovers pending tombstone cleanup after restart', async () => {
+    await (
+      await openFileExplorerDB()
+    ).put('folder-records', {
+      id: 'folder-1',
+      name: 'Recovered',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'connection-1',
+        providerType: 'onedrive',
+        remoteFolderId: 'remote-folder-1',
+        offlinePolicy: 'always-offline'
+      }
+    })
     await putSyncTombstone({
       providerConnectionId: 'connection-1',
       remoteItemId: 'remote-folder-1',
       folderId: 'folder-1',
+      unlinkScope: 'root',
       reason: 'unlink'
     })
     await putSyncTombstone({
@@ -623,6 +909,52 @@ describe('sync unlink', () => {
       tombstoneCount: 2
     })
     await expect(listSyncTombstones()).resolves.toEqual([])
+    expect(mockCancelVideoPosterJobsAndWait).toHaveBeenCalledWith(['item-1'])
+  })
+
+  it('ignores a raw descendant marker that points at a sibling root during restart', async () => {
+    const db = await openFileExplorerDB()
+    await Promise.all(
+      [
+        ['folder-a', 'remote-a'],
+        ['folder-b', 'remote-b']
+      ].map(([id, remoteFolderId]) =>
+        db.put('folder-records', {
+          id,
+          name: id,
+          parentId: 'file-root',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          syncLink: {
+            providerConnectionId: 'connection-1',
+            providerType: 'onedrive',
+            remoteFolderId,
+            offlinePolicy: 'always-offline'
+          }
+        })
+      )
+    )
+    await putSyncTombstone({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-a',
+      folderId: 'folder-a',
+      unlinkScope: 'root',
+      reason: 'unlink'
+    })
+    await putSyncTombstone({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-b',
+      folderId: 'folder-b',
+      reason: 'unlink'
+    })
+
+    await recoverPendingSyncResourceCleanups()
+
+    expect(mockCleanupFileResources).toHaveBeenCalledWith({
+      folderIds: ['folder-a'],
+      itemIds: []
+    })
   })
 
   it('keeps tombstones when restart cleanup fails so the next launch can retry', async () => {

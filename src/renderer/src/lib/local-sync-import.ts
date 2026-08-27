@@ -29,6 +29,7 @@ import {
 } from '@renderer/lib/sync-db'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail } from '@renderer/lib/thumbnail-db'
+import type { SyncDownloadCommitGuard } from '@renderer/lib/sync-provider'
 import { applySyncRefreshPlan, buildSyncRefreshPlan, type SyncRefreshPlan } from './sync-refresh'
 
 interface SyncFilePolicy {
@@ -334,7 +335,10 @@ function releaseImportedMediaPreparationSlot(): void {
   else activeImportedMediaPreparations -= 1
 }
 
-export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promise<void> {
+export async function refreshImportedMediaAssets(
+  items: FileItemRecord[],
+  guard?: SyncDownloadCommitGuard
+): Promise<void> {
   await Promise.all(
     items.map(async (item) => {
       await acquireImportedMediaPreparationSlot()
@@ -343,7 +347,7 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
         const blobId = getBlobId(item)
         const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
         if (!capability) return
-        await ensureSourceMediaMetadata(blobId, item.mimeType).catch((error) => {
+        await ensureSourceMediaMetadata(blobId, item.mimeType, guard).catch((error) => {
           console.warn('[sync] Failed to store synced media metadata', {
             itemId: item.id,
             error
@@ -352,7 +356,7 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
         const existingCover = await getDerivedAsset(blobId, 'cover-thumbnail')
         if (existingCover?.status === 'ready') return
         if (capability.kind === 'video' && !isWeb()) {
-          await enqueueVideoPosterJob({ sourceBlobId: blobId, itemId: item.id })
+          await enqueueVideoPosterJob({ sourceBlobId: blobId, itemId: item.id, canCommit: guard })
           return
         }
         if (capability.thumbnail === 'none') return
@@ -366,7 +370,9 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
           const file = new File([await response.blob()], item.name, { type: item.mimeType })
           const thumbnail = await generateThumbnail(file, item.mimeType)
           if (!thumbnail) return
+          if ((await guard?.()) === false) return
           await saveThumbnail(blobId, thumbnail)
+          if ((await guard?.()) === false) return
           window.dispatchEvent(
             new CustomEvent('hhc:thumbnail-ready', {
               detail: { itemId: item.id, dataUrl: thumbnail }

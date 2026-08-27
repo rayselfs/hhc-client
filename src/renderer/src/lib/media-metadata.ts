@@ -7,6 +7,7 @@ import {
 } from './file-explorer-db'
 import { loadPdfjsLib } from './pdfjs-loader'
 import { getDerivedAsset, putDerivedAsset, type DerivedAssetMetadata } from './media-work-db'
+import type { SyncDownloadCommitGuard } from './sync-provider'
 
 export const MEDIA_METADATA_VARIANT = 'source'
 const pendingSourceMediaMetadata = new Map<string, Promise<DerivedAssetMetadata | null>>()
@@ -103,7 +104,8 @@ async function probeNativeVideo(blobId: string): Promise<DerivedAssetMetadata | 
 
 async function loadSourceMediaMetadata(
   blobId: string,
-  mimeType: string
+  mimeType: string,
+  guard?: SyncDownloadCommitGuard
 ): Promise<DerivedAssetMetadata | null> {
   const existing = await getSourceMediaMetadata(blobId)
   if (existing) return existing
@@ -133,17 +135,19 @@ async function loadSourceMediaMetadata(
     })
   }
 
-  return metadata ? putSourceMediaMetadata(blobId, metadata) : null
+  if (!metadata || (await guard?.()) === false) return null
+  return putSourceMediaMetadata(blobId, metadata)
 }
 
 export function ensureSourceMediaMetadata(
   blobId: string,
-  mimeType: string
+  mimeType: string,
+  guard?: SyncDownloadCommitGuard
 ): Promise<DerivedAssetMetadata | null> {
   const pending = pendingSourceMediaMetadata.get(blobId)
   if (pending) return pending
 
-  const task = loadSourceMediaMetadata(blobId, mimeType).finally(() => {
+  const task = loadSourceMediaMetadata(blobId, mimeType, guard).finally(() => {
     if (pendingSourceMediaMetadata.get(blobId) === task) {
       pendingSourceMediaMetadata.delete(blobId)
     }

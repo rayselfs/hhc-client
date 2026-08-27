@@ -88,8 +88,7 @@ export function deriveSyncFolderHealth(
     (entry) => entry.status === 'failed' || entry.status === 'insufficient-storage'
   ).length
   const warningCount = fileEntries.filter(
-    (entry) =>
-      entry.status === 'remote-only' || entry.status === 'outdated' || isRetryableFailure(entry)
+    (entry) => entry.status === 'outdated' || isRetryableFailure(entry)
   ).length
   const nextRetryAt = rootEntries
     .map((entry) => entry.nextRetryAt)

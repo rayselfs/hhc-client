@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FolderRecord, FileItemRecord } from '@shared/types/folder'
+import type { FolderRecord, FileItemRecord, SyncOfflinePolicy } from '@shared/types/folder'
 import type { SyncEntryRecord } from '../sync-db'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { getSyncEntryByRemoteItem, putSyncEntry, resetSyncDBForTests } from '../sync-db'
@@ -622,6 +622,98 @@ describe('buildSyncRefreshPlan', () => {
     expect(plan.needsFullScan).toBe(true)
     expect(plan.removedItemIds).toEqual([])
   })
+
+  it('requests a full scan to reconcile remote-only files after switching to always-offline', () => {
+    const onDemandRoot = {
+      ...rootFolder,
+      syncLink: { ...rootFolder.syncLink!, offlinePolicy: 'on-demand' as const }
+    }
+    const remoteOnlyEntry = { ...existingEntry, status: 'remote-only' as const, blobId: undefined }
+
+    const delta = buildSyncDeltaRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder: onDemandRoot,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'web',
+      existingFolders: [onDemandRoot],
+      existingItems: [existingItem],
+      existingEntries: [remoteOnlyEntry],
+      remoteItems: []
+    })
+
+    expect(delta.needsFullScan).toBe(true)
+
+    const full = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder: onDemandRoot,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'web',
+      existingFolders: [onDemandRoot],
+      existingItems: [existingItem],
+      existingEntries: [
+        remoteOnlyEntry,
+        {
+          ...remoteOnlyEntry,
+          id: 'entry-unsupported',
+          remoteItemId: 'unsupported-file',
+          name: 'legacy.avi',
+          itemId: '22222222-2222-4222-8222-222222222222',
+          mimeType: 'video/x-msvideo'
+        }
+      ],
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: '.',
+          kind: 'file',
+          name: 'old.mp4',
+          mimeType: 'video/mp4',
+          size: 100,
+          etag: 'before'
+        },
+        {
+          remoteItemId: 'unsupported-file',
+          parentRemoteItemId: '.',
+          kind: 'file',
+          name: 'legacy.avi',
+          mimeType: 'video/x-msvideo',
+          size: 100,
+          etag: 'before'
+        }
+      ]
+    })
+
+    expect(full.fileTransfers).toEqual([
+      { itemId: existingItem.id, remoteItemId: 'old-file', mimeType: 'video/mp4' }
+    ])
+    expect(
+      full.syncEntries.find((entry) => entry.remoteItemId === 'unsupported-file')
+    ).toMatchObject({ status: 'remote-only' })
+  })
+
+  it.each(['on-demand', 'online-only'] satisfies SyncOfflinePolicy[])(
+    'does not force a full scan for remote-only files under %s policy',
+    (offlinePolicy) => {
+      const plan = buildSyncDeltaRefreshPlan({
+        providerConnectionId: 'connection-1',
+        providerType: 'local-fs',
+        rootFolder,
+        rootRemoteFolderId: '.',
+        offlinePolicy,
+        platform: 'electron',
+        existingFolders: [rootFolder],
+        existingItems: [existingItem],
+        existingEntries: [{ ...existingEntry, status: 'remote-only' as const, blobId: undefined }],
+        remoteItems: []
+      })
+
+      expect(plan.needsFullScan).toBe(false)
+    }
+  )
 
   it('requests full scan fallback when retryable failures are waiting for retry', () => {
     const plan = buildSyncDeltaRefreshPlan({

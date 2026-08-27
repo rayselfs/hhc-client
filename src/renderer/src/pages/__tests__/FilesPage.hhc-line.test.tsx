@@ -103,11 +103,14 @@ vi.mock('@renderer/components/Control/FileExplorer/CloudFolderPickerDialog', () 
     provider,
     isOpen
   }: {
-    provider: { providerType: string; displayName: string }
+    provider: { providerType: string; displayName: string; icon: React.ReactNode }
     isOpen: boolean
   }) =>
     provider.providerType === 'hhc-line' && isOpen ? (
-      <div>{provider.displayName} picker open</div>
+      <div>
+        {provider.icon}
+        {provider.displayName} picker open
+      </div>
     ) : null
 }))
 vi.mock('@renderer/components/Control/Folder/FolderModal', () => ({ FolderModal: () => null }))
@@ -221,5 +224,6 @@ describe('FilesPage HHC LINE role resolution', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Add LINE media folder' }))
     expect(screen.getByText('LINE media picker open')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'LINE' })).toBeInTheDocument()
   })
 })

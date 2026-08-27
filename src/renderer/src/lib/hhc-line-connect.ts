@@ -1,6 +1,7 @@
-import type { FileItemRecord, FolderRecord, SyncOfflinePolicy } from '@shared/types/folder'
+import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { HhcSession } from '@shared/hhc-auth'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { resolveUniqueName } from './file-naming'
 import { createHhcAssetApi } from './hhc-asset-api'
 import { HhcLineReadonlyProvider } from './hhc-line-provider'
@@ -36,6 +37,7 @@ import {
 } from './sync-refresh'
 import { unlinkSyncRootFolderFromApp } from './sync-unlink'
 import { handleHhcLineAccessError, isHhcLineRootAuthorized } from './hhc-line-access'
+import { dispatchPlannedSyncDownloads } from './sync-transfer-dispatch'
 
 const importsInFlight = new Map<string, Promise<CloudImportResult>>()
 const importQueueTails = new Map<string, Promise<void>>()
@@ -244,7 +246,7 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
         error,
         { accountUserId: session.userId, authGeneration }
       ),
-    onDownloaded: () => refreshImportedMediaAssets([item])
+    onDownloaded: (_result, canCommit) => refreshImportedMediaAssets([item], canCommit)
   })
   assertCurrentAccount(auth, session.userId)
   if (!result) {
@@ -362,6 +364,8 @@ async function runImport(
   connectionId: string,
   collection: CloudRemoteFolder
 ): Promise<CloudImportResult> {
+  const authGeneration = auth.getAuthGeneration?.() ?? 0
+  const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const store = useFileExplorerStore.getState()
   await store.initialize()
   assertCurrentAccount(auth, expectedUserId)
@@ -395,25 +399,26 @@ async function runImport(
   const current = useFileExplorerStore.getState()
   const roots = current.getChildFolders(FILE_EXPLORER_ROOT_ID)
   const now = Date.now()
-  const offlinePolicy: SyncOfflinePolicy = isElectron() ? 'on-demand' : 'online-only'
-  const root: FolderRecord = existing ?? {
-    id: rootFolderId(connectionId, collection.remoteItemId),
-    name: resolveUniqueName(
-      collection.name,
-      roots.map((folder) => folder.name)
-    ),
-    parentId: FILE_EXPLORER_ROOT_ID,
-    sortIndex: roots.length,
-    createdAt: now,
-    expiresAt: null,
-    syncLink: {
-      providerConnectionId: connectionId,
-      providerType: 'hhc-line',
-      remoteFolderId: collection.remoteItemId,
-      offlinePolicy,
-      status: 'active'
-    }
-  }
+  const root: FolderRecord = existing
+    ? { ...existing, syncLink: { ...existing.syncLink!, offlinePolicy } }
+    : {
+        id: rootFolderId(connectionId, collection.remoteItemId),
+        name: resolveUniqueName(
+          collection.name,
+          roots.map((folder) => folder.name)
+        ),
+        parentId: FILE_EXPLORER_ROOT_ID,
+        sortIndex: roots.length,
+        createdAt: now,
+        expiresAt: null,
+        syncLink: {
+          providerConnectionId: connectionId,
+          providerType: 'hhc-line',
+          remoteFolderId: collection.remoteItemId,
+          offlinePolicy,
+          status: 'active'
+        }
+      }
   const db = await openFileExplorerDB()
   const [entries, fileBlobs] = await Promise.all([
     listSyncEntriesByProviderConnection(connectionId),
@@ -467,6 +472,32 @@ async function runImport(
     throw error
   }
   publishRootFolder(root)
+  dispatchPlannedSyncDownloads({
+    provider,
+    providerConnectionId: connectionId,
+    rootRemoteFolderId: collection.remoteItemId,
+    offlinePolicy,
+    plan,
+    remoteItems: scan.remoteItems,
+    existingEntries: collectionEntries(entries, collection.remoteItemId),
+    canCommit: () =>
+      (auth.getAuthGeneration?.() ?? 0) === authGeneration &&
+      auth.getSession()?.userId === expectedUserId &&
+      isHhcLineRootAuthorized(auth, connectionId, collection.remoteItemId),
+    onFailed: (error, transfer) =>
+      handleHhcLineAccessError(
+        auth,
+        {
+          kind: 'root',
+          providerConnectionId: connectionId,
+          rootRemoteFolderId: collection.remoteItemId,
+          remoteItemId: transfer.remoteItemId
+        },
+        error,
+        { accountUserId: expectedUserId, authGeneration }
+      ),
+    onDownloaded: (item, canCommit) => refreshImportedMediaAssets([item], canCommit)
+  })
 
   return {
     connectionId,
@@ -508,6 +539,8 @@ async function runHhcLineFolderRefresh(
   rootFolderIdValue: string,
   options: { forceRetry?: boolean }
 ): Promise<CloudRefreshSummary> {
+  const authGeneration = auth.getAuthGeneration?.() ?? 0
+  const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const session = requireSession(auth)
   const connectionId = createHhcLineProviderConnectionId(session.userId)
   const store = useFileExplorerStore.getState()
@@ -520,6 +553,10 @@ async function runHhcLineFolderRefresh(
   ) {
     throw new Error('HHC LINE root folder not found')
   }
+  const refreshedRoot =
+    root.syncLink.offlinePolicy === offlinePolicy
+      ? root
+      : { ...root, syncLink: { ...root.syncLink, offlinePolicy } }
 
   const provider = await createProvider(auth, session.userId)
   assertCurrentAccount(auth, session.userId)
@@ -544,9 +581,9 @@ async function runHhcLineFolderRefresh(
   let input = {
     providerConnectionId: connectionId,
     providerType: 'hhc-line' as const,
-    rootFolder: root,
+    rootFolder: refreshedRoot,
     rootRemoteFolderId: root.syncLink.remoteFolderId,
-    offlinePolicy: root.syncLink.offlinePolicy ?? (isElectron() ? 'on-demand' : 'online-only'),
+    offlinePolicy,
     platform: isElectron() ? ('electron' as const) : ('web' as const),
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
@@ -584,6 +621,43 @@ async function runHhcLineFolderRefresh(
     await unlinkSyncRootFolderFromApp(root).catch(() => undefined)
     throw error
   }
+  if (refreshedRoot !== root) {
+    try {
+      assertCurrentAccount(auth, session.userId)
+      await db.put('folder-records', refreshedRoot)
+      assertCurrentAccount(auth, session.userId)
+    } catch (error) {
+      await unlinkSyncRootFolderFromApp(root).catch(() => undefined)
+      throw error
+    }
+    publishRootFolder(refreshedRoot)
+  }
+  dispatchPlannedSyncDownloads({
+    provider,
+    providerConnectionId: connectionId,
+    rootRemoteFolderId: root.syncLink.remoteFolderId,
+    offlinePolicy,
+    plan,
+    remoteItems: scan.remoteItems,
+    existingEntries: input.existingEntries,
+    canCommit: () =>
+      (auth.getAuthGeneration?.() ?? 0) === authGeneration &&
+      auth.getSession()?.userId === session.userId &&
+      isHhcLineRootAuthorized(auth, connectionId, root.syncLink!.remoteFolderId),
+    onFailed: (error, transfer) =>
+      handleHhcLineAccessError(
+        auth,
+        {
+          kind: 'root',
+          providerConnectionId: connectionId,
+          rootRemoteFolderId: root.syncLink!.remoteFolderId,
+          remoteItemId: transfer.remoteItemId
+        },
+        error,
+        { accountUserId: session.userId, authGeneration }
+      ),
+    onDownloaded: (item, canCommit) => refreshImportedMediaAssets([item], canCommit)
+  })
 
   return {
     connectionId,

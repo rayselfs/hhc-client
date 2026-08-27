@@ -812,6 +812,7 @@
         "lanRemote": "LAN 遙控"
       },
       "defaultOfflinePolicy": "離線策略",
+      "defaultOfflinePolicyDesc": "套用至 HHC LINE 與 OneDrive 資料夾。",
       "offlinePolicies": {
         "online-only": "僅線上",
         "on-demand": "需要時下載",

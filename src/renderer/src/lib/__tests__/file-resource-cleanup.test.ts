@@ -28,7 +28,11 @@ vi.mock('@renderer/lib/media-work-db', () => ({
   listMediaJobs: vi.fn(async () => [])
 }))
 
-import { cleanupFileResources, purgeExpiredFileTrash } from '../file-resource-cleanup'
+import {
+  cleanupFileResources,
+  listFileResourceCleanupItemIds,
+  purgeExpiredFileTrash
+} from '../file-resource-cleanup'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { lockMediaResources, resetMediaResourceLocksForTests } from '../media-resource-locks'
 import {
@@ -59,6 +63,12 @@ beforeEach(async () => {
 })
 
 describe('file resource cleanup', () => {
+  it('keeps requested missing item IDs in the poster cancellation closure', async () => {
+    await expect(
+      listFileResourceCleanupItemIds({ itemIds: ['already-removed-item'] })
+    ).resolves.toEqual(['already-removed-item'])
+  })
+
   it('recursively deletes unloaded descendants and their resources from the database', async () => {
     const db = await openFileExplorerDB()
     await db.put('folder-records', {
@@ -95,6 +105,9 @@ describe('file resource cleanup', () => {
       refCount: 1
     })
 
+    await expect(listFileResourceCleanupItemIds({ folderIds: ['deep-root'] })).resolves.toEqual([
+      'deep-item'
+    ])
     const result = await cleanupFileResources({ folderIds: ['deep-root'] })
 
     expect(result.folderIds).toEqual(expect.arrayContaining(['deep-root', 'deep-child']))

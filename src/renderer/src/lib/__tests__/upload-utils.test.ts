@@ -32,6 +32,7 @@ vi.mock('@renderer/lib/env', () => ({
 }))
 
 vi.mock('@renderer/lib/media-job-queue', () => ({
+  MediaJobBlockedError: class MediaJobBlockedError extends Error {},
   mediaJobQueue: {
     registerExecutor: vi.fn(),
     enqueue: vi.fn().mockResolvedValue({ id: 'job-id' })

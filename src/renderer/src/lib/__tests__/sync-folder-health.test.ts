@@ -93,7 +93,7 @@ describe('deriveSyncFolderHealth', () => {
     expect(health).toMatchObject({ status: 'syncing', downloadingCount: 1, queuedCount: 1 })
   })
 
-  it('returns warning for remote-only, outdated, or retryable failures', () => {
+  it('returns warning for retryable failures', () => {
     const health = deriveSyncFolderHealth(
       [
         entry({ remoteItemId: 'root-remote', parentRemoteItemId: null, folderId: 'sync-root' }),
@@ -112,7 +112,41 @@ describe('deriveSyncFolderHealth', () => {
     expect(health).toMatchObject({ status: 'warning', failedCount: 1, nextRetryAt: 10_000 })
   })
 
-  it('returns error for fatal failures or insufficient storage', () => {
+  it('returns warning for outdated files', () => {
+    const health = deriveSyncFolderHealth(
+      [
+        entry({ remoteItemId: 'root-remote', parentRemoteItemId: null, folderId: 'sync-root' }),
+        entry({
+          remoteItemId: 'file-1',
+          parentRemoteItemId: 'root-remote',
+          itemId: 'file-1',
+          status: 'outdated'
+        })
+      ],
+      rootFolder()
+    )
+
+    expect(health).toMatchObject({ status: 'warning', warningCount: 1 })
+  })
+
+  it('returns ok when all descendants are remote-only', () => {
+    const health = deriveSyncFolderHealth(
+      [
+        entry({ remoteItemId: 'root-remote', parentRemoteItemId: null, folderId: 'sync-root' }),
+        entry({
+          remoteItemId: 'file-1',
+          parentRemoteItemId: 'root-remote',
+          itemId: 'file-1',
+          status: 'remote-only'
+        })
+      ],
+      rootFolder()
+    )
+
+    expect(health).toMatchObject({ status: 'ok', warningCount: 0 })
+  })
+
+  it('returns error for fatal failures', () => {
     const health = deriveSyncFolderHealth(
       [
         entry({ remoteItemId: 'root-remote', parentRemoteItemId: null, folderId: 'sync-root' }),
@@ -122,6 +156,23 @@ describe('deriveSyncFolderHealth', () => {
           itemId: 'file-1',
           status: 'failed',
           errorKind: 'fatal'
+        })
+      ],
+      rootFolder()
+    )
+
+    expect(health).toMatchObject({ status: 'error', failedCount: 1 })
+  })
+
+  it('returns error for insufficient storage', () => {
+    const health = deriveSyncFolderHealth(
+      [
+        entry({ remoteItemId: 'root-remote', parentRemoteItemId: null, folderId: 'sync-root' }),
+        entry({
+          remoteItemId: 'file-1',
+          parentRemoteItemId: 'root-remote',
+          itemId: 'file-1',
+          status: 'insufficient-storage'
         })
       ],
       rootFolder()

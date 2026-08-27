@@ -192,6 +192,34 @@ describe('MediaJobQueue', () => {
     await expect(getMediaJob(job.id)).resolves.toBeUndefined()
   })
 
+  it('waits for cancelled active work to settle', async () => {
+    const queue = new MediaJobQueue()
+    let release = (): void => undefined
+    queue.registerExecutor(
+      'video-poster',
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve
+        })
+    )
+
+    const job = await queue.enqueue({ type: 'video-poster', itemId: 'item-1' })
+    await waitForJob(job.id, 'running')
+    let settled = false
+    const cancellation = queue.cancelAndWait(
+      (candidate) => candidate.type === 'video-poster' && candidate.itemId === 'item-1'
+    )
+    void cancellation.then(() => {
+      settled = true
+    })
+
+    await waitForJob(job.id, 'cancelled')
+    expect(settled).toBe(false)
+    release()
+    await cancellation
+    expect(settled).toBe(true)
+  })
+
   it('keeps paused active work resumable after aborting its executor', async () => {
     const queue = new MediaJobQueue()
     queue.registerExecutor(

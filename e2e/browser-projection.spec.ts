@@ -393,6 +393,13 @@ test('restores the HHC account session without storing the access token', async 
   expect(JSON.stringify(storageState)).not.toContain(accessToken)
   expect(await page.evaluate(() => Object.values(sessionStorage))).not.toContain(accessToken)
 
+  await page.getByRole('button', { name: 'Account menu for Ada Lovelace' }).click()
+  await page.getByRole('menuitem', { name: 'Preferences' }).click()
+  await page.getByTestId('category-media').click()
+  await page.getByLabel('Offline Policy').click()
+  await page.getByRole('option', { name: 'Online only' }).click()
+  await page.locator('[data-slot="modal-backdrop"]').click({ position: { x: 5, y: 5 } })
+
   await page.getByRole('link', { name: /files/i }).click()
   await page.getByLabel('New').click()
   await page.getByRole('menuitem', { name: 'Add LINE media folder' }).click()
@@ -483,6 +490,7 @@ test('restores the HHC account session without storing the access token', async 
     return count
   })
   expect(persistedFileBlobs).toBe(0)
+  await context.unrouteAll({ behavior: 'ignoreErrors' })
 })
 
 test('uses full-window Media controls and closes from the control workspace', async ({

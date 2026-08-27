@@ -6,7 +6,7 @@ const mockRetry = vi.fn()
 const mockInitialize = vi.fn()
 const mockFolderInitialize = vi.fn()
 const mockFolderCleanupExpired = vi.fn().mockResolvedValue(undefined)
-const mockFileExplorerInitialize = vi.fn()
+const mockFileExplorerInitialize = vi.fn().mockResolvedValue(undefined)
 const mockFileExplorerCleanupExpired = vi.fn().mockResolvedValue(undefined)
 const mockInitializeSearchIndexes = vi.fn()
 const mockUnsubscribeBible = vi.fn()
@@ -136,18 +136,62 @@ describe('startEarlyInit', () => {
     const { startEarlyInit } = await import('../app-init')
 
     startEarlyInit()
-    await Promise.resolve()
+    await vi.waitFor(() => expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 0))
+  })
 
-    expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 0)
+  it('replays sync cleanup before recovering stale jobs', async () => {
+    let finishCleanup = (): void => undefined
+    mockRecoverPendingSyncResourceCleanups.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishCleanup = () => resolve({ folderIds: [], itemIds: [], tombstoneCount: 1 })
+      })
+    )
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+    expect(mockRecoverStaleJobs).not.toHaveBeenCalled()
+
+    finishCleanup()
+    await vi.waitFor(() => expect(mockRecoverStaleJobs).toHaveBeenCalledOnce())
+  })
+
+  it('waits for File Explorer hydration before cleanup replay', async () => {
+    let finishHydration = (): void => undefined
+    mockFileExplorerInitialize.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishHydration = resolve
+      })
+    )
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+    expect(mockRecoverPendingSyncResourceCleanups).not.toHaveBeenCalled()
+
+    finishHydration()
+    await vi.waitFor(() => expect(mockRecoverPendingSyncResourceCleanups).toHaveBeenCalledOnce())
+  })
+
+  it('does not recover jobs or start sync when cleanup replay fails', async () => {
+    mockRecoverPendingSyncResourceCleanups.mockRejectedValueOnce(new Error('cleanup failed'))
+    const { initializeApp } = await import('../app-init')
+
+    const cleanup = initializeApp()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mockRecoverStaleJobs).not.toHaveBeenCalled()
+    expect(mockStartSyncRuntime).not.toHaveBeenCalled()
+    cleanup()
   })
 
   it('keeps the five-minute recovery lease in the browser', async () => {
     const { startEarlyInit } = await import('../app-init')
 
     startEarlyInit()
-    await Promise.resolve()
-
-    expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 5 * 60 * 1000)
+    await vi.waitFor(() =>
+      expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 5 * 60 * 1000)
+    )
   })
 
   it('skips control-window initialization on the projection route', async () => {
@@ -204,7 +248,7 @@ describe('initializeApp — online handler', () => {
 
     const cleanup = initializeApp(options)
 
-    expect(mockStartSyncRuntime).toHaveBeenCalledWith(options)
+    await vi.waitFor(() => expect(mockStartSyncRuntime).toHaveBeenCalledWith(options))
     cleanup()
     expect(mockStopSyncRuntime).toHaveBeenCalled()
   })

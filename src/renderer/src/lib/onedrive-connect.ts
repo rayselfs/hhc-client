@@ -45,10 +45,151 @@ import {
 } from './sync-refresh'
 import { refreshImportedMediaAssets } from './local-sync-import'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
+import { dispatchPlannedSyncDownloads } from './sync-transfer-dispatch'
 
 const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
 const ONEDRIVE_WEB_CALLBACK_STORAGE_KEY = 'libre-presenter:onedrive-callback'
 const ONEDRIVE_WEB_CALLBACK_TIMEOUT_MS = 2 * 60_000
+
+function publishOneDriveRootFolder(root: FolderRecord): void {
+  useFileExplorerStore.setState((state) => {
+    const folders = { ...state.folders, [root.id]: root }
+    const siblings = [
+      ...(state._childFoldersByParent[root.parentId!] ?? []).filter(
+        (folder) => folder.id !== root.id
+      ),
+      root
+    ].sort((left, right) => left.sortIndex - right.sortIndex)
+    return {
+      folders,
+      _foldersArray: Object.values(folders),
+      _childFoldersByParent: {
+        ...state._childFoldersByParent,
+        [root.parentId!]: siblings
+      }
+    }
+  })
+}
+
+function rootOwner(
+  id: string | undefined,
+  parents: Map<string, string | null | undefined>,
+  roots: Map<string, string>
+): string | false | undefined {
+  let owner: string | undefined
+  const seen = new Set<string>()
+  while (id && !seen.has(id)) {
+    seen.add(id)
+    const candidate = roots.get(id)
+    if (candidate && owner && candidate !== owner) return false
+    if (candidate) owner = candidate
+    id = parents.get(id) ?? undefined
+  }
+  return owner
+}
+
+function hasParent(
+  id: string | null | undefined,
+  parents: Map<string, string | null | undefined>,
+  target: string | Set<string>
+): boolean {
+  const seen = new Set<string>()
+  while (id && !seen.has(id)) {
+    if (typeof target === 'string' ? id === target : target.has(id)) return true
+    seen.add(id)
+    id = parents.get(id)
+  }
+  return false
+}
+
+function scopeRoot(
+  entries: SyncEntryRecord[],
+  connectionId: string,
+  rootId: string,
+  folders: FolderRecord[],
+  items: Array<{ id: string; parentId: string; deletedAt?: number }>
+): {
+  entries: SyncEntryRecord[]
+  protectRemovals: boolean
+} {
+  const roots = folders.filter((folder) => {
+    const syncLink = folder.syncLink
+    return (
+      folder.parentId === FILE_EXPLORER_ROOT_ID &&
+      syncLink?.providerType === 'onedrive' &&
+      syncLink.providerConnectionId === connectionId
+    )
+  })
+  const root = roots.find((candidate) => candidate.id === rootId && candidate.deletedAt == null)
+  if (!root) return { entries: [], protectRemovals: false }
+  const remoteRoot = new Map(
+    roots.map((candidate) => [candidate.syncLink!.remoteFolderId, candidate.id])
+  )
+  const localRoot = new Map(roots.map((candidate) => [candidate.id, candidate.id]))
+  const remoteUp = new Map(entries.map((entry) => [entry.remoteItemId, entry.parentRemoteItemId]))
+  const folderById = new Map(folders.map((folder) => [folder.id, folder]))
+  const localUp = new Map(folders.map((folder) => [folder.id, folder.parentId]))
+  const itemById = new Map(items.map((item) => [item.id, item]))
+  const remoteOf = (id: string): string | false | undefined => rootOwner(id, remoteUp, remoteRoot)
+  const localOf = (folderId?: string): string | false | undefined =>
+    rootOwner(folderId, localUp, localRoot)
+
+  const refCounts = new Map<string, number>()
+  for (const entry of entries) {
+    const id = entry.kind === 'folder' ? entry.folderId : entry.itemId
+    if (!id) continue
+    const key = `${entry.kind}\0${id}`
+    refCounts.set(key, (refCounts.get(key) ?? 0) + 1)
+  }
+  const activeOf = (entry: SyncEntryRecord): string | false | undefined => {
+    if (entry.kind === 'folder' && entry.folderId) {
+      return folderById.get(entry.folderId)?.deletedAt == null ? localOf(entry.folderId) : undefined
+    }
+    const item = entry.kind === 'file' && entry.itemId ? itemById.get(entry.itemId) : undefined
+    return item && item.deletedAt == null ? localOf(item.parentId) : undefined
+  }
+
+  const scoped: SyncEntryRecord[] = []
+  const unsafeIds = new Set<string>()
+  for (const entry of entries) {
+    const localId = entry.kind === 'folder' ? entry.folderId : entry.itemId
+    const remote = remoteOf(entry.remoteItemId)
+    const local = activeOf(entry)
+    const owners = [
+      remote,
+      localOf(entry.folderId),
+      localOf(itemById.get(entry.itemId ?? '')?.parentId)
+    ]
+    const wrongKind = entry.kind === 'file' ? entry.folderId : entry.itemId
+    const ambiguous =
+      wrongKind ||
+      (localId && (refCounts.get(`${entry.kind}\0${localId}`) ?? 0) > 1) ||
+      (entry.kind === 'folder' &&
+        entry.folderId === rootId &&
+        entry.remoteItemId !== root.syncLink!.remoteFolderId) ||
+      owners.includes(false) ||
+      new Set(owners.filter(Boolean)).size > 1
+    const owner = remote ?? local
+    if (ambiguous || !owner) {
+      unsafeIds.add(entry.remoteItemId)
+    } else if (owner === rootId) {
+      scoped.push(entry)
+    }
+  }
+
+  return {
+    entries: scoped,
+    protectRemovals: entries.some((entry) => {
+      if (!hasParent(entry.remoteItemId, remoteUp, unsafeIds)) return false
+      const parentId = itemById.get(entry.itemId ?? '')?.parentId
+      return (
+        hasParent(entry.remoteItemId, remoteUp, root.syncLink!.remoteFolderId) ||
+        hasParent(entry.folderId, localUp, rootId) ||
+        hasParent(parentId, localUp, rootId)
+      )
+    })
+  }
+}
 
 interface TokenResponse {
   access_token: string
@@ -479,46 +620,6 @@ export function ensureOneDriveItemAvailableForPresentation(item: FileItemRecord)
   return downloadOneDriveItemForPresentation(item)
 }
 
-async function downloadImportedOneDriveItems(input: {
-  connection: ProviderConnectionRecord
-  provider: OneDriveReadonlyProvider
-  remoteItems: RemoteSyncItem[]
-  plan: OneDriveImportPlan
-  rootRemoteFolderId: string
-}): Promise<void> {
-  const remoteById = new Map(input.remoteItems.map((item) => [item.remoteItemId, item]))
-
-  for (const item of input.plan.downloadableItems) {
-    const remoteItem = remoteById.get(item.remoteItemId)
-    if (!remoteItem) continue
-    const downloadedItem = input.plan.items.find((planItem) => planItem.id === item.itemId)
-    void enqueueSyncDownload({
-      provider: input.provider,
-      request: {
-        providerConnectionId: input.connection.id,
-        rootRemoteFolderId: input.rootRemoteFolderId,
-        remoteItemId: item.remoteItemId,
-        targetBlobId: item.itemId,
-        offlinePolicy: 'always-offline'
-      },
-      entry: {
-        providerConnectionId: input.connection.id,
-        remoteItemId: item.remoteItemId,
-        parentRemoteItemId: remoteItem.parentRemoteItemId,
-        kind: 'file',
-        name: remoteItem.name,
-        itemId: item.itemId,
-        mimeType: remoteItem.mimeType,
-        size: remoteItem.size,
-        etag: remoteItem.etag,
-        contentHash: remoteItem.contentHash
-      },
-      priority: 'background',
-      onDownloaded: downloadedItem ? () => refreshImportedMediaAssets([downloadedItem]) : undefined
-    })
-  }
-}
-
 export async function scanOneDriveFolder(
   provider: OneDriveReadonlyProvider,
   connectionId: string,
@@ -682,14 +783,21 @@ export async function importOneDriveFolder(
   mergeImportedRecordsIntoStore(plan.folders, plan.items)
 
   if (defaultSyncOfflinePolicy === 'always-offline') {
-    void downloadImportedOneDriveItems({
-      connection,
+    dispatchPlannedSyncDownloads({
       provider,
+      providerConnectionId: connection.id,
+      rootRemoteFolderId: remoteFolder.remoteItemId,
+      offlinePolicy: defaultSyncOfflinePolicy,
+      plan: {
+        items: plan.items,
+        fileTransfers: plan.downloadableItems.map((transfer) => ({
+          ...transfer,
+          mimeType: plan.items.find((item) => item.id === transfer.itemId)!.mimeType
+        }))
+      },
       remoteItems,
-      plan,
-      rootRemoteFolderId: remoteFolder.remoteItemId
-    }).catch((error) => {
-      console.warn('[onedrive] Failed to finish offline downloads', error)
+      existingEntries: [],
+      onDownloaded: (item) => refreshImportedMediaAssets([item])
     })
   }
 
@@ -750,6 +858,7 @@ async function runOneDriveFolderRefresh(
   rootFolderId: string,
   options: { forceRetry?: boolean } = {}
 ): Promise<OneDriveRefreshSummary> {
+  const offlinePolicy = useSettingsStore.getState().defaultSyncOfflinePolicy
   const store = useFileExplorerStore.getState()
   await store.initialize()
   const db = await openFileExplorerDB()
@@ -763,12 +872,29 @@ async function runOneDriveFolderRefresh(
   if (!rootFolder || !syncLink || syncLink.providerType !== 'onedrive') {
     throw new Error('OneDrive root folder not found')
   }
+  const refreshedRoot =
+    syncLink.offlinePolicy === offlinePolicy
+      ? rootFolder
+      : { ...rootFolder, syncLink: { ...syncLink, offlinePolicy } }
 
   const provider = createStoredOneDriveProvider(syncLink.providerConnectionId)
   const cursor = await getSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
-  const existingEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
-  const offlinePolicy =
-    syncLink.offlinePolicy ?? useSettingsStore.getState().defaultSyncOfflinePolicy
+  const accountEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
+  const scope = scopeRoot(
+    accountEntries,
+    syncLink.providerConnectionId,
+    rootFolder.id,
+    folders,
+    allItems
+  )
+  const existingEntries = scope.entries
+  const existingFolderIds = new Set([
+    rootFolder.id,
+    ...existingEntries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))
+  ])
+  const existingItemIds = new Set(
+    existingEntries.flatMap((entry) => (entry.itemId ? [entry.itemId] : []))
+  )
 
   let scan: Awaited<ReturnType<typeof scanOneDriveFolder>>
   let fullScanFallback = false
@@ -792,12 +918,14 @@ async function runOneDriveFolderRefresh(
   const basePlanInput = {
     providerConnectionId: syncLink.providerConnectionId,
     providerType: 'onedrive' as const,
-    rootFolder,
+    rootFolder: refreshedRoot,
     rootRemoteFolderId: syncLink.remoteFolderId,
     offlinePolicy,
     platform: getOneDriveMediaPlatform(),
-    existingFolders: folders,
-    existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
+    existingFolders: folders.filter((folder) => existingFolderIds.has(folder.id)),
+    existingItems: allItems.filter(
+      (item): item is FileItemRecord => item.type === 'file' && existingItemIds.has(item.id)
+    ),
     existingEntries,
     existingBlobIds: await collectAvailableFileBlobIds(fileBlobs),
     forceRetry: options.forceRetry
@@ -817,8 +945,14 @@ async function runOneDriveFolderRefresh(
     plan = buildSyncRefreshPlan({ ...basePlanInput, remoteItems: scan.remoteItems })
   }
 
+  if (scope.protectRemovals) {
+    plan.removedEntries = []
+    plan.removedFolderIds = []
+    plan.removedItemIds = []
+  }
+
   await applySyncRefreshPlan(plan)
-  if (scan.nextCursor) {
+  if (!scope.protectRemovals && scan.nextCursor) {
     await putSyncCursor({
       providerConnectionId: syncLink.providerConnectionId,
       remoteFolderId: syncLink.remoteFolderId,
@@ -826,11 +960,11 @@ async function runOneDriveFolderRefresh(
       updatedAt: Date.now()
     })
   }
+  if (refreshedRoot !== rootFolder) {
+    await db.put('folder-records', refreshedRoot)
+    publishOneDriveRootFolder(refreshedRoot)
+  }
 
-  const remoteById = new Map(scan.remoteItems.map((item) => [item.remoteItemId, item]))
-  const existingEntryByRemoteId = new Map(
-    existingEntries.map((entry) => [entry.remoteItemId, entry])
-  )
   const downloadedCount = 0
   const failedFileCount = 0
   const retryableFileCount = plan.syncEntries.filter(
@@ -842,37 +976,16 @@ async function runOneDriveFolderRefresh(
     .map((entry) => entry.nextRetryAt)
     .filter((value): value is number => typeof value === 'number')
     .sort((a, b) => a - b)[0]
-  for (const transfer of plan.fileTransfers) {
-    const remoteItem = remoteById.get(transfer.remoteItemId)
-    const previousEntry = existingEntryByRemoteId.get(transfer.remoteItemId)
-    if (!remoteItem) continue
-    const downloadedItem = plan.items.find((item) => item.id === transfer.itemId)
-    void enqueueSyncDownload({
-      provider,
-      request: {
-        providerConnectionId: syncLink.providerConnectionId,
-        rootRemoteFolderId: syncLink.remoteFolderId,
-        remoteItemId: transfer.remoteItemId,
-        targetBlobId: transfer.itemId,
-        offlinePolicy
-      },
-      entry: {
-        providerConnectionId: syncLink.providerConnectionId,
-        remoteItemId: transfer.remoteItemId,
-        parentRemoteItemId: remoteItem.parentRemoteItemId,
-        kind: 'file',
-        name: remoteItem.name,
-        itemId: transfer.itemId,
-        mimeType: transfer.mimeType,
-        size: remoteItem.size,
-        etag: remoteItem.etag,
-        contentHash: remoteItem.contentHash
-      },
-      previousEntry,
-      priority: 'background',
-      onDownloaded: downloadedItem ? () => refreshImportedMediaAssets([downloadedItem]) : undefined
-    })
-  }
+  dispatchPlannedSyncDownloads({
+    provider,
+    providerConnectionId: syncLink.providerConnectionId,
+    rootRemoteFolderId: syncLink.remoteFolderId,
+    offlinePolicy,
+    plan,
+    remoteItems: scan.remoteItems,
+    existingEntries,
+    onDownloaded: (item) => refreshImportedMediaAssets([item])
+  })
 
   const changedCount =
     plan.folders.length +

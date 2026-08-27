@@ -84,8 +84,11 @@ export interface SyncTombstoneRecord {
   folderId?: string
   blobId?: string
   reason: 'remote-delete' | 'unlink' | 'cache-eviction'
+  unlinkScope?: 'root' | 'connection'
   createdAt: number
 }
+
+export const SYNC_CONNECTION_UNLINK_MARKER = '\0connection-unlink'
 
 interface SyncDBSchema extends DBSchema {
   'provider-connections': {
@@ -353,6 +356,10 @@ export async function getSyncEntryByLocalItem(
   itemId: string
 ): Promise<SyncEntryRecord | undefined> {
   return (await getSyncDB()).getFromIndex('sync-entries', 'by-local-item', itemId)
+}
+
+export async function listSyncEntriesByLocalItem(itemId: string): Promise<SyncEntryRecord[]> {
+  return (await getSyncDB()).getAllFromIndex('sync-entries', 'by-local-item', itemId)
 }
 
 export async function listSyncEntries(): Promise<SyncEntryRecord[]> {
