@@ -827,6 +827,7 @@ export default function FileProjection({
               mimeType: presentationMimeType
             }}
             slideIndex={initialPresentation?.slideIndex ?? 0}
+            verifyNativeFile={false}
           />
         </div>
       </div>

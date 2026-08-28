@@ -1,5 +1,5 @@
 import { getBlobId } from './blob-identity'
-import { getFileSource, openFileExplorerDB } from './file-explorer-db'
+import { getFileSource, openFileExplorerDB, type GetFileSourceOptions } from './file-explorer-db'
 import type { FileItemRecord } from '@shared/types/folder'
 
 export type PresentationSource = Pick<FileItemRecord, 'id' | 'url' | 'mimeType'>
@@ -22,14 +22,15 @@ function isTrustedEphemeralSourceUrl(value: string): boolean {
 }
 
 export async function readPresentationArrayBuffer(
-  sourceItem: PresentationSource
+  sourceItem: PresentationSource,
+  options: GetFileSourceOptions = {}
 ): Promise<ArrayBuffer> {
   let sourceUrl = sourceItem.url
   let revoke = (): void => undefined
   const ephemeral = isTrustedEphemeralSourceUrl(sourceUrl)
   if (!ephemeral) {
     const db = await openFileExplorerDB()
-    const source = await getFileSource(db, getBlobId(sourceItem), sourceItem.mimeType)
+    const source = await getFileSource(db, getBlobId(sourceItem), sourceItem.mimeType, options)
     if (!source) throw new Error('Presentation source is unavailable')
     sourceUrl = source.url
     revoke = source.revoke

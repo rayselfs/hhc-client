@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getBlobId } from '../blob-identity'
+import { PPTX_MIME_TYPE } from '../presentation-media'
 import { readPresentationArrayBuffer } from '../presentation-source'
 
 const mocks = vi.hoisted(() => ({
@@ -39,5 +41,43 @@ describe('presentation source', () => {
     })
     expect(mocks.openDb).not.toHaveBeenCalled()
     expect(mocks.getFileSource).not.toHaveBeenCalled()
+  })
+
+  it('uses native availability verification for copied local presentations by default', async () => {
+    const source = {
+      id: 'copied-item',
+      url: 'blob:source-blob',
+      mimeType: PPTX_MIME_TYPE
+    }
+    const bytes = new Uint8Array([1, 2, 3]).buffer
+    const db = {}
+    mocks.openDb.mockResolvedValue(db)
+    mocks.getFileSource.mockResolvedValue({ url: 'blob:resolved-source', revoke: vi.fn() })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(bytes, { status: 200 }))
+
+    await expect(readPresentationArrayBuffer(source)).resolves.toEqual(bytes)
+
+    expect(mocks.getFileSource).toHaveBeenCalledWith(db, getBlobId(source), source.mimeType, {})
+  })
+
+  it('skips native availability verification for an already authorized copied projection source', async () => {
+    const source = {
+      id: 'copied-item',
+      url: 'blob:source-blob',
+      mimeType: PPTX_MIME_TYPE
+    }
+    const bytes = new Uint8Array([1, 2, 3]).buffer
+    const db = {}
+    mocks.openDb.mockResolvedValue(db)
+    mocks.getFileSource.mockResolvedValue({ url: 'blob:resolved-source', revoke: vi.fn() })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(bytes, { status: 200 }))
+
+    await expect(readPresentationArrayBuffer(source, { verifyNativeFile: false })).resolves.toEqual(
+      bytes
+    )
+
+    expect(mocks.getFileSource).toHaveBeenCalledWith(db, getBlobId(source), source.mimeType, {
+      verifyNativeFile: false
+    })
   })
 })
