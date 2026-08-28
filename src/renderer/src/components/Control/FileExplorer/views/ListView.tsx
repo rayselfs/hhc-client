@@ -8,7 +8,8 @@ import { getFileIcon } from './getFileIcon'
 import type { GridViewItem } from './GridView'
 import { InlineRenameInput } from '../InlineRenameInput'
 import { splitFileName } from '@renderer/lib/file-naming'
-import { SyncStatusBadge } from './SyncStatusBadge'
+import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
+import { FileItemStatus } from '../FileItemStatus'
 
 export interface ListViewProps {
   items: GridViewItem[]
@@ -194,7 +195,17 @@ export const ListView = React.memo(function ListView({
               >
                 <div className="flex-shrink-0 w-6 flex items-center justify-center mr-3">
                   {item.isFolder ? (
-                    <Folder size={20} className="text-accent" fill="currentColor" />
+                    <span className="relative flex items-center justify-center">
+                      <Folder size={20} className="text-accent" fill="currentColor" />
+                      {item.syncProviderType ? (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <SyncProviderIcon
+                            providerType={item.syncProviderType}
+                            className="size-3.5"
+                          />
+                        </span>
+                      ) : null}
+                    </span>
                   ) : (
                     <div className="text-danger">
                       {getFileIcon(item.mimeType, item.isFolder, 20)}
@@ -223,11 +234,15 @@ export const ListView = React.memo(function ListView({
                     >
                       {item.name}
                     </div>
-                    <SyncStatusBadge
-                      status={item.syncStatus}
+                    <FileItemStatus
+                      variant="badge"
+                      folderHealth={item.syncFolderHealth}
+                      folderHealthTooltip={item.syncFolderHealthTooltip}
+                      syncStatus={item.syncStatus}
                       downloadedBytes={item.downloadedBytes}
                       downloadTotalBytes={item.downloadTotalBytes}
-                      compact
+                      processingStatus={item.processingStatus}
+                      processingProgress={item.processingProgress}
                     />
                   </div>
                 )}

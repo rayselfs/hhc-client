@@ -17,6 +17,7 @@ import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
 import { isIgnoredSystemFile } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
 import { ensurePdfPageJob } from '@renderer/lib/pdf-page-jobs'
+import { enqueueCoverThumbnailJob } from '@renderer/lib/cover-thumbnail-jobs'
 
 export { MAX_FILE_SIZE_WEB }
 
@@ -181,11 +182,20 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
         }
         const shouldUseBrowserThumbnail = classification.kind !== 'video' || isWeb()
         if (shouldUseBrowserThumbnail && canGenerateThumbnail(classification.mimeType, file.name)) {
-          const dataUrl = await generateThumbnail(file, classification.mimeType)
-          if (dataUrl) await saveThumbnail(id, dataUrl)
-          window.dispatchEvent(
-            new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: id, dataUrl } })
-          )
+          if (isWeb()) {
+            const dataUrl = await generateThumbnail(file, classification.mimeType)
+            if (dataUrl) await saveThumbnail(id, dataUrl)
+            window.dispatchEvent(
+              new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: id, dataUrl } })
+            )
+          } else {
+            await enqueueCoverThumbnailJob({
+              sourceBlobId: id,
+              itemId: id,
+              file,
+              mimeType: classification.mimeType
+            })
+          }
         }
       } finally {
         release()

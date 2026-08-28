@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, CheckCircle2, Folder, Loader2, Star, XCircle } from 'lucide-react'
+import { Folder, Star } from 'lucide-react'
 import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { getFileIcon } from './getFileIcon'
@@ -9,8 +9,9 @@ import { splitFileName } from '@renderer/lib/file-naming'
 import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import type { SyncEntryStatus } from '@renderer/lib/sync-db'
 import type { SyncProviderType } from '@shared/types/folder'
-import { SyncStatusIcon } from './SyncStatusBadge'
 import type { SyncFolderHealthStatus } from '@renderer/lib/sync-folder-health'
+import { FileItemStatus } from '../FileItemStatus'
+import type { MediaProcessingStatus } from '@renderer/lib/media-job-view-state'
 
 export interface GridViewItem {
   id: string
@@ -29,6 +30,8 @@ export interface GridViewItem {
   syncFolderHealth?: SyncFolderHealthStatus
   syncFolderHealthTooltip?: string
   isUnsupportedMedia?: boolean
+  processingStatus?: MediaProcessingStatus
+  processingProgress?: number
 }
 
 function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
@@ -71,21 +74,6 @@ function renderSyncProviderIcon(providerType?: SyncProviderType): React.ReactNod
       <span className="rounded-full bg-primary/90 p-1">{icon}</span>
     </span>
   )
-}
-
-function renderSyncFolderHealthIcon(status?: SyncFolderHealthStatus): React.ReactNode {
-  switch (status) {
-    case 'syncing':
-      return <Loader2 size={14} className="animate-spin text-primary" aria-label="Syncing" />
-    case 'warning':
-      return <AlertTriangle size={14} className="text-warning" aria-label="Sync warning" />
-    case 'error':
-      return <XCircle size={14} className="text-danger" aria-label="Sync error" />
-    case 'ok':
-      return <CheckCircle2 size={14} className="text-success" aria-label="Sync OK" />
-    default:
-      return null
-  }
 }
 
 export interface GridViewProps {
@@ -189,20 +177,18 @@ export const GridView = React.memo(function GridView({
               <div className="relative flex items-center justify-center">
                 {renderGridIcon(item, iconSize)}
                 {item.isFolder ? renderSyncProviderIcon(item.syncProviderType) : null}
-                {item.isFolder && item.syncFolderHealth && item.syncFolderHealth !== 'unknown' ? (
-                  <span
-                    className="absolute -bottom-1 -right-1 rounded-full bg-background/90 p-0.5"
-                    title={item.syncFolderHealthTooltip}
-                  >
-                    {renderSyncFolderHealthIcon(item.syncFolderHealth)}
-                  </span>
-                ) : null}
-                {!item.isFolder && item.syncStatus ? (
-                  <span className="absolute -bottom-1 -right-1 rounded-full bg-background/90">
-                    <SyncStatusIcon
-                      status={item.syncStatus}
+                {(item.syncFolderHealth && item.syncFolderHealth !== 'unknown') ||
+                (!item.isFolder && (item.syncStatus || item.processingStatus)) ? (
+                  <span className="absolute -bottom-1 -right-1 rounded-full bg-background/90 p-0.5">
+                    <FileItemStatus
+                      variant="icon"
+                      folderHealth={item.syncFolderHealth}
+                      folderHealthTooltip={item.syncFolderHealthTooltip}
+                      syncStatus={item.syncStatus}
                       downloadedBytes={item.downloadedBytes}
                       downloadTotalBytes={item.downloadTotalBytes}
+                      processingStatus={item.processingStatus}
+                      processingProgress={item.processingProgress}
                     />
                   </span>
                 ) : null}

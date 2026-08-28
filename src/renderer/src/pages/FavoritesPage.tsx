@@ -19,6 +19,7 @@ import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import FileExplorerShell from '@renderer/components/Control/FileExplorer/FileExplorerShell'
 import type { SortField } from '@renderer/stores/file-explorer'
+import { buildFolderViewItem } from '@renderer/lib/file-view-item'
 
 export default function FavoritesPage(): React.JSX.Element {
   const { t } = useTranslation()
@@ -42,14 +43,7 @@ export default function FavoritesPage(): React.JSX.Element {
 
   const sortedItems: GridViewItem[] = useMemo(() => {
     const favoritedFolders = foldersArray.filter((f) => f.isFavorited)
-    const gridItems: GridViewItem[] = favoritedFolders.map((f) => ({
-      id: f.id,
-      name: f.name,
-      isFolder: true,
-      createdAt: f.createdAt,
-      isFavorited: true,
-      isSelected: false
-    }))
+    const gridItems: GridViewItem[] = favoritedFolders.map((folder) => buildFolderViewItem(folder))
     if (sortDir !== 'none') {
       gridItems.sort((a, b) => compareByField(a, b, sortField, sortDir))
     } else {

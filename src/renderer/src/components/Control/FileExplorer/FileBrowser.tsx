@@ -54,11 +54,14 @@ import {
   type SyncEntryStatus
 } from '@renderer/lib/sync-db'
 import { deriveSyncFolderHealth, type SyncFolderHealth } from '@renderer/lib/sync-folder-health'
+import { buildFolderViewItem } from '@renderer/lib/file-view-item'
 import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { isWeb } from '@renderer/lib/env'
 import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
+import { listMediaJobs, subscribeMediaJobs } from '@renderer/lib/media-work-db'
+import { buildMediaJobViewState, type MediaJobViewState } from '@renderer/lib/media-job-view-state'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -403,6 +406,7 @@ export function FileBrowser({
   const [syncStates, setSyncStates] = useState<Record<string, SyncItemViewState>>({})
   const [syncEntries, setSyncEntries] = useState<SyncEntryRecord[]>([])
   const [unsupportedMediaIds, setUnsupportedMediaIds] = useState<Set<string>>(new Set())
+  const [mediaJobStates, setMediaJobStates] = useState<Record<string, MediaJobViewState>>({})
   const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingRenameItemIdRef = React.useRef<string | null>(null)
   const pointerRef = React.useRef<{
@@ -513,6 +517,20 @@ export function FileBrowser({
   }, [folders, fileItems])
 
   useEffect(() => {
+    let cancelled = false
+    const load = async (): Promise<void> => {
+      const next = buildMediaJobViewState(await listMediaJobs())
+      if (!cancelled) setMediaJobStates(next)
+    }
+    void load()
+    const unsubscribe = subscribeMediaJobs(() => void load())
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
     if (!isWeb()) {
       setUnsupportedMediaIds(new Set())
       return
@@ -546,23 +564,15 @@ export function FileBrowser({
 
   const allItems: GridViewItem[] = useMemo(
     () => [
-      ...folders.map((folder) => ({
-        syncFolderHealth: syncFolderHealthById[folder.id]?.status,
-        syncFolderHealthTooltip: syncFolderHealthById[folder.id]
-          ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id])
-          : undefined,
-        id: folder.id,
-        name: folder.name,
-        isFolder: true,
-        createdAt: folder.createdAt,
-        isFavorited: folder.isFavorited,
-        isSelected: false,
-        syncStatus: syncStates[folder.id]?.status,
-        downloadedBytes: syncStates[folder.id]?.downloadedBytes,
-        downloadTotalBytes: syncStates[folder.id]?.downloadTotalBytes,
-        syncProviderType:
-          folder.parentId === FILE_EXPLORER_ROOT_ID ? folder.syncLink?.providerType : undefined
-      })),
+      ...folders.map((folder) =>
+        buildFolderViewItem(folder, {
+          health: syncFolderHealthById[folder.id],
+          healthTooltip: syncFolderHealthById[folder.id]
+            ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id])
+            : undefined,
+          syncState: syncStates[folder.id]
+        })
+      ),
       ...fileItems.map((item) => ({
         id: item.id,
         name: item.name,
@@ -580,10 +590,20 @@ export function FileBrowser({
         syncStatus: syncStates[item.id]?.status,
         downloadedBytes: syncStates[item.id]?.downloadedBytes,
         downloadTotalBytes: syncStates[item.id]?.downloadTotalBytes,
+        processingStatus: mediaJobStates[item.id]?.status,
+        processingProgress: mediaJobStates[item.id]?.progress,
         isUnsupportedMedia: unsupportedMediaIds.has(item.id) || item.url.startsWith('unsupported:')
       }))
     ],
-    [folders, fileItems, syncFolderHealthById, thumbnails, syncStates, unsupportedMediaIds]
+    [
+      folders,
+      fileItems,
+      syncFolderHealthById,
+      thumbnails,
+      syncStates,
+      mediaJobStates,
+      unsupportedMediaIds
+    ]
   )
 
   const sortedItems = useMemo(() => {

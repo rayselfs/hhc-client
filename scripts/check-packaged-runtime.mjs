@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { access, readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import { listPackage } from '@electron/asar'
+import { extractFile, listPackage } from '@electron/asar'
 
 const args = new Set(process.argv.slice(2))
 const root = process.cwd()
@@ -142,6 +142,21 @@ async function checkResourceRoot(resourceRoot, target) {
     const packagedFiles = listPackage(appAsar)
     if (packagedFiles.some((file) => file.startsWith('/.local-runtimes/'))) {
       failures.push('Local runtime downloads must not be embedded in app.asar')
+    }
+    const pdfWorkers = packagedFiles.filter((file) =>
+      /^\/out\/renderer\/assets\/pdf-worker[^/]*\.js$/.test(file)
+    )
+    if (pdfWorkers.length === 0) {
+      failures.push('Missing compiled PDF worker in app.asar')
+    } else if (
+      pdfWorkers.some((file) => {
+        const source = extractFile(appAsar, file.slice(1)).toString('utf8')
+        return /\b(?:interface|type)\s+\w+|<K,\s*V>|:\s*(?:Map|Iterable)<|import\('pdfjs-dist/.test(
+          source
+        )
+      })
+    ) {
+      failures.push('PDF worker contains uncompiled TypeScript source')
     }
   }
 

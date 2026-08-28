@@ -1,3 +1,5 @@
+import pdfWorkerUrl from './pdf-worker-polyfill.worker.ts?worker&url'
+
 export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
   if (!('getOrInsertComputed' in Map.prototype)) {
     Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
@@ -23,9 +25,6 @@ export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
   }
 
   const pdfjsLib = await import('pdfjs-dist')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    './pdf-worker-polyfill.worker.ts',
-    import.meta.url
-  ).href
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
   return pdfjsLib
 }

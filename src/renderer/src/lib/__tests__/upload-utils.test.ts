@@ -329,7 +329,12 @@ describe('uploadFiles classification', () => {
     await uploadFiles([file], 'parent-1')
 
     expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', canonicalMimeType)
-    expect(generateThumbnail).toHaveBeenCalledWith(file, canonicalMimeType)
+    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+      type: 'cover-thumbnail',
+      sourceBlobId: 'mock-id',
+      itemId: 'mock-id',
+      dedupeKey: 'cover-thumbnail:mock-id'
+    })
   })
 
   it('skips unsupported files', async () => {
@@ -379,6 +384,20 @@ describe('uploadFiles classification', () => {
       sourceBlobId: 'mock-id',
       itemId: 'mock-id',
       dedupeKey: 'video-poster:mock-id'
+    })
+  })
+
+  it('queues Electron image thumbnails instead of blocking folder upload', async () => {
+    const file = makeFile('photo.PNG', 100, '')
+
+    await expect(uploadFiles([file], 'parent-1')).resolves.toBe(1)
+
+    expect(generateThumbnail).not.toHaveBeenCalled()
+    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+      type: 'cover-thumbnail',
+      sourceBlobId: 'mock-id',
+      itemId: 'mock-id',
+      dedupeKey: 'cover-thumbnail:mock-id'
     })
   })
 })

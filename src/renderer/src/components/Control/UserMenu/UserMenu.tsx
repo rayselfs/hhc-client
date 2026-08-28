@@ -18,7 +18,6 @@ import {
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
-import RecoveryIndicator from '@renderer/components/Control/RecoveryCenter/RecoveryIndicator'
 import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 import { isElectron } from '@renderer/lib/env'
@@ -73,24 +72,22 @@ export default function UserMenu({
   return (
     <>
       <Dropdown.Root>
-        <div
-          className={`flex w-full items-center ${isExpanded ? 'flex-row gap-2' : 'flex-col gap-1'}`}
-        >
+        <div className="flex w-full items-center">
           <Button
             variant="ghost"
             aria-label={t('userMenu.accountMenu', { name: accountLabel })}
             className={`flex h-auto min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70 ${isExpanded ? 'flex-1' : 'w-auto'}`}
           >
             <Avatar.Root className="shrink-0">
+              {session?.avatarUrl ? (
+                <Avatar.Image src={session.avatarUrl} alt={accountLabel} />
+              ) : null}
               <Avatar.Fallback>
                 <CircleUser />
               </Avatar.Fallback>
             </Avatar.Root>
             {isExpanded && <span>{accountLabel}</span>}
           </Button>
-          <div className="pointer-events-none flex shrink-0 items-center">
-            <RecoveryIndicator />
-          </div>
         </div>
         <Dropdown.Popover>
           <Dropdown.Menu

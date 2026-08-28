@@ -175,4 +175,47 @@ describe('inline rename in file views', () => {
 
     expect(screen.getByText('Offline')).toBeInTheDocument()
   })
+
+  it('renders provider and folder health in list view', () => {
+    render(
+      <ListView
+        items={[
+          {
+            id: 'line-root',
+            name: 'LINE group',
+            isFolder: true,
+            isSelected: false,
+            syncProviderType: 'hhc-line',
+            syncFolderHealth: 'syncing',
+            syncFolderHealthTooltip: 'Downloading: 1'
+          }
+        ]}
+        sortField="name"
+        sortDir="asc"
+        onSortChange={vi.fn()}
+        colWidths={{ created: 100, size: 80, kind: 120 }}
+        onColWidthChange={vi.fn()}
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    expect(screen.getByLabelText('LINE')).toBeInTheDocument()
+    expect(screen.getByLabelText('Syncing')).toBeInTheDocument()
+  })
+
+  it('renders ordinary media processing with the shared status view', () => {
+    render(
+      <GridView
+        items={[{ ...items[0], processingStatus: 'running', processingProgress: 25 }]}
+        viewMode="large-icon"
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    expect(screen.getByLabelText('Processing 25%')).toBeInTheDocument()
+  })
 })
