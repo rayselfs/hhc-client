@@ -90,6 +90,7 @@ describe('EditableSlideSurface', () => {
 
   it('grows auto-sized text boxes to measured content while typing', () => {
     mockTextMeasurement()
+    const flushAnimationFrame = mockAnimationFrame()
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -110,20 +111,63 @@ describe('EditableSlideSurface', () => {
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
     textBox.textContent = 'Longer title'
     fireEvent.input(textBox)
+    act(() => flushAnimationFrame())
+
+    expect(textBox).toHaveStyle({
+      boxSizing: 'border-box',
+      padding: '4px 8px'
+    })
 
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
       text.id,
       expect.objectContaining({
         text: 'Longer title',
-        width: 144,
-        height: 74
+        width: 160,
+        height: 82
       })
     )
   })
 
-  it('does not commit text while the user is composing East Asian input', () => {
+  it('keeps fixed-width content-height text wrapping while typing', () => {
     mockTextMeasurement()
+    const flushAnimationFrame = mockAnimationFrame()
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: '',
+      width: 120,
+      height: 30,
+      autoSize: 'content',
+      autoWidth: false
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSurfaceHarness
+        document={withText}
+        slideId={slideId}
+        selectedElementId={text.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    handleUpdate.mockClear()
+    const textBox = screen.getByRole('textbox')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'LongEnglishTokenThatWraps'
+    fireEvent.input(textBox)
+    act(() => flushAnimationFrame())
+
+    const updates = handleUpdate.mock.calls.at(-1)?.[2]
+    expect(updates).toMatchObject({ text: 'LongEnglishTokenThatWraps', height: 230 })
+    expect(updates).not.toHaveProperty('width')
+  })
+
+  it('defers East Asian composition commits until the scheduled frame reads the current text', () => {
+    mockTextMeasurement()
+    const flushAnimationFrame = mockAnimationFrame()
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -150,6 +194,10 @@ describe('EditableSlideSurface', () => {
 
     textBox.textContent = '中'
     fireEvent.compositionEnd(textBox)
+
+    expect(handleUpdate).not.toHaveBeenCalled()
+
+    act(() => flushAnimationFrame())
 
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
@@ -399,6 +447,7 @@ describe('EditableSlideSurface', () => {
 
   it('keeps manually-sized text boxes at fixed width and height while typing', () => {
     mockTextMeasurement()
+    const flushAnimationFrame = mockAnimationFrame()
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -419,6 +468,7 @@ describe('EditableSlideSurface', () => {
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
     textBox.textContent = 'Longer title'
     fireEvent.input(textBox)
+    act(() => flushAnimationFrame())
 
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
@@ -433,6 +483,7 @@ describe('EditableSlideSurface', () => {
   })
 
   it('renders imported text runs and clears them on the first plain-text edit', () => {
+    const flushAnimationFrame = mockAnimationFrame()
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -478,6 +529,7 @@ describe('EditableSlideSurface', () => {
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
     textBox.textContent = 'Edited'
     fireEvent.input(textBox)
+    act(() => flushAnimationFrame())
 
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
@@ -866,17 +918,48 @@ function mockTextMeasurement(): void {
   vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (
     this: HTMLElement
   ) {
-    return Math.max(20, (this.textContent?.length ?? 0) * 12)
+    return Math.max(20, (this.textContent?.length ?? 0) * 12) + getHorizontalPadding(this)
   })
   vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (
     this: HTMLElement
   ) {
-    const width = Number.parseFloat(this.style.width)
+    const width = Number.parseFloat(this.style.width) - getHorizontalPadding(this)
     const textWidth = Math.max(20, (this.textContent?.length ?? 0) * 12)
     const lines =
       Number.isFinite(width) && width > 0 ? Math.max(1, Math.ceil(textWidth / width)) : 1
-    return lines * 74
+    return lines * 74 + getVerticalPadding(this)
   })
+}
+
+function getHorizontalPadding(element: HTMLElement): number {
+  return (
+    Number.parseFloat(element.style.paddingLeft) + Number.parseFloat(element.style.paddingRight)
+  )
+}
+
+function getVerticalPadding(element: HTMLElement): number {
+  return (
+    Number.parseFloat(element.style.paddingTop) + Number.parseFloat(element.style.paddingBottom)
+  )
+}
+
+function mockAnimationFrame(): () => void {
+  let nextFrameId = 0
+  const frames = new Map<number, FrameRequestCallback>()
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    const frameId = ++nextFrameId
+    frames.set(frameId, callback)
+    return frameId
+  })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+    frames.delete(frameId)
+  })
+
+  return () => {
+    const pendingFrames = [...frames.values()]
+    frames.clear()
+    pendingFrames.forEach((callback) => callback(0))
+  }
 }
 
 function getSlideSurface(container: HTMLElement): HTMLElement {

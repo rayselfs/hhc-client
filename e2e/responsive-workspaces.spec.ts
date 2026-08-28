@@ -29,6 +29,18 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
   await expect(page).toHaveURL(/#\/presentations\//)
 
+  await page.getByRole('button', { name: /^(Insert|插入)$/ }).click()
+  await page.getByRole('button', { name: /^(Text|文字)$/ }).click()
+  await page
+    .locator('.presentation-stage [data-slide-surface]')
+    .click({ position: { x: 160, y: 120 } })
+  const textBox = page.locator('[data-text-content][contenteditable="true"]')
+  await textBox.pressSequentially('Supercalifragilisticexpialidocious')
+  expect(
+    await textBox.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)
+  ).toBe(true)
+  await page.getByRole('button', { name: /^(Home|常用)$/ }).click()
+
   await page.setViewportSize({ width: 1470, height: 726 })
   const stageSlot = page.locator('.workspace-stage-slot')
   const presentationStage = page.locator('.presentation-stage')

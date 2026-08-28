@@ -75,6 +75,8 @@ type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 const TEXT_MIN_WIDTH = 60
 const TEXT_MIN_HEIGHT = 24
 const TEXT_AUTO_MIN_WIDTH = INSERTED_TEXT_CLICK_SIZE.width
+const TEXT_PADDING_X = 8
+const TEXT_PADDING_Y = 4
 const TEXT_FRAME_HIT_AREA = 6
 const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
@@ -848,7 +850,10 @@ function measureAutoSizedTextElement(
   })
   window.document.body.appendChild(measure)
 
-  const width = Math.max(TEXT_AUTO_MIN_WIDTH, Math.ceil(measure.scrollWidth))
+  const width =
+    element.autoWidth === true
+      ? Math.max(TEXT_AUTO_MIN_WIDTH, Math.ceil(measure.scrollWidth))
+      : element.width
   measure.style.width = `${width}px`
   measure.style.whiteSpace = 'pre-wrap'
   measure.style.overflowWrap = 'break-word'
@@ -910,6 +915,7 @@ function TextElementContent({
   const isComposingRef = useRef(false)
   const initializedEditingElementRef = useRef<string | null>(null)
   const blurFrameRef = useRef<number | null>(null)
+  const textFrameRef = useRef<number | null>(null)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
 
   const cancelPendingBlur = (): void => {
@@ -926,6 +932,21 @@ function TextElementContent({
         ? measureAutoSizedTextElement(contentRef.current, element, text)
         : {})
     } as Partial<EditablePresentationElement>)
+  }
+
+  const cancelPendingTextCommit = (): void => {
+    if (textFrameRef.current == null) return
+    window.cancelAnimationFrame(textFrameRef.current)
+    textFrameRef.current = null
+  }
+
+  const scheduleTextCommit = (): void => {
+    cancelPendingTextCommit()
+    textFrameRef.current = window.requestAnimationFrame(() => {
+      textFrameRef.current = null
+      const content = contentRef.current
+      if (content) commitText(content.textContent ?? '')
+    })
   }
 
   const focusEditableContent = (
@@ -957,21 +978,15 @@ function TextElementContent({
   }, [editing, element.id, element.locked, element.text])
 
   useLayoutEffect(() => {
-    if (!editing || element.locked) return
-    const content = contentRef.current
-    if (!content) return
-    if (window.document.activeElement === content) return
-    focusEditableContent(content)
-  }, [editing, element.height, element.locked, element.width])
-
-  useLayoutEffect(() => {
     if (editing) return
     initializedEditingElementRef.current = null
+    cancelPendingTextCommit()
   }, [editing])
 
   useEffect(() => {
     return () => {
       if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+      cancelPendingTextCommit()
     }
   }, [])
 
@@ -993,20 +1008,26 @@ function TextElementContent({
         fontStyle: element.italic ? 'italic' : 'normal',
         textDecoration: element.underline ? 'underline' : 'none',
         textAlign: element.align,
-        lineHeight: element.lineHeight
+        lineHeight: element.lineHeight,
+        boxSizing: 'border-box',
+        padding: `${TEXT_PADDING_Y}px ${TEXT_PADDING_X}px`,
+        width: editing && element.autoWidth === true ? 'max-content' : undefined,
+        minWidth: editing && element.autoWidth === true ? '100%' : undefined,
+        whiteSpace: editing && element.autoWidth === true ? 'pre' : 'pre-wrap',
+        overflowWrap: editing && element.autoWidth === true ? 'normal' : 'break-word'
       }}
-      onInput={(event) => {
+      onInput={() => {
         if (!editing) return
         if (isComposingRef.current) return
-        commitText(event.currentTarget.textContent ?? '')
+        scheduleTextCommit()
       }}
       onCompositionStart={() => {
         isComposingRef.current = true
       }}
-      onCompositionEnd={(event) => {
+      onCompositionEnd={() => {
         isComposingRef.current = false
         if (!editing) return
-        commitText(event.currentTarget.textContent ?? '')
+        scheduleTextCommit()
       }}
       onPointerDown={(event) => {
         if (!editable) return
@@ -1029,6 +1050,7 @@ function TextElementContent({
       }}
       onBlur={(event) => {
         const target = event.currentTarget
+        cancelPendingTextCommit()
         if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
         blurFrameRef.current = window.requestAnimationFrame(() => {
           blurFrameRef.current = null
