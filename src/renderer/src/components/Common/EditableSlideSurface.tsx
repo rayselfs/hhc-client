@@ -415,6 +415,7 @@ export default function EditableSlideSurface({
             editable={editable}
             editing={element.id === editingElementId}
             cropMode={element.id === cropElementId}
+            surfaceScale={surfaceScale}
             selected={
               element.id === selectedElementId || Boolean(selectedElementIds?.has(element.id))
             }
@@ -469,6 +470,7 @@ function SlideElement({
   editable,
   editing,
   cropMode,
+  surfaceScale,
   selected,
   primarySelected,
   onSelect,
@@ -489,6 +491,7 @@ function SlideElement({
   editable: boolean
   editing: boolean
   cropMode: boolean
+  surfaceScale: number
   selected: boolean
   primarySelected: boolean
   onSelect: (event: React.MouseEvent) => void
@@ -513,14 +516,16 @@ function SlideElement({
     width: element.width,
     height: element.height,
     transform: `rotate(${element.rotation}deg)`,
-    opacity: element.opacity
+    opacity: element.opacity,
+    outlineWidth: selected ? 1.5 / surfaceScale : undefined,
+    outlineOffset: selected ? `${2 / surfaceScale}px` : undefined
   }
 
   return (
     <div
       data-slide-element
       className={`absolute ${editable ? 'cursor-move' : ''} ${
-        selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''
+        selected ? 'outline-solid outline-primary' : ''
       }`}
       style={commonStyle}
       onPointerDown={(event) => {
@@ -550,6 +555,8 @@ function SlideElement({
         <ElementHandles
           element={element}
           cropMode={cropMode}
+          surfaceScale={surfaceScale}
+          onMovePointerDown={onPointerDown}
           onResizePointerDown={onResizePointerDown}
           onCropPointerDown={onCropPointerDown}
           onPointerMove={onPointerMove}
@@ -564,6 +571,8 @@ function SlideElement({
 function ElementHandles({
   element,
   cropMode,
+  surfaceScale,
+  onMovePointerDown,
   onResizePointerDown,
   onCropPointerDown,
   onPointerMove,
@@ -572,6 +581,8 @@ function ElementHandles({
 }: {
   element: EditablePresentationElement
   cropMode: boolean
+  surfaceScale: number
+  onMovePointerDown: (event: React.PointerEvent) => void
   onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onPointerMove: (event: React.PointerEvent) => void
@@ -580,14 +591,43 @@ function ElementHandles({
 }): React.JSX.Element {
   if (element.type === 'text') {
     const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
+    const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
+    const handleSize = 12 / surfaceScale
+    const borderWidth = 1.5 / surfaceScale
     return (
       <>
+        {(['top', 'right', 'bottom', 'left'] as const).map((edge) => (
+          <div
+            key={`move-text-${edge}`}
+            data-text-frame-edge={edge}
+            data-testid={`text-frame-edge-${edge}`}
+            className="absolute cursor-move"
+            style={{
+              zIndex: 10,
+              ...(edge === 'top' || edge === 'bottom'
+                ? {
+                    left: 0,
+                    width: '100%',
+                    height: edgeSize,
+                    [edge]: -edgeSize / 2
+                  }
+                : {
+                    top: 0,
+                    width: edgeSize,
+                    height: '100%',
+                    [edge]: -edgeSize / 2
+                  })
+            }}
+            onPointerDown={onMovePointerDown}
+          />
+        ))}
         {handles.map((handle) => (
           <button
             key={`resize-text-${handle}`}
             type="button"
-            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute size-4 rounded-[2px] border-2 border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]`}
+            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]`}
             aria-label={`Resize text box ${handleToLabel(handle)}`}
+            style={{ zIndex: 20, width: handleSize, height: handleSize, borderWidth }}
             onPointerDown={(event) => onResizePointerDown(event, handle)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -839,21 +879,6 @@ function createCaretRangeFromPoint(x: number, y: number, content: HTMLElement): 
   return range && content.contains(range.startContainer) ? range : null
 }
 
-function isTextFramePointer(
-  event: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>
-): boolean {
-  const rect = event.currentTarget.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0) return false
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
-  return (
-    x <= TEXT_FRAME_HIT_AREA ||
-    y <= TEXT_FRAME_HIT_AREA ||
-    rect.width - x <= TEXT_FRAME_HIT_AREA ||
-    rect.height - y <= TEXT_FRAME_HIT_AREA
-  )
-}
-
 function TextElementContent({
   element,
   slideId,
@@ -980,7 +1005,6 @@ function TextElementContent({
       onPointerDown={(event) => {
         if (!editable) return
         cancelPendingBlur()
-        if (isTextFramePointer(event)) return
         event.stopPropagation()
         if (!editing && !element.locked) {
           pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
@@ -988,9 +1012,9 @@ function TextElementContent({
         }
       }}
       onClick={(event) => {
-        if (!editable || element.locked) return
-        if (isTextFramePointer(event)) return
+        if (!editable) return
         event.stopPropagation()
+        if (element.locked) return
         cancelPendingBlur()
         if (!editing) {
           pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }

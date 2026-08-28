@@ -229,6 +229,7 @@ describe('EditableSlideSurface', () => {
   })
 
   it('does not start moving a text box from inside the text content area', () => {
+    const onTransformStart = vi.fn()
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -241,6 +242,7 @@ describe('EditableSlideSurface', () => {
         slideId={slideId}
         editable
         selectedElementId={text.id}
+        onTransformStart={onTransformStart}
         onUpdateElement={handleUpdate}
       />
     )
@@ -251,9 +253,32 @@ describe('EditableSlideSurface', () => {
     fireEvent.pointerMove(textBox, { clientX: 24, clientY: 18, pointerId: 1 })
 
     expect(handleUpdate).not.toHaveBeenCalled()
+    expect(onTransformStart).not.toHaveBeenCalled()
   })
 
-  it('moves a text box when dragging from its frame edge', () => {
+  it('renders selected text move edges separate from the editable content', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Move frame', autoWidth: false })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    expect(screen.getByTestId('text-frame-edge-left')).toHaveClass('cursor-move')
+    expect(screen.getByTestId('text-frame-edge-right')).toHaveClass('cursor-move')
+    expect(screen.getByTestId('text-frame-edge-top')).toHaveClass('cursor-move')
+    expect(screen.getByTestId('text-frame-edge-bottom')).toHaveClass('cursor-move')
+    expect(screen.getByRole('textbox')).toHaveClass('cursor-text')
+  })
+
+  it('moves a text box when dragging from its dedicated frame edge', () => {
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -277,10 +302,9 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    const textBox = screen.getByText('Move frame')
-    mockElementRect(textBox, { left: 100, top: 80, width: 220, height: 40 })
-    fireEvent.pointerDown(textBox, { clientX: 102, clientY: 100, pointerId: 1 })
-    fireEvent.pointerMove(textBox, { clientX: 122, clientY: 112, pointerId: 1 })
+    const leftEdge = screen.getByTestId('text-frame-edge-left')
+    fireEvent.pointerDown(leftEdge, { clientX: 102, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(leftEdge, { clientX: 122, clientY: 112, pointerId: 1 })
 
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
@@ -320,17 +344,16 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    const textBox = screen.getByText('Move once')
-    mockElementRect(textBox, { left: 100, top: 80, width: 220, height: 40 })
-    fireEvent.pointerDown(textBox, { clientX: 102, clientY: 100, pointerId: 1 })
+    const leftEdge = screen.getByTestId('text-frame-edge-left')
+    fireEvent.pointerDown(leftEdge, { clientX: 102, clientY: 100, pointerId: 1 })
     for (let index = 1; index <= 100; index += 1) {
-      fireEvent.pointerMove(textBox, {
+      fireEvent.pointerMove(leftEdge, {
         clientX: 102 + index,
         clientY: 100 + index,
         pointerId: 1
       })
     }
-    fireEvent.pointerUp(textBox, { clientX: 202, clientY: 200, pointerId: 1 })
+    fireEvent.pointerUp(leftEdge, { clientX: 202, clientY: 200, pointerId: 1 })
 
     expect(onTransformStart).toHaveBeenCalledTimes(1)
     expect(onTransformPreview).toHaveBeenCalledTimes(100)
@@ -365,10 +388,9 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    const textBox = screen.getByText('Cancel move')
-    mockElementRect(textBox, { left: 100, top: 80, width: 220, height: 40 })
-    fireEvent.pointerDown(textBox, { clientX: 102, clientY: 100, pointerId: 1 })
-    fireEvent.pointerCancel(textBox, { pointerId: 1 })
+    const leftEdge = screen.getByTestId('text-frame-edge-left')
+    fireEvent.pointerDown(leftEdge, { clientX: 102, clientY: 100, pointerId: 1 })
+    fireEvent.pointerCancel(leftEdge, { pointerId: 1 })
 
     expect(onTransformStart).toHaveBeenCalledTimes(1)
     expect(onTransformCancel).toHaveBeenCalledTimes(1)
@@ -481,13 +503,38 @@ describe('EditableSlideSurface', () => {
 
     expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     expect(screen.getByLabelText('Resize text box top left')).toHaveClass('rounded-[2px]')
-    expect(screen.getByLabelText('Resize text box top left')).toHaveClass('size-4')
-    expect(screen.getByLabelText('Resize text box top left')).toHaveClass('border-2')
     expect(screen.getByLabelText('Resize text box top left')).toHaveClass('bg-white')
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box bottom')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Resize element')).not.toBeInTheDocument()
+  })
+
+  it.each([0.5, 1, 2])('keeps text selection chrome at 12 screen px at scale %s', (scale) => {
+    mockSurfaceScale(scale)
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Resize me' })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    const handle = screen.getByLabelText('Resize text box top left')
+    const leftEdge = screen.getByTestId('text-frame-edge-left')
+    const frame = screen.getByRole('textbox').parentElement
+    if (!(frame instanceof HTMLElement)) throw new Error('text frame not found')
+    expect(Number.parseFloat(handle.style.width) * scale).toBe(12)
+    expect(Number.parseFloat(handle.style.height) * scale).toBe(12)
+    expect(Number.parseFloat(handle.style.borderWidth) * scale).toBe(1.5)
+    expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
+    expect(Number.parseFloat(frame.style.outlineWidth) * scale).toBe(1.5)
   })
 
   it('resizes content-height text box width without changing its height', () => {
@@ -788,6 +835,29 @@ function mockSurfaceRect(surface: HTMLElement): void {
     width: 960,
     height: 540,
     toJSON: () => ({})
+  })
+}
+
+function mockSurfaceScale(scale: number): void {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    if (this.hasAttribute('data-slide-surface')) {
+      const width = 1920 * scale
+      const height = 1080 * scale
+      return {
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+        width,
+        height,
+        toJSON: () => ({})
+      }
+    }
+    return new DOMRect()
   })
 }
 
