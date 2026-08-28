@@ -402,7 +402,7 @@ test('restores the HHC account session without storing the access token', async 
 
   await page.getByRole('link', { name: /files/i }).click()
   await page.getByLabel('New').click()
-  await page.getByRole('menuitem', { name: 'Add LINE media folder' }).click()
+  await page.getByRole('menuitem', { name: 'Sync LINE group' }).click()
   await page.getByRole('button', { name: collection.name }).click()
   await page.getByRole('button', { name: 'Add Folder' }).click()
   const importedCollection = page.locator(`span[title="${collection.name}"]`)
