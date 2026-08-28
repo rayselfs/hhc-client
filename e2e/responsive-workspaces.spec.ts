@@ -59,7 +59,8 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   expect(textMetrics.scrollHeight).toBeLessThanOrEqual(
     textMetrics.lineHeight + textMetrics.verticalPadding + 1
   )
-  await page.getByRole('tab', { name: /^(Home|常用)$/ }).click()
+  const homeTab = page.getByRole('tab', { name: /^(Home|常用)$/ })
+  await homeTab.click()
 
   const shapes = page.getByRole('button', { name: /^(Shapes|圖案|形状)$/ })
   const shapesBox = await shapes.boundingBox()
@@ -75,6 +76,15 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await expect(page.getByRole('menuitem').first()).toBeFocused()
   await shapeMenu.press('Escape')
   await expect(shapes).toBeFocused()
+
+  const ribbonPanel = page.locator('#presentation-ribbon-panel')
+  await homeTab.click()
+  await expect(ribbonPanel).toHaveAttribute('inert', '')
+  await homeTab.focus()
+  await page.keyboard.press('Tab')
+  expect(await ribbonPanel.evaluate((panel) => !panel.contains(document.activeElement))).toBe(true)
+  await homeTab.click()
+  await expect(ribbonPanel).toHaveCSS('height', '96px')
 
   await page.setViewportSize({ width: 1470, height: 726 })
   const stageSlot = page.locator('.workspace-stage-slot')

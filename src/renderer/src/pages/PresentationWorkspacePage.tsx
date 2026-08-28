@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -1861,6 +1862,7 @@ function EditableSessionDocumentView({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) return
       const target = event.target as HTMLElement | null
       if (event.key === 'Escape' && session.getSnapshot().draftKind !== null) {
         event.preventDefault()
@@ -1972,6 +1974,7 @@ function EditableSessionDocumentView({
           role="tabpanel"
           aria-labelledby={`presentation-ribbon-tab-${activeRibbon}`}
           aria-hidden={!isRibbonOpen}
+          inert={!isRibbonOpen}
           data-testid="presentation-ribbon-frame"
           className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
             isRibbonOpen ? `${ribbonHeightClass} opacity-100` : 'h-0 opacity-0'
@@ -2844,6 +2847,17 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const effectiveActiveRibbon = ribbonTabs.includes(activeRibbon) ? activeRibbon : 'home'
   const activeRibbonIndex = Math.max(0, ribbonTabs.indexOf(effectiveActiveRibbon))
 
+  const handleSelectedElementTypeChange = useCallback((type: PresentationElementType | null) => {
+    if (type !== 'image') {
+      const pictureTab = globalThis.document.getElementById('presentation-ribbon-tab-picture')
+      if (globalThis.document.activeElement === pictureTab) {
+        globalThis.document.getElementById('presentation-ribbon-tab-home')?.focus()
+      }
+      setActiveRibbon((current) => (current === 'picture' ? 'home' : current))
+    }
+    setSelectedElementType(type)
+  }, [])
+
   useEffect(() => {
     if (!itemId) return
     const routeItemId = itemId
@@ -2956,7 +2970,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
             onBackgroundPanelOpenChange={(isOpen) =>
               setBackgroundPanel({ itemId: activeDocument.itemId, isOpen })
             }
-            onSelectedElementTypeChange={setSelectedElementType}
+            onSelectedElementTypeChange={handleSelectedElementTypeChange}
           />
         ) : (
           <PptxDocumentView deck={activeDocument} />

@@ -13,6 +13,7 @@ import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
+  createImageElement,
   createTextElement,
   insertBlankEditableSlide
 } from '@renderer/lib/editable-presentation'
@@ -277,6 +278,71 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(home).toHaveAttribute('aria-selected', 'true')
     expect(insert).toHaveAttribute('aria-selected', 'false')
     expect(panel).toHaveAttribute('aria-labelledby', home.id)
+  })
+
+  it('changes Ribbon tabs with arrow keys without nudging the selected image', async () => {
+    const user = userEvent.setup()
+    let registry: PresentationSessionRegistry | null = null
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const image = createImageElement({
+      assetId: 'asset-1',
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: 640,
+      sourceHeight: 360
+    })
+    const withImage = addElementToSlide(document, slideId, image)
+    withImage.assets['asset-1'] = {
+      id: 'asset-1',
+      name: 'Worship image',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,AA=='
+    }
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withImage, revision: 0 })
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const session = registry!.get('deck-1')!
+    const imageElement = (await screen.findAllByRole('img', { name: 'Worship image' }))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(imageElement).not.toBeNull()
+    fireEvent.pointerDown(imageElement!, { clientX: 10, clientY: 10 })
+    const home = screen.getByRole('tab', { name: '常用' })
+    const insert = screen.getByRole('tab', { name: '插入' })
+    const initialX = session.getSnapshot().renderedDocument.slides[slideId].elements[image.id].x
+
+    home.focus()
+    await user.keyboard('{ArrowRight}')
+
+    expect(insert).toHaveFocus()
+    expect(insert).toHaveAttribute('aria-selected', 'true')
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[image.id].x).toBe(
+      initialX
+    )
+  })
+
+  it('skips Ribbon controls when the selected tab collapses its panel', async () => {
+    const user = userEvent.setup()
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const home = await screen.findByRole('tab', { name: '常用' })
+    const panel = await screen.findByRole('tabpanel')
+    await user.click(home)
+
+    expect(panel).toHaveAttribute('aria-hidden', 'true')
+    expect(panel).toHaveAttribute('inert')
+    await user.tab()
+    expect(panel).not.toContainElement(document.activeElement as HTMLElement)
   })
 
   it('keeps text formatting on Home without adding a Text contextual tab', async () => {

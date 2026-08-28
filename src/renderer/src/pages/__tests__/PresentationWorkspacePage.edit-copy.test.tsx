@@ -619,6 +619,57 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     expect(screen.queryByRole('tab', { name: '圖片' })).not.toBeInTheDocument()
   })
 
+  it('returns a removed focused Picture Format tab to a one-click collapsible Home tab', async () => {
+    const user = userEvent.setup()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const image = createImageElement({
+      assetId: 'asset-1',
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: 640,
+      sourceHeight: 360
+    })
+    const withImage = addElementToSlide(document, slideId, image)
+    withImage.assets['asset-1'] = {
+      id: 'asset-1',
+      name: 'Worship image',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,AA=='
+    }
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withImage, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    const imageElement = (await screen.findAllByRole('img', { name: 'Worship image' }))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(imageElement).not.toBeNull()
+    fireEvent.pointerDown(imageElement!, { clientX: 10, clientY: 10 })
+    const pictureFormat = await screen.findByRole('tab', { name: 'Picture Format' })
+    await user.click(pictureFormat)
+    expect(pictureFormat).toHaveFocus()
+
+    await user.keyboard('{Delete}')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('tab', { name: 'Picture Format' })).not.toBeInTheDocument()
+    )
+    const home = screen.getByRole('tab', { name: 'Home' })
+    const panel = screen.getByTestId('presentation-ribbon-frame')
+    expect(home).toHaveFocus()
+    expect(home).toHaveAttribute('aria-selected', 'true')
+    expect(panel).toHaveClass('h-24')
+
+    await user.click(home)
+    expect(panel).toHaveClass('h-0')
+  })
+
   it('groups Picture Format commands as Adjust, Arrange, and Size', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
