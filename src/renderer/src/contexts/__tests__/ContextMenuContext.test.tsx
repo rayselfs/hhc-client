@@ -1,4 +1,4 @@
-import { renderHook, render, screen, act, fireEvent } from '@testing-library/react'
+import { renderHook, render, screen, act, fireEvent, createEvent } from '@testing-library/react'
 import { ContextMenuProvider, useContextMenu, type ContextMenuEntry } from '../ContextMenuContext'
 
 function renderWithProvider(ui: React.ReactElement): ReturnType<typeof render> {
@@ -22,6 +22,55 @@ describe('ContextMenuContext', () => {
 
   it('does not render menu initially', () => {
     renderWithProvider(<div>content</div>)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it.each([[[] as ContextMenuEntry[]], [['separator'] as ContextMenuEntry[]]])(
+    'prevents the browser menu but does not render an empty menu for %j',
+    (items) => {
+      function TestComponent(): React.JSX.Element {
+        const { showMenu } = useContextMenu()
+        return (
+          <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+            target
+          </div>
+        )
+      }
+
+      renderWithProvider(<TestComponent />)
+      const target = screen.getByTestId('target')
+      const event = createEvent.contextMenu(target)
+
+      fireEvent(target, event)
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    }
+  )
+
+  it('closes an open menu when a later empty request is made', () => {
+    const items: ContextMenuEntry[] = [{ id: 'action', label: 'Action', onAction: vi.fn() }]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <>
+          <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+            target
+          </div>
+          <div data-testid="empty-target" onContextMenu={(e) => showMenu([], e)}>
+            empty target
+          </div>
+        </>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    fireEvent.contextMenu(screen.getByTestId('empty-target'))
+
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 

@@ -47,6 +47,11 @@ export function ContextMenuProvider({
     e.preventDefault()
     e.stopPropagation()
     triggerRef.current = document.activeElement
+    const hasActionableItem = items.some((item) => item !== 'separator')
+    if (!hasActionableItem) {
+      setMenu(null)
+      return
+    }
     setMenu({ x: e.clientX, y: e.clientY, items })
   }, [])
 
