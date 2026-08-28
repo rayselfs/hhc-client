@@ -53,6 +53,15 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(read('src/shared/app-config.ts')).toContain('hhcAssetOrigin: __HHC_ASSET_ORIGIN__')
   })
 
+  it('allows Google account avatars only through img-src', () => {
+    const html = read('src/renderer/index.html')
+    const imgSrc = html.match(/img-src ([^;]+);/)?.[1]
+
+    expect(imgSrc).toContain('https://lh3.googleusercontent.com')
+    expect(imgSrc?.split(/\s+/)).not.toContain('https:')
+    expect(html.match(/https:\/\/lh3\.googleusercontent\.com/g)).toHaveLength(1)
+  })
+
   it('keeps OAuth callback queries outside PWA navigation fallback', () => {
     expect(OAUTH_CALLBACK_PWA_DENYLIST.test('/oauth/callback?code=code-1&state=state-1')).toBe(true)
     expect(OAUTH_CALLBACK_PWA_DENYLIST.test('/oauth/callback/other')).toBe(false)
