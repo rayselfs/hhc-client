@@ -1949,11 +1949,15 @@ function EditableSessionDocumentView({
       if (event.defaultPrevented) return
       const target = event.target instanceof HTMLElement ? event.target : null
       if (target?.closest('[role="menu"], [role="dialog"]')) return
-      const isFormControl =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'SELECT' ||
-        target?.tagName === 'TEXTAREA'
+      const isFormControl = Boolean(target?.closest('input, select, textarea'))
       if (isFormControl) return
+      const isActionControl = Boolean(
+        target?.closest('button, a[href], [role="button"], [role="link"], [role="tab"]')
+      )
+      const isTabDelete =
+        Boolean(target?.closest('[role="tab"]')) &&
+        (event.key === 'Delete' || event.key === 'Backspace')
+      if (isActionControl && !isTabDelete) return
       const isContentEditable =
         target?.isContentEditable || target?.getAttribute('contenteditable') === 'true'
       if (isContentEditable && event.key !== 'Escape') return

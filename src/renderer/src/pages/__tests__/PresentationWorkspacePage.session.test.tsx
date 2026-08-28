@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   refreshEditablePresentationThumbnail: vi.fn(),
   queryLocalFontFamiliesOnce: vi.fn(),
   supportsLocalFontAccess: vi.fn(),
+  showMenu: vi.fn(),
   toastWarning: vi.fn()
 }))
 
@@ -73,7 +74,7 @@ vi.mock('react-router-dom', async () => {
 })
 
 vi.mock('@renderer/contexts/ContextMenuContext', () => ({
-  useContextMenu: () => ({ showMenu: vi.fn() })
+  useContextMenu: () => ({ showMenu: mocks.showMenu })
 }))
 
 vi.mock('@renderer/contexts/PresentationCloseDecisionContext', () => ({
@@ -216,6 +217,7 @@ describe('PresentationWorkspacePage session integration', () => {
     mocks.queryLocalFontFamiliesOnce.mockResolvedValue([])
     mocks.supportsLocalFontAccess.mockReset()
     mocks.supportsLocalFontAccess.mockReturnValue(true)
+    mocks.showMenu.mockReset()
     mocks.toastWarning.mockReset()
     useFileExplorerStore.setState({
       items: { [item.id]: item },
@@ -529,6 +531,36 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(textInsert).toHaveAttribute('aria-pressed', 'true')
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
     expect(textInsert).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('lets Enter activate Shapes while a text frame is selected', async () => {
+    const user = userEvent.setup()
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Selected target' })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(source, slideId, text),
+      revision: 0
+    })
+    await renderWorkspaceSession()
+
+    const textFrame = (await screen.findAllByText('Selected target'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(textFrame).not.toBeNull()
+    fireEvent.click(textFrame!)
+    const shapes = screen.getByRole('button', { name: 'Shapes' })
+
+    shapes.focus()
+    await user.keyboard('{Enter}')
+
+    expect(mocks.showMenu).toHaveBeenCalledOnce()
+    expect(shapes).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeEnabled()
+    expect(document.querySelector('.presentation-stage [data-text-content]')).toHaveAttribute(
+      'contenteditable',
+      'false'
+    )
   })
 
   it.each(['menu', 'dialog'] as const)(
