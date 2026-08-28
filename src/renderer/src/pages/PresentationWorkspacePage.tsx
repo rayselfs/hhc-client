@@ -908,16 +908,15 @@ function EditableSessionDocumentView({
   const addShape = (shape: 'rectangle' | 'ellipse'): void => {
     if (!activeSlideId) return
     const element = createShapeElement(shape)
-    commitDocument((current) => addElementToSlide(current, activeSlideId, element))
+    if (!commitDocument((current) => addElementToSlide(current, activeSlideId, element))) return
     setSelectedElementId(element.id)
-    setSelectedElementIds(new Set([element.id]))
     setSelectedElementIds(new Set([element.id]))
   }
 
   const addLine = (): void => {
     if (!activeSlideId) return
     const element = createLineElement()
-    commitDocument((current) => addElementToSlide(current, activeSlideId, element))
+    if (!commitDocument((current) => addElementToSlide(current, activeSlideId, element))) return
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
   }
@@ -1161,7 +1160,7 @@ function EditableSessionDocumentView({
       x: copiedElement.x + 24,
       y: copiedElement.y + 24
     } as EditablePresentationElement
-    commitDocument((current) => addElementToSlide(current, activeSlideId, element))
+    if (!commitDocument((current) => addElementToSlide(current, activeSlideId, element))) return
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
   }
@@ -1221,9 +1220,11 @@ function EditableSessionDocumentView({
 
   const addImage = async (file: File): Promise<void> => {
     if (!document || !activeSlideId) return
+    const targetSlideId = activeSlideId
     const { dataUrl, width, height } = await readImageFile(file)
+    if (registry.get(deck.itemId) !== session) return
     const currentDocument = finalizeDocumentMutation()
-    if (!currentDocument) return
+    if (!currentDocument || !currentDocument.slides[targetSlideId]) return
     const assetId = crypto.randomUUID()
     const nextDocument: EditablePresentationDocument = {
       ...currentDocument,
@@ -1244,7 +1245,7 @@ function EditableSessionDocumentView({
       sourceWidth: width,
       sourceHeight: height
     })
-    session.commit(addElementToSlide(nextDocument, activeSlideId, element))
+    session.commit(addElementToSlide(nextDocument, targetSlideId, element))
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
     setIsTextInsertMode(false)
@@ -2391,9 +2392,13 @@ function EditableSessionDocumentView({
                       onInsertText={addTextElement}
                       onElementContextMenu={showElementContextMenu}
                       onTransformStart={(elementId) => {
+                        const current =
+                          session.getSnapshot().renderedDocument.slides[activeSlideId]?.elements[
+                            elementId
+                          ]
+                        if (!current) return undefined
                         session.beginDraft('pointer')
-                        return session.getSnapshot().renderedDocument.slides[activeSlideId]
-                          ?.elements[elementId]
+                        return current
                       }}
                       onTransformPreview={(elementId, updates) => {
                         const snapshot = session.getSnapshot()

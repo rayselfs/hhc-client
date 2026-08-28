@@ -489,7 +489,7 @@ describe('EditableSlideSurface', () => {
   })
 
   it('groups pointer previews into one transform transaction', () => {
-    const onTransformStart = vi.fn()
+    const onTransformStart = vi.fn(() => text)
     const onTransformPreview = vi.fn()
     const onTransformCommit = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -532,8 +532,38 @@ describe('EditableSlideSurface', () => {
     expect(onTransformCommit).toHaveBeenCalledTimes(1)
   })
 
+  it('aborts a transform when the current element no longer exists', () => {
+    const onTransformStart = vi.fn(() => undefined)
+    const onTransformPreview = vi.fn()
+    const onTransformCommit = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Gone', x: 100, y: 80, autoWidth: false })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+        onTransformCommit={onTransformCommit}
+      />
+    )
+
+    const leftEdge = screen.getByTestId('text-frame-edge-left')
+    fireEvent.pointerDown(leftEdge, { clientX: 102, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(leftEdge, { clientX: 126, clientY: 124, pointerId: 1 })
+    fireEvent.pointerUp(leftEdge, { clientX: 126, clientY: 124, pointerId: 1 })
+
+    expect(onTransformStart).toHaveBeenCalledWith(text.id)
+    expect(onTransformPreview).not.toHaveBeenCalled()
+    expect(onTransformCommit).not.toHaveBeenCalled()
+  })
+
   it('cancels a pointer transform without committing it', () => {
-    const onTransformStart = vi.fn()
     const onTransformCommit = vi.fn()
     const onTransformCancel = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -546,6 +576,7 @@ describe('EditableSlideSurface', () => {
       height: 40,
       autoWidth: false
     })
+    const onTransformStart = vi.fn(() => text)
     const withText = addElementToSlide(document, slideId, text)
 
     render(

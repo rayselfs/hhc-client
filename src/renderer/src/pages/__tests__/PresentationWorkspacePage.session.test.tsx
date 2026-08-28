@@ -16,7 +16,8 @@ import {
   createBlankEditablePresentationDocument,
   createImageElement,
   createTextElement,
-  insertBlankEditableSlide
+  insertBlankEditableSlide,
+  removeEditableSlides
 } from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -82,6 +83,51 @@ function mockAutoTextMeasurement(): void {
     return Math.max(20, (this.textContent?.length ?? 0) * 12) + 16
   })
   vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(82)
+}
+
+function deferImageDecode(): { resolve: () => Promise<void>; restore: () => void } {
+  const OriginalFileReader = window.FileReader
+  const OriginalImage = window.Image
+  let resolveReader: (() => void) | null = null
+  let resolveImage: (() => void) | null = null
+
+  class DeferredFileReader {
+    result = 'data:image/png;base64,AA=='
+    error = null
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+
+    readAsDataURL(): void {
+      resolveReader = () => this.onload?.()
+    }
+  }
+
+  class DeferredImage {
+    naturalWidth = 100
+    naturalHeight = 60
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+
+    set src(_value: string) {
+      resolveImage = () => this.onload?.()
+    }
+  }
+
+  Object.defineProperty(window, 'FileReader', { configurable: true, value: DeferredFileReader })
+  Object.defineProperty(window, 'Image', { configurable: true, value: DeferredImage })
+
+  return {
+    resolve: async () => {
+      resolveReader?.()
+      await Promise.resolve()
+      resolveImage?.()
+      await Promise.resolve()
+    },
+    restore: () => {
+      Object.defineProperty(window, 'FileReader', { configurable: true, value: OriginalFileReader })
+      Object.defineProperty(window, 'Image', { configurable: true, value: OriginalImage })
+    }
+  }
 }
 
 vi.mock('react-i18next', async () => {
@@ -1004,6 +1050,27 @@ describe('PresentationWorkspacePage session integration', () => {
     })
   })
 
+  it('does not select a generated shape while composition blocks the mutation', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Composing', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!textBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.compositionStart(textBox)
+    expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rectangle' }))
+
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elementOrder).toEqual([text.id])
+    expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
+  })
+
   it('rebases pending text before New Slide and keyboard nudge mutations', async () => {
     const flushAnimationFrame = mockAnimationFrame()
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
@@ -1052,7 +1119,8 @@ describe('PresentationWorkspacePage session integration', () => {
   it.each([
     ['activation', 'activate', true],
     ['close save', 'close', true],
-    ['close discard', 'discard', false]
+    ['close discard', 'discard', false],
+    ['flush all', 'flushAll', true]
   ] as const)('finalizes live pending text before %s', async (_label, action, persists) => {
     const flushAnimationFrame = mockAnimationFrame()
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
@@ -1085,11 +1153,16 @@ describe('PresentationWorkspacePage session integration', () => {
         await registry!.open(secondItem)
         await registry!.activate(secondItem.id)
       })
+    } else if (action === 'flushAll') {
+      await act(async () => {
+        await registry!.flushAll()
+      })
     } else {
       await act(async () => {
         await registry!.close('deck-1', action === 'discard' ? 'discard' : undefined)
       })
     }
+    const persistedBeforeFrame = mocks.persistEditablePresentationRevision.mock.calls.length
     act(() => flushAnimationFrame())
 
     if (persists) {
@@ -1109,6 +1182,81 @@ describe('PresentationWorkspacePage session integration', () => {
       )
     } else {
       expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+    }
+    if (action === 'flushAll') {
+      expect(mocks.persistEditablePresentationRevision).toHaveBeenCalledTimes(persistedBeforeFrame)
+    }
+  })
+
+  it('drops a deferred image decode after its document session closes', async () => {
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const decode = deferImageDecode()
+    try {
+      const input = globalThis.document.querySelector<HTMLInputElement>('input[type="file"]')
+      if (!input) throw new Error('image file input not found')
+      fireEvent.change(input, {
+        target: { files: [new File(['image'], 'late.png', { type: 'image/png' })] }
+      })
+
+      await act(async () => {
+        await registry!.close('deck-1')
+      })
+      await act(async () => {
+        await decode.resolve()
+      })
+
+      expect(registry!.get('deck-1')).toBeUndefined()
+      expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+    } finally {
+      decode.restore()
+    }
+  })
+
+  it('drops a deferred image decode when its target slide was deleted', async () => {
+    const initialDocument = createBlankEditablePresentationDocument('Sunday')
+    const { document: sourceDocument } = insertBlankEditableSlide(initialDocument, 1)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: sourceDocument,
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const session = registry!.get('deck-1')!
+    const targetSlideId = session.getSnapshot().renderedDocument.slideOrder[0]
+    const decode = deferImageDecode()
+    try {
+      const input = globalThis.document.querySelector<HTMLInputElement>('input[type="file"]')
+      if (!input) throw new Error('image file input not found')
+      fireEvent.change(input, {
+        target: { files: [new File(['image'], 'late.png', { type: 'image/png' })] }
+      })
+      act(() => {
+        session.commit(
+          removeEditableSlides(session.getSnapshot().renderedDocument, [targetSlideId])
+        )
+      })
+      mocks.persistEditablePresentationRevision.mockClear()
+
+      await act(async () => {
+        await decode.resolve()
+      })
+
+      expect(session.getSnapshot().renderedDocument.slides[targetSlideId]).toBeUndefined()
+      expect(session.getSnapshot().renderedDocument.assets).toEqual({})
+      expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+    } finally {
+      decode.restore()
     }
   })
 

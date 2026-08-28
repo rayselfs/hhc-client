@@ -175,7 +175,8 @@ export default function EditableSlideSurface({
     }
     onEditingElementChange?.(null)
     onSelectElement?.(element.id, event)
-    const original = onTransformStart?.(element.id) ?? element
+    const original = onTransformStart ? onTransformStart(element.id) : element
+    if (!original) return
     dragRef.current = {
       elementId: element.id,
       mode,
