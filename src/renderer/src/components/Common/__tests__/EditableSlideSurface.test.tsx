@@ -319,6 +319,38 @@ describe('EditableSlideSurface', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('contenteditable', 'true')
   })
 
+  it('persists pending blur text when the editor unmounts', () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'First', width: 220, height: 40, autoWidth: false })
+    const withText = addElementToSlide(document, slideId, text)
+    const { unmount } = render(
+      <EditableSurfaceHarness
+        document={withText}
+        slideId={slideId}
+        selectedElementId={text.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    const textBox = screen.getByRole('textbox')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'Final text'
+    globalThis.document.body.focus()
+    fireEvent.blur(textBox)
+
+    unmount()
+    act(() => flushAnimationFrame())
+
+    expect(handleUpdate).toHaveBeenCalledWith(
+      slideId,
+      text.id,
+      expect.objectContaining({ text: 'Final text' })
+    )
+  })
+
   it('does not start moving a text box from inside the text content area', () => {
     const onTransformStart = vi.fn()
     const handleUpdate = vi.fn()

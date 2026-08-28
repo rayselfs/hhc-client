@@ -56,6 +56,25 @@ function resizeElement(element: Element, width: number, height: number): void {
   )
 }
 
+function mockAnimationFrame(): () => void {
+  let nextFrameId = 0
+  const frames = new Map<number, FrameRequestCallback>()
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    const frameId = ++nextFrameId
+    frames.set(frameId, callback)
+    return frameId
+  })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+    frames.delete(frameId)
+  })
+
+  return () => {
+    const pendingFrames = [...frames.values()]
+    frames.clear()
+    pendingFrames.forEach((callback) => callback(0))
+  }
+}
+
 vi.mock('react-i18next', async () => {
   const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next')
   return {
@@ -855,6 +874,53 @@ describe('PresentationWorkspacePage session integration', () => {
       expect(afterUndo.type === 'text' ? afterUndo.autoSize : null).toBe('content')
     }
   )
+
+  it('does not let a pending text blur create history after a resize commits', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({
+      text: 'Original text',
+      width: 80,
+      height: 40,
+      autoSize: 'content',
+      autoWidth: false
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+
+    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!textBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'Pending blur text'
+    fireEvent.input(textBox)
+    const rightHandle = await screen.findByLabelText('Resize text box right')
+    rightHandle.focus()
+    fireEvent.blur(textBox)
+
+    fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 2 })
+    fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 0, pointerId: 2 })
+    fireEvent.pointerUp(rightHandle, { clientX: 24, clientY: 0, pointerId: 2 })
+
+    act(() => flushAnimationFrame())
+
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ width: 104 })
+    act(() => registry!.get('deck-1')!.undo())
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ width: 80 })
+  })
 
   it('does not expose dimensions-only Slide Size controls', async () => {
     render(

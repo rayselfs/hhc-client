@@ -913,15 +913,19 @@ function TextElementContent({
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
   const isComposingRef = useRef(false)
+  const editingRef = useRef(editing)
+  const commitTextRef = useRef<(text: string) => void>(() => {})
   const initializedEditingElementRef = useRef<string | null>(null)
   const blurFrameRef = useRef<number | null>(null)
   const textFrameRef = useRef<number | null>(null)
+  const pendingBlurTextRef = useRef<string | null>(null)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
 
   const cancelPendingBlur = (): void => {
     if (blurFrameRef.current == null) return
     window.cancelAnimationFrame(blurFrameRef.current)
     blurFrameRef.current = null
+    pendingBlurTextRef.current = null
   }
 
   const commitText = (text: string): void => {
@@ -933,6 +937,10 @@ function TextElementContent({
         : {})
     } as Partial<EditablePresentationElement>)
   }
+
+  useLayoutEffect(() => {
+    commitTextRef.current = commitText
+  })
 
   const cancelPendingTextCommit = (): void => {
     if (textFrameRef.current == null) return
@@ -968,6 +976,10 @@ function TextElementContent({
   }
 
   useLayoutEffect(() => {
+    editingRef.current = editing
+  }, [editing])
+
+  useLayoutEffect(() => {
     if (!editing || element.locked) return
     const content = contentRef.current
     if (!content) return
@@ -986,7 +998,13 @@ function TextElementContent({
 
   useEffect(() => {
     return () => {
-      if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+      if (blurFrameRef.current != null) {
+        window.cancelAnimationFrame(blurFrameRef.current)
+        blurFrameRef.current = null
+        const text = pendingBlurTextRef.current
+        pendingBlurTextRef.current = null
+        if (editingRef.current && text !== null) commitTextRef.current(text)
+      }
       cancelPendingTextCommit()
     }
   }, [])
@@ -1055,9 +1073,11 @@ function TextElementContent({
         const target = event.currentTarget
         cancelPendingTextCommit()
         if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+        pendingBlurTextRef.current = target.textContent ?? ''
         blurFrameRef.current = window.requestAnimationFrame(() => {
           blurFrameRef.current = null
-          if (window.document.activeElement === target) return
+          pendingBlurTextRef.current = null
+          if (!editingRef.current || window.document.activeElement === target) return
           isComposingRef.current = false
           commitText(target.textContent ?? '')
           onFinishTextEdit?.()
