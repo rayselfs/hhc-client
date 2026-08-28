@@ -8,16 +8,18 @@ import { PresentationSessionRegistryProvider } from '@renderer/contexts/Presenta
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import UserMenu from '../UserMenu'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
-import { collectRecoveryIssues } from '@renderer/lib/recovery-center'
-import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
-import type { RecoveryIssue } from '@renderer/types/recovery-center'
 import { isElectron } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
 
 const auth = vi.hoisted(() => ({
   value: {
     status: 'anonymous' as 'loading' | 'anonymous' | 'authenticated' | 'unavailable',
-    session: null as { userId: string; displayName: string; roles: string[] } | null,
+    session: null as {
+      userId: string
+      displayName: string
+      roles: string[]
+      avatarUrl?: string
+    } | null,
     signInStatus: 'idle' as 'idle' | 'pending' | 'cancelled' | 'expired',
     pendingSignInExpiresAt: null as number | null,
     signIn: vi.fn(async () => undefined),
@@ -37,21 +39,7 @@ vi.mock('@heroui/react/toast', async (importOriginal) => {
   return { ...actual, toast: { ...actual.toast, danger: toastDanger } }
 })
 
-vi.mock('@renderer/lib/recovery-center', () => ({
-  collectRecoveryIssues: vi.fn(async () => [])
-}))
-
 vi.mock('@renderer/lib/env', () => ({ isElectron: vi.fn(() => false) }))
-
-const recoveryIssue = {
-  id: 'storage-integrity:orphan:blob-1',
-  kind: 'storage-integrity' as const,
-  severity: 'warning' as const,
-  titleKey: 'recovery.issues.storageIntegrity.title',
-  detailKey: 'recovery.issues.storageIntegrity.detail',
-  occurredAt: 1,
-  actions: []
-} satisfies RecoveryIssue
 
 function renderUserMenu(
   props: { isExpanded?: boolean; onOpenPreferences?: () => void } = {}
@@ -86,8 +74,6 @@ beforeEach(async () => {
   toastDanger.mockClear()
   vi.mocked(isElectron).mockReturnValue(false)
   useUpdateStore.getState().reset()
-  vi.mocked(collectRecoveryIssues).mockResolvedValue([])
-  useRecoveryCenterStore.setState({ dismissedIssueIds: [], filter: 'all' })
 })
 
 describe('UserMenu', () => {
@@ -97,53 +83,6 @@ describe('UserMenu', () => {
     expect(container.querySelector('[data-slot="avatar"]')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Account menu for Guest' })).toHaveLength(1)
     expect(container.querySelector('button button')).not.toBeInTheDocument()
-  })
-
-  it('places the expanded recovery issue count after the account content in normal flow', async () => {
-    vi.mocked(collectRecoveryIssues).mockResolvedValueOnce([recoveryIssue])
-
-    renderUserMenu()
-
-    const button = screen.getByRole('button', { name: 'Account menu for Guest' })
-    const status = await screen.findByRole('status', { name: '1 recovery issues' })
-    const layout = button.parentElement
-
-    expect(status.closest('button')).toBeNull()
-    expect(status.parentElement).toHaveClass('pointer-events-none')
-    expect(status.parentElement).not.toHaveClass('absolute')
-    expect(layout).toHaveClass('flex-row')
-    expect(button).toHaveClass('flex-1')
-    expect(button).not.toHaveClass('w-auto')
-    expect(layout?.children[0]).toBe(button)
-    expect(layout?.children[1]).toBe(status.parentElement)
-  })
-
-  it('stacks the collapsed recovery issue count below the account trigger in normal flow', async () => {
-    vi.mocked(collectRecoveryIssues).mockResolvedValueOnce([recoveryIssue])
-
-    renderUserMenu({ isExpanded: false })
-
-    const button = screen.getByRole('button', { name: 'Account menu for Guest' })
-    const status = await screen.findByRole('status', { name: '1 recovery issues' })
-    const layout = button.parentElement
-
-    expect(status.closest('button')).toBeNull()
-    expect(status.parentElement).toHaveClass('pointer-events-none')
-    expect(status.parentElement).not.toHaveClass('absolute')
-    expect(layout).toHaveClass('flex-col')
-    expect(button).toHaveClass('w-auto')
-    expect(layout?.children[0]).toBe(button)
-    expect(layout?.children[1]).toBe(status.parentElement)
-  })
-
-  it('exposes recovery unavailability outside the account menu button', async () => {
-    vi.mocked(collectRecoveryIssues).mockRejectedValueOnce(new Error('scan failed'))
-
-    renderUserMenu()
-
-    const status = await screen.findByRole('status', { name: 'Recovery status unavailable' })
-    expect(status.closest('button')).toBeNull()
-    expect(status.parentElement).toHaveClass('pointer-events-none')
   })
 
   it('renders all menu items', () => {
@@ -231,6 +170,23 @@ describe('UserMenu', () => {
     ).toBeInTheDocument()
     fireEvent.click(screen.getByText('Logout').closest('[role="menuitem"]')!)
     expect(auth.value.signOut).toHaveBeenCalledOnce()
+  })
+
+  it('renders the authenticated account avatar', () => {
+    auth.value.status = 'authenticated'
+    auth.value.session = {
+      userId: 'user-1',
+      displayName: 'Ada Lovelace',
+      roles: [],
+      avatarUrl: 'https://account.example/avatar.png'
+    }
+
+    renderUserMenu()
+
+    expect(screen.getByRole('img', { name: 'Ada Lovelace' })).toHaveAttribute(
+      'src',
+      'https://account.example/avatar.png'
+    )
   })
 
   it.each([

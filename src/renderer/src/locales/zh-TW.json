@@ -538,6 +538,12 @@
     "uploadSkippedUnsupported": "已略過 {{count}} 個不支援的檔案",
     "uploadFileTooLarge": "檔案「{{name}}」超過 2GB 上限",
     "uploadInsufficientBrowserStorage": "所選檔案超過瀏覽器可用儲存空間",
+    "processingStatus": {
+      "processing": "處理中",
+      "failed": "處理失敗",
+      "blocked": "處理受阻",
+      "paused": "處理已暫停"
+    },
     "renameFile": "重新命名檔案",
     "renameFolder": "重新命名資料夾",
     "blobLoadFailed": "檔案載入失敗，已跳過",

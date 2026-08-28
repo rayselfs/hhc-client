@@ -538,6 +538,12 @@
     "uploadSkippedUnsupported": "Skipped {{count}} unsupported file(s)",
     "uploadFileTooLarge": "File \"{{name}}\" exceeds 2GB limit",
     "uploadInsufficientBrowserStorage": "The selected files exceed available browser storage",
+    "processingStatus": {
+      "processing": "Processing",
+      "failed": "Processing failed",
+      "blocked": "Processing blocked",
+      "paused": "Processing paused"
+    },
     "renameFile": "Rename file",
     "renameFolder": "Rename folder",
     "blobLoadFailed": "Failed to load file, skipping",

@@ -22,6 +22,17 @@ async function writeFileIn(root: string, path: string): Promise<void> {
   await writeFile(absolutePath, '')
 }
 
+async function writeRendererAsar(
+  resourcesRoot: string,
+  workerSource = 'self.onmessage = () => {}'
+): Promise<void> {
+  const asarSource = join(resourcesRoot, 'asar-source')
+  await writeFileIn(asarSource, 'out/renderer/assets/pdf-worker.js')
+  await writeFile(join(asarSource, 'out/renderer/assets/pdf-worker.js'), workerSource)
+  await createPackage(asarSource, join(resourcesRoot, 'app.asar'))
+  await rm(asarSource, { recursive: true })
+}
+
 async function writeValidMacPackage(root: string): Promise<string> {
   const resourcesRoot = join(root, 'dist/mac-arm64/LibrePresenter.app/Contents/Resources')
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.GPL-2.0')
@@ -34,6 +45,7 @@ async function writeValidMacPackage(root: string): Promise<string> {
   )
   await writeFileIn(resourcesRoot, 'video-engine/vlc/darwin-arm64/lib/libvlc.dylib')
   await writeFileIn(resourcesRoot, 'video-engine/ffmpeg/darwin-arm64/ffmpeg')
+  await writeRendererAsar(resourcesRoot)
   return resourcesRoot
 }
 
@@ -49,6 +61,7 @@ async function writeValidWindowsPackage(root: string): Promise<string> {
   )
   await writeFileIn(resourcesRoot, 'video-engine/vlc/win32-x64/libvlc.dll')
   await writeFileIn(resourcesRoot, 'video-engine/ffmpeg/win32-x64/ffmpeg.exe')
+  await writeRendererAsar(resourcesRoot)
   return resourcesRoot
 }
 
@@ -122,6 +135,17 @@ describe('check packaged runtime script', () => {
     await createPackage(asarSource, join(resourcesRoot, 'app.asar'))
 
     await expect(runChecker(root, 'win32-x64')).rejects.toMatchObject({ code: 1 })
+  })
+
+  it('rejects a PDF worker packaged as raw TypeScript', async () => {
+    const root = await createTempRoot()
+    const resourcesRoot = await writeValidMacPackage(root)
+    await writeRendererAsar(
+      resourcesRoot,
+      'value<K, V>(this: Map<K, V>, key: K): V { return this.get(key)! }'
+    )
+
+    await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
   })
 
   it('rejects Windows installers larger than 450 MiB', async () => {
