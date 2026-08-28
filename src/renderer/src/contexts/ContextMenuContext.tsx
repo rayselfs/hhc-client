@@ -44,17 +44,20 @@ export function ContextMenuProvider({
     triggerRef.current = null
   }, [])
 
-  const showMenu = useCallback((items: ContextMenuEntry[], e: React.MouseEvent): void => {
-    e.preventDefault()
-    e.stopPropagation()
-    triggerRef.current = document.activeElement
-    const hasActionableItem = items.some((item) => item !== 'separator')
-    if (!hasActionableItem) {
-      setMenu(null)
-      return
-    }
-    setMenu({ x: e.clientX, y: e.clientY, items })
-  }, [])
+  const showMenu = useCallback(
+    (items: ContextMenuEntry[], e: React.MouseEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+      const hasActionableItem = items.some((item) => item !== 'separator')
+      if (!hasActionableItem) {
+        close()
+        return
+      }
+      triggerRef.current = document.activeElement
+      setMenu({ x: e.clientX, y: e.clientY, items })
+    },
+    [close]
+  )
 
   useEffect(() => {
     if (!menu) return

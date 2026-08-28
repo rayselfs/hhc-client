@@ -50,31 +50,38 @@ describe('ContextMenuContext', () => {
     }
   )
 
-  it('closes an open menu when a later empty request is made', () => {
-    const items: ContextMenuEntry[] = [{ id: 'action', label: 'Action', onAction: vi.fn() }]
+  it.each([[[] as ContextMenuEntry[]], [['separator'] as ContextMenuEntry[]]])(
+    'closes an open menu and restores its trigger focus for %j',
+    (emptyItems) => {
+      const items: ContextMenuEntry[] = [{ id: 'action', label: 'Action', onAction: vi.fn() }]
 
-    function TestComponent(): React.JSX.Element {
-      const { showMenu } = useContextMenu()
-      return (
-        <>
-          <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
-            target
-          </div>
-          <div data-testid="empty-target" onContextMenu={(e) => showMenu([], e)}>
-            empty target
-          </div>
-        </>
-      )
+      function TestComponent(): React.JSX.Element {
+        const { showMenu } = useContextMenu()
+        return (
+          <>
+            <button type="button" data-testid="trigger" onContextMenu={(e) => showMenu(items, e)}>
+              target
+            </button>
+            <div data-testid="empty-target" onContextMenu={(e) => showMenu(emptyItems, e)}>
+              empty target
+            </div>
+          </>
+        )
+      }
+
+      renderWithProvider(<TestComponent />)
+      const trigger = screen.getByTestId('trigger')
+      trigger.focus()
+      fireEvent.contextMenu(trigger)
+      expect(screen.getByRole('menu')).toBeInTheDocument()
+      expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Action' }))
+
+      fireEvent.contextMenu(screen.getByTestId('empty-target'))
+
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(document.activeElement).toBe(trigger)
     }
-
-    renderWithProvider(<TestComponent />)
-    fireEvent.contextMenu(screen.getByTestId('target'))
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    fireEvent.contextMenu(screen.getByTestId('empty-target'))
-
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-  })
+  )
 
   it('shows menu on showMenu call', () => {
     const items: ContextMenuEntry[] = [{ id: 'copy', label: 'Copy', onAction: vi.fn() }]
