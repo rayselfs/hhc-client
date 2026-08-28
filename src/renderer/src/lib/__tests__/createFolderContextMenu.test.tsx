@@ -28,12 +28,9 @@ describe('createFolderContextMenu HHC LINE action', () => {
     const entries = showMenu.mock.calls[0][0]
     const action = entries.find((entry: { id?: string }) => entry?.id === 'add-hhc-line')
     expect(action.label).toBe('folder.contextMenu.addHhcLine')
-    expect(action.iconSlotClassName).toBe('size-10')
+    expect(action).not.toHaveProperty('iconSlotClassName')
     render(action.icon)
-    expect(screen.getByRole('img', { name: 'LINE' })).toHaveAttribute(
-      'src',
-      expect.stringContaining('line-brand-icon')
-    )
+    expect(screen.getByRole('img', { name: 'LINE' })).toHaveClass('size-4')
     expect(document.querySelector('svg.lucide-cloud')).not.toBeInTheDocument()
     action.onAction()
     expect(onAddHhcLine).toHaveBeenCalledTimes(1)

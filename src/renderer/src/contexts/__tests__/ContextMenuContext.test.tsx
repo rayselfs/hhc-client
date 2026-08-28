@@ -106,13 +106,12 @@ describe('ContextMenuContext', () => {
     expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
   })
 
-  it('uses the requested LINE icon slot without changing normal icon slots', () => {
+  it('uses the same icon slot for LINE and normal menu items', () => {
     const items: ContextMenuEntry[] = [
       {
         id: 'line',
         label: 'Sync LINE group',
-        icon: <SyncProviderIcon providerType="hhc-line" />,
-        iconSlotClassName: 'size-10',
+        icon: <SyncProviderIcon providerType="hhc-line" className="size-4" />,
         onAction: vi.fn()
       },
       {
@@ -136,13 +135,12 @@ describe('ContextMenuContext', () => {
     fireEvent.contextMenu(screen.getByTestId('target'))
 
     const lineItem = screen.getByRole('menuitem', { name: 'Sync LINE group' })
-    const lineSlot = lineItem.querySelector('img[alt="LINE"]')?.parentElement?.parentElement
+    const lineIcon = lineItem.querySelector('[aria-label="LINE"]')
+    const lineSlot = lineIcon?.parentElement
     expect(lineItem).toBeInTheDocument()
-    expect(lineSlot).toHaveClass('size-10')
+    expect(lineIcon).toHaveClass('size-4')
+    expect(lineSlot).toHaveClass('h-4', 'w-4')
     expect(lineSlot).toHaveAttribute('aria-hidden', 'true')
-    expect(lineSlot).not.toHaveClass('overflow-hidden')
-    expect(lineSlot?.querySelector('img')).toHaveAttribute('width', '20')
-    expect(lineSlot?.querySelector('img')).toHaveAttribute('height', '20')
     expect(
       screen.getByRole('menuitem', { name: 'Sync local folder' }).querySelector(':scope > span')
     ).toHaveClass('h-4', 'w-4')

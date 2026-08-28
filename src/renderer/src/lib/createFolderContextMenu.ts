@@ -394,8 +394,10 @@ export function createFolderContextMenu(
                     {
                       id: 'add-hhc-line',
                       label: tKey('addHhcLine'),
-                      icon: React.createElement(SyncProviderIcon, { providerType: 'hhc-line' }),
-                      iconSlotClassName: 'size-10',
+                      icon: React.createElement(SyncProviderIcon, {
+                        providerType: 'hhc-line',
+                        className: 'size-4'
+                      }),
                       disabled: isAddHhcLineDisabled,
                       onAction: onAddHhcLine
                     } as ContextMenuEntry
