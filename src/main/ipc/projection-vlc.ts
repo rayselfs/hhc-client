@@ -30,6 +30,7 @@ let lifecycleVersion = 0
 let lastProgressPublicationMs: number | null = null
 
 const VLC_PROGRESS_PUBLICATION_INTERVAL_MS = 250
+const VLC_PREMATURE_END_TOLERANCE_MS = 2_000
 const VLC_FAILURE_DETAILS: Record<
   ProjectionVlcFailureCode,
   Pick<ProjectionVlcFailure, 'recoverable' | 'message'>
@@ -267,18 +268,26 @@ function sendState(wm: WindowManager, next?: { isPlaying?: boolean; isEnded?: bo
   if (!player || !currentItemId) return
   const generation = wm.getProjectionState().lifecycle.generation
   if (!Number.isSafeInteger(generation) || generation <= 0) return
-  const currentTime = Math.max(0, player.getTime()) / 1000
-  const duration =
-    currentDurationMs !== undefined && currentDurationMs > 0
-      ? currentDurationMs / 1000
-      : Math.max(0, player.getLength()) / 1000
+  let currentTime = 0
+  let duration =
+    currentDurationMs !== undefined && currentDurationMs > 0 ? currentDurationMs / 1000 : 0
+  let isPlaying = next?.isPlaying ?? false
+  let isEnded = next?.isEnded ?? false
+  try {
+    currentTime = Math.max(0, player.getTime()) / 1000
+    if (duration === 0) duration = Math.max(0, player.getLength()) / 1000
+    if (next?.isPlaying === undefined) isPlaying = player.isPlaying()
+    if (next?.isEnded === undefined) isEnded = player.getState() === 6
+  } catch {
+    // Native state can be unavailable after VLC reports a playback failure.
+  }
 
   wm.sendToMain('projection:message', generation, 'file:playback-state', {
     itemId: currentItemId,
     currentTime,
     duration,
-    isPlaying: next?.isPlaying ?? player.isPlaying(),
-    isEnded: next?.isEnded ?? player.getState() === 6
+    isPlaying,
+    isEnded
   })
 }
 
@@ -288,6 +297,20 @@ function hideNativePlayerWindow(currentPlayer: VlcPlayer): void {
     activeRuntime?.getBinding().setPlayerWindowVisible(currentPlayer.playerId, false)
   } catch {
     // Window teardown can race with native view teardown.
+  }
+}
+
+function didPlaybackEndPrematurely(): boolean {
+  if (!player) return false
+  try {
+    const elapsedMs = Math.max(0, player.getTime())
+    const durationMs =
+      currentDurationMs !== undefined && currentDurationMs > 0
+        ? currentDurationMs
+        : Math.max(0, player.getLength())
+    return durationMs > 0 && elapsedMs + VLC_PREMATURE_END_TOLERANCE_MS < durationMs
+  } catch {
+    return false
   }
 }
 
@@ -395,8 +418,22 @@ async function startVlc(
     nextPlayer.on('playing', () => sendState(wm, { isPlaying: true, isEnded: false }))
     nextPlayer.on('paused', () => sendState(wm, { isPlaying: false }))
     nextPlayer.on('stopped', () => sendState(wm, { isPlaying: false }))
-    nextPlayer.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
+    nextPlayer.on('endReached', () => {
+      const endedPrematurely = didPlaybackEndPrematurely()
+      sendState(wm, { isPlaying: false, isEnded: true })
+      if (endedPrematurely) {
+        publishFailure(
+          wm,
+          'playback-failed',
+          generation,
+          startVersion,
+          request.itemId,
+          embeddedPlayer
+        )
+      }
+    })
     nextPlayer.on('error', () => {
+      sendState(wm, { isPlaying: false, isEnded: true })
       publishFailure(
         wm,
         'playback-failed',
@@ -410,7 +447,7 @@ async function startVlc(
     if (request.initialVolume !== undefined) {
       nextPlayer.setVolume(Math.round(Math.max(0, Math.min(1, request.initialVolume)) * 100))
     }
-    if (request.initialPositionSeconds !== undefined) {
+    if (request.initialPositionSeconds !== undefined && request.initialPositionSeconds > 0) {
       nextPlayer.setTime(Math.max(0, Math.round(request.initialPositionSeconds * 1000)))
     }
     if (request.initialPlaybackState === 'playing') nextPlayer.play()

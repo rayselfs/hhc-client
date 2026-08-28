@@ -75,6 +75,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
+  const projectionPlaybackState = useMediaProjectionStore((s) => s.typeStates.video)
   const setTypeState = useMediaProjectionStore((s) => s.setTypeState)
   const metadataDuration = useMediaProjectionStore((s) => {
     const durationMs = s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.durationMs
@@ -86,11 +87,11 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     return entry.remoteSource ? entry.sourceUrl : null
   })
   const MediaElement = item.mimeType.startsWith('audio/') ? 'audio' : 'video'
-  const displayedCurrentTime = currentTime
-  const displayedDuration = metadataDuration ?? duration
-  const displayedHasStarted = hasStarted
-  const displayedIsPlaying = isPlaying
-  const displayedIsEnded = isEnded
+  const displayedCurrentTime = projectionPlaybackState?.currentTime ?? currentTime
+  const displayedDuration = projectionPlaybackState?.duration ?? metadataDuration ?? duration
+  const displayedHasStarted = projectionPlaybackState?.hasStarted ?? hasStarted
+  const displayedIsPlaying = projectionPlaybackState?.isPlaying ?? isPlaying
+  const displayedIsEnded = projectionPlaybackState?.isEnded ?? isEnded
   const transform =
     zoomLevel !== 1
       ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
@@ -187,7 +188,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const handlePlayPause = useCallback((): void => {
     if (!videoRef.current) return
-    if (isEnded) {
+    if (displayedIsEnded) {
       triggerFlash('play')
       videoRef.current.currentTime = 0
       setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
@@ -197,7 +198,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         .catch(() => setPlaybackState({ isPlaying: false }))
       sendCommand({ action: 'seek', itemId: item.id, value: 0 })
       sendCommand({ action: 'play', itemId: item.id })
-    } else if (isPlaying) {
+    } else if (displayedIsPlaying) {
       triggerFlash('pause')
       setPlaybackState({ isPlaying: false })
       videoRef.current.pause()
@@ -211,15 +212,15 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         .catch(() => setPlaybackState({ isPlaying: false }))
       sendCommand({ action: 'play', itemId: item.id })
     }
-  }, [isEnded, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [displayedIsEnded, displayedIsPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   const pauseVideo = useCallback((): void => {
-    if (!videoRef.current || !isPlaying) return
+    if (!videoRef.current || !displayedIsPlaying) return
     triggerFlash('pause')
     setPlaybackState({ isPlaying: false })
     videoRef.current.pause()
     sendCommand({ action: 'pause', itemId: item.id })
-  }, [isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [displayedIsPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
@@ -428,12 +429,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             min={0}
             max={displayedDuration || 1}
             step={0.1}
-            value={isDraggingSeek ? localSeekTime : currentTime}
+            value={isDraggingSeek ? localSeekTime : displayedCurrentTime}
             className="video-seek-range w-full"
             ref={seekInputRef}
             style={
               {
-                '--seek-fill': `${(((isDraggingSeek ? localSeekTime : currentTime) / (displayedDuration || 1)) * 100).toFixed(2)}%`
+                '--seek-fill': `${(((isDraggingSeek ? localSeekTime : displayedCurrentTime) / (displayedDuration || 1)) * 100).toFixed(2)}%`
               } as React.CSSProperties
             }
             onPointerDown={(e) => {

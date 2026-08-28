@@ -347,6 +347,27 @@ describe('projection-vlc listener cleanup', () => {
     expect(JSON.stringify(mockWindowManager.sendToMain.mock.calls)).not.toContain('/media/source')
   })
 
+  it('publishes playback failure when damaged media ends far before its duration', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player',
+      durationMs: 183_000
+    })
+    const current = mockVlcPlayers[0]
+    current.getTime.mockReturnValue(90_000)
+    mockWindowManager.sendToMain.mockClear()
+
+    current.emit('endReached')
+
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:failure', {
+      itemId: 'item-1',
+      code: 'playback-failed',
+      recoverable: true,
+      message: 'VLC playback stopped unexpectedly.'
+    })
+  })
+
   it('does not publish a delayed old-item startup failure after newer media starts', async () => {
     const oldEmbed = deferred<void>()
     let embedCount = 0
@@ -421,6 +442,16 @@ describe('projection-vlc listener cleanup', () => {
       recoverable: true,
       message: 'VLC playback stopped unexpectedly.'
     })
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+      'projection:message',
+      4,
+      'file:playback-state',
+      expect.objectContaining({
+        itemId: 'item-1',
+        isPlaying: false,
+        isEnded: true
+      })
+    )
   })
 
   it('reports a missing native binding without failing handler registration', async () => {
@@ -605,6 +636,18 @@ describe('projection-vlc listener cleanup', () => {
     expect(current.setTime.mock.invocationCallOrder[0]).toBeLessThan(
       current.play.mock.invocationCallOrder[0]
     )
+  })
+
+  it('does not force an MKV demux seek when replay starts at zero', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player',
+      initialPositionSeconds: 0,
+      initialPlaybackState: 'paused'
+    })
+
+    expect(mockVlcPlayers[0].setTime).not.toHaveBeenCalled()
   })
 
   it('does not play a paused or ended VLC replay state', async () => {
