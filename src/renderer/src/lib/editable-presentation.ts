@@ -170,6 +170,15 @@ const DEFAULT_FONT_FAMILY = 'Inter Variable'
 export const DEFAULT_SLIDE_BACKGROUND_COLOR = '#ffffff'
 const DEFAULT_FOREGROUND_COLOR = '#111827'
 export type EditableTextAutoSize = 'content' | 'fixed'
+
+export function hasContentHeight(
+  element: Pick<EditableTextElement, 'autoSize' | 'autoWidth'>
+): boolean {
+  return (
+    element.autoSize === 'content' || (element.autoSize === undefined && element.autoWidth === true)
+  )
+}
+
 export const INSERTED_TEXT_FONT_SIZE_POINTS = 18
 export const INSERTED_TEXT_CLICK_SIZE = { width: 24, height: 32 } as const
 export const INSERTED_TEXT_DRAG_MIN_SIZE = { width: 80, height: 40 } as const

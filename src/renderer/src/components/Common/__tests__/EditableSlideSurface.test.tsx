@@ -557,6 +557,40 @@ describe('EditableSlideSurface', () => {
     expect(screen.getByLabelText('Resize text box bottom')).toBeInTheDocument()
   })
 
+  it('keeps legacy auto-width text content-height when autoSize is absent', () => {
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Legacy frame',
+      width: 220,
+      height: 40,
+      autoWidth: true
+    })
+    delete text.autoSize
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
+    const rightHandle = screen.getByLabelText('Resize text box right')
+    fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 24, pointerId: 1 })
+
+    const updates = handleUpdate.mock.calls[0]?.[2]
+    expect(updates).toMatchObject({ width: 244, autoSize: 'content', autoWidth: false })
+    expect(updates).not.toHaveProperty('height')
+    expect(updates).not.toHaveProperty('y')
+  })
+
   it('renders selected images with native-like resize handles and applied effects', () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]

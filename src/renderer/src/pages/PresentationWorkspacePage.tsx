@@ -59,6 +59,7 @@ import {
   DEFAULT_GRADIENT_BACKGROUND,
   duplicateEditableSlides,
   getSlideBackgroundPrimaryColor,
+  hasContentHeight,
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
   INSERTED_TEXT_FONT_SIZE_POINTS,
@@ -1147,9 +1148,11 @@ function EditableSessionDocumentView({
     if (!Number.isFinite(next)) return
     updateSelectedElement({
       [key]: next,
-      ...(selectedElement?.type === 'text' && (key === 'width' || key === 'height')
-        ? { autoWidth: false, autoSize: 'fixed' as const }
-        : {})
+      ...(selectedElement?.type === 'text' && key === 'width'
+        ? { autoWidth: false, autoSize: hasContentHeight(selectedElement) ? 'content' : 'fixed' }
+        : selectedElement?.type === 'text' && key === 'height'
+          ? { autoWidth: false, autoSize: 'fixed' as const }
+          : {})
     } as Partial<EditablePresentationElement>)
   }
 

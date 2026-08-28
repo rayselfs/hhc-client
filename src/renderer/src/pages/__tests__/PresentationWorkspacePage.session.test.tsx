@@ -279,9 +279,86 @@ describe('PresentationWorkspacePage session integration', () => {
         expect(element.height).toBeGreaterThanOrEqual(
           Math.ceil(element.fontSize * element.lineHeight)
         )
+        expect(element.autoSize).toBe('content')
+        expect(element.autoWidth).toBe(true)
       })
+
+      fireEvent.click(screen.getByRole('button', { name: '插入' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Text' }))
+      fireEvent.pointerDown(surface!, { clientX: 100, clientY: 100, pointerId: 1 })
+      fireEvent.pointerUp(surface!, { clientX: 140, clientY: 120, pointerId: 1 })
+
+      await waitFor(() => {
+        const slide = registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[
+          sourceDocument.slideOrder[0]
+        ]
+        const dragged = slide.elements[slide.elementOrder[1]]
+        expect(dragged.type).toBe('text')
+        if (dragged.type !== 'text') return
+        expect(dragged.autoSize).toBe('content')
+        expect(dragged.autoWidth).toBe(false)
+      })
+
+      const rightHandle = screen.getByLabelText('Resize text box right')
+      fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 2 })
+      fireEvent.pointerMove(rightHandle, { clientX: 12, clientY: 0, pointerId: 2 })
+      fireEvent.pointerUp(rightHandle, { clientX: 12, clientY: 0, pointerId: 2 })
+
+      await waitFor(() => {
+        const slide = registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[
+          sourceDocument.slideOrder[0]
+        ]
+        const resized = slide.elements[slide.elementOrder[1]]
+        expect(resized.type === 'text' ? resized.width : null).toBe(104)
+        expect(resized.type === 'text' ? resized.autoSize : null).toBe('content')
+      })
+
+      act(() => registry!.get('deck-1')!.undo())
+      const afterUndo = registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[
+        sourceDocument.slideOrder[0]
+      ].elements[
+        registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[sourceDocument.slideOrder[0]]
+          .elementOrder[1]
+      ]
+      expect(afterUndo.type === 'text' ? afterUndo.width : null).toBe(80)
+      expect(afterUndo.type === 'text' ? afterUndo.autoSize : null).toBe('content')
     }
   )
+
+  it('keeps content-height text content-height when the inspector changes width', async () => {
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
+    const session = registry!.get('deck-1')!
+    const document = session.getSnapshot().renderedDocument
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Content height',
+      width: 220,
+      height: 40,
+      autoSize: 'content',
+      autoWidth: false
+    })
+    act(() => session.commit(addElementToSlide(document, slideId, text)))
+
+    const textElement = (await screen.findAllByText('Content height'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(textElement).not.toBeNull()
+    fireEvent.pointerDown(textElement!, { clientX: 10, clientY: 10 })
+    fireEvent.change(screen.getByLabelText('width'), { target: { value: '280' } })
+
+    await waitFor(() => {
+      const updated = session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+      expect(updated.type === 'text' ? updated.width : null).toBe(280)
+      expect(updated.type === 'text' ? updated.autoSize : null).toBe('content')
+      expect(updated.type === 'text' ? updated.autoWidth : null).toBe(false)
+    })
+  })
 
   it('does not expose dimensions-only Slide Size controls', async () => {
     render(

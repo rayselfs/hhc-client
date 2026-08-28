@@ -697,6 +697,38 @@ describe('editable presentation documents', () => {
     expect(loaded.name).toBe('Source')
   })
 
+  it('preserves legacy auto-width text without injecting autoSize on load', async () => {
+    const document = createBlankEditablePresentationDocument('Legacy')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Legacy text', autoWidth: true })
+    const contentHeightText = createTextElement({ text: 'Content height', autoSize: 'content' })
+    delete text.autoSize
+    delete contentHeightText.autoWidth
+    const source = { id: 'deck-legacy', url: 'blob:deck-legacy', name: 'Legacy' }
+    const stored = addElementToSlide(
+      addElementToSlide(document, slideId, text),
+      slideId,
+      contentHeightText
+    )
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'deck-legacy',
+      blob: createStoredBlob(JSON.stringify(stored)),
+      revision: 1
+    })
+
+    const loaded = await loadEditablePresentation(source)
+    const loadedText = loaded.slides[slideId].elements[text.id]
+
+    expect(loadedText).toMatchObject({ type: 'text', autoWidth: true })
+    expect(loadedText.type === 'text' ? loadedText.autoSize : undefined).toBeUndefined()
+    const loadedContentHeightText = loaded.slides[slideId].elements[contentHeightText.id]
+    expect(loadedContentHeightText).toMatchObject({ type: 'text', autoSize: 'content' })
+    expect(
+      loadedContentHeightText.type === 'text' ? loadedContentHeightText.autoWidth : undefined
+    ).toBeUndefined()
+  })
+
   it('reuses parsed documents by source revision and invalidates on revision change', async () => {
     const firstDocument = createBlankEditablePresentationDocument(
       'Revision one',

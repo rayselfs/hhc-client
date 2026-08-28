@@ -8,6 +8,7 @@ import type {
 import {
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
+  hasContentHeight,
   getSlideBackgroundCss,
   getSlideBackgroundPrimaryColor
 } from '@renderer/lib/editable-presentation'
@@ -190,7 +191,7 @@ export default function EditableSlideSurface({
       updates = {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false,
-        autoSize: drag.original.autoSize === 'content' ? 'content' : 'fixed'
+        autoSize: hasContentHeight(drag.original) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'image' && drag.handle) {
       updates = calculateImageResize(
@@ -578,7 +579,7 @@ function ElementHandles({
   onPointerCancel: (event: React.PointerEvent) => void
 }): React.JSX.Element {
   if (element.type === 'text') {
-    const handles = element.autoSize === 'content' ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
+    const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
     return (
       <>
         {handles.map((handle) => (
@@ -753,7 +754,7 @@ function calculateTextResize(
   const hasWest = handle.includes('w')
   const hasEast = handle.includes('e')
   const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
-  if (element.autoSize === 'content') {
+  if (hasContentHeight(element)) {
     return {
       x: hasWest ? element.x + (element.width - width) : element.x,
       width
@@ -813,7 +814,7 @@ function measureAutoSizedTextElement(
 
   const updates: Partial<EditablePresentationElement> = {}
   if (element.autoWidth === true && Math.abs(width - element.width) >= 1) updates.width = width
-  if (element.autoSize === 'content' && Math.abs(height - element.height) >= 1) {
+  if (hasContentHeight(element) && Math.abs(height - element.height) >= 1) {
     updates.height = height
   }
   return updates
