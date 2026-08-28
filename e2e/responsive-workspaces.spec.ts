@@ -34,7 +34,10 @@ async function selectSlideElement(element: Locator): Promise<void> {
   await element.evaluate((target) => (target as HTMLElement).click())
 }
 
-async function expectEffectiveHandleTarget(handle: Locator): Promise<void> {
+async function expectEffectiveHandleTarget(
+  handle: Locator,
+  expectedDirection: ResizeHandle
+): Promise<void> {
   await expect(handle).toBeVisible()
   await handle.evaluate(async (element) => {
     const viewport = element.closest('[data-testid="presentation-canvas-viewport"]')
@@ -92,9 +95,9 @@ async function expectEffectiveHandleTarget(handle: Locator): Promise<void> {
     return {
       width: Math.max(0, right - left),
       height: Math.max(0, bottom - top),
-      hitIsResizeTarget: Boolean(
-        document.elementFromPoint(centerX, centerY)?.closest('[data-resize-handle]')
-      ),
+      hitHandle: document
+        .elementFromPoint(centerX, centerY)
+        ?.closest<HTMLElement>('[data-resize-handle]')?.dataset.resizeHandle,
       rect,
       clips,
       surface: element.closest('[data-slide-surface]')?.getBoundingClientRect(),
@@ -110,7 +113,7 @@ async function expectEffectiveHandleTarget(handle: Locator): Promise<void> {
   })
   expect(effective.width, JSON.stringify(effective)).toBeGreaterThanOrEqual(24)
   expect(effective.height).toBeGreaterThanOrEqual(24)
-  expect(effective.hitIsResizeTarget).toBe(true)
+  expect(effective.hitHandle).toBe(expectedDirection)
 }
 
 async function setEditorZoom(
@@ -146,7 +149,7 @@ async function dragResizeHandle(
   horizontalOnly = false,
   inward = true
 ): Promise<void> {
-  await expectEffectiveHandleTarget(handle)
+  await expectEffectiveHandleTarget(handle, direction)
   const chrome = page.locator('[data-selection-chrome]').first()
   const before = await chrome.evaluate((element) => ({
     x: Number.parseFloat((element as HTMLElement).style.left),
@@ -224,7 +227,7 @@ async function dragResizeHandle(
 }
 
 async function dragCropHandle(page: Page, handle: Locator, direction: ResizeHandle): Promise<void> {
-  await expectEffectiveHandleTarget(handle)
+  await expectEffectiveHandleTarget(handle, direction)
   const image = page.locator(
     '.presentation-stage [data-slide-content] [data-slide-element] img[alt="Corner image"]'
   )
@@ -254,6 +257,106 @@ async function dragCropHandle(page: Page, handle: Locator, direction: ResizeHand
   if (direction.includes('s')) expect(after[3], direction).toBeGreaterThan(before[3])
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(readCropGeometry).toEqual(before)
+}
+
+async function dragWithTouch(
+  page: Page,
+  handle: Locator,
+  dx: number,
+  dy: number,
+  finish: 'end' | 'cancel' = 'end'
+): Promise<string[]> {
+  const direction = await handle.getAttribute('data-resize-handle')
+  expect(direction).not.toBeNull()
+  await expectEffectiveHandleTarget(handle, direction as ResizeHandle)
+  const target = await handle.boundingBox()
+  expect(target).not.toBeNull()
+  await page.evaluate(() => {
+    const trackedWindow = window as Window & { __presentationTouchEvents?: string[] }
+    trackedWindow.__presentationTouchEvents = []
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+      document.addEventListener(type, () => trackedWindow.__presentationTouchEvents?.push(type), {
+        capture: true,
+        once: true
+      })
+    }
+  })
+  const x = target!.x + target!.width / 2
+  const y = target!.y + target!.height / 2
+  const session = await page.context().newCDPSession(page)
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x, y, id: 1 }]
+  })
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [{ x: x + dx, y: y + dy, id: 1 }]
+  })
+  await session.send('Input.dispatchTouchEvent', {
+    type: finish === 'end' ? 'touchEnd' : 'touchCancel',
+    touchPoints: []
+  })
+  await session.detach()
+  return page.evaluate(
+    () =>
+      (window as Window & { __presentationTouchEvents?: string[] }).__presentationTouchEvents ?? []
+  )
+}
+
+async function expectTextInteriorAndFrameMove(page: Page, element: Locator): Promise<void> {
+  const text = element.getByText('Corner', { exact: true })
+  const content = await text.boundingBox()
+  expect(content).not.toBeNull()
+  const contentPoint = {
+    x: content!.x + content!.width / 2,
+    y: content!.y + content!.height / 2
+  }
+  expect(
+    await page.evaluate(({ x, y }) => {
+      const hit = document.elementFromPoint(x, y)
+      return {
+        element: Boolean(hit?.closest('[data-slide-element]')),
+        handle: Boolean(hit?.closest('[data-resize-handle]')),
+        edge: Boolean(hit?.closest('[data-text-frame-edge]'))
+      }
+    }, contentPoint)
+  ).toEqual({ element: true, handle: false, edge: false })
+
+  await page.mouse.dblclick(contentPoint.x, contentPoint.y)
+  await expect(text).toHaveAttribute('contenteditable', 'true')
+  await expect(text).toBeFocused()
+  await page.keyboard.press('Escape')
+  await selectSlideElement(element)
+
+  const edge = page.getByTestId('text-frame-edge-top')
+  await expect(edge).toHaveCSS('touch-action', 'none')
+  const edgeBox = await edge.boundingBox()
+  expect(edgeBox).not.toBeNull()
+  const edgePoint = {
+    x: edgeBox!.x + edgeBox!.width / 2,
+    y: edgeBox!.y + edgeBox!.height / 2
+  }
+  expect(
+    await page.evaluate(({ x, y }) => {
+      return document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-text-frame-edge]')
+        ?.dataset.textFrameEdge
+    }, edgePoint)
+  ).toBe('top')
+
+  const chrome = page.locator('[data-selection-chrome]')
+  const readPosition = (): Promise<number[]> =>
+    chrome.evaluate((selection) => {
+      const style = (selection as HTMLElement).style
+      return [Number.parseFloat(style.left), Number.parseFloat(style.top)]
+    })
+  const before = await readPosition()
+  await page.mouse.move(edgePoint.x, edgePoint.y)
+  await page.mouse.down()
+  await page.mouse.move(edgePoint.x + 24, edgePoint.y + 24)
+  await page.mouse.up()
+  await expect.poll(readPosition).not.toEqual(before)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(readPosition).toEqual(before)
 }
 
 async function installResizeFixture(page: Page): Promise<void> {
@@ -315,9 +418,9 @@ async function installResizeFixture(page: Page): Promise<void> {
         id: 'content-text',
         autoWidth: false,
         autoSize: 'content',
-        x: 90,
+        x: 0,
         y: 0,
-        width: 240,
+        width: 60,
         height: 32,
         text: 'Corner'
       },
@@ -337,9 +440,9 @@ async function installResizeFixture(page: Page): Promise<void> {
         type: 'image',
         assetId: 'corner-asset',
         x: 0,
-        y: document.height - 180,
-        width: 180,
-        height: 180,
+        y: document.height - 20,
+        width: 20,
+        height: 20,
         rotation: 0,
         opacity: 1
       },
@@ -347,10 +450,10 @@ async function installResizeFixture(page: Page): Promise<void> {
         id: 'corner-shape',
         type: 'shape',
         shape: 'rectangle',
-        x: document.width - 180,
+        x: document.width - 20,
         y: 0,
-        width: 180,
-        height: 180,
+        width: 20,
+        height: 20,
         rotation: 0,
         opacity: 1,
         fillColor: '#2563eb',
@@ -750,20 +853,18 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
   const contentTextHandles: ResizeHandle[] = ['nw', 'w', 'sw', 'ne', 'e', 'se']
   await expect(elements).toHaveCount(4)
   await expect(saved).toBeVisible()
-  await expect(elements.nth(0)).toHaveCSS('left', '90px')
+  await expect(elements.nth(0)).toHaveCSS('left', '0px')
+  await expect(elements.nth(0)).toHaveCSS('width', '60px')
+  await expect(elements.nth(1)).toHaveCSS('width', '60px')
+  await expect(elements.nth(1)).toHaveCSS('height', '24px')
+  await expect(elements.nth(2)).toHaveCSS('width', '20px')
+  await expect(elements.nth(2)).toHaveCSS('height', '20px')
+  await expect(elements.nth(3)).toHaveCSS('width', '20px')
+  await expect(elements.nth(3)).toHaveCSS('height', '20px')
   await expect(page.locator('.presentation-stage [data-slide-content]')).toHaveCSS(
     'overflow',
     'hidden'
   )
-
-  await selectSlideElement(elements.nth(0))
-  const contentLeftHandle = page.getByRole('button', {
-    name: 'Resize text box left',
-    exact: true
-  })
-  for (let step = 0; step < 9; step += 1) await contentLeftHandle.press('Shift+ArrowLeft')
-  await expect(page.locator('[data-selection-chrome]')).toHaveCSS('left', '0px')
-  await expect(saved).toBeVisible()
 
   for (const zoomPercent of ['25', '100', '200']) {
     await selectSlideElement(elements.nth(0))
@@ -781,6 +882,7 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
         false
       )
     }
+    await expectTextInteriorAndFrameMove(page, elements.nth(0))
 
     await selectSlideElement(elements.nth(1))
     await expect(saved).toBeVisible()
@@ -808,7 +910,9 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
           name: `Resize image ${HANDLE_LABELS[direction]}`,
           exact: true
         }),
-        direction
+        direction,
+        false,
+        false
       )
     }
 
@@ -833,7 +937,7 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
     await expect(saved).toBeVisible()
     await setEditorZoom(page, zoomSlider, zoomValue, zoomPercent)
     const genericHandle = page.getByRole('button', { name: 'Resize element', exact: true })
-    await dragResizeHandle(page, genericHandle, 'se')
+    await dragResizeHandle(page, genericHandle, 'se', false, false)
     expect(
       await page.evaluate(() => {
         const surface = document.querySelector<HTMLElement>(
@@ -853,6 +957,59 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
       })
     ).toBe(true)
   }
+})
+
+test.describe('touch presentation editing', () => {
+  test.use({ hasTouch: true })
+
+  test('commits touch resize and crop gestures while explicit cancellation restores geometry', async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await page.goto('/')
+    await completeOnboarding(page)
+    await page.goto('/#/files')
+    await page.getByLabel(/New|新增/).click()
+    await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
+    await installResizeFixture(page)
+
+    const elements = page.locator('.presentation-stage [data-slide-content] [data-slide-element]')
+    await expect(page.getByTestId('presentation-canvas-viewport')).toHaveCSS('touch-action', 'auto')
+    await selectSlideElement(elements.nth(1))
+    const textHandle = page.getByRole('button', {
+      name: 'Resize text box right',
+      exact: true
+    })
+    await expect(textHandle).toHaveCSS('touch-action', 'none')
+    const textChrome = page.locator('[data-selection-chrome]')
+    const readTextWidth = (): Promise<number> =>
+      textChrome.evaluate((element) => Number.parseFloat((element as HTMLElement).style.width))
+    const initialWidth = await readTextWidth()
+    const commitEvents = await dragWithTouch(page, textHandle, 24, 0)
+    await expect.poll(readTextWidth).toBeGreaterThan(initialWidth)
+    expect(commitEvents).toContain('pointerdown')
+    expect(commitEvents).toContain('pointermove')
+    expect(commitEvents).toContain('pointerup')
+    expect(commitEvents).not.toContain('pointercancel')
+
+    const committedWidth = await readTextWidth()
+    const cancelEvents = await dragWithTouch(page, textHandle, 24, 0, 'cancel')
+    await expect.poll(readTextWidth).toBe(committedWidth)
+    expect(cancelEvents).toContain('pointercancel')
+    expect(cancelEvents).not.toContain('pointerup')
+
+    await selectSlideElement(elements.nth(2))
+    await page.getByRole('tab', { name: /Picture Format|圖片格式|图片格式/ }).click()
+    await page.getByRole('button', { name: /^(Crop|裁剪)$/ }).click()
+    const cropHandle = page.getByRole('button', { name: 'Crop image right', exact: true })
+    await expect(cropHandle).toHaveCSS('touch-action', 'none')
+    const image = elements.nth(2).getByRole('img', { name: 'Corner image' })
+    const initialCrop = await image.getAttribute('style')
+    const cropEvents = await dragWithTouch(page, cropHandle, -8, 0)
+    await expect.poll(() => image.getAttribute('style')).not.toBe(initialCrop)
+    expect(cropEvents).toContain('pointerup')
+    expect(cropEvents).not.toContain('pointercancel')
+  })
 })
 
 test('keeps the media sidebar on the right without horizontal overflow at each breakpoint', async ({

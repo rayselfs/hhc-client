@@ -740,18 +740,19 @@ function ElementHandles({
             className="pointer-events-auto absolute cursor-move"
             style={{
               zIndex: 10,
+              touchAction: 'none',
               ...(edge === 'top' || edge === 'bottom'
                 ? {
                     left: 0,
                     width: '100%',
                     height: edgeSize,
-                    [edge]: -edgeSize / 2
+                    [edge]: -edgeSize
                   }
                 : {
                     top: 0,
                     width: edgeSize,
                     height: '100%',
-                    [edge]: -edgeSize / 2
+                    [edge]: -edgeSize
                   })
             }}
             onPointerDown={onMovePointerDown}
@@ -768,15 +769,21 @@ function ElementHandles({
               ...getTextHandlePositionStyle(handle, hitTargetSize),
               zIndex: 20,
               width: hitTargetSize,
-              height: hitTargetSize
+              height: hitTargetSize,
+              touchAction: 'none'
             }}
             onKeyDown={(event) => onResizeKeyDown(event, handle)}
           >
             <span
               data-resize-handle-indicator
               aria-hidden="true"
-              className="pointer-events-none rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
-              style={{ width: handleSize, height: handleSize, borderWidth }}
+              className="pointer-events-none absolute rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
+              style={{
+                ...getHandleIndicatorPositionStyle(handle, handleSize),
+                width: handleSize,
+                height: handleSize,
+                borderWidth
+              }}
             />
           </button>
         ))}
@@ -804,7 +811,8 @@ function ElementHandles({
               ...getTextHandlePositionStyle(handle, hitTargetSize),
               zIndex: 20,
               width: hitTargetSize,
-              height: hitTargetSize
+              height: hitTargetSize,
+              touchAction: 'none'
             }}
             onKeyDown={(event) =>
               cropMode ? onCropKeyDown(event, handle) : onResizeKeyDown(event, handle)
@@ -813,10 +821,15 @@ function ElementHandles({
             <span
               data-resize-handle-indicator
               aria-hidden="true"
-              className={`pointer-events-none rounded-full border border-white ${
+              className={`pointer-events-none absolute rounded-full border border-white ${
                 cropMode ? 'bg-warning' : 'bg-primary'
               }`}
-              style={{ width: handleSize, height: handleSize, borderWidth }}
+              style={{
+                ...getHandleIndicatorPositionStyle(handle, handleSize),
+                width: handleSize,
+                height: handleSize,
+                borderWidth
+              }}
             />
           </button>
         ))}
@@ -837,15 +850,21 @@ function ElementHandles({
         ...getTextHandlePositionStyle('se', hitTargetSize),
         zIndex: 20,
         width: hitTargetSize,
-        height: hitTargetSize
+        height: hitTargetSize,
+        touchAction: 'none'
       }}
       onKeyDown={(event) => onResizeKeyDown(event, 'se')}
     >
       <span
         data-resize-handle-indicator
         aria-hidden="true"
-        className="pointer-events-none rounded-full border border-white bg-primary"
-        style={{ width: handleSize, height: handleSize, borderWidth }}
+        className="pointer-events-none absolute rounded-full border border-white bg-primary"
+        style={{
+          ...getHandleIndicatorPositionStyle('se', handleSize),
+          width: handleSize,
+          height: handleSize,
+          borderWidth
+        }}
       />
     </button>
   )
@@ -1416,7 +1435,7 @@ function getImageShadow(
 }
 
 function getTextHandlePositionStyle(handle: ResizeHandle, handleSize: number): React.CSSProperties {
-  const offset = -handleSize / 2
+  const offset = -handleSize
   const vertical = handle.includes('n')
     ? { top: offset }
     : handle.includes('s')
@@ -1436,17 +1455,55 @@ function getTextHandlePositionStyle(handle: ResizeHandle, handleSize: number): R
   return { ...vertical, ...horizontal, transform: transform || undefined }
 }
 
+function getHandleIndicatorPositionStyle(
+  handle: ResizeHandle,
+  indicatorSize: number
+): React.CSSProperties {
+  const offset = -indicatorSize / 2
+  const vertical = handle.includes('n')
+    ? { bottom: offset }
+    : handle.includes('s')
+      ? { top: offset }
+      : { top: '50%' }
+  const horizontal = handle.includes('w')
+    ? { right: offset }
+    : handle.includes('e')
+      ? { left: offset }
+      : { left: '50%' }
+  const transform = [
+    !handle.includes('n') && !handle.includes('s') ? 'translateY(-50%)' : '',
+    !handle.includes('w') && !handle.includes('e') ? 'translateX(-50%)' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+  return { ...vertical, ...horizontal, transform: transform || undefined }
+}
+
 function getNearestResizeHandle(event: React.PointerEvent<HTMLDivElement>): ResizeHandle | null {
   const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-resize-handle]')
   if (!target || !event.currentTarget.contains(target)) return null
 
-  let nearest = target
+  const candidates = IMAGE_HANDLES.map((handle) =>
+    event.currentTarget.querySelector<HTMLElement>(`[data-resize-handle="${handle}"]`)
+  ).filter((candidate): candidate is HTMLElement => candidate !== null)
+  if (
+    candidates.every((candidate) => {
+      const rect = candidate.getBoundingClientRect()
+      return rect.width === 0 && rect.height === 0
+    })
+  ) {
+    const handle = target.dataset.resizeHandle
+    return IMAGE_HANDLES.includes(handle as ResizeHandle) ? (handle as ResizeHandle) : null
+  }
+  const first = candidates[0]
+  if (!first) return null
+  let nearest = first
   let nearestDistance = distanceToCenter(
-    target.getBoundingClientRect(),
+    first.getBoundingClientRect(),
     event.clientX,
     event.clientY
   )
-  event.currentTarget.querySelectorAll<HTMLElement>('[data-resize-handle]').forEach((candidate) => {
+  candidates.slice(1).forEach((candidate) => {
     const distance = distanceToCenter(
       candidate.getBoundingClientRect(),
       event.clientX,

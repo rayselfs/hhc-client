@@ -451,6 +451,30 @@ describe('EditableSlideSurface', () => {
     expect(screen.getByRole('textbox')).toHaveClass('cursor-text')
   })
 
+  it('keeps touch gestures owned by resize handles and text frame move edges', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Touch frame', autoWidth: false })
+
+    render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    for (const target of [
+      ...screen.getAllByLabelText(/Resize text box/),
+      ...(['top', 'right', 'bottom', 'left'] as const).map((edge) =>
+        screen.getByTestId(`text-frame-edge-${edge}`)
+      )
+    ]) {
+      expect(target).toHaveStyle({ touchAction: 'none' })
+    }
+  })
+
   it('moves a text box when dragging from its dedicated frame edge', () => {
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -597,6 +621,44 @@ describe('EditableSlideSurface', () => {
     fireEvent.pointerCancel(leftEdge, { pointerId: 1 })
 
     expect(onTransformStart).toHaveBeenCalledTimes(1)
+    expect(onTransformCancel).toHaveBeenCalledTimes(1)
+    expect(onTransformCommit).not.toHaveBeenCalled()
+  })
+
+  it('cancels an explicit resize gesture without committing it', () => {
+    const onTransformPreview = vi.fn()
+    const onTransformCommit = vi.fn()
+    const onTransformCancel = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Cancel resize',
+      x: 100,
+      y: 80,
+      width: 220,
+      height: 40,
+      autoWidth: false
+    })
+
+    render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={() => text}
+        onTransformPreview={onTransformPreview}
+        onTransformCancel={onTransformCancel}
+        onTransformCommit={onTransformCommit}
+      />
+    )
+
+    const handle = screen.getByLabelText('Resize text box right')
+    fireEvent.pointerDown(handle, { clientX: 320, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 344, clientY: 100, pointerId: 1 })
+    fireEvent.pointerCancel(handle, { pointerId: 1 })
+
+    expect(onTransformPreview).toHaveBeenCalled()
     expect(onTransformCancel).toHaveBeenCalledTimes(1)
     expect(onTransformCommit).not.toHaveBeenCalled()
   })
@@ -856,7 +918,9 @@ describe('EditableSlideSurface', () => {
           selectedElementId={image.id}
         />
       )
-      expectScreenHitTarget(screen.getByLabelText('Resize image right'), scale)
+      const resizeHandle = screen.getByLabelText('Resize image right')
+      expectScreenHitTarget(resizeHandle, scale)
+      expect(resizeHandle).toHaveStyle({ touchAction: 'none' })
       imageView.rerender(
         <EditableSlideSurface
           document={withImage}
@@ -866,7 +930,9 @@ describe('EditableSlideSurface', () => {
           cropElementId={image.id}
         />
       )
-      expectScreenHitTarget(screen.getByLabelText('Crop image right'), scale)
+      const cropHandle = screen.getByLabelText('Crop image right')
+      expectScreenHitTarget(cropHandle, scale)
+      expect(cropHandle).toHaveStyle({ touchAction: 'none' })
       imageView.unmount()
 
       const shape = createShapeElement('rectangle')
@@ -878,42 +944,79 @@ describe('EditableSlideSurface', () => {
           selectedElementId={shape.id}
         />
       )
-      expectScreenHitTarget(screen.getByLabelText('Resize element'), scale)
+      const genericHandle = screen.getByLabelText('Resize element')
+      expectScreenHitTarget(genericHandle, scale)
+      expect(genericHandle).toHaveStyle({ touchAction: 'none' })
     }
   )
 
-  it.each([0.5, 1, 2])('centres text handles on frame edges at scale %s', (scale) => {
-    mockSurfaceScale(scale)
-    const document = createBlankEditablePresentationDocument('Sunday')
-    const slideId = document.slideOrder[0]
-    const text = createTextElement({ text: 'Resize me', autoSize: 'fixed', autoWidth: false })
-    const withText = addElementToSlide(document, slideId, text)
+  it.each([0.25, 1, 2])(
+    'keeps text targets outside the frame and visual handles on its boundary at scale %s',
+    (scale) => {
+      mockSurfaceScale(scale)
+      const document = createBlankEditablePresentationDocument('Sunday')
+      const slideId = document.slideOrder[0]
+      const text = createTextElement({ text: 'Resize me', autoSize: 'fixed', autoWidth: false })
+      const withText = addElementToSlide(document, slideId, text)
 
-    render(
-      <EditableSlideSurface
-        document={withText}
-        slideId={slideId}
-        editable
-        selectedElementId={text.id}
-      />
-    )
+      render(
+        <EditableSlideSurface
+          document={withText}
+          slideId={slideId}
+          editable
+          selectedElementId={text.id}
+        />
+      )
 
-    const offset = `${-12.5 / scale}px`
-    const expected = {
-      'top left': { top: offset, left: offset, transform: '' },
-      top: { top: offset, left: '50%', transform: 'translateX(-50%)' },
-      'top right': { top: offset, right: offset, transform: '' },
-      right: { top: '50%', right: offset, transform: 'translateY(-50%)' },
-      'bottom right': { bottom: offset, right: offset, transform: '' },
-      bottom: { bottom: offset, left: '50%', transform: 'translateX(-50%)' },
-      'bottom left': { bottom: offset, left: offset, transform: '' },
-      left: { top: '50%', left: offset, transform: 'translateY(-50%)' }
+      const targetOffset = `${-25 / scale}px`
+      const indicatorOffset = `${-6 / scale}px`
+      const edgeOffset = `${-6 / scale}px`
+      const expected = {
+        'top left': {
+          target: { top: targetOffset, left: targetOffset, transform: '' },
+          indicator: { right: indicatorOffset, bottom: indicatorOffset, transform: '' }
+        },
+        top: {
+          target: { top: targetOffset, left: '50%', transform: 'translateX(-50%)' },
+          indicator: { left: '50%', bottom: indicatorOffset, transform: 'translateX(-50%)' }
+        },
+        'top right': {
+          target: { top: targetOffset, right: targetOffset, transform: '' },
+          indicator: { left: indicatorOffset, bottom: indicatorOffset, transform: '' }
+        },
+        right: {
+          target: { top: '50%', right: targetOffset, transform: 'translateY(-50%)' },
+          indicator: { top: '50%', left: indicatorOffset, transform: 'translateY(-50%)' }
+        },
+        'bottom right': {
+          target: { right: targetOffset, bottom: targetOffset, transform: '' },
+          indicator: { top: indicatorOffset, left: indicatorOffset, transform: '' }
+        },
+        bottom: {
+          target: { bottom: targetOffset, left: '50%', transform: 'translateX(-50%)' },
+          indicator: { top: indicatorOffset, left: '50%', transform: 'translateX(-50%)' }
+        },
+        'bottom left': {
+          target: { bottom: targetOffset, left: targetOffset, transform: '' },
+          indicator: { top: indicatorOffset, right: indicatorOffset, transform: '' }
+        },
+        left: {
+          target: { top: '50%', left: targetOffset, transform: 'translateY(-50%)' },
+          indicator: { top: '50%', right: indicatorOffset, transform: 'translateY(-50%)' }
+        }
+      }
+      expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
+      for (const [label, styles] of Object.entries(expected)) {
+        const target = screen.getByLabelText(`Resize text box ${label}`)
+        expect(target).toHaveStyle(styles.target)
+        expect(withinResizeHandle(target)).toHaveStyle(styles.indicator)
+      }
+      expect(screen.getByTestId('text-frame-edge-top')).toHaveStyle({ top: edgeOffset })
+      expect(screen.getByTestId('text-frame-edge-right')).toHaveStyle({ right: edgeOffset })
+      expect(screen.getByTestId('text-frame-edge-bottom')).toHaveStyle({ bottom: edgeOffset })
+      expect(screen.getByTestId('text-frame-edge-left')).toHaveStyle({ left: edgeOffset })
     }
-    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
-    for (const [label, style] of Object.entries(expected)) {
-      expect(screen.getByLabelText(`Resize text box ${label}`)).toHaveStyle(style)
-    }
-  })
+  )
 
   it.each([0, Number.POSITIVE_INFINITY])(
     'keeps selection geometry finite for document width %s',
@@ -968,8 +1071,9 @@ describe('EditableSlideSurface', () => {
     )
 
     const rightHandle = screen.getByLabelText('Resize text box right')
-    fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 1 })
-    fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 24, pointerId: 1 })
+    mockElementRect(rightHandle, { left: 0, top: 0, width: 25, height: 25 })
+    fireEvent.pointerDown(rightHandle, { clientX: 12.5, clientY: 12.5, pointerId: 1 })
+    fireEvent.pointerMove(rightHandle, { clientX: 36.5, clientY: 36.5, pointerId: 1 })
 
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
@@ -1261,8 +1365,9 @@ describe('EditableSlideSurface', () => {
 
     expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     const rightHandle = screen.getByLabelText('Resize text box right')
-    fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 1 })
-    fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 24, pointerId: 1 })
+    mockElementRect(rightHandle, { left: 0, top: 0, width: 25, height: 25 })
+    fireEvent.pointerDown(rightHandle, { clientX: 12.5, clientY: 12.5, pointerId: 1 })
+    fireEvent.pointerMove(rightHandle, { clientX: 36.5, clientY: 36.5, pointerId: 1 })
 
     const updates = handleUpdate.mock.calls[0]?.[2]
     expect(updates).toMatchObject({ width: 244, autoSize: 'content', autoWidth: false })
@@ -1519,7 +1624,7 @@ function mockOverlappingHandleRects(
 ): void {
   vi.spyOn(surface, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 480, 270))
   vi.spyOn(topLeft, 'getBoundingClientRect').mockReturnValue(rect(87.5, 87.5, 25, 25))
-  vi.spyOn(bottomRight, 'getBoundingClientRect').mockReturnValue(rect(92.5, 92.5, 25, 25))
+  vi.spyOn(bottomRight, 'getBoundingClientRect').mockReturnValue(rect(87.5, 87.5, 25, 25))
 }
 
 function rect(x: number, y: number, width: number, height: number): DOMRect {
