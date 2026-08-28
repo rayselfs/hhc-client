@@ -84,6 +84,7 @@ const TEXT_FRAME_HIT_AREA = 6
 const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
 const RESIZE_HIT_TARGET_SIZE = 25
+const RESIZE_INDICATOR_HIT_SIZE = 4
 const TEXT_HANDLE_SIZE = 12
 const IMAGE_HANDLE_SIZE = 16
 const GENERIC_HANDLE_SIZE = 20
@@ -728,6 +729,7 @@ function ElementHandles({
     const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
     const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
     const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+    const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
     const handleSize = TEXT_HANDLE_SIZE / surfaceScale
     const borderWidth = 1.5 / surfaceScale
     return (
@@ -777,14 +779,19 @@ function ElementHandles({
             <span
               data-resize-handle-indicator
               aria-hidden="true"
-              className="pointer-events-none absolute rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
+              className="pointer-events-auto absolute"
               style={{
-                ...getHandleIndicatorPositionStyle(handle, handleSize),
-                width: handleSize,
-                height: handleSize,
-                borderWidth
+                ...getHandleIndicatorPositionStyle(handle, indicatorHitSize),
+                width: indicatorHitSize,
+                height: indicatorHitSize
               }}
-            />
+            >
+              <span
+                data-resize-handle-visual
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
+                style={{ width: handleSize, height: handleSize, borderWidth }}
+              />
+            </span>
           </button>
         ))}
       </>
@@ -793,6 +800,7 @@ function ElementHandles({
 
   if (element.type === 'image') {
     const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+    const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
     const handleSize = IMAGE_HANDLE_SIZE / surfaceScale
     const borderWidth = 1 / surfaceScale
     return (
@@ -821,16 +829,21 @@ function ElementHandles({
             <span
               data-resize-handle-indicator
               aria-hidden="true"
-              className={`pointer-events-none absolute rounded-full border border-white ${
-                cropMode ? 'bg-warning' : 'bg-primary'
-              }`}
+              className="pointer-events-auto absolute"
               style={{
-                ...getHandleIndicatorPositionStyle(handle, handleSize),
-                width: handleSize,
-                height: handleSize,
-                borderWidth
+                ...getHandleIndicatorPositionStyle(handle, indicatorHitSize),
+                width: indicatorHitSize,
+                height: indicatorHitSize
               }}
-            />
+            >
+              <span
+                data-resize-handle-visual
+                className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white ${
+                  cropMode ? 'bg-warning' : 'bg-primary'
+                }`}
+                style={{ width: handleSize, height: handleSize, borderWidth }}
+              />
+            </span>
           </button>
         ))}
       </>
@@ -838,6 +851,7 @@ function ElementHandles({
   }
 
   const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+  const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
   const handleSize = GENERIC_HANDLE_SIZE / surfaceScale
   const borderWidth = 1 / surfaceScale
   return (
@@ -858,14 +872,19 @@ function ElementHandles({
       <span
         data-resize-handle-indicator
         aria-hidden="true"
-        className="pointer-events-none absolute rounded-full border border-white bg-primary"
+        className="pointer-events-auto absolute"
         style={{
-          ...getHandleIndicatorPositionStyle('se', handleSize),
-          width: handleSize,
-          height: handleSize,
-          borderWidth
+          ...getHandleIndicatorPositionStyle('se', indicatorHitSize),
+          width: indicatorHitSize,
+          height: indicatorHitSize
         }}
-      />
+      >
+        <span
+          data-resize-handle-visual
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary"
+          style={{ width: handleSize, height: handleSize, borderWidth }}
+        />
+      </span>
     </button>
   )
 }
@@ -1488,7 +1507,7 @@ function getNearestResizeHandle(event: React.PointerEvent<HTMLDivElement>): Resi
   ).filter((candidate): candidate is HTMLElement => candidate !== null)
   if (
     candidates.every((candidate) => {
-      const rect = candidate.getBoundingClientRect()
+      const rect = getResizeHandleIndicatorRect(candidate)
       return rect.width === 0 && rect.height === 0
     })
   ) {
@@ -1499,13 +1518,13 @@ function getNearestResizeHandle(event: React.PointerEvent<HTMLDivElement>): Resi
   if (!first) return null
   let nearest = first
   let nearestDistance = distanceToCenter(
-    first.getBoundingClientRect(),
+    getResizeHandleIndicatorRect(first),
     event.clientX,
     event.clientY
   )
   candidates.slice(1).forEach((candidate) => {
     const distance = distanceToCenter(
-      candidate.getBoundingClientRect(),
+      getResizeHandleIndicatorRect(candidate),
       event.clientX,
       event.clientY
     )
@@ -1516,6 +1535,12 @@ function getNearestResizeHandle(event: React.PointerEvent<HTMLDivElement>): Resi
   })
   const handle = nearest.dataset.resizeHandle
   return IMAGE_HANDLES.includes(handle as ResizeHandle) ? (handle as ResizeHandle) : null
+}
+
+function getResizeHandleIndicatorRect(handle: HTMLElement): DOMRect {
+  return (
+    handle.querySelector<HTMLElement>('[data-resize-handle-indicator]') ?? handle
+  ).getBoundingClientRect()
 }
 
 function distanceToCenter(rect: DOMRect, x: number, y: number): number {

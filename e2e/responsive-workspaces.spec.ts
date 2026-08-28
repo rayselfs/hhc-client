@@ -147,7 +147,8 @@ async function dragResizeHandle(
   handle: Locator,
   direction: ResizeHandle,
   horizontalOnly = false,
-  inward = true
+  inward = true,
+  pointerSource: 'target' | 'indicator' = 'target'
 ): Promise<void> {
   await expectEffectiveHandleTarget(handle, direction)
   const chrome = page.locator('[data-selection-chrome]').first()
@@ -157,7 +158,10 @@ async function dragResizeHandle(
     width: Number.parseFloat((element as HTMLElement).style.width),
     height: Number.parseFloat((element as HTMLElement).style.height)
   }))
-  const target = await handle.boundingBox()
+  const pointerTarget =
+    pointerSource === 'indicator' ? handle.locator('[data-resize-handle-indicator]') : handle
+  if (pointerSource === 'indicator') await expect(pointerTarget).toHaveCSS('pointer-events', 'auto')
+  const target = await pointerTarget.boundingBox()
   expect(target).not.toBeNull()
   const sign = inward ? 1 : -1
   const dx = direction.includes('w') ? 24 * sign : direction.includes('e') ? -24 * sign : 0
@@ -305,7 +309,7 @@ async function dragWithTouch(
 
 async function expectTextInteriorAndFrameMove(page: Page, element: Locator): Promise<void> {
   const text = element.getByText('Corner', { exact: true })
-  const content = await text.boundingBox()
+  const content = await element.boundingBox()
   expect(content).not.toBeNull()
   const contentPoint = {
     x: content!.x + content!.width / 2,
@@ -898,6 +902,21 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
         false,
         false
       )
+    }
+    if (zoomPercent === '25') {
+      for (const direction of HANDLE_DIRECTIONS) {
+        await dragResizeHandle(
+          page,
+          page.getByRole('button', {
+            name: `Resize text box ${HANDLE_LABELS[direction]}`,
+            exact: true
+          }),
+          direction,
+          false,
+          false,
+          'indicator'
+        )
+      }
     }
 
     await selectSlideElement(elements.nth(2))

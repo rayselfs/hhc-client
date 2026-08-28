@@ -774,7 +774,7 @@ describe('EditableSlideSurface', () => {
     expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     const topLeft = screen.getByLabelText('Resize text box top left')
     expect(topLeft).toHaveClass('rounded-[2px]')
-    expect(withinResizeHandle(topLeft)).toHaveClass('bg-white')
+    expect(withinResizeHandleVisual(topLeft)).toHaveClass('bg-white')
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box bottom')).not.toBeInTheDocument()
@@ -801,6 +801,7 @@ describe('EditableSlideSurface', () => {
 
       const handle = screen.getByLabelText('Resize text box top left')
       const indicator = withinResizeHandle(handle)
+      const visual = withinResizeHandleVisual(handle)
       const leftEdge = screen.getByTestId('text-frame-edge-left')
       const frame = screen.getByRole('textbox').closest('[data-slide-element]')
       const chrome = screen
@@ -810,9 +811,12 @@ describe('EditableSlideSurface', () => {
       if (!(chrome instanceof HTMLElement)) throw new Error('selection chrome not found')
       expect(Number.parseFloat(handle.style.width) * scale).toBeGreaterThanOrEqual(24)
       expect(Number.parseFloat(handle.style.height) * scale).toBeGreaterThanOrEqual(24)
-      expect(Number.parseFloat(indicator.style.width) * scale).toBe(12)
-      expect(Number.parseFloat(indicator.style.height) * scale).toBe(12)
-      expect(Number.parseFloat(indicator.style.borderWidth) * scale).toBe(1.5)
+      expect(Number.parseFloat(indicator.style.width) * scale).toBe(4)
+      expect(Number.parseFloat(indicator.style.height) * scale).toBe(4)
+      expect(indicator).toHaveClass('pointer-events-auto')
+      expect(Number.parseFloat(visual.style.width) * scale).toBe(12)
+      expect(Number.parseFloat(visual.style.height) * scale).toBe(12)
+      expect(Number.parseFloat(visual.style.borderWidth) * scale).toBe(1.5)
       expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
       expect(Number.parseFloat(chrome.style.outlineWidth) * scale).toBe(1.5)
     }
@@ -840,7 +844,7 @@ describe('EditableSlideSurface', () => {
     expect(chrome).toContainElement(handle)
   })
 
-  it('resolves overlapping text targets to the handle nearest the pointer', () => {
+  it('resolves overlapping text targets from visual knob centers in stable handle order', () => {
     const onTransformStart = vi.fn(() => text)
     const onTransformPreview = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -869,8 +873,9 @@ describe('EditableSlideSurface', () => {
     const bottomRight = screen.getByLabelText('Resize text box bottom right')
     mockOverlappingHandleRects(surface, topLeft, bottomRight)
 
-    fireEvent.pointerDown(bottomRight, { clientX: 100, clientY: 100, pointerId: 1 })
-    fireEvent.pointerMove(bottomRight, { clientX: 95, clientY: 95, pointerId: 1 })
+    const paintedIndicator = withinResizeHandle(bottomRight)
+    fireEvent.pointerDown(paintedIndicator, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(paintedIndicator, { clientX: 95, clientY: 95, pointerId: 1 })
 
     expect(onTransformPreview).toHaveBeenLastCalledWith(
       text.id,
@@ -969,7 +974,7 @@ describe('EditableSlideSurface', () => {
       )
 
       const targetOffset = `${-25 / scale}px`
-      const indicatorOffset = `${-6 / scale}px`
+      const indicatorOffset = `${-2 / scale}px`
       const edgeOffset = `${-6 / scale}px`
       const expected = {
         'top left': {
@@ -1039,8 +1044,8 @@ describe('EditableSlideSurface', () => {
 
       const handle = screen.getByLabelText('Resize text box top left')
       const edge = screen.getByTestId('text-frame-edge-left')
-      const indicator = withinResizeHandle(handle)
-      for (const value of [handle.style.width, indicator.style.borderWidth, edge.style.width]) {
+      const visual = withinResizeHandleVisual(handle)
+      for (const value of [handle.style.width, visual.style.borderWidth, edge.style.width]) {
         expect(Number.parseFloat(value)).toBeGreaterThan(0)
         expect(Number.isFinite(Number.parseFloat(value))).toBe(true)
       }
@@ -1598,6 +1603,12 @@ function withinResizeHandle(handle: HTMLElement): HTMLElement {
   return indicator
 }
 
+function withinResizeHandleVisual(handle: HTMLElement): HTMLElement {
+  const visual = handle.querySelector('[data-resize-handle-visual]')
+  if (!(visual instanceof HTMLElement)) throw new Error('resize handle visual not found')
+  return visual
+}
+
 function expectScreenHitTarget(handle: HTMLElement, scale: number): void {
   expect(Number.parseFloat(handle.style.width) * scale).toBeGreaterThanOrEqual(24)
   expect(Number.parseFloat(handle.style.height) * scale).toBeGreaterThanOrEqual(24)
@@ -1623,8 +1634,14 @@ function mockOverlappingHandleRects(
   bottomRight: HTMLElement
 ): void {
   vi.spyOn(surface, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 480, 270))
-  vi.spyOn(topLeft, 'getBoundingClientRect').mockReturnValue(rect(87.5, 87.5, 25, 25))
+  vi.spyOn(topLeft, 'getBoundingClientRect').mockReturnValue(rect(92.5, 92.5, 25, 25))
   vi.spyOn(bottomRight, 'getBoundingClientRect').mockReturnValue(rect(87.5, 87.5, 25, 25))
+  vi.spyOn(withinResizeHandle(topLeft), 'getBoundingClientRect').mockReturnValue(
+    rect(89, 89, 12, 12)
+  )
+  vi.spyOn(withinResizeHandle(bottomRight), 'getBoundingClientRect').mockReturnValue(
+    rect(99, 99, 12, 12)
+  )
 }
 
 function rect(x: number, y: number, width: number, height: number): DOMRect {
