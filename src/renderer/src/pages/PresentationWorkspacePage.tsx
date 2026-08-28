@@ -2173,14 +2173,22 @@ function EditableSessionDocumentView({
                     value={notesDraft}
                     onChange={(event) => {
                       if (!activeSlideId) return
-                      if (session.getSnapshot().draftKind !== 'notes') {
+                      const snapshot = session.getSnapshot()
+                      const nextNotes = event.currentTarget.value
+                      const storedNotes =
+                        snapshot.history.present.slides[activeSlideId]?.notes ?? ''
+                      if (nextNotes === storedNotes) {
+                        if (snapshot.draftKind === 'notes') session.cancelDraft()
+                        return
+                      }
+                      if (snapshot.draftKind !== 'notes') {
                         session.beginDraft('notes')
                       }
                       session.previewDraft(
                         updateSlideNotes(
                           session.getSnapshot().renderedDocument,
                           activeSlideId,
-                          event.currentTarget.value
+                          nextNotes
                         )
                       )
                     }}

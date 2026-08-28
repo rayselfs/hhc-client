@@ -18,6 +18,9 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await page.setViewportSize({ width: 1200, height: 800 })
   await page.goto('/')
   await completeOnboarding(page)
+  await page.evaluate(() => localStorage.setItem('hhc-language', 'zh-TW'))
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-TW')
 
   await page.goto('/#/files')
   await expect(page).toHaveURL(/#\/files$/)
@@ -29,7 +32,8 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
   await expect(page).toHaveURL(/#\/presentations\//)
 
-  const fit = page.getByRole('button', { name: /^Fit$|^符合視窗$/ })
+  const fit = page.getByRole('button', { name: '符合視窗' })
+  await expect(page.getByRole('button', { name: 'Fit', exact: true })).toHaveCount(0)
   const zoomSlider = page.getByRole('slider', { name: /Zoom|縮放/ })
   await expect(fit).toHaveAttribute('aria-pressed', 'true')
 

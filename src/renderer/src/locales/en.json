@@ -587,6 +587,7 @@
     "home": "Home",
     "insert": "Insert",
     "design": "Design",
+    "fit": "Fit",
     "ribbonGroups": {
       "font": "Font",
       "paragraph": "Paragraph",
@@ -1089,7 +1090,6 @@
     "noMediaSelected": "No media selected",
     "grid": "Grid",
     "zoom": "Zoom",
-    "fit": "Fit",
     "next": "Next",
     "prev": "Prev",
     "slideInfo": "Slide {{current}} of {{total}}",

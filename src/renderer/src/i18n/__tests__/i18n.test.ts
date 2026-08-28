@@ -57,6 +57,12 @@ describe('translations', () => {
     expect(i18n.t('bible.title', { lng: 'zh-CN' })).toBe('圣经')
   })
 
+  it('translates the presentation workspace Fit control across all locales', () => {
+    expect(i18n.t('presentationWorkspace.fit', { lng: 'en' })).toBe('Fit')
+    expect(i18n.t('presentationWorkspace.fit', { lng: 'zh-TW' })).toBe('符合視窗')
+    expect(i18n.t('presentationWorkspace.fit', { lng: 'zh-CN' })).toBe('适合窗口')
+  })
+
   it('translates Recovery accessibility and Web upload errors in English and Traditional Chinese', () => {
     expect(i18n.t('recovery.indicatorLabel', { lng: 'en', count: 2 })).toBe('2 recovery issues')
     expect(i18n.t('recovery.indicatorLabel', { lng: 'zh-TW', count: 2 })).toBe('2 個修復問題')

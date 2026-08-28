@@ -480,6 +480,35 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(session.getSnapshot().history.past).toHaveLength(historyLength)
   })
 
+  it('cancels a reverted Notes draft before route unmount without undo or save work', async () => {
+    let registry: PresentationSessionRegistry | null = null
+    const { rerender } = render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
+    const session = registry!.get('deck-1')!
+    const initialHistoryLength = session.getSnapshot().history.past.length
+    const initialScheduledRevision = session.getSnapshot().save.scheduledRevision
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    const notes = screen.getByRole('textbox', { name: 'Notes' })
+    fireEvent.change(notes, { target: { value: 'Temporary note' } })
+    expect(session.getSnapshot().draftKind).toBe('notes')
+    fireEvent.change(notes, { target: { value: '' } })
+
+    expect(session.getSnapshot().draftKind).toBeNull()
+    rerender(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage={false} onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    expect(session.getSnapshot().history.past).toHaveLength(initialHistoryLength)
+    expect(session.getSnapshot().save.scheduledRevision).toBe(initialScheduledRevision)
+    expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+  })
+
   it('flushes a focused Notes draft before registry activation and close', async () => {
     let registry: PresentationSessionRegistry | null = null
     render(
