@@ -541,7 +541,7 @@ describe('EditableSlideSurface', () => {
     mockSurfaceScale(scale)
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
-    const text = createTextElement({ text: 'Resize me' })
+    const text = createTextElement({ text: 'Resize me', autoSize: 'fixed', autoWidth: false })
     const withText = addElementToSlide(document, slideId, text)
 
     render(
@@ -554,11 +554,20 @@ describe('EditableSlideSurface', () => {
     )
 
     const offset = `${-6 / scale}px`
-    const topLeft = screen.getByLabelText('Resize text box top left')
-    const right = screen.getByLabelText('Resize text box right')
-    expect(topLeft.style.top).toBe(offset)
-    expect(topLeft.style.left).toBe(offset)
-    expect(right.style.right).toBe(offset)
+    const expected = {
+      'top left': { top: offset, left: offset, transform: '' },
+      top: { top: offset, left: '50%', transform: 'translateX(-50%)' },
+      'top right': { top: offset, right: offset, transform: '' },
+      right: { top: '50%', right: offset, transform: 'translateY(-50%)' },
+      'bottom right': { bottom: offset, right: offset, transform: '' },
+      bottom: { bottom: offset, left: '50%', transform: 'translateX(-50%)' },
+      'bottom left': { bottom: offset, left: offset, transform: '' },
+      left: { top: '50%', left: offset, transform: 'translateY(-50%)' }
+    }
+    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
+    for (const [label, style] of Object.entries(expected)) {
+      expect(screen.getByLabelText(`Resize text box ${label}`)).toHaveStyle(style)
+    }
   })
 
   it.each([0, Number.POSITIVE_INFINITY])(
