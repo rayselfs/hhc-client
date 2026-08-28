@@ -307,7 +307,9 @@ describe('PresentationWorkspacePage session integration', () => {
     const group = window.document.querySelector('.workspace-panel-group')
     expect(group).not.toBeNull()
     expect(group!.querySelector('.workspace-navigator-slot [data-slide-sidebar]')).not.toBeNull()
-    expect(group!.querySelector('.workspace-stage-slot .presentation-stage')).not.toBeNull()
+    const stageSlot = group!.querySelector('.workspace-stage-slot')
+    expect(stageSlot).toHaveClass('flex')
+    expect(stageSlot?.querySelector('.presentation-stage')).toHaveClass('min-h-0', 'flex-1')
     expect(ribbon.querySelector('[data-ribbon-surface]')).toHaveClass(
       'overflow-x-auto',
       'overflow-y-hidden'

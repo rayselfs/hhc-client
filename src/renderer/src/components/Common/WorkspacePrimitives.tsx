@@ -156,7 +156,7 @@ export function ResponsivePanelGroup({
           <OverlayClose label={`Close ${navigatorLabel}`} onPress={closeNavigator} />
         )}
       </div>
-      <div className="workspace-stage-slot min-h-0 min-w-0">{stage}</div>
+      <div className="workspace-stage-slot flex min-h-0 min-w-0">{stage}</div>
       {inspector && (
         <div
           className={`workspace-inspector-slot ${

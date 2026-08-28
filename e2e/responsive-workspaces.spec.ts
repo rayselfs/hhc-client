@@ -29,6 +29,22 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
   await expect(page).toHaveURL(/#\/presentations\//)
 
+  await page.setViewportSize({ width: 1470, height: 726 })
+  const stageSlot = page.locator('.workspace-stage-slot')
+  const presentationStage = page.locator('.presentation-stage')
+  const notes = page.getByRole('button', { name: /Toggle Notes|切換備忘稿/ })
+  const zoom = page.getByRole('button', { name: /Reset zoom|重設縮放/ })
+  await expect(notes).toBeVisible()
+  await expect(zoom).toBeVisible()
+
+  const [slotBox, stageBox] = await Promise.all([
+    stageSlot.boundingBox(),
+    presentationStage.boundingBox()
+  ])
+  expect(stageBox!.height).toBeLessThanOrEqual(slotBox!.height)
+  expect(stageBox!.y + stageBox!.height).toBeLessThanOrEqual(726)
+  await page.setViewportSize({ width: 1200, height: 800 })
+
   const navigator = page.locator('.workspace-navigator-slot')
   const stage = page.locator('.workspace-stage-slot')
   const slidesTrigger = page.getByRole('button', { name: /Slides|投影片/ })
