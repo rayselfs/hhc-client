@@ -48,7 +48,7 @@ describe('FileExplorerFAB HHC LINE action', () => {
     const onAddHhcLine = vi.fn()
     render(<FileExplorerFAB onAddHhcLine={onAddHhcLine} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add LINE media folder' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sync LINE group' }))
 
     expect(onAddHhcLine).toHaveBeenCalledTimes(1)
   })
@@ -57,7 +57,7 @@ describe('FileExplorerFAB HHC LINE action', () => {
     const onAddHhcLine = vi.fn()
     render(<FileExplorerFAB onAddHhcLine={onAddHhcLine} isAddHhcLineDisabled />)
 
-    const action = screen.getByRole('button', { name: 'Add LINE media folder' })
+    const action = screen.getByRole('button', { name: 'Sync LINE group' })
     await userEvent.click(action)
 
     expect(onAddHhcLine).not.toHaveBeenCalled()

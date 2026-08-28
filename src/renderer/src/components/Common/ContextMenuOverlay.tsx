@@ -127,7 +127,11 @@ export default function ContextMenuOverlay({
             }}
             onFocus={() => setFocusedIndex(currentIdx)}
           >
-            {entry.icon && <span className="shrink-0 w-4 h-4">{entry.icon}</span>}
+            {entry.icon && (
+              <span className={`shrink-0 ${entry.iconSlotClassName ?? 'h-4 w-4'}`}>
+                {entry.icon}
+              </span>
+            )}
             {entry.label}
           </button>
         )

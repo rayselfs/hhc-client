@@ -1,4 +1,6 @@
 import { renderHook, render, screen, act, fireEvent, createEvent } from '@testing-library/react'
+import { FolderSync } from 'lucide-react'
+import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { ContextMenuProvider, useContextMenu, type ContextMenuEntry } from '../ContextMenuContext'
 
 function renderWithProvider(ui: React.ReactElement): ReturnType<typeof render> {
@@ -95,6 +97,45 @@ describe('ContextMenuContext', () => {
 
     expect(screen.getByRole('menu')).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
+  })
+
+  it('uses the requested LINE icon slot without changing normal icon slots', () => {
+    const items: ContextMenuEntry[] = [
+      {
+        id: 'line',
+        label: 'Sync LINE group',
+        icon: <SyncProviderIcon providerType="hhc-line" />,
+        iconSlotClassName: 'size-10',
+        onAction: vi.fn()
+      },
+      {
+        id: 'local',
+        label: 'Sync local folder',
+        icon: <FolderSync />,
+        onAction: vi.fn()
+      }
+    ]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'))
+
+    const lineSlot = screen.getByRole('img', { name: 'LINE' }).parentElement?.parentElement
+    expect(lineSlot).toHaveClass('size-10')
+    expect(lineSlot).not.toHaveClass('overflow-hidden')
+    expect(lineSlot?.querySelector('img')).toHaveAttribute('width', '20')
+    expect(lineSlot?.querySelector('img')).toHaveAttribute('height', '20')
+    expect(
+      screen.getByRole('menuitem', { name: 'Sync local folder' }).querySelector(':scope > span')
+    ).toHaveClass('h-4', 'w-4')
   })
 
   it('calls onAction and closes menu on item click', () => {

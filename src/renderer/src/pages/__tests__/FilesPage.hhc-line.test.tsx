@@ -94,7 +94,7 @@ vi.mock('@renderer/components/Control/FileExplorer/FileExplorerFAB', () => ({
     isAddHhcLineDisabled?: boolean
   }) => (
     <button disabled={isAddHhcLineDisabled} onClick={onAddHhcLine}>
-      Add LINE media folder
+      Sync LINE group
     </button>
   )
 }))
@@ -173,11 +173,11 @@ describe('FilesPage HHC LINE role resolution', () => {
     )
     const view = render(<FilesPage />)
 
-    expect(screen.getByRole('button', { name: 'Add LINE media folder' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sync LINE group' })).toBeDisabled()
     expect(mocks.getAccessToken).toHaveBeenCalledTimes(1)
 
     await act(async () => resolveToken('token'))
-    expect(await screen.findByRole('button', { name: 'Add LINE media folder' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Sync LINE group' })).toBeEnabled()
     view.rerender(<FilesPage />)
     expect(mocks.getAccessToken).toHaveBeenCalledTimes(1)
     expect(mocks.getCloudProviderAdapter).toHaveBeenCalledWith(
@@ -194,7 +194,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     mocks.getAccessToken.mockResolvedValue('token')
     render(<FilesPage />)
 
-    const action = await screen.findByRole('button', { name: 'Add LINE media folder' })
+    const action = await screen.findByRole('button', { name: 'Sync LINE group' })
     expect(action).toBeEnabled()
     await userEvent.click(action)
     expect(screen.getByText('LINE media picker open')).toBeInTheDocument()
@@ -204,7 +204,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     mocks.session = null
     render(<FilesPage />)
 
-    expect(screen.getByRole('button', { name: 'Add LINE media folder' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sync LINE group' })).toBeDisabled()
   })
 
   it('does not open the picker from a disabled folder context action', async () => {
@@ -222,7 +222,7 @@ describe('FilesPage HHC LINE role resolution', () => {
     mocks.getAccessToken.mockResolvedValue('token')
     render(<FilesPage />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Add LINE media folder' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Sync LINE group' }))
     expect(screen.getByText('LINE media picker open')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'LINE' })).toBeInTheDocument()
   })

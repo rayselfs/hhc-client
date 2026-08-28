@@ -5,6 +5,7 @@ export interface ContextMenuItem {
   id: string
   label: string
   icon?: React.ReactNode
+  iconSlotClassName?: string
   variant?: 'default' | 'danger'
   disabled?: boolean
   onAction: () => void
