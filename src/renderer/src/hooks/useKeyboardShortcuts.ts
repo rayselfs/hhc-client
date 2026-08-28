@@ -122,10 +122,17 @@ export function useKeyboardShortcuts(
     })
 
     const handleKeydown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) return
       if (event.isComposing || event.keyCode === 229) return
       if (!enabledRef.current) return
       if (isPresenterActive() && sectionKeyRef.current !== 'media') return
       if (isEditableTarget(event.target)) return
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[role="menu"], [role="dialog"]')
+      ) {
+        return
+      }
 
       if (event.code === 'Escape' && document.querySelector('[role="menu"]')) {
         return

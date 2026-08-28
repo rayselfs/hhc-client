@@ -9,6 +9,7 @@ import {
   usePresentationSessionRegistry,
   type PresentationSessionRegistry
 } from '@renderer/contexts/PresentationSessionRegistryContext'
+import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import {
   addElementToSlide,
@@ -160,6 +161,17 @@ function renderEditableWorkspaceWithText(): void {
       <PresentationWorkspacePage />
     </PresentationSessionRegistryProvider>
   )
+}
+
+async function renderWorkspaceSession(): Promise<PresentationEditorSession> {
+  let registry: PresentationSessionRegistry | null = null
+  render(
+    <PresentationSessionRegistryProvider>
+      <Workspace showPage onSession={(next) => (registry = next)} />
+    </PresentationSessionRegistryProvider>
+  )
+  await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+  return registry!.get('deck-1')!
 }
 
 describe('PresentationWorkspacePage session integration', () => {
@@ -359,6 +371,177 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     expect(screen.getByRole('group', { name: 'Font' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Paragraph' })).toBeInTheDocument()
+  })
+
+  it('dispatches Windows and macOS editor commands through the active session', async () => {
+    const platform = vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Win32')
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Keyboard target' })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(source, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+
+    fireEvent.keyDown(document, { code: 'KeyM', key: 'm', ctrlKey: true })
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(2)
+
+    platform.mockReturnValue('MacIntel')
+    fireEvent.keyDown(document, { code: 'KeyN', key: 'N', metaKey: true, shiftKey: true })
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(3)
+
+    fireEvent.click(screen.getByRole('button', { name: '1Keyboard target' }))
+    const textFrame = (await screen.findAllByText('Keyboard target'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(textFrame).not.toBeNull()
+    fireEvent.click(textFrame!)
+
+    platform.mockReturnValue('Win32')
+    fireEvent.keyDown(document, { code: 'KeyB', key: 'b', ctrlKey: true })
+    platform.mockReturnValue('MacIntel')
+    fireEvent.keyDown(document, { code: 'KeyI', key: 'i', metaKey: true })
+    fireEvent.keyDown(document, { code: 'KeyU', key: 'u', metaKey: true })
+
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      bold: true,
+      italic: true,
+      underline: true
+    })
+  })
+
+  it('duplicates only an applicable selected object in one history transaction', async () => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Duplicate target' })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(source, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const initialHistoryLength = session.getSnapshot().history.past.length
+
+    fireEvent.keyDown(document, { code: 'KeyD', key: 'd', metaKey: true })
+    expect(session.getSnapshot().history.past).toHaveLength(initialHistoryLength)
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elementOrder).toHaveLength(1)
+
+    const textFrame = (await screen.findAllByText('Duplicate target'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(textFrame).not.toBeNull()
+    fireEvent.click(textFrame!)
+    fireEvent.keyDown(document, { code: 'KeyD', key: 'd', metaKey: true })
+
+    const snapshot = session.getSnapshot()
+    expect(snapshot.history.past).toHaveLength(initialHistoryLength + 1)
+    expect(snapshot.renderedDocument.slides[slideId].elementOrder).toHaveLength(2)
+  })
+
+  it('supports plus/equal zoom-in variants, zoom-out, and fit on both platforms', async () => {
+    const platform = vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Win32')
+    await renderWorkspaceSession()
+    const viewport = await screen.findByTestId('presentation-canvas-viewport')
+    resizeElement(viewport, 1050, 486)
+    const zoom = screen.getByRole('slider', { name: 'Zoom' })
+
+    fireEvent.keyDown(document, {
+      code: 'Equal',
+      key: '+',
+      ctrlKey: true,
+      shiftKey: true
+    })
+    expect(zoom).toHaveValue('98')
+    fireEvent.keyDown(document, { code: 'Equal', key: '=', ctrlKey: true })
+    expect(zoom).toHaveValue('123')
+    fireEvent.keyDown(document, { code: 'Minus', key: '-', ctrlKey: true })
+    expect(zoom).toHaveValue('98')
+
+    platform.mockReturnValue('MacIntel')
+    fireEvent.keyDown(document, { code: 'Equal', key: '=', metaKey: true })
+    expect(zoom).toHaveValue('123')
+    fireEvent.keyDown(document, { code: 'KeyO', key: 'o', metaKey: true, altKey: true })
+    await waitFor(() => expect(zoom).toHaveValue('73'))
+  })
+
+  it('navigates slides and progresses Enter/Escape editor state without stealing caret keys', async () => {
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const firstSlideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Editable target' })
+    const withText = addElementToSlide(source, firstSlideId, text)
+    const second = insertBlankEditableSlide(withText, 1)
+    const third = insertBlankEditableSlide(second.document, 2)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: third.document,
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+
+    fireEvent.keyDown(document, { code: 'PageDown', key: 'PageDown' })
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(second.slideId)
+    fireEvent.keyDown(document, { code: 'PageUp', key: 'PageUp' })
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(firstSlideId)
+
+    const textFrame = (await screen.findAllByText('Editable target'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(textFrame).not.toBeNull()
+    fireEvent.click(textFrame!)
+    fireEvent.keyDown(document, { code: 'Enter', key: 'Enter' })
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!
+    expect(content).toHaveAttribute('contenteditable', 'true')
+    expect(content).toHaveFocus()
+
+    const historyLength = session.getSnapshot().history.past.length
+    fireEvent.keyDown(content, { code: 'PageDown', key: 'PageDown' })
+    fireEvent.keyDown(content, { code: 'KeyB', key: 'b', ctrlKey: true })
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(firstSlideId)
+    expect(session.getSnapshot().history.past).toHaveLength(historyLength)
+
+    fireEvent.keyDown(content, { code: 'Escape', key: 'Escape' })
+    expect(content).toHaveAttribute('contenteditable', 'false')
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeEnabled()
+    fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled()
+
+    const textInsert = screen.getByRole('button', { name: 'Text Box' })
+    fireEvent.click(textInsert)
+    expect(textInsert).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
+    expect(textInsert).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it.each(['menu', 'dialog'] as const)(
+    'does not dispatch editor shortcuts from an active %s',
+    async (role) => {
+      const session = await renderWorkspaceSession()
+      const overlay = document.createElement('div')
+      overlay.setAttribute('role', role)
+      const button = document.createElement('button')
+      overlay.appendChild(button)
+      document.body.appendChild(overlay)
+
+      fireEvent.keyDown(button, { code: 'KeyM', key: 'm', ctrlKey: true })
+
+      expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(1)
+      overlay.remove()
+    }
+  )
+
+  it('does not dispatch an already-prevented editor shortcut', async () => {
+    const session = await renderWorkspaceSession()
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyM',
+      key: 'm',
+      ctrlKey: true
+    })
+    event.preventDefault()
+    document.dispatchEvent(event)
+
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(1)
   })
 
   it('loads each installed font once from the font selector first gesture', async () => {

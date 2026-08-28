@@ -49,6 +49,7 @@ import { AlertDialog } from '@heroui/react/alert-dialog'
 import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
 import {
   InspectorPanel,
@@ -68,6 +69,7 @@ import {
   createTextElement,
   convertPptxToEditablePresentation,
   DEFAULT_GRADIENT_BACKGROUND,
+  duplicateElementInSlide,
   duplicateEditableSlides,
   getSlideBackgroundPrimaryColor,
   INSERTED_TEXT_CLICK_SIZE,
@@ -113,6 +115,7 @@ import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationS
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
 import { calculateFitZoomPercent } from '@renderer/lib/presentation-viewport'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
 import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
@@ -1104,6 +1107,15 @@ function EditableSessionDocumentView({
     setSelectedElementIds(new Set([element.id]))
   }
 
+  const duplicateSelectedElement = (): void => {
+    if (!activeSlideId || !selectedElementId) return
+    const result = duplicateElementInSlide(document, activeSlideId, selectedElementId)
+    if (result.document === document) return
+    commitDocument(result.document)
+    setSelectedElementId(result.elementId)
+    setSelectedElementIds(new Set([result.elementId]))
+  }
+
   const reorderElement = (
     elementId: string,
     action: 'bring-forward' | 'bring-to-front' | 'send-backward' | 'send-to-back'
@@ -1860,23 +1872,148 @@ function EditableSessionDocumentView({
     )
   }
 
+  useKeyboardShortcuts(
+    [
+      {
+        id: 'presentation-new-slide',
+        config: SHORTCUTS.PRESENTATION.NEW_SLIDE,
+        description: t('presentationWorkspace.newSlide', 'New Slide'),
+        handler: addSlide
+      },
+      {
+        id: 'presentation-duplicate-object',
+        config: SHORTCUTS.PRESENTATION.DUPLICATE,
+        description: t('presentationWorkspace.duplicateElement', 'Duplicate object'),
+        handler: duplicateSelectedElement
+      },
+      {
+        id: 'presentation-zoom-in',
+        config: SHORTCUTS.PRESENTATION.ZOOM_IN,
+        description: t('presentationWorkspace.zoomIn', 'Zoom in'),
+        handler: () => setCustomZoom(zoomPercent + 25)
+      },
+      {
+        id: 'presentation-zoom-in-alt',
+        config: SHORTCUTS.PRESENTATION.ZOOM_IN_ALT,
+        description: t('presentationWorkspace.zoomIn', 'Zoom in'),
+        handler: () => setCustomZoom(zoomPercent + 25)
+      },
+      {
+        id: 'presentation-zoom-out',
+        config: SHORTCUTS.PRESENTATION.ZOOM_OUT,
+        description: t('presentationWorkspace.zoomOut', 'Zoom out'),
+        handler: () => setCustomZoom(zoomPercent - 25)
+      },
+      {
+        id: 'presentation-zoom-fit',
+        config: SHORTCUTS.PRESENTATION.ZOOM_FIT,
+        description: t('presentationWorkspace.fit', 'Fit'),
+        handler: () => setZoomMode('fit')
+      },
+      {
+        id: 'presentation-bold',
+        config: SHORTCUTS.PRESENTATION.BOLD,
+        description: t('presentationWorkspace.bold', 'Bold'),
+        handler: () => {
+          if (!editingElementId && selectedTextElement) {
+            updateSelectedTextElement({ bold: !selectedTextElement.bold })
+          }
+        }
+      },
+      {
+        id: 'presentation-italic',
+        config: SHORTCUTS.PRESENTATION.ITALIC,
+        description: t('presentationWorkspace.italic', 'Italic'),
+        handler: () => {
+          if (!editingElementId && selectedTextElement) {
+            updateSelectedTextElement({ italic: !selectedTextElement.italic })
+          }
+        }
+      },
+      {
+        id: 'presentation-underline',
+        config: SHORTCUTS.PRESENTATION.UNDERLINE,
+        description: t('presentationWorkspace.underline', 'Underline'),
+        handler: () => {
+          if (!editingElementId && selectedTextElement) {
+            updateSelectedTextElement({ underline: !selectedTextElement.underline })
+          }
+        }
+      }
+    ],
+    { sectionKey: 'presentation' }
+  )
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.defaultPrevented) return
-      const target = event.target as HTMLElement | null
-      if (event.key === 'Escape' && session.getSnapshot().draftKind !== null) {
-        event.preventDefault()
-        clearTextCommitTimer()
-        session.cancelDraft()
-        setEditingElementId(null)
-        return
-      }
-      const isEditingText =
-        target?.isContentEditable ||
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (target?.closest('[role="menu"], [role="dialog"]')) return
+      const isFormControl =
         target?.tagName === 'INPUT' ||
         target?.tagName === 'SELECT' ||
         target?.tagName === 'TEXTAREA'
-      if (isEditingText) return
+      if (isFormControl) return
+      const isContentEditable =
+        target?.isContentEditable || target?.getAttribute('contenteditable') === 'true'
+      if (isContentEditable && event.key !== 'Escape') return
+
+      if (event.key === 'Escape') {
+        if (editingElementId || session.getSnapshot().draftKind !== null) {
+          event.preventDefault()
+          clearTextCommitTimer()
+          if (session.getSnapshot().draftKind !== null) session.cancelDraft()
+          setEditingElementId(null)
+          return
+        }
+        if (selectedElementIds.size > 0) {
+          event.preventDefault()
+          selectElement(null)
+          return
+        }
+        if (isTextInsertMode) {
+          event.preventDefault()
+          setIsTextInsertMode(false)
+        }
+        return
+      }
+
+      if (event.key === 'PageUp' || event.key === 'PageDown') {
+        event.preventDefault()
+        const nextIndex = Math.max(
+          0,
+          Math.min(
+            document.slideOrder.length - 1,
+            activeSlideIndex + (event.key === 'PageUp' ? -1 : 1)
+          )
+        )
+        const nextSlideId = document.slideOrder[nextIndex]
+        if (nextSlideId && nextSlideId !== activeSlideId) {
+          commitTextDraft()
+          activateSlide(nextSlideId)
+          setSelectedSlideIds(new Set([nextSlideId]))
+          setSelectionAnchorIndex(nextIndex)
+          setSelectedElementId(null)
+          setSelectedElementIds(new Set())
+          setEditingElementId(null)
+          setIsTextInsertMode(false)
+          setInsertionIndex(null)
+        }
+        return
+      }
+
+      if (
+        event.key === 'Enter' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        selectedTextElement &&
+        !selectedTextElement.locked
+      ) {
+        event.preventDefault()
+        setEditingElementId(selectedTextElement.id)
+        return
+      }
 
       const command = event.metaKey || event.ctrlKey
       const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
