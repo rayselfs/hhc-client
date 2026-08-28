@@ -1830,7 +1830,43 @@ describe('PresentationWorkspacePage session integration', () => {
     )
   })
 
-  it('anchors Ctrl and macOS Meta wheel zoom while leaving ordinary wheel scrolling alone', async () => {
+  it('leaves Windows Meta-wheel untouched while Windows Ctrl-wheel zooms', async () => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Win32')
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const viewport = await screen.findByTestId('presentation-canvas-viewport')
+    resizeElement(viewport, 1050, 486)
+    const zoom = screen.getByRole('slider', { name: 'Zoom' })
+    const fit = screen.getByRole('button', { name: 'Fit' })
+
+    const metaWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      metaKey: true,
+      deltaY: -100
+    })
+    fireEvent(viewport, metaWheel)
+    expect(metaWheel.defaultPrevented).toBe(false)
+    expect(zoom).toHaveValue('73')
+    expect(fit).toHaveAttribute('aria-pressed', 'true')
+
+    const ctrlWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      deltaY: -100
+    })
+    fireEvent(viewport, ctrlWheel)
+    expect(ctrlWheel.defaultPrevented).toBe(true)
+    expect(zoom).toHaveValue('78')
+    expect(fit).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('anchors macOS Ctrl and Meta wheel zoom while leaving ordinary wheel scrolling alone', async () => {
     vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('MacIntel')
     render(
       <PresentationSessionRegistryProvider>

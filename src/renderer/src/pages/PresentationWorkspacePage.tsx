@@ -96,6 +96,7 @@ import {
 } from '@renderer/lib/editable-presentation'
 import type { HhcLineCloudAuth } from '@renderer/lib/cloud-provider'
 import { prepareHhcLinePresentationSource } from '@renderer/lib/hhc-line-connect'
+import { isMac } from '@renderer/lib/env'
 import {
   alignElements,
   distributeElements,
@@ -834,7 +835,7 @@ function EditableSessionDocumentView({
     const viewport = canvasViewportRef.current
     if (!viewport) return
     const handleWheel = (event: WheelEvent): void => {
-      if (!(event.ctrlKey || event.metaKey)) return
+      if (!(event.ctrlKey || (isMac() && event.metaKey))) return
       event.preventDefault()
       if (event.deltaY === 0) return
       const nextZoom = Math.max(25, Math.min(200, zoomPercent + (event.deltaY < 0 ? 5 : -5)))
