@@ -594,7 +594,7 @@ test('uses full-window Media controls and closes from the control workspace', as
   await expect.poll(() => headerProjection.isClosed()).toBe(true)
 })
 
-test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ page }) => {
+test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await completeOnboarding(page)
@@ -666,6 +666,12 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   await expect(inspector.locator('.workspace-inspector-content-close:visible')).toHaveCount(1)
   await inspector.locator('.workspace-inspector-content-close').click()
   await expect(formatBackgroundTrigger).toBeFocused()
+
+  const projectionPromise = context.waitForEvent('page')
+  await page.getByRole('button', { name: /Start projection|開始投影/ }).click()
+  const projection = await projectionPromise
+  await expect(projection.getByText(/主愛永不止息/)).toBeVisible()
+  await expect(page).toHaveURL(/#\/media$/)
 })
 
 export {}

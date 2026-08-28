@@ -143,7 +143,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       if (Number.isInteger(parsedIndex) && parsedIndex >= 0) slideIndex = parsedIndex
     }
     if (from === 'beginning') slideIndex = 0
-    await startMediaProjection(
+    const report = await startMediaProjection(
       [item],
       0,
       { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
@@ -155,6 +155,9 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         }
       }
     )
+    if (report.items.find((entry) => entry.itemId === item.id)?.status === 'ready') {
+      navigate('/media')
+    }
   }
 
   const runPresentAction = (from: 'beginning' | 'current'): void => {
