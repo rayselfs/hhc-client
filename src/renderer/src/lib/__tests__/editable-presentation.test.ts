@@ -513,14 +513,16 @@ describe('editable presentation documents', () => {
   })
 
   it('marks newly inserted text boxes as content auto-sized until a fixed width is provided', () => {
-    expect(createTextElement({ text: 'New text' })).toMatchObject({
+    const text = createTextElement({ text: 'New text' })
+
+    expect(text).toMatchObject({
       type: 'text',
       autoWidth: true,
       autoSize: 'content',
-      fontSize: 24,
-      width: 24,
-      height: 28
+      width: 24
     })
+    expect(presentationCanvasPxToPoints(text.fontSize, 1920)).toBe(18)
+    expect(text.height).toBeGreaterThanOrEqual(Math.ceil(text.fontSize * text.lineHeight))
 
     expect(createTextElement({ text: 'Imported text', width: 360 })).toMatchObject({
       type: 'text',

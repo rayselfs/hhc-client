@@ -352,6 +352,19 @@ describe('PresentationWorkspaceHeader', () => {
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
   })
 
+  it('aligns only document tabs to the bottom of the normal 56px header frame', () => {
+    const { container } = renderHeader()
+
+    const header = container.querySelector('header')
+    expect(header).toHaveClass('h-14', 'items-center', 'px-2')
+    expect(header?.querySelector('.mb-1')).toBeNull()
+    expect(screen.getByText('Sunday.lpdeck').closest('[role="button"]')).toHaveClass('self-end')
+    expect(screen.getByRole('button', { name: 'Start projection' })).toHaveClass(
+      'size-10',
+      'min-w-10'
+    )
+  })
+
   it('keeps the presentation editor open when the requested item failed', async () => {
     const user = userEvent.setup()
     mocks.startMediaProjection.mockResolvedValue(makeReadinessReport(item, 'failed', 1))

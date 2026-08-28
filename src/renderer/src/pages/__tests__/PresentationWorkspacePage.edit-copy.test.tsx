@@ -440,6 +440,26 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     groups.forEach((group) => expect(group).toHaveClass('shrink-0'))
     const surface = window.document.querySelector('[data-ribbon-surface]')
     expect(surface).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
+    const fontGroup = screen.getByRole('group', { name: 'Font' })
+    expect(fontGroup).toHaveClass('w-[440px]')
+    const fontRows = fontGroup.querySelector('.grid.grid-rows-2')?.children
+    expect(fontRows).toHaveLength(2)
+    const firstRow = fontRows?.[0]
+    const secondRow = fontRows?.[1]
+    const familySelect = screen.getByLabelText('Font family')
+    const sizeSelect = Array.from(fontGroup.querySelectorAll('select')).find(
+      (select) => select !== familySelect
+    )
+    expect(familySelect).toHaveClass('min-w-44', 'flex-1')
+    expect(sizeSelect).toHaveClass('w-20')
+    expect(firstRow).toContainElement(familySelect)
+    expect(firstRow).toContainElement(sizeSelect!)
+    expect(firstRow).toContainElement(screen.getByRole('button', { name: 'Increase font size' }))
+    expect(firstRow).toContainElement(screen.getByRole('button', { name: 'Decrease font size' }))
+    expect(secondRow).toContainElement(screen.getByRole('button', { name: 'Bold' }))
+    expect(secondRow).toContainElement(screen.getByRole('button', { name: 'Italic' }))
+    expect(secondRow).toContainElement(screen.getByRole('button', { name: 'Underline' }))
+    expect(secondRow).toContainElement(screen.getByRole('button', { name: 'Clear formatting' }))
     expect(screen.getByRole('group', { name: 'Arrange' }).querySelector('.flex-wrap')).toBeNull()
     ;[
       'Align objects left',
@@ -464,22 +484,29 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
     const queryLocalFonts = vi
       .fn()
-      .mockResolvedValue([{ family: 'PingFang TC' }, { family: 'PingFang TC' }])
+      .mockResolvedValue([
+        { family: 'BiauKaiTC' },
+        { family: 'Songti TC' },
+        { family: 'BiauKaiTC' },
+        { family: 'Songti TC' }
+      ])
     Object.defineProperty(window, 'queryLocalFonts', {
       configurable: true,
       value: queryLocalFonts
     })
 
     renderEditableDeck(sourceItem)
+    expect(queryLocalFonts).not.toHaveBeenCalled()
     fireEvent.click(await screen.findByRole('button', { name: 'Load local fonts' }))
 
-    expect(await screen.findByRole('option', { name: 'PingFang TC' })).toBeInTheDocument()
+    expect(await screen.findAllByRole('option', { name: 'BiauKaiTC' })).toHaveLength(1)
+    expect(screen.getAllByRole('option', { name: 'Songti TC' })).toHaveLength(1)
     expect(queryLocalFonts).toHaveBeenCalledOnce()
 
     Reflect.deleteProperty(window, 'queryLocalFonts')
   })
 
-  it('keeps an imported font family selectable before local fonts are loaded', async () => {
+  it('keeps an imported font family selectable when local font discovery omits it', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
     const text = createTextElement({
@@ -487,7 +514,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
       width: 300,
       height: 80,
       autoWidth: false,
-      fontFamily: 'Aptos'
+      fontFamily: 'PMingLiU'
     })
     const withText = addElementToSlide(document, slideId, text)
     const sourceItem = makeFile({
@@ -497,13 +524,23 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
       mimeType: EDITABLE_PRESENTATION_MIME_TYPE
     })
     mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withText, revision: 0 })
+    const queryLocalFonts = vi
+      .fn()
+      .mockResolvedValue([{ family: 'BiauKaiTC' }, { family: 'Songti TC' }])
+    Object.defineProperty(window, 'queryLocalFonts', {
+      configurable: true,
+      value: queryLocalFonts
+    })
 
     renderEditableDeck(sourceItem)
     const textBoxes = await screen.findAllByRole('textbox')
     fireEvent.click(textBoxes.at(-1)!)
+    fireEvent.click(screen.getByRole('button', { name: 'Load local fonts' }))
 
-    expect(screen.getByRole('option', { name: 'Aptos' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Font family')).toHaveValue('Aptos')
+    expect(await screen.findByRole('option', { name: 'PMingLiU' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Font family')).toHaveValue('PMingLiU')
+
+    Reflect.deleteProperty(window, 'queryLocalFonts')
   })
 
   it('uses the same Ribbon group shell for Insert and Design', async () => {

@@ -218,6 +218,11 @@ describe('PresentationWorkspacePage session integration', () => {
       .getAllByRole('combobox')
       .find((select) => select.querySelector('option[value="72"]'))
     expect(fontSizeSelect).toBeDefined()
+    expect(
+      Array.from(fontSizeSelect!.querySelectorAll('option'), (option) => Number(option.value))
+    ).toEqual([
+      8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96
+    ])
 
     fireEvent.change(fontSizeSelect!, { target: { value: '72' } })
 
@@ -226,6 +231,57 @@ describe('PresentationWorkspacePage session integration', () => {
       expect(updated.type === 'text' ? updated.fontSize : null).toBe(144)
     })
   })
+
+  it.each([1920, 1280])(
+    'inserts 18 point text with a full line-height frame at %i px document width',
+    async (documentWidth) => {
+      const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+      sourceDocument.width = documentWidth
+      sourceDocument.height = (documentWidth * 9) / 16
+      mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+        document: sourceDocument,
+        revision: 0
+      })
+      let registry: PresentationSessionRegistry | null = null
+      render(
+        <PresentationSessionRegistryProvider>
+          <Workspace showPage onSession={(next) => (registry = next)} />
+        </PresentationSessionRegistryProvider>
+      )
+      await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
+
+      const surface = window.document.querySelector<HTMLElement>(
+        '.presentation-stage [data-slide-surface]'
+      )
+      expect(surface).not.toBeNull()
+      vi.spyOn(surface!, 'getBoundingClientRect').mockReturnValue({
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: documentWidth / 2,
+        bottom: sourceDocument.height / 2,
+        width: documentWidth / 2,
+        height: sourceDocument.height / 2,
+        toJSON: () => undefined
+      })
+
+      fireEvent.doubleClick(surface!, { clientX: 100, clientY: 100 })
+
+      await waitFor(() => {
+        const document = registry!.get('deck-1')!.getSnapshot().renderedDocument
+        const slide = document.slides[document.slideOrder[0]]
+        expect(slide.elementOrder).toHaveLength(1)
+        const element = slide.elements[slide.elementOrder[0]]
+        expect(element.type).toBe('text')
+        if (element.type !== 'text') return
+        expect((element.fontSize * 960) / documentWidth).toBe(18)
+        expect(element.height).toBeGreaterThanOrEqual(
+          Math.ceil(element.fontSize * element.lineHeight)
+        )
+      })
+    }
+  )
 
   it('does not expose dimensions-only Slide Size controls', async () => {
     render(

@@ -11,15 +11,16 @@ describe('local fonts', () => {
     const queryLocalFonts = vi
       .fn()
       .mockResolvedValue([
-        { family: 'PingFang TC' },
-        { family: ' Arial ' },
+        { family: 'Songti TC' },
+        { family: ' BiauKaiTC ' },
         { family: '' },
-        { family: 'PingFang TC' }
+        { family: 'Songti TC' },
+        { family: 'BiauKaiTC' }
       ])
 
     await expect(queryLocalFontFamilies({ queryLocalFonts })).resolves.toEqual([
-      'Arial',
-      'PingFang TC'
+      'BiauKaiTC',
+      'Songti TC'
     ])
     expect(queryLocalFonts).toHaveBeenCalledOnce()
   })
