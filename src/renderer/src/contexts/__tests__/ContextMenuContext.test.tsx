@@ -128,8 +128,11 @@ describe('ContextMenuContext', () => {
     renderWithProvider(<TestComponent />)
     fireEvent.contextMenu(screen.getByTestId('target'))
 
-    const lineSlot = screen.getByRole('img', { name: 'LINE' }).parentElement?.parentElement
+    const lineItem = screen.getByRole('menuitem', { name: 'Sync LINE group' })
+    const lineSlot = lineItem.querySelector('img[alt="LINE"]')?.parentElement?.parentElement
+    expect(lineItem).toBeInTheDocument()
     expect(lineSlot).toHaveClass('size-10')
+    expect(lineSlot).toHaveAttribute('aria-hidden', 'true')
     expect(lineSlot).not.toHaveClass('overflow-hidden')
     expect(lineSlot?.querySelector('img')).toHaveAttribute('width', '20')
     expect(lineSlot?.querySelector('img')).toHaveAttribute('height', '20')
