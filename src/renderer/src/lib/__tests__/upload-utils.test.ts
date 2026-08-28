@@ -273,13 +273,13 @@ describe('folder upload yielding', () => {
       addFolder,
       getChildFolders: vi.fn(() => [])
     } as never)
-    const fileEntry = (file: File) => ({
+    const fileEntry = (file: File): object => ({
       isFile: true,
       isDirectory: false,
       name: file.name,
       file: (resolve: (value: File) => void) => resolve(file)
     })
-    const directoryEntry = (name: string, entries: object[]) => {
+    const directoryEntry = (name: string, entries: object[]): object => {
       let read = false
       return {
         isFile: false,

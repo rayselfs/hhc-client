@@ -211,7 +211,9 @@ describe('PDF thumbnail yield ordering', () => {
 
   it('yields before serializing a single PDF thumbnail', async () => {
     const events: string[] = []
-    vi.stubGlobal('scheduler', { yield: vi.fn().mockImplementation(async () => events.push('yield')) })
+    vi.stubGlobal('scheduler', {
+      yield: vi.fn().mockImplementation(async () => events.push('yield'))
+    })
     const page = {
       getViewport: vi.fn().mockReturnValue({ width: 100, height: 100 }),
       render: vi.fn().mockReturnValue({ promise: Promise.resolve() })
@@ -249,7 +251,9 @@ describe('PDF thumbnail yield ordering', () => {
 
   it('yields before and after serializing every PDF page', async () => {
     const events: string[] = []
-    vi.stubGlobal('scheduler', { yield: vi.fn().mockImplementation(async () => events.push('yield')) })
+    vi.stubGlobal('scheduler', {
+      yield: vi.fn().mockImplementation(async () => events.push('yield'))
+    })
     const pages = Array.from({ length: 2 }, () => ({
       getViewport: vi.fn().mockReturnValue({ width: 100, height: 100 }),
       render: vi.fn().mockReturnValue({ promise: Promise.resolve() })
