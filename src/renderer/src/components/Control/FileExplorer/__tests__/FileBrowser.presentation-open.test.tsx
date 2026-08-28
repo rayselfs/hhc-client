@@ -242,6 +242,46 @@ describe('FileBrowser presentation open behavior', () => {
     })
   })
 
+  it('keeps PPTX out of a direct media projection playlist', async () => {
+    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    const video = makeFile({ id: 'video-1', name: 'Clip.mp4', mimeType: 'video/mp4' })
+    const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: [{ itemId: image.id, status: 'ready' }]
+    })
+    await renderWithItems([image, video, deck])
+
+    await act(async () => {
+      fireEvent.doubleClick(screen.getByText('Photo.png'))
+      await Promise.resolve()
+    })
+
+    expect(mocks.startMediaProjection).toHaveBeenCalledWith([image, video], 0, expect.any(Object), {
+      prioritizeStartItem: true
+    })
+  })
+
+  it('starts a selected PPTX alone at index zero with Shift+F5', async () => {
+    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    const video = makeFile({ id: 'video-1', name: 'Clip.mp4', mimeType: 'video/mp4' })
+    const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: [{ itemId: deck.id, status: 'ready' }]
+    })
+    await renderWithItems([image, video, deck])
+    fireEvent.click(screen.getByText('Deck.pptx'))
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5', shiftKey: true })
+
+    await waitFor(() =>
+      expect(mocks.startMediaProjection).toHaveBeenCalledWith([deck], 0, expect.any(Object), {
+        prioritizeStartItem: true
+      })
+    )
+  })
+
   it('opens an editable presentation in the presentation workspace', async () => {
     const deck = makeFile({
       id: 'deck-1',

@@ -26,7 +26,7 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
 
 type MockProjectionContext = ReturnType<typeof useProjectionHook>
 
-function makeFile(id: string): FileItemRecord {
+function makeFile(id: string, overrides: Partial<FileItemRecord> = {}): FileItemRecord {
   return {
     id,
     name: `${id}.png`,
@@ -37,7 +37,8 @@ function makeFile(id: string): FileItemRecord {
     size: 1,
     url: `blob:${id}`,
     createdAt: Date.now(),
-    expiresAt: null
+    expiresAt: null,
+    ...overrides
   }
 }
 
@@ -265,6 +266,48 @@ describe('Header', () => {
       0
     )
     expect(await screen.findByTestId('media-workspace')).toBeInTheDocument()
+  })
+
+  it('starts the current files folder without PPTX entries', async () => {
+    await i18n.changeLanguage('en')
+    await mockProjectionContext({ isProjectionOpen: false })
+    const startPresentationWithReadiness = vi.fn(() =>
+      Promise.resolve({ summary: { ready: 1, unsupported: 0, failed: 0 } })
+    )
+    const image = makeFile('image-1')
+    const deck = makeFile('deck-1', {
+      name: 'Deck.pptx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    })
+    useFileExplorerStore.setState({
+      currentFolderId: 'file-root',
+      _itemsArray: [image, deck]
+    })
+    useMediaProjectionStore.setState({ startPresentationWithReadiness } as never)
+
+    renderWithRouter(['/files'])
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    expect(startPresentationWithReadiness).toHaveBeenCalledWith([image], 0)
+  })
+
+  it('disables files projection when the current folder contains only PPTX files', async () => {
+    await i18n.changeLanguage('en')
+    await mockProjectionContext({ isProjectionOpen: false })
+    useFileExplorerStore.setState({
+      currentFolderId: 'file-root',
+      _itemsArray: [
+        makeFile('deck-1', {
+          name: 'Deck.pptx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        })
+      ]
+    })
+
+    renderWithRouter(['/files'])
+
+    expect(screen.getByRole('button', { name: 'Start projection' })).toBeDisabled()
   })
 
   it('starts current folder presentation with F5 from the files route', async () => {

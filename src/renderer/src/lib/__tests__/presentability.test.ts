@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { isPresentable, getMediaType, getPresentableItems } from '@renderer/lib/presentability'
+import {
+  isPresentable,
+  getMediaType,
+  getPresentableItems,
+  getProjectionPlaylist
+} from '@renderer/lib/presentability'
 import type { AnyItemRecord, FileItemRecord, VerseItemRecord } from '@shared/types/folder'
 
 describe('isPresentable', () => {
@@ -114,5 +119,48 @@ describe('getPresentableItems', () => {
   it('returns empty for no presentable items', () => {
     const items: AnyItemRecord[] = [file('txt', 'text/plain'), verse]
     expect(getPresentableItems(items)).toHaveLength(0)
+  })
+})
+
+describe('getProjectionPlaylist', () => {
+  const file = (id: string, mimeType: string): FileItemRecord => ({
+    id,
+    name: `${id}.file`,
+    mimeType,
+    type: 'file',
+    sortIndex: 0,
+    parentId: 'root',
+    size: 100,
+    url: `https://example.com/${id}`,
+    createdAt: Date.now(),
+    expiresAt: null
+  })
+
+  it('keeps presentations out of folder media playlists unless directly requested', () => {
+    const image = file('image', 'image/png')
+    const video = file('video', 'video/mp4')
+    const pdf = file('pdf', 'application/pdf')
+    const pptx = file(
+      'pptx',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+    const unsupported = file('unsupported', 'text/plain')
+    const subfolder = {
+      id: 'subfolder',
+      name: 'Subfolder',
+      parentId: 'root',
+      sortIndex: 0,
+      createdAt: Date.now(),
+      expiresAt: null
+    } as unknown as AnyItemRecord
+    const items: AnyItemRecord[] = [image, video, pdf, pptx, unsupported, subfolder]
+
+    expect(getProjectionPlaylist(items).map(({ id }) => id)).toEqual(['image', 'video', 'pdf'])
+    expect(getProjectionPlaylist(items, pptx).map(({ id }) => id)).toEqual(['pptx'])
+    expect(getProjectionPlaylist(items, video).map(({ id }) => id)).toEqual([
+      'image',
+      'video',
+      'pdf'
+    ])
   })
 })

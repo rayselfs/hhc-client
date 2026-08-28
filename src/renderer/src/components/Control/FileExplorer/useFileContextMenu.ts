@@ -7,9 +7,14 @@ import { createFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
 import type { UseFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { getPresentableItems, isPresentable } from '@renderer/lib/presentability'
+import { getProjectionPlaylist, isPresentable } from '@renderer/lib/presentability'
 import { presentMediaItem, startMediaProjection } from '@renderer/lib/projection-actions'
-import { isFileItem, type FolderItem, type FolderRecord } from '@shared/types/folder'
+import {
+  isFileItem,
+  type FileItemRecord,
+  type FolderItem,
+  type FolderRecord
+} from '@shared/types/folder'
 
 export type {
   ClipboardState,
@@ -23,21 +28,22 @@ export type {
 const useBaseFileContextMenu = createFolderContextMenu({ i18nPrefix: 'fileExplorer.contextMenu' })
 
 function project(
-  items: Parameters<typeof getPresentableItems>[0],
-  startIndex: number,
+  items: Parameters<typeof getProjectionPlaylist>[0],
+  requestedItem: FileItemRecord | undefined,
   t: (key: string) => string,
-  navigate: (path: string) => void,
-  prioritizeStartItem: boolean
+  navigate: (path: string) => void
 ): void {
-  const presentableFiles = getPresentableItems(items)
-  if (presentableFiles.length === 0) return
+  const playlist = getProjectionPlaylist(items, requestedItem)
+  if (playlist.length === 0) return
+  const startIndex = requestedItem
+    ? playlist.findIndex((entry) => entry.id === requestedItem.id)
+    : 0
+  if (startIndex < 0) return
 
-  if (prioritizeStartItem) {
-    const item = presentableFiles[Math.max(startIndex, 0)]
-    if (!item) return
+  if (requestedItem) {
     void presentMediaItem({
-      item,
-      playlist: presentableFiles,
+      item: requestedItem,
+      playlist,
       start: (files, index, _, options) =>
         startMediaProjection(
           files,
@@ -50,7 +56,7 @@ function project(
     return
   }
 
-  void startMediaProjection(presentableFiles, Math.max(startIndex, 0), {
+  void startMediaProjection(playlist, startIndex, {
     onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
   })
     .then((report) => {
@@ -75,13 +81,7 @@ function getItemProjectActions(
       onAction: () => {
         const { currentFolderId, getItems } = useFileExplorerStore.getState()
         const items = getItems(currentFolderId)
-        project(
-          items,
-          getPresentableItems(items).findIndex((entry) => entry.id === item.id),
-          t,
-          navigate,
-          true
-        )
+        project(items, item, t, navigate)
       }
     }
   ]
@@ -94,16 +94,16 @@ function getFolderProjectActions(
 ): ContextMenuEntry[] {
   const { toggleFavorite, getItems } = useFileExplorerStore.getState()
   const items = getItems(folder.id)
-  const presentableFiles = getPresentableItems(items)
+  const playlist = getProjectionPlaylist(items)
   const isFavorited = folder.isFavorited ?? false
   const actions: ContextMenuEntry[] = []
 
-  if (presentableFiles.length > 0) {
+  if (playlist.length > 0) {
     actions.push('separator', {
       id: 'project',
       label: t('fileExplorer.contextMenu.project'),
       icon: React.createElement(Play, { size: 14 }),
-      onAction: () => project(items, 0, t, navigate, false)
+      onAction: () => project(items, undefined, t, navigate)
     })
   }
 
