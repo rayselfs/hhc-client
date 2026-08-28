@@ -872,6 +872,51 @@ describe('EditableSlideSurface', () => {
     expect(screen.getByLabelText('Resize text box bottom')).toBeInTheDocument()
   })
 
+  it.each([true, false])(
+    'keeps imported fixed text frames inset-free in %s shared-surface mode',
+    (editable) => {
+      const document = createBlankEditablePresentationDocument('Sunday')
+      const slideId = document.slideOrder[0]
+      const text = createTextElement({
+        text: 'Imported frame',
+        width: 220,
+        height: 40,
+        autoSize: 'fixed',
+        autoWidth: false,
+        runs: [
+          {
+            text: 'Imported ',
+            fontFamily: 'Arial',
+            fontSize: 24,
+            bold: true,
+            italic: false,
+            underline: false,
+            color: '#ff0000'
+          },
+          {
+            text: 'frame',
+            fontFamily: 'Arial',
+            fontSize: 24,
+            bold: false,
+            italic: false,
+            underline: false,
+            color: '#0000ff'
+          }
+        ]
+      })
+      const withText = addElementToSlide(document, slideId, text)
+
+      render(<EditableSlideSurface document={withText} slideId={slideId} editable={editable} />)
+
+      const textContent = screen.getByRole('textbox')
+      const frame = textContent.closest('[data-slide-element]')
+      expect(textContent.style.padding).toBe('')
+      expect(textContent.style.boxSizing).toBe('')
+      expect(textContent).toHaveTextContent('Imported frame')
+      expect(frame).toHaveStyle({ width: '220px', height: '40px' })
+    }
+  )
+
   it('keeps legacy auto-width text content-height when autoSize is absent', () => {
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')

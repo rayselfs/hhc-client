@@ -1157,7 +1157,7 @@ describe('PresentationWorkspacePage session integration', () => {
   })
 
   it.each([1920, 1280])(
-    'inserts 18 point text with a full line-height frame at %i px document width',
+    'inserts 18 point text with line-height and vertical inset at %i px document width',
     async (documentWidth) => {
       const sourceDocument = createBlankEditablePresentationDocument('Sunday')
       sourceDocument.width = documentWidth
@@ -1200,8 +1200,8 @@ describe('PresentationWorkspacePage session integration', () => {
         expect(element.type).toBe('text')
         if (element.type !== 'text') return
         expect((element.fontSize * 960) / documentWidth).toBe(18)
-        expect(element.height).toBeGreaterThanOrEqual(
-          Math.ceil(element.fontSize * element.lineHeight)
+        expect(element.height).toBe(
+          Math.max(32, Math.ceil(element.fontSize * element.lineHeight) + 8)
         )
         expect(element.autoSize).toBe('content')
         expect(element.autoWidth).toBe(true)
@@ -1219,6 +1219,9 @@ describe('PresentationWorkspacePage session integration', () => {
         const dragged = slide.elements[slide.elementOrder[1]]
         expect(dragged.type).toBe('text')
         if (dragged.type !== 'text') return
+        expect(dragged.height).toBe(
+          Math.max(40, Math.ceil(dragged.fontSize * dragged.lineHeight) + 8)
+        )
         expect(dragged.autoSize).toBe('content')
         expect(dragged.autoWidth).toBe(false)
       })

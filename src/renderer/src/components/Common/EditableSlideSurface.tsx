@@ -6,6 +6,8 @@ import type {
   EditableTextInsertFrame
 } from '@renderer/lib/editable-presentation'
 import {
+  CONTENT_HEIGHT_TEXT_PADDING_X,
+  CONTENT_HEIGHT_TEXT_PADDING_Y,
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
   hasContentHeight,
@@ -78,8 +80,6 @@ type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 const TEXT_MIN_WIDTH = 60
 const TEXT_MIN_HEIGHT = 24
 const TEXT_AUTO_MIN_WIDTH = INSERTED_TEXT_CLICK_SIZE.width
-const TEXT_PADDING_X = 8
-const TEXT_PADDING_Y = 4
 const TEXT_FRAME_HIT_AREA = 6
 const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
@@ -848,7 +848,7 @@ function calculateTextResize(
 function isContentAutoSizedText(
   element: Extract<EditablePresentationElement, { type: 'text' }>
 ): boolean {
-  return element.autoSize === 'content' || element.autoWidth === true
+  return hasContentHeight(element)
 }
 
 function measureAutoSizedTextElement(
@@ -947,6 +947,7 @@ function TextElementContent({
   const pendingBlurTextRef = useRef<string | null>(null)
   const hasPendingTextRef = useRef(false)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
+  const contentHeight = hasContentHeight(element)
 
   const settlePendingText = (): void => {
     if (isComposingRef.current || !hasPendingTextRef.current) return
@@ -1097,8 +1098,10 @@ function TextElementContent({
         textDecoration: element.underline ? 'underline' : 'none',
         textAlign: element.align,
         lineHeight: element.lineHeight,
-        boxSizing: 'border-box',
-        padding: `${TEXT_PADDING_Y}px ${TEXT_PADDING_X}px`,
+        boxSizing: contentHeight ? 'border-box' : undefined,
+        padding: contentHeight
+          ? `${CONTENT_HEIGHT_TEXT_PADDING_Y}px ${CONTENT_HEIGHT_TEXT_PADDING_X}px`
+          : undefined,
         width: editing && element.autoWidth === true ? 'max-content' : undefined,
         minWidth: editing && element.autoWidth === true ? '100%' : undefined,
         height: editing && element.autoWidth === true ? 'auto' : undefined,

@@ -182,6 +182,8 @@ export function hasContentHeight(
 export const INSERTED_TEXT_FONT_SIZE_POINTS = 18
 export const INSERTED_TEXT_CLICK_SIZE = { width: 24, height: 32 } as const
 export const INSERTED_TEXT_DRAG_MIN_SIZE = { width: 80, height: 40 } as const
+export const CONTENT_HEIGHT_TEXT_PADDING_X = 8
+export const CONTENT_HEIGHT_TEXT_PADDING_Y = 4
 export const INSERTED_IMAGE_MAX_SLIDE_RATIO = 0.6
 const EMU_PER_INCH = 914400
 const CSS_PX_PER_INCH = 96

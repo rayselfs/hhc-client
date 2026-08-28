@@ -30,7 +30,7 @@ describe('FileProjection editable payload', () => {
     vi.clearAllMocks()
   })
 
-  it('renders editable text and image elements from the projection payload', () => {
+  it('renders fixed imported text and image elements from the projection payload', () => {
     render(
       <FileProjection
         fileName="Editable deck.lpdeck"
@@ -65,6 +65,7 @@ describe('FileProjection editable payload', () => {
                 color: '#111827',
                 align: 'center',
                 lineHeight: 1.15,
+                autoSize: 'fixed',
                 autoWidth: false
               },
               'image-1': {
@@ -94,7 +95,14 @@ describe('FileProjection editable payload', () => {
     )
 
     expect(mockGetFileSource).not.toHaveBeenCalled()
-    expect(screen.getByText('Holy Spirit come')).toBeInTheDocument()
+    const textContent = screen.getByText('Holy Spirit come')
+    expect(textContent).toBeInTheDocument()
+    expect(textContent.style.padding).toBe('')
+    expect(textContent.style.boxSizing).toBe('')
+    expect(textContent.closest('[data-slide-element]')).toHaveStyle({
+      width: '600px',
+      height: '120px'
+    })
     expect(screen.getByAltText('photo.png')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
     const frame = document.querySelector('[data-editable-projection-frame]')
     expect(frame).toHaveStyle({

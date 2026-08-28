@@ -63,6 +63,7 @@ import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 import {
   addElementToSlide,
   applySlideBackgroundToAllSlides,
+  CONTENT_HEIGHT_TEXT_PADDING_Y,
   createImageElement,
   createLineElement,
   createShapeElement,
@@ -1000,7 +1001,10 @@ function EditableSessionDocumentView({
       INSERTED_TEXT_FONT_SIZE_POINTS,
       currentDocument.width
     )
-    const textHeight = Math.max(height, Math.ceil(fontSize * 1.15))
+    const textHeight = Math.max(
+      height,
+      Math.ceil(fontSize * 1.15) + CONTENT_HEIGHT_TEXT_PADDING_Y * 2
+    )
     const element = createTextElement({
       x: Math.max(0, Math.min(currentDocument.width - width, nextFrame.x)),
       y: Math.max(0, Math.min(currentDocument.height - textHeight, nextFrame.y)),
