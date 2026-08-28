@@ -36,7 +36,7 @@ interface EditableSlideSurfaceProps {
   onTextEditFinalizerChange?: (finalize: (() => boolean) | null) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
-  onTransformStart?: () => void
+  onTransformStart?: (elementId: string) => EditablePresentationElement | undefined
   onTransformPreview?: (elementId: string, updates: Partial<EditablePresentationElement>) => void
   onTransformCommit?: () => void
   onTransformCancel?: () => void
@@ -173,17 +173,17 @@ export default function EditableSlideSurface({
         y: document.height / rect.height
       }
     }
+    onEditingElementChange?.(null)
+    onSelectElement?.(element.id, event)
+    const original = onTransformStart?.(element.id) ?? element
     dragRef.current = {
       elementId: element.id,
       mode,
       handle,
       startX: event.clientX,
       startY: event.clientY,
-      original: element
+      original
     }
-    onEditingElementChange?.(null)
-    onSelectElement?.(element.id, event)
-    onTransformStart?.()
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 

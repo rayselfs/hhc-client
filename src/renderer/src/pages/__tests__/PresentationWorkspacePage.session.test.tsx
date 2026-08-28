@@ -75,6 +75,15 @@ function mockAnimationFrame(): () => void {
   }
 }
 
+function mockAutoTextMeasurement(): void {
+  vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return Math.max(20, (this.textContent?.length ?? 0) * 12) + 16
+  })
+  vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(82)
+}
+
 vi.mock('react-i18next', async () => {
   const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next')
   return {
@@ -920,6 +929,225 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(
       registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
     ).toMatchObject({ text: 'Pending blur text', width: 80 })
+  })
+
+  it('resizes from finalized auto-width text geometry and undoes only the resize', async () => {
+    mockAutoTextMeasurement()
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({
+      text: 'Original',
+      width: 80,
+      height: 30,
+      autoSize: 'content',
+      autoWidth: true
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+
+    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!textBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'Final title'
+    fireEvent.input(textBox)
+    const rightHandle = await screen.findByLabelText('Resize text box right')
+    rightHandle.focus()
+    fireEvent.blur(textBox)
+
+    fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 2 })
+    fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 0, pointerId: 2 })
+    fireEvent.pointerUp(rightHandle, { clientX: 24, clientY: 0, pointerId: 2 })
+    act(() => flushAnimationFrame())
+
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Final title', width: 172, height: 82 })
+    act(() => registry!.get('deck-1')!.undo())
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Final title', width: 148, height: 82 })
+  })
+
+  it('does not create a text history entry when editing finishes unchanged before resize', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Unchanged', width: 80, height: 40, autoWidth: false })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const initialHistoryLength = session.getSnapshot().history.past.length
+    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!textBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    const rightHandle = await screen.findByLabelText('Resize text box right')
+    fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 2 })
+    fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 0, pointerId: 2 })
+    fireEvent.pointerUp(rightHandle, { clientX: 24, clientY: 0, pointerId: 2 })
+
+    expect(session.getSnapshot().history.past).toHaveLength(initialHistoryLength + 1)
+    act(() => session.undo())
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      text: 'Unchanged',
+      width: 80
+    })
+  })
+
+  it('rebases pending text before New Slide and keyboard nudge mutations', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', x: 20, y: 20, width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!textBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'Before New Slide'
+    fireEvent.input(textBox)
+    const newSlide = screen.getByRole('button', { name: 'New Slide' })
+    newSlide.focus()
+    fireEvent.blur(textBox)
+    fireEvent.click(newSlide)
+    act(() => flushAnimationFrame())
+
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      text: 'Before New Slide'
+    })
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(2)
+
+    await act(async () => {
+      usePresentationWorkspaceStore.getState().setActiveSlideId('deck-1', slideId)
+    })
+    const returnedTextBox = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
+    if (!returnedTextBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(returnedTextBox, { clientX: 40, clientY: 20, pointerId: 2 })
+    returnedTextBox.textContent = 'Before Nudge'
+    fireEvent.input(returnedTextBox)
+    fireEvent.keyDown(document, { key: 'ArrowRight' })
+    act(() => flushAnimationFrame())
+
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      text: 'Before Nudge',
+      x: 21
+    })
+  })
+
+  it.each([
+    ['activation', 'activate', true],
+    ['close save', 'close', true],
+    ['close discard', 'discard', false]
+  ] as const)('finalizes live pending text before %s', async (_label, action, persists) => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!textBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'Final before boundary'
+    fireEvent.input(textBox)
+
+    if (action === 'activate') {
+      const secondItem = makeEditableItem('deck-2', 'Second.lpdeck')
+      useFileExplorerStore.setState((state) => ({
+        items: { ...state.items, [secondItem.id]: secondItem },
+        _itemsArray: [...state._itemsArray, secondItem]
+      }))
+      await act(async () => {
+        await registry!.open(secondItem)
+        await registry!.activate(secondItem.id)
+      })
+    } else {
+      await act(async () => {
+        await registry!.close('deck-1', action === 'discard' ? 'discard' : undefined)
+      })
+    }
+    act(() => flushAnimationFrame())
+
+    if (persists) {
+      expect(mocks.persistEditablePresentationRevision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          itemId: 'deck-1',
+          document: expect.objectContaining({
+            slides: expect.objectContaining({
+              [slideId]: expect.objectContaining({
+                elements: expect.objectContaining({
+                  [text.id]: expect.objectContaining({ text: 'Final before boundary' })
+                })
+              })
+            })
+          })
+        })
+      )
+    } else {
+      expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+    }
+  })
+
+  it('finalizes pending text before direct slide switching and deletes without a later frame write', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    const withText = addElementToSlide(sourceDocument, slideId, text)
+    const { document, slideId: secondSlideId } = insertBlankEditableSlide(withText, 1)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+    const session = await renderWorkspaceSession()
+    const textBox = globalThis.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
+    if (!textBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'Before switch'
+    fireEvent.input(textBox)
+    fireEvent.click(screen.getByRole('button', { name: '2' }))
+    act(() => flushAnimationFrame())
+
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      text: 'Before switch'
+    })
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(secondSlideId)
+
+    fireEvent.click(screen.getByRole('button', { name: '1Before switch' }))
+    const returnedTextBox = globalThis.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
+    if (!returnedTextBox) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(returnedTextBox, { clientX: 40, clientY: 20, pointerId: 2 })
+    returnedTextBox.textContent = 'Delete me'
+    fireEvent.input(returnedTextBox)
+    fireEvent.keyDown(globalThis.document, { key: 'Delete' })
+    act(() => flushAnimationFrame())
+
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toBeUndefined()
   })
 
   it('does not expose dimensions-only Slide Size controls', async () => {

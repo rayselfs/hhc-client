@@ -793,10 +793,19 @@ function EditableSessionDocumentView({
     if (session.getSnapshot().draftKind === 'text') session.commitDraft()
   }
 
-  const commitDocument = (nextDocument: EditablePresentationDocument): void => {
-    if (!finalizeTextEditor()) return
+  const finalizeDocumentMutation = (): EditablePresentationDocument | null => {
+    if (!finalizeTextEditor()) return null
     clearTextCommitTimer()
-    session.commit(nextDocument)
+    return session.getSnapshot().renderedDocument
+  }
+
+  const commitDocument = (
+    update: (currentDocument: EditablePresentationDocument) => EditablePresentationDocument
+  ): boolean => {
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return false
+    session.commit(update(currentDocument))
+    return true
   }
 
   function commitNotes(): void {
@@ -840,8 +849,17 @@ function EditableSessionDocumentView({
     elementId: string,
     updates: Partial<EditablePresentationElement>
   ): void => {
-    if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
     const preview = session.getSnapshot().renderedDocument
+    const current = preview.slides[slideId]?.elements[elementId]
+    if (
+      current &&
+      Object.entries(updates).every(
+        ([key, value]) => current[key as keyof typeof current] === value
+      )
+    ) {
+      return
+    }
+    if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
     session.previewDraft(updateElementInSlide(preview, slideId, elementId, updates))
     clearTextCommitTimer()
     textCommitTimerRef.current = window.setTimeout(() => {
@@ -852,7 +870,9 @@ function EditableSessionDocumentView({
 
   const updateSelectedElement = (updates: Partial<EditablePresentationElement>): void => {
     if (!document || !activeSlideId || !selectedElementId) return
-    commitDocument(updateElementInSlide(document, activeSlideId, selectedElementId, updates))
+    commitDocument((current) =>
+      updateElementInSlide(current, activeSlideId, selectedElementId, updates)
+    )
   }
 
   const selectElement = (
@@ -888,7 +908,7 @@ function EditableSessionDocumentView({
   const addShape = (shape: 'rectangle' | 'ellipse'): void => {
     if (!activeSlideId) return
     const element = createShapeElement(shape)
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    commitDocument((current) => addElementToSlide(current, activeSlideId, element))
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
     setSelectedElementIds(new Set([element.id]))
@@ -897,7 +917,7 @@ function EditableSessionDocumentView({
   const addLine = (): void => {
     if (!activeSlideId) return
     const element = createLineElement()
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    commitDocument((current) => addElementToSlide(current, activeSlideId, element))
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
   }
@@ -906,38 +926,41 @@ function EditableSessionDocumentView({
     if (!activeSlideId) return
     const ids = [...selectedElementIds]
     if (ids.length < 2) return
-    commitDocument(alignElements(document, activeSlideId, ids, alignment))
+    commitDocument((current) => alignElements(current, activeSlideId, ids, alignment))
   }
 
   const applyElementDistribution = (distribution: ElementDistribution): void => {
     if (!activeSlideId) return
     const ids = [...selectedElementIds]
     if (ids.length < 3) return
-    commitDocument(distributeElements(document, activeSlideId, ids, distribution))
+    commitDocument((current) => distributeElements(current, activeSlideId, ids, distribution))
   }
 
   const moveSelectedSlides = (targetIndex: number): void => {
     const ids = draggingSlideIds.length > 0 ? draggingSlideIds : getSelectedSlideIds()
-    const nextDocument = reorderSelectedSlides(document, ids, targetIndex)
-    if (nextDocument === document) return
-    commitDocument(nextDocument)
+    commitDocument((current) => reorderSelectedSlides(current, ids, targetIndex))
     setDraggingSlideIds([])
     setInsertionIndex(null)
   }
 
   const setActiveSlideBackground = (background: EditableSlideBackground): void => {
     if (!document || !activeSlideId) return
-    commitDocument(updateSlideBackground(document, activeSlideId, background))
+    commitDocument((current) => updateSlideBackground(current, activeSlideId, background))
   }
 
   const applyActiveBackgroundToAllSlides = (): void => {
     if (!document || !activeSlide) return
-    commitDocument(applySlideBackgroundToAllSlides(document, activeSlide.background))
+    commitDocument((current) =>
+      applySlideBackgroundToAllSlides(
+        current,
+        current.slides[activeSlideId]?.background ?? activeSlide.background
+      )
+    )
   }
 
   const resetActiveSlideBackground = (): void => {
     if (!document || !activeSlideId) return
-    commitDocument(resetSlideBackground(document, activeSlideId))
+    commitDocument((current) => resetSlideBackground(current, activeSlideId))
   }
 
   const addTextElement = (frame?: EditableTextInsertFrame): void => {
@@ -960,11 +983,16 @@ function EditableSessionDocumentView({
       autoSize === 'content'
         ? nextFrame.height
         : Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.height, nextFrame.height)
-    const fontSize = presentationPointsToCanvasPx(INSERTED_TEXT_FONT_SIZE_POINTS, document.width)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const fontSize = presentationPointsToCanvasPx(
+      INSERTED_TEXT_FONT_SIZE_POINTS,
+      currentDocument.width
+    )
     const textHeight = Math.max(height, Math.ceil(fontSize * 1.15))
     const element = createTextElement({
-      x: Math.max(0, Math.min(document.width - width, nextFrame.x)),
-      y: Math.max(0, Math.min(document.height - textHeight, nextFrame.y)),
+      x: Math.max(0, Math.min(currentDocument.width - width, nextFrame.x)),
+      y: Math.max(0, Math.min(currentDocument.height - textHeight, nextFrame.y)),
       width,
       height: textHeight,
       autoWidth: nextFrame.autoWidth,
@@ -972,7 +1000,7 @@ function EditableSessionDocumentView({
       fontSize,
       text: ''
     })
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    session.commit(addElementToSlide(currentDocument, activeSlideId, element))
     setSelectedElementId(element.id)
     setEditingElementId(element.id)
     setIsTextInsertMode(false)
@@ -980,8 +1008,10 @@ function EditableSessionDocumentView({
 
   const addSlide = (): void => {
     if (!document) return
-    const result = insertBlankEditableSlide(document, document.slideOrder.length)
-    commitDocument(result.document)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const result = insertBlankEditableSlide(currentDocument, currentDocument.slideOrder.length)
+    session.commit(result.document)
     activateSlide(result.slideId)
     setSelectedSlideIds(new Set([result.slideId]))
     setSelectedElementId(null)
@@ -990,8 +1020,10 @@ function EditableSessionDocumentView({
 
   const addSlideAfter = (index: number): void => {
     if (!document) return
-    const result = insertBlankEditableSlide(document, index + 1)
-    commitDocument(result.document)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const result = insertBlankEditableSlide(currentDocument, index + 1)
+    session.commit(result.document)
     activateSlide(result.slideId)
     setSelectedSlideIds(new Set([result.slideId]))
     setSelectionAnchorIndex(index + 1)
@@ -1068,10 +1100,13 @@ function EditableSessionDocumentView({
 
   const pasteSlide = (): void => {
     if (copiedSlideIds.length === 0 || !document) return
-    const targetIndex = insertionIndex ?? activeSlideIndex + 1
-    const result = duplicateEditableSlides(document, copiedSlideIds, targetIndex)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const targetIndex =
+      insertionIndex ?? currentDocument.slideOrder.indexOf(activeSlideId ?? '') + 1
+    const result = duplicateEditableSlides(currentDocument, copiedSlideIds, targetIndex)
     if (result.slideIds.length === 0) return
-    commitDocument(result.document)
+    session.commit(result.document)
     setSelectedSlideIds(new Set(result.slideIds))
     activateSlide(result.slideIds[0])
     setInsertionIndex(null)
@@ -1098,7 +1133,7 @@ function EditableSessionDocumentView({
     const nextDocument = removeEditableSlides(currentDocument, removingIds)
     const nextIndex = Math.min(activeSlideIndex, Math.max(0, nextDocument.slideOrder.length - 1))
     const nextSlideId = nextDocument.slideOrder[nextIndex]
-    commitDocument(nextDocument)
+    session.commit(nextDocument)
     activateSlide(nextSlideId ?? null)
     setSelectedSlideIds(nextSlideId ? new Set([nextSlideId]) : new Set())
     setSelectedElementId(null)
@@ -1113,7 +1148,7 @@ function EditableSessionDocumentView({
       (current, elementId) => removeElementFromSlide(current, activeSlideId, elementId),
       session.getSnapshot().renderedDocument
     )
-    commitDocument(nextDocument)
+    session.commit(nextDocument)
     setSelectedElementId(null)
     setSelectedElementIds(new Set())
   }
@@ -1126,16 +1161,18 @@ function EditableSessionDocumentView({
       x: copiedElement.x + 24,
       y: copiedElement.y + 24
     } as EditablePresentationElement
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    commitDocument((current) => addElementToSlide(current, activeSlideId, element))
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
   }
 
   const duplicateSelectedElement = (): void => {
     if (!activeSlideId || !selectedElementId) return
-    const result = duplicateElementInSlide(document, activeSlideId, selectedElementId)
-    if (result.document === document) return
-    commitDocument(result.document)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const result = duplicateElementInSlide(currentDocument, activeSlideId, selectedElementId)
+    if (result.document === currentDocument) return
+    session.commit(result.document)
     setSelectedElementId(result.elementId)
     setSelectedElementIds(new Set([result.elementId]))
   }
@@ -1145,7 +1182,7 @@ function EditableSessionDocumentView({
     action: 'bring-forward' | 'bring-to-front' | 'send-backward' | 'send-to-back'
   ): void => {
     if (!document || !activeSlideId) return
-    commitDocument(reorderElementInSlide(document, activeSlideId, elementId, action))
+    commitDocument((current) => reorderElementInSlide(current, activeSlideId, elementId, action))
   }
 
   const showElementContextMenu = (
@@ -1185,11 +1222,13 @@ function EditableSessionDocumentView({
   const addImage = async (file: File): Promise<void> => {
     if (!document || !activeSlideId) return
     const { dataUrl, width, height } = await readImageFile(file)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
     const assetId = crypto.randomUUID()
     const nextDocument: EditablePresentationDocument = {
-      ...document,
+      ...currentDocument,
       assets: {
-        ...document.assets,
+        ...currentDocument.assets,
         [assetId]: {
           id: assetId,
           name: file.name,
@@ -1200,12 +1239,12 @@ function EditableSessionDocumentView({
     }
     const element = createImageElement({
       assetId,
-      slideWidth: document.width,
-      slideHeight: document.height,
+      slideWidth: currentDocument.width,
+      slideHeight: currentDocument.height,
       sourceWidth: width,
       sourceHeight: height
     })
-    commitDocument(addElementToSlide(nextDocument, activeSlideId, element))
+    session.commit(addElementToSlide(nextDocument, activeSlideId, element))
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
     setIsTextInsertMode(false)
@@ -2056,7 +2095,9 @@ function EditableSessionDocumentView({
         const amount = event.shiftKey ? 10 : 1
         const dx = event.key === 'ArrowLeft' ? -amount : event.key === 'ArrowRight' ? amount : 0
         const dy = event.key === 'ArrowUp' ? -amount : event.key === 'ArrowDown' ? amount : 0
-        commitDocument(nudgeElements(document, activeSlideId, [...selectedElementIds], dx, dy))
+        commitDocument((current) =>
+          nudgeElements(current, activeSlideId, [...selectedElementIds], dx, dy)
+        )
         return
       }
       if (isSlideSidebar && command && event.key.toLowerCase() === 'a') {
@@ -2224,8 +2265,7 @@ function EditableSessionDocumentView({
                             const ids = selectedSlideIds.has(slideId)
                               ? getSelectedSlideIds()
                               : [slideId]
-                            const nextDocument = reorderSelectedSlides(document, ids, target)
-                            if (nextDocument !== document) commitDocument(nextDocument)
+                            commitDocument((current) => reorderSelectedSlides(current, ids, target))
                             return
                           }
                           if (event.key === 'Enter') {
@@ -2350,7 +2390,11 @@ function EditableSessionDocumentView({
                       onTextEditFinalizerChange={setTextEditorFinalizer}
                       onInsertText={addTextElement}
                       onElementContextMenu={showElementContextMenu}
-                      onTransformStart={() => session.beginDraft('pointer')}
+                      onTransformStart={(elementId) => {
+                        session.beginDraft('pointer')
+                        return session.getSnapshot().renderedDocument.slides[activeSlideId]
+                          ?.elements[elementId]
+                      }}
                       onTransformPreview={(elementId, updates) => {
                         const snapshot = session.getSnapshot()
                         const preview = snapshot.renderedDocument
