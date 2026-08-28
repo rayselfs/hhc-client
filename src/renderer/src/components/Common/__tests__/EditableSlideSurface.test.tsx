@@ -740,17 +740,81 @@ describe('EditableSlideSurface', () => {
       const handle = screen.getByLabelText('Resize text box top left')
       const indicator = withinResizeHandle(handle)
       const leftEdge = screen.getByTestId('text-frame-edge-left')
-      const frame = screen.getByRole('textbox').parentElement
+      const frame = screen.getByRole('textbox').closest('[data-slide-element]')
+      const chrome = screen
+        .getByLabelText('Resize text box top left')
+        .closest('[data-selection-chrome]')
       if (!(frame instanceof HTMLElement)) throw new Error('text frame not found')
+      if (!(chrome instanceof HTMLElement)) throw new Error('selection chrome not found')
       expect(Number.parseFloat(handle.style.width) * scale).toBeGreaterThanOrEqual(24)
       expect(Number.parseFloat(handle.style.height) * scale).toBeGreaterThanOrEqual(24)
       expect(Number.parseFloat(indicator.style.width) * scale).toBe(12)
       expect(Number.parseFloat(indicator.style.height) * scale).toBe(12)
       expect(Number.parseFloat(indicator.style.borderWidth) * scale).toBe(1.5)
       expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
-      expect(Number.parseFloat(frame.style.outlineWidth) * scale).toBe(1.5)
+      expect(Number.parseFloat(chrome.style.outlineWidth) * scale).toBe(1.5)
     }
   )
+
+  it('keeps selection chrome outside the clipped slide-content layer', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ x: 0, y: 0, text: 'Corner' })
+    const { container } = render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    const content = container.querySelector('[data-slide-content]')
+    const chrome = container.querySelector('[data-selection-chrome]')
+    const handle = screen.getByLabelText('Resize text box top left')
+    expect(content).toHaveClass('overflow-hidden')
+    expect(chrome).not.toBeNull()
+    expect(content).not.toContainElement(handle)
+    expect(chrome).toContainElement(handle)
+  })
+
+  it('resolves overlapping text targets to the handle nearest the pointer', () => {
+    const onTransformStart = vi.fn(() => text)
+    const onTransformPreview = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      x: 100,
+      y: 100,
+      width: 60,
+      height: 24,
+      text: 'Small',
+      autoSize: 'fixed',
+      autoWidth: false
+    })
+    const { container } = render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+      />
+    )
+    const surface = getSlideSurface(container)
+    const topLeft = screen.getByLabelText('Resize text box top left')
+    const bottomRight = screen.getByLabelText('Resize text box bottom right')
+    mockOverlappingHandleRects(surface, topLeft, bottomRight)
+
+    fireEvent.pointerDown(bottomRight, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(bottomRight, { clientX: 95, clientY: 95, pointerId: 1 })
+
+    expect(onTransformPreview).toHaveBeenLastCalledWith(
+      text.id,
+      expect.objectContaining({ x: 80, y: 80, width: 80, height: 44 })
+    )
+  })
 
   it.each([0.25, 1, 2])(
     'keeps image, crop, and generic resize targets at least 24 screen px at scale %s',
@@ -1446,6 +1510,30 @@ function mockSurfaceRect(surface: HTMLElement): void {
     height: 540,
     toJSON: () => ({})
   })
+}
+
+function mockOverlappingHandleRects(
+  surface: HTMLElement,
+  topLeft: HTMLElement,
+  bottomRight: HTMLElement
+): void {
+  vi.spyOn(surface, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 480, 270))
+  vi.spyOn(topLeft, 'getBoundingClientRect').mockReturnValue(rect(87.5, 87.5, 25, 25))
+  vi.spyOn(bottomRight, 'getBoundingClientRect').mockReturnValue(rect(92.5, 92.5, 25, 25))
+}
+
+function rect(x: number, y: number, width: number, height: number): DOMRect {
+  return {
+    x,
+    y,
+    left: x,
+    top: y,
+    right: x + width,
+    bottom: y + height,
+    width,
+    height,
+    toJSON: () => ({})
+  }
 }
 
 function mockSurfaceScale(scale: number): void {

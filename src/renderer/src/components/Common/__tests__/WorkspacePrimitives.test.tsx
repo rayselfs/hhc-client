@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -193,20 +193,87 @@ describe('ResponsivePanelGroup', () => {
     )
     expect(container.querySelector('.workspace-inspector-slot')).not.toHaveAttribute('inert')
   })
+
+  it('hands focus from a disappearing compact close button to the docked pane', async () => {
+    const setViewportWidth = mockCompactViewport()
+    const user = userEvent.setup()
+    const { container } = render(
+      <ResponsivePanelGroup
+        navigatorLabel="Slides"
+        inspectorLabel="Format"
+        navigator={<NavigatorRail>Slide navigator</NavigatorRail>}
+        stage={<StageViewport>Editing stage</StageViewport>}
+        inspector={
+          <InspectorPanel>
+            <button type="button">Apply format</button>
+          </InspectorPanel>
+        }
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Format' }))
+    const close = screen.getByRole('button', { name: 'Close Format' })
+    await waitFor(() => expect(close).toHaveFocus())
+
+    act(() => setViewportWidth(1400))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply format' })).toHaveFocus())
+    expect(container.querySelector('.workspace-inspector-slot')).not.toHaveAttribute(
+      'role',
+      'dialog'
+    )
+    expect(container.querySelector('.workspace-stage-slot')).not.toHaveAttribute('inert')
+
+    act(() => setViewportWidth(900))
+    await waitFor(() => expect(close).toHaveFocus())
+    screen.getByRole('button', { name: 'Apply format' }).focus()
+
+    act(() => setViewportWidth(1400))
+
+    expect(screen.getByRole('button', { name: 'Apply format' })).toHaveFocus()
+  })
 })
 
-function mockCompactViewport(): void {
-  vi.spyOn(window, 'matchMedia').mockImplementation(
-    (query) =>
-      ({
-        matches: query.includes('max-width'),
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(() => false)
-      }) as MediaQueryList
-  )
+function mockCompactViewport(initialWidth = 900): (width: number) => void {
+  let width = initialWidth
+  const media = new Map<
+    string,
+    MediaQueryList & { listeners: Set<(event: MediaQueryListEvent) => void> }
+  >()
+  vi.spyOn(window, 'matchMedia').mockImplementation((query) => {
+    const existing = media.get(query)
+    if (existing) return existing
+    const listeners = new Set<(event: MediaQueryListEvent) => void>()
+    const maxWidth = Number.parseInt(query.match(/max-width:\s*(\d+)px/)?.[1] ?? '0', 10)
+    const result = {
+      get matches() {
+        return width <= maxWidth
+      },
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn((_type: string, listener: (event: MediaQueryListEvent) => void) =>
+        listeners.add(listener)
+      ),
+      removeEventListener: vi.fn((_type: string, listener: (event: MediaQueryListEvent) => void) =>
+        listeners.delete(listener)
+      ),
+      dispatchEvent: vi.fn(() => false),
+      listeners
+    } as MediaQueryList & { listeners: Set<(event: MediaQueryListEvent) => void> }
+    media.set(query, result)
+    return result
+  })
+  return (nextWidth) => {
+    const previousWidth = width
+    width = nextWidth
+    media.forEach((query) => {
+      const maxWidth = Number.parseInt(query.media.match(/max-width:\s*(\d+)px/)?.[1] ?? '0', 10)
+      const previousMatches = previousWidth <= maxWidth
+      if (query.matches === previousMatches) return
+      const event = { matches: query.matches, media: query.media } as MediaQueryListEvent
+      query.listeners.forEach((listener) => listener(event))
+    })
+  }
 }

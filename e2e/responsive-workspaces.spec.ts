@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { completeOnboarding } from './helpers'
 
 async function expectProjectionActionGeometry(action: Locator): Promise<void> {
@@ -12,6 +12,380 @@ async function expectProjectionActionGeometry(action: Locator): Promise<void> {
     expect(Math.abs(box!.y - 8)).toBeLessThanOrEqual(1)
     expect(Math.abs(1200 - box!.x - box!.width - 8)).toBeLessThanOrEqual(1)
   }).toPass({ timeout: 5_000 })
+}
+
+type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
+
+const HANDLE_DIRECTIONS: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+
+const HANDLE_LABELS: Record<ResizeHandle, string> = {
+  nw: 'top left',
+  n: 'top',
+  ne: 'top right',
+  e: 'right',
+  se: 'bottom right',
+  s: 'bottom',
+  sw: 'bottom left',
+  w: 'left'
+}
+
+async function selectSlideElement(element: Locator): Promise<void> {
+  await element.scrollIntoViewIfNeeded()
+  await element.evaluate((target) => (target as HTMLElement).click())
+}
+
+async function expectEffectiveHandleTarget(handle: Locator): Promise<void> {
+  await expect(handle).toBeVisible()
+  await handle.evaluate(async (element) => {
+    const viewport = element.closest('[data-testid="presentation-canvas-viewport"]')
+    if (!(viewport instanceof HTMLElement)) return
+    const rect = element.getBoundingClientRect()
+    const viewportRect = viewport.getBoundingClientRect()
+    const inset = 13
+    if (rect.left < viewportRect.left + inset) {
+      viewport.scrollLeft += rect.left - viewportRect.left - inset
+    } else if (rect.right > viewportRect.right - inset) {
+      viewport.scrollLeft += rect.right - viewportRect.right + inset
+    }
+    if (rect.top < viewportRect.top + inset) {
+      viewport.scrollTop += rect.top - viewportRect.top - inset
+    } else if (rect.bottom > viewportRect.bottom - inset) {
+      viewport.scrollTop += rect.bottom - viewportRect.bottom + inset
+    }
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    )
+  })
+  const effective = await handle.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const clips: Array<{ tag: string; className: string; rect: DOMRect; overflow: string }> = []
+    let left = rect.left
+    let top = rect.top
+    let right = rect.right
+    let bottom = rect.bottom
+    for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      const style = getComputedStyle(ancestor)
+      const clip = ancestor.getBoundingClientRect()
+      if (/hidden|clip/.test(style.overflowX) || /hidden|clip/.test(style.overflowY)) {
+        clips.push({
+          tag: ancestor.tagName,
+          className: ancestor.className,
+          rect: clip,
+          overflow: `${style.overflowX}/${style.overflowY}`
+        })
+      }
+      if (/hidden|clip/.test(style.overflowX)) {
+        left = Math.max(left, clip.left)
+        right = Math.min(right, clip.right)
+      }
+      if (/hidden|clip/.test(style.overflowY)) {
+        top = Math.max(top, clip.top)
+        bottom = Math.min(bottom, clip.bottom)
+      }
+    }
+    left = Math.max(0, left)
+    top = Math.max(0, top)
+    right = Math.min(innerWidth, right)
+    bottom = Math.min(innerHeight, bottom)
+    const centerX = (rect.left + rect.right) / 2
+    const centerY = (rect.top + rect.bottom) / 2
+    return {
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top),
+      hitIsResizeTarget: Boolean(
+        document.elementFromPoint(centerX, centerY)?.closest('[data-resize-handle]')
+      ),
+      rect,
+      clips,
+      surface: element.closest('[data-slide-surface]')?.getBoundingClientRect(),
+      chrome: element.closest('[data-selection-chrome]')?.getBoundingClientRect(),
+      chromeStyle: element.closest('[data-selection-chrome]')?.getAttribute('style'),
+      handleStyle: element.getAttribute('style'),
+      layerStyle: element.closest('[data-selection-layer]')?.getAttribute('style'),
+      viewport: element
+        .closest('[data-testid="presentation-canvas"]')
+        ?.parentElement?.parentElement?.getBoundingClientRect(),
+      zoom: document.querySelector<HTMLInputElement>('input[type="range"]')?.value
+    }
+  })
+  expect(effective.width, JSON.stringify(effective)).toBeGreaterThanOrEqual(24)
+  expect(effective.height).toBeGreaterThanOrEqual(24)
+  expect(effective.hitIsResizeTarget).toBe(true)
+}
+
+async function setEditorZoom(
+  page: Page,
+  slider: Locator,
+  value: Locator,
+  zoomPercent: string
+): Promise<void> {
+  await expect(async () => {
+    await slider.evaluate((element, nextValue) => {
+      const input = element as HTMLInputElement
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setValue?.call(input, nextValue)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    }, zoomPercent)
+    await slider.evaluate(
+      () =>
+        new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    )
+    await expect(slider).toHaveValue(zoomPercent)
+    await expect(value).toHaveText(`${zoomPercent}%`)
+    await expect
+      .poll(async () => (await page.getByTestId('presentation-canvas').boundingBox())?.width)
+      .toBeCloseTo((1024 * Number(zoomPercent)) / 100, 0)
+  }).toPass()
+}
+
+async function dragResizeHandle(
+  page: Page,
+  handle: Locator,
+  direction: ResizeHandle,
+  horizontalOnly = false,
+  inward = true
+): Promise<void> {
+  await expectEffectiveHandleTarget(handle)
+  const chrome = page.locator('[data-selection-chrome]').first()
+  const before = await chrome.evaluate((element) => ({
+    x: Number.parseFloat((element as HTMLElement).style.left),
+    y: Number.parseFloat((element as HTMLElement).style.top),
+    width: Number.parseFloat((element as HTMLElement).style.width),
+    height: Number.parseFloat((element as HTMLElement).style.height)
+  }))
+  const target = await handle.boundingBox()
+  expect(target).not.toBeNull()
+  const sign = inward ? 1 : -1
+  const dx = direction.includes('w') ? 24 * sign : direction.includes('e') ? -24 * sign : 0
+  const dy = horizontalOnly
+    ? 0
+    : direction.includes('n')
+      ? 24 * sign
+      : direction.includes('s')
+        ? -24 * sign
+        : 0
+  const x = target!.x + target!.width / 2
+  const y = target!.y + target!.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + dx, y + dy)
+  await page.mouse.up()
+  if (direction.includes('w') || direction.includes('e')) {
+    await expect
+      .poll(() =>
+        chrome.evaluate((element) => Number.parseFloat((element as HTMLElement).style.width))
+      )
+      .not.toBe(before.width)
+  } else {
+    await expect
+      .poll(() =>
+        chrome.evaluate((element) => Number.parseFloat((element as HTMLElement).style.height))
+      )
+      .not.toBe(before.height)
+  }
+  const after = await chrome.evaluate((element) => ({
+    x: Number.parseFloat((element as HTMLElement).style.left),
+    y: Number.parseFloat((element as HTMLElement).style.top),
+    width: Number.parseFloat((element as HTMLElement).style.width),
+    height: Number.parseFloat((element as HTMLElement).style.height)
+  }))
+  if (direction.includes('w')) {
+    if (inward) expect(after.x, direction).toBeGreaterThan(before.x)
+    else expect(after.x, direction).toBeLessThan(before.x)
+  }
+  if (direction.includes('e')) {
+    if (inward) {
+      expect(after.x + after.width, direction).toBeLessThan(before.x + before.width)
+    } else {
+      expect(after.x + after.width, direction).toBeGreaterThan(before.x + before.width)
+    }
+  }
+  if (!horizontalOnly && direction.includes('n')) {
+    if (inward) expect(after.y, direction).toBeGreaterThan(before.y)
+    else expect(after.y, direction).toBeLessThan(before.y)
+  }
+  if (!horizontalOnly && direction.includes('s')) {
+    if (inward) {
+      expect(after.y + after.height, direction).toBeLessThan(before.y + before.height)
+    } else {
+      expect(after.y + after.height, direction).toBeGreaterThan(before.y + before.height)
+    }
+  }
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect
+    .poll(() =>
+      chrome.evaluate((element) => {
+        const style = (element as HTMLElement).style
+        return [style.left, style.top, style.width, style.height]
+      })
+    )
+    .toEqual([`${before.x}px`, `${before.y}px`, `${before.width}px`, `${before.height}px`])
+}
+
+async function dragCropHandle(page: Page, handle: Locator, direction: ResizeHandle): Promise<void> {
+  await expectEffectiveHandleTarget(handle)
+  const image = page.locator(
+    '.presentation-stage [data-slide-content] [data-slide-element] img[alt="Corner image"]'
+  )
+  const readCropGeometry = (): Promise<number[]> =>
+    image.evaluate((element) => {
+      const style = (element as HTMLElement).style
+      return [style.left, style.top, style.width, style.height].map((value) =>
+        Number.parseFloat(value)
+      )
+    })
+  const before = await readCropGeometry()
+  const target = await handle.boundingBox()
+  expect(target).not.toBeNull()
+  const dx = direction.includes('w') ? 4 : direction.includes('e') ? -4 : 0
+  const dy = direction.includes('n') ? 4 : direction.includes('s') ? -4 : 0
+  const x = target!.x + target!.width / 2
+  const y = target!.y + target!.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + dx, y + dy)
+  await page.mouse.up()
+  await expect.poll(readCropGeometry).not.toEqual(before)
+  const after = await readCropGeometry()
+  if (direction.includes('w')) expect(after[0], direction).toBeLessThan(before[0])
+  if (direction.includes('e')) expect(after[2], direction).toBeGreaterThan(before[2])
+  if (direction.includes('n')) expect(after[1], direction).toBeLessThan(before[1])
+  if (direction.includes('s')) expect(after[3], direction).toBeGreaterThan(before[3])
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(readCropGeometry).toEqual(before)
+}
+
+async function installResizeFixture(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const requestResult = <T>(request: IDBRequest<T>): Promise<T> =>
+      new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+    const open = indexedDB.open('hhc-file-explorer', 5)
+    const db = await requestResult(open)
+    const read = db.transaction(['folder-items', 'file-blobs'], 'readonly')
+    const items = (await requestResult(read.objectStore('folder-items').getAll())) as Array<{
+      id: string
+      mimeType?: string
+    }>
+    const item = items.find(
+      (candidate) => candidate.mimeType === 'application/vnd.librepresenter.presentation+json'
+    )
+    if (!item) throw new Error('editable presentation fixture item not found')
+    const record = (await requestResult(read.objectStore('file-blobs').get(item.id))) as {
+      id: string
+      blob: Blob
+      revision?: number
+      [key: string]: unknown
+    }
+    const document = JSON.parse(await record.blob.text()) as {
+      width: number
+      height: number
+      slideOrder: string[]
+      slides: Record<
+        string,
+        {
+          elementOrder: string[]
+          elements: Record<string, unknown>
+        }
+      >
+      assets: Record<string, unknown>
+      updatedAt: number
+    }
+    const slide = document.slides[document.slideOrder[0]]
+    const textBase = {
+      type: 'text',
+      rotation: 0,
+      opacity: 1,
+      fontFamily: 'Arial',
+      fontSize: 24,
+      bold: false,
+      italic: false,
+      underline: false,
+      color: '#000000',
+      align: 'left',
+      lineHeight: 1.15
+    }
+    slide.elementOrder = ['content-text', 'fixed-text', 'corner-image', 'corner-shape']
+    slide.elements = {
+      'content-text': {
+        ...textBase,
+        id: 'content-text',
+        autoWidth: false,
+        autoSize: 'content',
+        x: 90,
+        y: 0,
+        width: 240,
+        height: 32,
+        text: 'Corner'
+      },
+      'fixed-text': {
+        ...textBase,
+        id: 'fixed-text',
+        autoWidth: false,
+        autoSize: 'fixed',
+        x: document.width - 60,
+        y: document.height - 24,
+        width: 60,
+        height: 24,
+        text: 'Fixed'
+      },
+      'corner-image': {
+        id: 'corner-image',
+        type: 'image',
+        assetId: 'corner-asset',
+        x: 0,
+        y: document.height - 180,
+        width: 180,
+        height: 180,
+        rotation: 0,
+        opacity: 1
+      },
+      'corner-shape': {
+        id: 'corner-shape',
+        type: 'shape',
+        shape: 'rectangle',
+        x: document.width - 180,
+        y: 0,
+        width: 180,
+        height: 180,
+        rotation: 0,
+        opacity: 1,
+        fillColor: '#2563eb',
+        strokeColor: '#000000',
+        strokeWidth: 0
+      }
+    }
+    document.assets = {
+      'corner-asset': {
+        id: 'corner-asset',
+        name: 'Corner image',
+        mimeType: 'image/png',
+        dataUrl:
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+      }
+    }
+    document.updatedAt = Date.now()
+    const blob = new Blob([JSON.stringify(document)], {
+      type: 'application/vnd.librepresenter.presentation+json'
+    })
+    const write = db.transaction('file-blobs', 'readwrite')
+    write.objectStore('file-blobs').put({
+      ...record,
+      blob,
+      size: blob.size,
+      revision: (record.revision ?? 0) + 1
+    })
+    await new Promise<void>((resolve, reject) => {
+      write.oncomplete = () => resolve()
+      write.onerror = () => reject(write.error)
+      write.onabort = () => reject(write.error)
+    })
+    db.close()
+  })
+  await page.reload()
 }
 
 test('keeps the editable presentation stage primary at the 900px breakpoint', async ({ page }) => {
@@ -305,6 +679,37 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await inspectorFocusables.first().press('Shift+Tab')
   await expect(inspectorFocusables.last()).toBeFocused()
 
+  await page.setViewportSize({ width: 1400, height: 800 })
+  const inspectorSlot = page.locator('.workspace-inspector-slot')
+  await expect(inspectorOverlay).toHaveCount(0)
+  await expect(inspectorSlot).toBeVisible()
+  await expect(inspectorSlot).not.toHaveAttribute('role', 'dialog')
+  await expect(stage).not.toHaveAttribute('inert')
+  await expect(stage).not.toHaveAttribute('aria-hidden')
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null
+        if (!active || active === document.body) return false
+        const style = getComputedStyle(active)
+        return (
+          style.display !== 'none' && style.visibility !== 'hidden' && active.offsetParent !== null
+        )
+      })
+    )
+    .toBe(true)
+  expect(
+    await page.evaluate(() =>
+      Boolean(document.activeElement?.closest('[hidden], [inert], [aria-hidden="true"]'))
+    )
+  ).toBe(false)
+
+  await page.setViewportSize({ width: 900, height: 800 })
+  await expect(inspectorOverlay).toBeVisible()
+  await expect(stage).toHaveAttribute('inert', '')
+  await expect(stage).toHaveAttribute('aria-hidden', 'true')
+  await expect(inspectorFocusables.last()).toBeFocused()
+
   await slidesTrigger.click()
   const slidesOverlay = page.getByRole('dialog', { name: /^(Slides|投影片|幻灯片)$/ })
   await expect(slidesOverlay).toBeVisible()
@@ -323,6 +728,131 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   )
+})
+
+test('keeps corner resize and crop chrome fully operable at every editor zoom', async ({
+  page
+}) => {
+  test.setTimeout(120_000)
+  await page.setViewportSize({ width: 1200, height: 800 })
+  await page.goto('/')
+  await completeOnboarding(page)
+  await page.goto('/#/files')
+  await page.getByLabel(/New|新增/).click()
+  await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
+  await expect(page).toHaveURL(/#\/presentations\//)
+  await installResizeFixture(page)
+
+  const zoomSlider = page.getByRole('slider', { name: /Zoom|縮放/ })
+  const zoomValue = page.getByRole('button', { name: /Reset zoom|重設縮放/ })
+  const saved = page.getByText(/^(Saved|已儲存|已保存)$/)
+  const elements = page.locator('.presentation-stage [data-slide-content] [data-slide-element]')
+  const contentTextHandles: ResizeHandle[] = ['nw', 'w', 'sw', 'ne', 'e', 'se']
+  await expect(elements).toHaveCount(4)
+  await expect(saved).toBeVisible()
+  await expect(elements.nth(0)).toHaveCSS('left', '90px')
+  await expect(page.locator('.presentation-stage [data-slide-content]')).toHaveCSS(
+    'overflow',
+    'hidden'
+  )
+
+  await selectSlideElement(elements.nth(0))
+  const contentLeftHandle = page.getByRole('button', {
+    name: 'Resize text box left',
+    exact: true
+  })
+  for (let step = 0; step < 9; step += 1) await contentLeftHandle.press('Shift+ArrowLeft')
+  await expect(page.locator('[data-selection-chrome]')).toHaveCSS('left', '0px')
+  await expect(saved).toBeVisible()
+
+  for (const zoomPercent of ['25', '100', '200']) {
+    await selectSlideElement(elements.nth(0))
+    await expect(saved).toBeVisible()
+    await setEditorZoom(page, zoomSlider, zoomValue, zoomPercent)
+    for (const direction of contentTextHandles) {
+      await dragResizeHandle(
+        page,
+        page.getByRole('button', {
+          name: `Resize text box ${HANDLE_LABELS[direction]}`,
+          exact: true
+        }),
+        direction,
+        true,
+        false
+      )
+    }
+
+    await selectSlideElement(elements.nth(1))
+    await expect(saved).toBeVisible()
+    await setEditorZoom(page, zoomSlider, zoomValue, zoomPercent)
+    for (const direction of HANDLE_DIRECTIONS) {
+      await dragResizeHandle(
+        page,
+        page.getByRole('button', {
+          name: `Resize text box ${HANDLE_LABELS[direction]}`,
+          exact: true
+        }),
+        direction,
+        false,
+        false
+      )
+    }
+
+    await selectSlideElement(elements.nth(2))
+    await expect(saved).toBeVisible()
+    await setEditorZoom(page, zoomSlider, zoomValue, zoomPercent)
+    for (const direction of HANDLE_DIRECTIONS) {
+      await dragResizeHandle(
+        page,
+        page.getByRole('button', {
+          name: `Resize image ${HANDLE_LABELS[direction]}`,
+          exact: true
+        }),
+        direction
+      )
+    }
+
+    await page.getByRole('tab', { name: /Picture Format|圖片格式|图片格式/ }).click()
+    if ((await page.getByRole('button', { name: /Crop image/ }).count()) === 0) {
+      await page.getByRole('button', { name: /^(Crop|裁剪)$/ }).click()
+    }
+    for (const direction of HANDLE_DIRECTIONS) {
+      await dragCropHandle(
+        page,
+        page.getByRole('button', {
+          name: `Crop image ${HANDLE_LABELS[direction]}`,
+          exact: true
+        }),
+        direction
+      )
+    }
+    await page.getByRole('button', { name: /^(Crop|裁剪)$/ }).click()
+    await expect(page.getByRole('button', { name: /Crop image/ })).toHaveCount(0)
+
+    await selectSlideElement(elements.nth(3))
+    await expect(saved).toBeVisible()
+    await setEditorZoom(page, zoomSlider, zoomValue, zoomPercent)
+    const genericHandle = page.getByRole('button', { name: 'Resize element', exact: true })
+    await dragResizeHandle(page, genericHandle, 'se')
+    expect(
+      await page.evaluate(() => {
+        const surface = document.querySelector<HTMLElement>(
+          '.presentation-stage [data-slide-surface]'
+        )
+        const shape = document.querySelectorAll<HTMLElement>(
+          '.presentation-stage [data-slide-content] [data-slide-element]'
+        )[3]
+        if (!surface || !shape) return false
+        const slideRect = surface.getBoundingClientRect()
+        const shapeRect = shape.getBoundingClientRect()
+        const hit = document.elementFromPoint(
+          slideRect.right + 2,
+          shapeRect.top + shapeRect.height / 2
+        )
+        return !hit?.closest('[data-slide-element]')
+      })
+    ).toBe(true)
+  }
 })
 
 test('keeps the media sidebar on the right without horizontal overflow at each breakpoint', async ({

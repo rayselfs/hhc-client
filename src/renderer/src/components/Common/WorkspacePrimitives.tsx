@@ -103,6 +103,7 @@ export function ResponsivePanelGroup({
   const inspectorTriggerRef = useRef<HTMLButtonElement>(null)
   const navigatorSlotRef = useRef<HTMLDivElement>(null)
   const inspectorSlotRef = useRef<HTMLDivElement>(null)
+  const previousCompactOverlayRef = useRef<WorkspaceOverlay>(null)
   const compactNavigator = useMediaQuery('(max-width: 1023px)')
   const compactInspector = useMediaQuery('(max-width: 1279px)')
   const overlay = controlledOverlay === undefined ? uncontrolledOverlay : controlledOverlay
@@ -151,6 +152,33 @@ export function ResponsivePanelGroup({
   }
 
   useLayoutEffect(() => {
+    const previousCompactOverlay = previousCompactOverlayRef.current
+    const previousSlot =
+      previousCompactOverlay === 'navigator'
+        ? navigatorSlotRef.current
+        : previousCompactOverlay === 'inspector'
+          ? inspectorSlotRef.current
+          : null
+    const previousClose =
+      previousSlot?.querySelector<HTMLElement>('.workspace-overlay-close') ?? null
+    if (
+      previousCompactOverlay !== null &&
+      compactOverlay === null &&
+      overlay === previousCompactOverlay &&
+      document.activeElement === previousClose
+    ) {
+      const paneControl = previousSlot
+        ? getFocusableElements(previousSlot).find(
+            (element) => !element.classList.contains('workspace-overlay-close')
+          )
+        : undefined
+      const returnTarget =
+        previousCompactOverlay === 'inspector'
+          ? (inspectorReturnFocusRef?.current ?? inspectorTriggerRef.current)
+          : navigatorTriggerRef.current
+      ;(paneControl ?? returnTarget)?.focus()
+    }
+
     const slot =
       compactOverlay === 'navigator'
         ? navigatorSlotRef.current
@@ -158,7 +186,8 @@ export function ResponsivePanelGroup({
           ? inspectorSlotRef.current
           : null
     slot?.querySelector<HTMLElement>('.workspace-overlay-close')?.focus()
-  }, [compactOverlay])
+    previousCompactOverlayRef.current = compactOverlay
+  }, [compactOverlay, inspectorReturnFocusRef, overlay])
 
   return (
     <div

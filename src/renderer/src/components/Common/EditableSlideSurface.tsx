@@ -436,7 +436,7 @@ export default function EditableSlideSurface({
     <div
       data-slide-surface
       ref={surfaceRef}
-      className={`relative aspect-video w-full overflow-hidden bg-black ${
+      className={`relative aspect-video w-full overflow-visible bg-black ${
         isTextInsertMode ? 'cursor-crosshair' : ''
       } ${className ?? ''}`}
       style={{
@@ -467,7 +467,59 @@ export default function EditableSlideSurface({
       onDoubleClick={insertTextAtPointer}
     >
       <div
-        className="absolute left-0 top-0"
+        data-slide-content
+        className="absolute inset-0 overflow-hidden"
+        style={{ borderRadius: 'inherit' }}
+      >
+        <div
+          className="absolute left-0 top-0"
+          style={{
+            width: document.width,
+            height: document.height,
+            transform: `scale(${surfaceScale})`,
+            transformOrigin: 'top left'
+          }}
+        >
+          {orderedElements.map((element) => (
+            <SlideElement
+              key={element.id}
+              document={document}
+              slide={slide}
+              element={element}
+              editable={editable}
+              editing={element.id === editingElementId}
+              onSelect={(event) => onSelectElement?.(element.id, event)}
+              onPointerDown={(event) => startDrag(event, element, 'move')}
+              onPointerMove={updateDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={cancelDrag}
+              onContextMenu={(event) => onElementContextMenu?.(event, element)}
+              onUpdateElement={onUpdateElement}
+              onStartTextEdit={() => {
+                onSelectElement?.(element.id)
+                onEditingElementChange?.(element.id)
+              }}
+              onFinishTextEdit={() => onEditingElementChange?.(null)}
+              onTextEditFinalizerChange={setTextEditFinalizer}
+            />
+          ))}
+          {marquee && (
+            <div
+              data-testid="element-marquee"
+              className="pointer-events-none absolute border border-primary bg-primary/15"
+              style={{
+                left: Math.min(marquee.startX, marquee.currentX),
+                top: Math.min(marquee.startY, marquee.currentY),
+                width: Math.abs(marquee.currentX - marquee.startX),
+                height: Math.abs(marquee.currentY - marquee.startY)
+              }}
+            />
+          )}
+        </div>
+      </div>
+      <div
+        data-selection-layer
+        className="pointer-events-none absolute left-0 top-0 overflow-visible"
         style={{
           width: document.width,
           height: document.height,
@@ -475,53 +527,30 @@ export default function EditableSlideSurface({
           transformOrigin: 'top left'
         }}
       >
-        {orderedElements.map((element) => (
-          <SlideElement
-            key={element.id}
-            document={document}
-            slide={slide}
-            element={element}
-            editable={editable}
-            editing={element.id === editingElementId}
-            cropMode={element.id === cropElementId}
-            surfaceScale={surfaceScale}
-            selected={
-              element.id === selectedElementId || Boolean(selectedElementIds?.has(element.id))
-            }
-            primarySelected={element.id === selectedElementId}
-            onSelect={(event) => onSelectElement?.(element.id, event)}
-            onPointerDown={(event) => startDrag(event, element, 'move')}
-            onPointerMove={updateDrag}
-            onPointerUp={endDrag}
-            onPointerCancel={cancelDrag}
-            onContextMenu={(event) => onElementContextMenu?.(event, element)}
-            onUpdateElement={onUpdateElement}
-            onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
-            onCropPointerDown={(event, handle) => startDrag(event, element, 'crop', handle)}
-            onResizeKeyDown={(event, handle) =>
-              resizeWithKeyboard(event, element, handle, 'resize')
-            }
-            onCropKeyDown={(event, handle) => resizeWithKeyboard(event, element, handle, 'crop')}
-            onStartTextEdit={() => {
-              onSelectElement?.(element.id)
-              onEditingElementChange?.(element.id)
-            }}
-            onFinishTextEdit={() => onEditingElementChange?.(null)}
-            onTextEditFinalizerChange={setTextEditFinalizer}
-          />
-        ))}
-        {marquee && (
-          <div
-            data-testid="element-marquee"
-            className="pointer-events-none absolute border border-primary bg-primary/15"
-            style={{
-              left: Math.min(marquee.startX, marquee.currentX),
-              top: Math.min(marquee.startY, marquee.currentY),
-              width: Math.abs(marquee.currentX - marquee.startX),
-              height: Math.abs(marquee.currentY - marquee.startY)
-            }}
-          />
-        )}
+        {orderedElements.map((element) => {
+          const selected =
+            element.id === selectedElementId || Boolean(selectedElementIds?.has(element.id))
+          if (!selected) return null
+          return (
+            <SelectionChrome
+              key={`selection-${element.id}`}
+              element={element}
+              cropMode={element.id === cropElementId}
+              surfaceScale={surfaceScale}
+              showHandles={editable && element.id === selectedElementId && !element.locked}
+              onMovePointerDown={(event) => startDrag(event, element, 'move')}
+              onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
+              onCropPointerDown={(event, handle) => startDrag(event, element, 'crop', handle)}
+              onResizeKeyDown={(event, handle) =>
+                resizeWithKeyboard(event, element, handle, 'resize')
+              }
+              onCropKeyDown={(event, handle) => resizeWithKeyboard(event, element, handle, 'crop')}
+              onPointerMove={updateDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={cancelDrag}
+            />
+          )
+        })}
       </div>
     </div>
   )
@@ -543,10 +572,6 @@ function SlideElement({
   element,
   editable,
   editing,
-  cropMode,
-  surfaceScale,
-  selected,
-  primarySelected,
   onSelect,
   onPointerDown,
   onPointerMove,
@@ -554,10 +579,6 @@ function SlideElement({
   onPointerCancel,
   onContextMenu,
   onUpdateElement,
-  onResizePointerDown,
-  onCropPointerDown,
-  onResizeKeyDown,
-  onCropKeyDown,
   onStartTextEdit,
   onFinishTextEdit,
   onTextEditFinalizerChange
@@ -567,10 +588,6 @@ function SlideElement({
   element: EditablePresentationElement
   editable: boolean
   editing: boolean
-  cropMode: boolean
-  surfaceScale: number
-  selected: boolean
-  primarySelected: boolean
   onSelect: (event: React.MouseEvent) => void
   onPointerDown: (event: React.PointerEvent) => void
   onPointerMove: (event: React.PointerEvent) => void
@@ -582,10 +599,6 @@ function SlideElement({
     elementId: string,
     updates: Partial<EditablePresentationElement>
   ) => void
-  onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
-  onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
-  onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
-  onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onStartTextEdit: () => void
   onFinishTextEdit: () => void
   onTextEditFinalizerChange: (finalize: (() => boolean) | null) => void
@@ -596,17 +609,13 @@ function SlideElement({
     width: element.width,
     height: element.height,
     transform: `rotate(${element.rotation}deg)`,
-    opacity: element.opacity,
-    outlineWidth: selected ? 1.5 / surfaceScale : undefined,
-    outlineOffset: selected ? `${2 / surfaceScale}px` : undefined
+    opacity: element.opacity
   }
 
   return (
     <div
       data-slide-element
-      className={`absolute ${editable ? 'cursor-move' : ''} ${
-        selected ? 'outline-solid outline-primary' : ''
-      }`}
+      className={`absolute ${editable ? 'cursor-move' : ''}`}
       style={commonStyle}
       onPointerDown={(event) => {
         if (editing) return
@@ -632,29 +641,15 @@ function SlideElement({
         onFinishTextEdit,
         onTextEditFinalizerChange
       )}
-      {editable && primarySelected && !element.locked && (
-        <ElementHandles
-          element={element}
-          cropMode={cropMode}
-          surfaceScale={surfaceScale}
-          onMovePointerDown={onPointerDown}
-          onResizePointerDown={onResizePointerDown}
-          onCropPointerDown={onCropPointerDown}
-          onResizeKeyDown={onResizeKeyDown}
-          onCropKeyDown={onCropKeyDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
-        />
-      )}
     </div>
   )
 }
 
-function ElementHandles({
+function SelectionChrome({
   element,
   cropMode,
   surfaceScale,
+  showHandles,
   onMovePointerDown,
   onResizePointerDown,
   onCropPointerDown,
@@ -667,6 +662,7 @@ function ElementHandles({
   element: EditablePresentationElement
   cropMode: boolean
   surfaceScale: number
+  showHandles: boolean
   onMovePointerDown: (event: React.PointerEvent) => void
   onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
@@ -675,6 +671,58 @@ function ElementHandles({
   onPointerMove: (event: React.PointerEvent) => void
   onPointerUp: (event: React.PointerEvent) => void
   onPointerCancel: (event: React.PointerEvent) => void
+}): React.JSX.Element {
+  return (
+    <div
+      data-selection-chrome
+      className="pointer-events-none absolute outline-solid outline-primary"
+      style={{
+        left: element.x,
+        top: element.y,
+        width: element.width,
+        height: element.height,
+        transform: `rotate(${element.rotation}deg)`,
+        outlineWidth: 1.5 / surfaceScale,
+        outlineOffset: `${2 / surfaceScale}px`
+      }}
+      onPointerDownCapture={(event) => {
+        const handle = getNearestResizeHandle(event)
+        if (!handle) return
+        if (cropMode && element.type === 'image') onCropPointerDown(event, handle)
+        else onResizePointerDown(event, handle)
+      }}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    >
+      {showHandles && (
+        <ElementHandles
+          element={element}
+          cropMode={cropMode}
+          surfaceScale={surfaceScale}
+          onMovePointerDown={onMovePointerDown}
+          onResizeKeyDown={onResizeKeyDown}
+          onCropKeyDown={onCropKeyDown}
+        />
+      )}
+    </div>
+  )
+}
+
+function ElementHandles({
+  element,
+  cropMode,
+  surfaceScale,
+  onMovePointerDown,
+  onResizeKeyDown,
+  onCropKeyDown
+}: {
+  element: EditablePresentationElement
+  cropMode: boolean
+  surfaceScale: number
+  onMovePointerDown: (event: React.PointerEvent) => void
+  onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
+  onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
 }): React.JSX.Element {
   if (element.type === 'text') {
     const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
@@ -689,7 +737,7 @@ function ElementHandles({
             key={`move-text-${edge}`}
             data-text-frame-edge={edge}
             data-testid={`text-frame-edge-${edge}`}
-            className="absolute cursor-move"
+            className="pointer-events-auto absolute cursor-move"
             style={{
               zIndex: 10,
               ...(edge === 'top' || edge === 'bottom'
@@ -713,7 +761,8 @@ function ElementHandles({
           <button
             key={`resize-text-${handle}`}
             type="button"
-            className={`${getHandleCursorClass(handle)} absolute flex items-center justify-center rounded-[2px]`}
+            data-resize-handle={handle}
+            className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-[2px]`}
             aria-label={`Resize text box ${handleToLabel(handle)}`}
             style={{
               ...getTextHandlePositionStyle(handle, hitTargetSize),
@@ -721,10 +770,6 @@ function ElementHandles({
               width: hitTargetSize,
               height: hitTargetSize
             }}
-            onPointerDown={(event) => onResizePointerDown(event, handle)}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerCancel}
             onKeyDown={(event) => onResizeKeyDown(event, handle)}
           >
             <span
@@ -752,7 +797,8 @@ function ElementHandles({
           <button
             key={`${cropMode ? 'crop' : 'resize'}-${handle}`}
             type="button"
-            className={`${getHandleCursorClass(handle)} absolute flex items-center justify-center rounded-full`}
+            data-resize-handle={handle}
+            className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-full`}
             aria-label={`${cropMode ? 'Crop' : 'Resize'} image ${handleToLabel(handle)}`}
             style={{
               ...getTextHandlePositionStyle(handle, hitTargetSize),
@@ -760,12 +806,6 @@ function ElementHandles({
               width: hitTargetSize,
               height: hitTargetSize
             }}
-            onPointerDown={(event) =>
-              cropMode ? onCropPointerDown(event, handle) : onResizePointerDown(event, handle)
-            }
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerCancel}
             onKeyDown={(event) =>
               cropMode ? onCropKeyDown(event, handle) : onResizeKeyDown(event, handle)
             }
@@ -790,7 +830,8 @@ function ElementHandles({
   return (
     <button
       type="button"
-      className="absolute flex cursor-nwse-resize items-center justify-center rounded-full"
+      data-resize-handle="se"
+      className="pointer-events-auto absolute flex cursor-nwse-resize items-center justify-center rounded-full"
       aria-label="Resize element"
       style={{
         ...getTextHandlePositionStyle('se', hitTargetSize),
@@ -798,10 +839,6 @@ function ElementHandles({
         width: hitTargetSize,
         height: hitTargetSize
       }}
-      onPointerDown={(event) => onResizePointerDown(event, 'se')}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
       onKeyDown={(event) => onResizeKeyDown(event, 'se')}
     >
       <span
@@ -1397,6 +1434,35 @@ function getTextHandlePositionStyle(handle: ResizeHandle, handleSize: number): R
     .filter(Boolean)
     .join(' ')
   return { ...vertical, ...horizontal, transform: transform || undefined }
+}
+
+function getNearestResizeHandle(event: React.PointerEvent<HTMLDivElement>): ResizeHandle | null {
+  const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-resize-handle]')
+  if (!target || !event.currentTarget.contains(target)) return null
+
+  let nearest = target
+  let nearestDistance = distanceToCenter(
+    target.getBoundingClientRect(),
+    event.clientX,
+    event.clientY
+  )
+  event.currentTarget.querySelectorAll<HTMLElement>('[data-resize-handle]').forEach((candidate) => {
+    const distance = distanceToCenter(
+      candidate.getBoundingClientRect(),
+      event.clientX,
+      event.clientY
+    )
+    if (distance < nearestDistance) {
+      nearest = candidate
+      nearestDistance = distance
+    }
+  })
+  const handle = nearest.dataset.resizeHandle
+  return IMAGE_HANDLES.includes(handle as ResizeHandle) ? (handle as ResizeHandle) : null
+}
+
+function distanceToCenter(rect: DOMRect, x: number, y: number): number {
+  return (rect.left + rect.width / 2 - x) ** 2 + (rect.top + rect.height / 2 - y) ** 2
 }
 
 function normalizeSurfaceScale(scale: number): number {
