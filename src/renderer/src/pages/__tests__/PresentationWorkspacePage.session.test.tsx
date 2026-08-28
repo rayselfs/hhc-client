@@ -730,6 +730,49 @@ describe('PresentationWorkspacePage session integration', () => {
     ).toMatchObject({ text: 'Pending navigation text' })
   })
 
+  it('settles a refocused pending blur through text commit without leaving edit mode unsafe', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    vi.useFakeTimers()
+    try {
+      const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+      if (!content) throw new Error('presentation text box not found')
+      fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+      content.textContent = 'Refocused text'
+      fireEvent.input(content)
+      fireEvent.blur(content)
+      fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 2 })
+      act(() => flushAnimationFrame())
+      await act(async () => {
+        vi.advanceTimersByTime(1000)
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(
+        registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+      ).toMatchObject({ text: 'Refocused text' })
+      expect(registry!.get('deck-1')!.getSnapshot().draftKind).toBeNull()
+      expect(registry!.hasUnsafeWork()).toBe(false)
+      expect(content).toHaveAttribute('contenteditable', 'true')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('blocks real navigation and browser unload until live pending text finalizes', async () => {
     const flushAnimationFrame = mockAnimationFrame()
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')

@@ -948,11 +948,17 @@ function TextElementContent({
   const hasPendingTextRef = useRef(false)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
 
+  const settlePendingText = (): void => {
+    if (isComposingRef.current || !hasPendingTextRef.current) return
+    scheduleTextCommit()
+  }
+
   const cancelPendingBlur = (): void => {
     if (blurFrameRef.current == null) return
     window.cancelAnimationFrame(blurFrameRef.current)
     blurFrameRef.current = null
     pendingBlurTextRef.current = null
+    settlePendingText()
   }
 
   const commitText = (text: string): void => {
@@ -987,7 +993,12 @@ function TextElementContent({
     blurFrameRef.current = window.requestAnimationFrame(() => {
       blurFrameRef.current = null
       const content = contentRef.current
-      if (!editingRef.current || !content || window.document.activeElement === content) return
+      if (!editingRef.current || !content) return
+      if (window.document.activeElement === content) {
+        pendingBlurTextRef.current = null
+        settlePendingText()
+        return
+      }
       if (isComposingRef.current) return
       pendingBlurTextRef.current = null
       commitText(content.textContent ?? '')
@@ -1062,8 +1073,8 @@ function TextElementContent({
 
   useEffect(() => {
     return () => {
-      cancelPendingBlur()
-      cancelPendingTextCommit()
+      if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+      if (textFrameRef.current != null) window.cancelAnimationFrame(textFrameRef.current)
     }
   }, [])
 
