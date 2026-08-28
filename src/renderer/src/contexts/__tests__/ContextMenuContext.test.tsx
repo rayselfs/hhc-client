@@ -466,6 +466,39 @@ describe('ContextMenuContext', () => {
     expect(focus).toHaveBeenCalledWith({ preventScroll: true })
   })
 
+  it('anchors a zero-coordinate button click below its trigger and restores focus', () => {
+    const items: ContextMenuEntry[] = [
+      { id: 'rectangle', label: 'Rectangle', onAction: vi.fn() },
+      { id: 'ellipse', label: 'Ellipse', onAction: vi.fn() }
+    ]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <button type="button" data-testid="trigger" onClick={(event) => showMenu(items, event)}>
+          Shapes
+        </button>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    const trigger = screen.getByTestId('trigger')
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 120, y: 80, width: 64, height: 28 })
+    )
+    trigger.focus()
+
+    fireEvent.click(trigger, { clientX: 0, clientY: 0 })
+
+    const menu = screen.getByRole('menu')
+    expect(menu).toHaveStyle({ left: '120px', top: '108px' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rectangle' }))
+
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
   it('closes menu on window resize', () => {
     const items: ContextMenuEntry[] = [{ id: 'a', label: 'Alpha', onAction: vi.fn() }]
 

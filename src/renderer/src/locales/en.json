@@ -600,6 +600,7 @@
       "size": "Size"
     },
     "fontFamily": "Font family",
+    "fontSize": "Font size",
     "loadLocalFonts": "Load local fonts",
     "localFontsLoadFailed": "Unable to load local fonts. Check the font access permission.",
     "present": "Present",
@@ -608,6 +609,7 @@
     "text": "Text",
     "image": "Image",
     "picture": "Picture",
+    "pictureFormat": "Picture Format",
     "shapes": "Shapes",
     "textBox": "Text Box",
     "moveSlideUp": "Move Up",

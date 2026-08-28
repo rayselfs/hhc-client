@@ -239,6 +239,46 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(within(homeRibbon).queryAllByRole('spinbutton')).toHaveLength(0)
   })
 
+  it('exposes Ribbon tabs with roving selection and keyboard navigation', async () => {
+    const user = userEvent.setup()
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const tablist = await screen.findByRole('tablist')
+    const home = within(tablist).getByRole('tab', { name: '常用' })
+    const insert = within(tablist).getByRole('tab', { name: '插入' })
+    const design = within(tablist).getByRole('tab', { name: '設計' })
+    const panel = screen.getByRole('tabpanel')
+
+    expect(home).toHaveAttribute('aria-selected', 'true')
+    expect(home).toHaveAttribute('tabindex', '0')
+    expect(home).toHaveAttribute('aria-controls', panel.id)
+    expect(panel).toHaveAttribute('aria-labelledby', home.id)
+
+    home.focus()
+    await user.keyboard('{ArrowLeft}')
+    expect(design).toHaveFocus()
+    expect(design).toHaveAttribute('aria-selected', 'true')
+    expect(home).toHaveAttribute('tabindex', '-1')
+
+    await user.keyboard('{ArrowRight}')
+    expect(home).toHaveFocus()
+    expect(home).toHaveAttribute('aria-selected', 'true')
+
+    await user.keyboard('{End}')
+    expect(design).toHaveFocus()
+    expect(design).toHaveAttribute('aria-selected', 'true')
+
+    await user.keyboard('{Home}')
+    expect(home).toHaveFocus()
+    expect(home).toHaveAttribute('aria-selected', 'true')
+    expect(insert).toHaveAttribute('aria-selected', 'false')
+    expect(panel).toHaveAttribute('aria-labelledby', home.id)
+  })
+
   it('keeps text formatting on Home without adding a Text contextual tab', async () => {
     renderEditableWorkspaceWithText()
     const textElement = (await screen.findAllByText('Font target'))
@@ -249,7 +289,7 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.pointerDown(textElement!, { clientX: 10, clientY: 10 })
 
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /^(Text|文字格式)$/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /^(Text|文字格式)$/ })).not.toBeInTheDocument()
     )
     expect(screen.getByRole('group', { name: 'Font' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Paragraph' })).toBeInTheDocument()
@@ -349,7 +389,7 @@ describe('PresentationWorkspacePage session integration', () => {
     )
 
     const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
-    await user.click(screen.getByRole('button', { name: '設計' }))
+    await user.click(screen.getByRole('tab', { name: '設計' }))
     await user.click(within(ribbonFrame).getByRole('button', { name: 'Format Background' }))
     expect(window.document.querySelector('.workspace-inspector-slot')).not.toBeNull()
 
@@ -454,7 +494,7 @@ describe('PresentationWorkspacePage session integration', () => {
         expect(element.autoWidth).toBe(true)
       })
 
-      fireEvent.click(screen.getByRole('button', { name: '插入' }))
+      fireEvent.click(screen.getByRole('tab', { name: '插入' }))
       fireEvent.click(screen.getByRole('button', { name: 'Text' }))
       fireEvent.pointerDown(surface!, { clientX: 100, clientY: 100, pointerId: 1 })
       fireEvent.pointerUp(surface!, { clientX: 140, clientY: 120, pointerId: 1 })
@@ -504,7 +544,7 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     await screen.findByTestId('presentation-ribbon-frame')
 
-    fireEvent.click(screen.getByRole('button', { name: /Design|設計/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Design|設計/ }))
 
     expect(screen.queryByText(/Slide Size|投影片大小/)).not.toBeInTheDocument()
   })

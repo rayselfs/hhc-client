@@ -1968,6 +1968,10 @@ function EditableSessionDocumentView({
           }}
         />
         <div
+          id="presentation-ribbon-panel"
+          role="tabpanel"
+          aria-labelledby={`presentation-ribbon-tab-${activeRibbon}`}
+          aria-hidden={!isRibbonOpen}
           data-testid="presentation-ribbon-frame"
           className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
             isRibbonOpen ? `${ribbonHeightClass} opacity-100` : 'h-0 opacity-0'
@@ -2867,6 +2871,35 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     setIsRibbonOpen(true)
   }
 
+  const handleRibbonTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    tabIndex: number
+  ): void => {
+    let nextIndex: number | null = null
+    if (event.key === 'ArrowLeft') {
+      nextIndex = (tabIndex - 1 + ribbonTabs.length) % ribbonTabs.length
+    } else if (event.key === 'ArrowRight') {
+      nextIndex = (tabIndex + 1) % ribbonTabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = ribbonTabs.length - 1
+    }
+    if (nextIndex === null) return
+
+    event.preventDefault()
+    const nextTab = ribbonTabs[nextIndex]
+    if (!nextTab) return
+    if (activeRibbon === 'design' && nextTab !== 'design') {
+      setBackgroundPanel((panel) => ({ ...panel, isOpen: false }))
+    }
+    setActiveRibbon(nextTab)
+    setIsRibbonOpen(true)
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLElement>('[role="tab"]')
+      [nextIndex]?.focus()
+  }
+
   const getRibbonTabLabel = (tab: RibbonTab): string => {
     const fallbacks: Record<RibbonTab, string> = {
       home: '常用',
@@ -2874,23 +2907,35 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
       design: '設計',
       picture: '圖片格式'
     }
-    return t(`presentationWorkspace.${tab}`, fallbacks[tab])
+    return t(
+      tab === 'picture' ? 'presentationWorkspace.pictureFormat' : `presentationWorkspace.${tab}`,
+      fallbacks[tab]
+    )
   }
 
   return (
     <WorkspaceShell className="w-0 min-w-full bg-background text-foreground">
-      <div className="relative flex h-10 shrink-0 items-end overflow-x-auto bg-background px-2 sm:px-4">
-        {ribbonTabs.map((tab) => (
+      <div
+        role="tablist"
+        aria-label={t('presentationWorkspace.title')}
+        className="relative flex h-10 shrink-0 items-end overflow-x-auto bg-background px-2 sm:px-4"
+      >
+        {ribbonTabs.map((tab, tabIndex) => (
           <button
             key={tab}
+            id={`presentation-ribbon-tab-${tab}`}
             type="button"
+            role="tab"
             aria-selected={effectiveActiveRibbon === tab}
+            aria-controls="presentation-ribbon-panel"
+            tabIndex={effectiveActiveRibbon === tab ? 0 : -1}
             className={`h-9 w-16 rounded-t-lg text-sm transition-colors ${
               effectiveActiveRibbon === tab
                 ? 'bg-content1 text-foreground'
                 : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
             }`}
             onClick={() => handleRibbonTabClick(tab)}
+            onKeyDown={(event) => handleRibbonTabKeyDown(event, tabIndex)}
           >
             {getRibbonTabLabel(tab)}
           </button>

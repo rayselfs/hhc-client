@@ -53,7 +53,13 @@ export function ContextMenuProvider({
         return
       }
       triggerRef.current = document.activeElement
-      setMenu({ x: e.clientX, y: e.clientY, items })
+      const anchorToTrigger = e.type === 'click' && e.clientX === 0 && e.clientY === 0
+      const triggerRect = anchorToTrigger ? e.currentTarget.getBoundingClientRect() : null
+      setMenu({
+        x: triggerRect?.left ?? e.clientX,
+        y: triggerRect?.bottom ?? e.clientY,
+        items
+      })
     },
     [close]
   )

@@ -37,7 +37,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const zoomSlider = page.getByRole('slider', { name: /Zoom|縮放/ })
   await expect(fit).toHaveAttribute('aria-pressed', 'true')
 
-  await page.getByRole('button', { name: /^(Insert|插入)$/ }).click()
+  await page.getByRole('tab', { name: /^(Insert|插入)$/ }).click()
   await page.getByRole('button', { name: /^(Text|文字)$/ }).click()
   await page
     .locator('.presentation-stage [data-slide-surface]')
@@ -59,7 +59,22 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   expect(textMetrics.scrollHeight).toBeLessThanOrEqual(
     textMetrics.lineHeight + textMetrics.verticalPadding + 1
   )
-  await page.getByRole('button', { name: /^(Home|常用)$/ }).click()
+  await page.getByRole('tab', { name: /^(Home|常用)$/ }).click()
+
+  const shapes = page.getByRole('button', { name: /^(Shapes|圖案|形状)$/ })
+  const shapesBox = await shapes.boundingBox()
+  expect(shapesBox).not.toBeNull()
+  await shapes.focus()
+  await shapes.press('Enter')
+  const shapeMenu = page.getByRole('menu')
+  await expect(shapeMenu).toBeVisible()
+  const shapeMenuBox = await shapeMenu.boundingBox()
+  expect(shapeMenuBox).not.toBeNull()
+  expect(shapeMenuBox!.x).toBeCloseTo(shapesBox!.x, 0)
+  expect(shapeMenuBox!.y).toBeCloseTo(shapesBox!.y + shapesBox!.height, 0)
+  await expect(page.getByRole('menuitem').first()).toBeFocused()
+  await shapeMenu.press('Escape')
+  await expect(shapes).toBeFocused()
 
   await page.setViewportSize({ width: 1470, height: 726 })
   const stageSlot = page.locator('.workspace-stage-slot')
@@ -215,6 +230,22 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await expect(stage).toBeVisible()
   await expect(presentationStage).toBeVisible()
   await expect(statusBar).toBeVisible()
+  const viewportBoxes = await Promise.all([
+    stage.boundingBox(),
+    presentationStage.boundingBox(),
+    statusBar.boundingBox()
+  ])
+  for (const box of viewportBoxes) {
+    expect(box).not.toBeNull()
+    expect(box!.width).toBeGreaterThan(0)
+    expect(box!.height).toBeGreaterThan(0)
+    expect(box!.x).toBeLessThan(900)
+    expect(box!.y).toBeLessThan(800)
+    expect(box!.x + box!.width).toBeGreaterThan(0)
+    expect(box!.y + box!.height).toBeGreaterThan(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(900)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(800)
+  }
   await expect(ribbon).toHaveCSS('overflow-x', 'auto')
   const ribbonMetrics = await ribbon.evaluate((element) => ({
     clientWidth: element.clientWidth,
@@ -222,7 +253,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   }))
   expect(ribbonMetrics.scrollWidth).toBeGreaterThan(ribbonMetrics.clientWidth)
 
-  await page.getByRole('button', { name: /Design|設計/ }).click()
+  await page.getByRole('tab', { name: /Design|設計/ }).click()
   await page.getByRole('button', { name: /Format Background|設定背景格式/ }).click()
   await expect(page.locator('.workspace-inspector-slot')).toBeVisible()
   await expect(navigator).toBeHidden()

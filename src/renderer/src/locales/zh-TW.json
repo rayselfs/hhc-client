@@ -600,6 +600,7 @@
       "size": "大小"
     },
     "fontFamily": "字型",
+    "fontSize": "字型大小",
     "loadLocalFonts": "載入本機字型",
     "localFontsLoadFailed": "無法載入本機字型，請確認已允許字型存取權限。",
     "present": "投影",
@@ -608,6 +609,7 @@
     "text": "文字",
     "image": "圖片",
     "picture": "圖片",
+    "pictureFormat": "圖片格式",
     "shapes": "圖案",
     "textBox": "文字方塊",
     "moveSlideUp": "上移",
