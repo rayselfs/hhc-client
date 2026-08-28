@@ -24,7 +24,10 @@ import type { FileItemRecord } from '@shared/types/folder'
 const mocks = vi.hoisted(() => ({
   loadEditablePresentationSnapshot: vi.fn(),
   persistEditablePresentationRevision: vi.fn(),
-  refreshEditablePresentationThumbnail: vi.fn()
+  refreshEditablePresentationThumbnail: vi.fn(),
+  queryLocalFontFamiliesOnce: vi.fn(),
+  supportsLocalFontAccess: vi.fn(),
+  toastWarning: vi.fn()
 }))
 
 interface ResizeObserverRecord {
@@ -94,6 +97,21 @@ vi.mock('@renderer/lib/editable-presentation-persistence', () => ({
   refreshEditablePresentationThumbnail: mocks.refreshEditablePresentationThumbnail
 }))
 
+vi.mock('@renderer/lib/local-fonts', async () => {
+  const actual = await vi.importActual<typeof import('@renderer/lib/local-fonts')>(
+    '@renderer/lib/local-fonts'
+  )
+  return {
+    ...actual,
+    queryLocalFontFamiliesOnce: mocks.queryLocalFontFamiliesOnce,
+    supportsLocalFontAccess: mocks.supportsLocalFontAccess
+  }
+})
+
+vi.mock('@heroui/react/toast', () => ({
+  toast: { warning: mocks.toastWarning }
+}))
+
 function makeEditableItem(id = 'deck-1', name = 'Sunday.lpdeck'): FileItemRecord {
   return {
     id,
@@ -127,6 +145,20 @@ function Workspace({
 }): React.JSX.Element {
   onSession(usePresentationSessionRegistry())
   return showPage ? <PresentationWorkspacePage /> : <div>other route</div>
+}
+
+function renderEditableWorkspaceWithText(): void {
+  const document = createBlankEditablePresentationDocument('Sunday')
+  const slideId = document.slideOrder[0]
+  mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+    document: addElementToSlide(document, slideId, createTextElement({ text: 'Font target' })),
+    revision: 0
+  })
+  render(
+    <PresentationSessionRegistryProvider>
+      <PresentationWorkspacePage />
+    </PresentationSessionRegistryProvider>
+  )
 }
 
 describe('PresentationWorkspacePage session integration', () => {
@@ -163,6 +195,11 @@ describe('PresentationWorkspacePage session integration', () => {
     }))
     mocks.refreshEditablePresentationThumbnail.mockReset()
     mocks.refreshEditablePresentationThumbnail.mockResolvedValue(undefined)
+    mocks.queryLocalFontFamiliesOnce.mockReset()
+    mocks.queryLocalFontFamiliesOnce.mockResolvedValue([])
+    mocks.supportsLocalFontAccess.mockReset()
+    mocks.supportsLocalFontAccess.mockReturnValue(true)
+    mocks.toastWarning.mockReset()
     useFileExplorerStore.setState({
       items: { [item.id]: item },
       _itemsArray: [item]
@@ -173,6 +210,51 @@ describe('PresentationWorkspacePage session integration', () => {
       activeSlideIdByItemId: {}
     })
     usePresentationWorkspaceStore.getState().openDocument(item)
+  })
+
+  it('loads each installed font once from the font selector first gesture', async () => {
+    let resolveFonts!: (families: string[]) => void
+    mocks.queryLocalFontFamiliesOnce.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFonts = resolve
+      })
+    )
+    renderEditableWorkspaceWithText()
+    fireEvent.click((await screen.findAllByRole('textbox')).at(-1)!)
+    const fontSelector = screen.getByLabelText('Font family')
+    const retryButton = screen.getByRole('button', { name: 'Load local fonts' })
+
+    fireEvent.pointerDown(fontSelector)
+    fireEvent.focus(fontSelector)
+
+    expect(mocks.queryLocalFontFamiliesOnce).toHaveBeenCalledOnce()
+    expect(retryButton).toBeDisabled()
+    await act(async () => resolveFonts(['PMingLiU', 'MingLiU', 'DFKai-SB', 'PMingLiU', 'DFKai-SB']))
+
+    await waitFor(() => expect(retryButton).toBeEnabled())
+    expect(screen.getAllByRole('option', { name: 'PMingLiU' })).toHaveLength(1)
+    expect(screen.getAllByRole('option', { name: 'MingLiU' })).toHaveLength(1)
+    expect(screen.getAllByRole('option', { name: 'DFKai-SB' })).toHaveLength(1)
+  })
+
+  it('warns after font access is rejected and retries from the explicit control', async () => {
+    mocks.queryLocalFontFamiliesOnce
+      .mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'))
+      .mockResolvedValueOnce(['Songti TC'])
+    renderEditableWorkspaceWithText()
+    fireEvent.click((await screen.findAllByRole('textbox')).at(-1)!)
+
+    fireEvent.focus(screen.getByLabelText('Font family'))
+
+    await waitFor(() =>
+      expect(mocks.toastWarning).toHaveBeenCalledWith(
+        'Unable to load local fonts. Check the font access permission.'
+      )
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Load local fonts' }))
+
+    expect(await screen.findByRole('option', { name: 'Songti TC' })).toBeInTheDocument()
+    expect(mocks.queryLocalFontFamiliesOnce).toHaveBeenCalledTimes(2)
   })
 
   it('renders the same registry session after the routed view remounts', async () => {

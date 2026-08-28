@@ -25,6 +25,35 @@ describe('local fonts', () => {
     expect(queryLocalFonts).toHaveBeenCalledOnce()
   })
 
+  it('caches a successful installed-family query for the module lifetime', async () => {
+    vi.resetModules()
+    const { queryLocalFontFamiliesOnce } = await import('../local-fonts')
+    const queryLocalFonts = vi.fn().mockResolvedValue([{ family: 'DFKai-SB' }])
+    const access = { queryLocalFonts }
+
+    await expect(queryLocalFontFamiliesOnce(access)).resolves.toEqual(['DFKai-SB'])
+    await expect(queryLocalFontFamiliesOnce(access)).resolves.toEqual(['DFKai-SB'])
+
+    expect(queryLocalFonts).toHaveBeenCalledOnce()
+  })
+
+  it('retries an installed-family query after a rejection', async () => {
+    vi.resetModules()
+    const { queryLocalFontFamiliesOnce } = await import('../local-fonts')
+    const queryLocalFonts = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'))
+      .mockResolvedValueOnce([{ family: 'PMingLiU' }])
+    const access = { queryLocalFonts }
+
+    await expect(queryLocalFontFamiliesOnce(access)).rejects.toMatchObject({
+      name: 'NotAllowedError'
+    })
+    await expect(queryLocalFontFamiliesOnce(access)).resolves.toEqual(['PMingLiU'])
+
+    expect(queryLocalFonts).toHaveBeenCalledTimes(2)
+  })
+
   it('merges groups once while preserving their display order', () => {
     expect(
       mergeFontFamilies(['Inter Variable', 'Arial'], ['Aptos'], ['Arial', 'PingFang TC'])

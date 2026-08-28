@@ -103,7 +103,7 @@ import {
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import {
   mergeFontFamilies,
-  queryLocalFontFamilies,
+  queryLocalFontFamiliesOnce,
   supportsLocalFontAccess
 } from '@renderer/lib/local-fonts'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
@@ -635,6 +635,7 @@ function EditableSessionDocumentView({
   const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
   const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([])
   const [isLoadingLocalFonts, setIsLoadingLocalFonts] = useState(false)
+  const hasRequestedLocalFontsRef = useRef(false)
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
   const [zoomMode, setZoomMode] = useState<ZoomMode>('fit')
@@ -1191,7 +1192,7 @@ function EditableSessionDocumentView({
   const loadLocalFonts = async (): Promise<void> => {
     setIsLoadingLocalFonts(true)
     try {
-      setLocalFontFamilies(await queryLocalFontFamilies())
+      setLocalFontFamilies(await queryLocalFontFamiliesOnce())
     } catch {
       toast.warning(
         t(
@@ -1202,6 +1203,12 @@ function EditableSessionDocumentView({
     } finally {
       setIsLoadingLocalFonts(false)
     }
+  }
+
+  const loadLocalFontsOnFirstGesture = (): void => {
+    if (hasRequestedLocalFontsRef.current) return
+    hasRequestedLocalFontsRef.current = true
+    void loadLocalFonts()
   }
 
   const updateSelectedImageElement = (
@@ -1520,6 +1527,8 @@ function EditableSessionDocumentView({
                 className={`h-9 min-w-44 flex-1 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
+                onPointerDown={loadLocalFontsOnFirstGesture}
+                onFocus={loadLocalFontsOnFirstGesture}
                 onChange={(event) =>
                   updateSelectedTextElement({
                     fontFamily: event.currentTarget.value

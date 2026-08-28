@@ -6,6 +6,8 @@ interface LocalFontAccess {
   queryLocalFonts?: () => Promise<LocalFontData[]>
 }
 
+let localFontFamiliesPromise: Promise<string[]> | null = null
+
 function getLocalFontAccess(): LocalFontAccess {
   return window as unknown as LocalFontAccess
 }
@@ -20,6 +22,14 @@ export async function queryLocalFontFamilies(access = getLocalFontAccess()): Pro
   return [...new Set(fonts.map(({ family }) => family.trim()).filter(Boolean))].sort(
     (left, right) => left.localeCompare(right)
   )
+}
+
+export function queryLocalFontFamiliesOnce(access = getLocalFontAccess()): Promise<string[]> {
+  localFontFamiliesPromise ??= queryLocalFontFamilies(access).catch((error) => {
+    localFontFamiliesPromise = null
+    throw error
+  })
+  return localFontFamiliesPromise
 }
 
 export function mergeFontFamilies(...groups: Array<readonly string[]>): string[] {
