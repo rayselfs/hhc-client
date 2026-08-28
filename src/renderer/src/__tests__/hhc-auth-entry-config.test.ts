@@ -55,11 +55,20 @@ describe('HHC browser auth entry and hosting config', () => {
 
   it('allows Google account avatars only through img-src', () => {
     const html = read('src/renderer/index.html')
-    const imgSrc = html.match(/img-src ([^;]+);/)?.[1]
+    const csp = html.match(/Content-Security-Policy"\s+content="([^"]+)"/)?.[1] ?? ''
+    const directives = Object.fromEntries(
+      csp.split(';').map((directive) => {
+        const [name, ...tokens] = directive.trim().split(/\s+/)
+        return [name, tokens]
+      })
+    )
+    const googleAvatarHost = 'https://lh3.googleusercontent.com'
 
-    expect(imgSrc).toContain('https://lh3.googleusercontent.com')
-    expect(imgSrc?.split(/\s+/)).not.toContain('https:')
-    expect(html.match(/https:\/\/lh3\.googleusercontent\.com/g)).toHaveLength(1)
+    expect(directives['img-src']).toContain(googleAvatarHost)
+    expect(directives['img-src']).not.toContain('https:')
+    for (const directive of ['default-src', 'script-src', 'connect-src']) {
+      expect(directives[directive]).not.toContain(googleAvatarHost)
+    }
   })
 
   it('keeps OAuth callback queries outside PWA navigation fallback', () => {
