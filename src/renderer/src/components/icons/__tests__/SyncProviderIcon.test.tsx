@@ -18,32 +18,14 @@ describe('SyncProviderIcon', () => {
     expect(container.querySelector('svg.lucide-folder-sync')).toBeInTheDocument()
   })
 
-  it('protects the official LINE image with its required clear space', () => {
-    render(<SyncProviderIcon providerType="hhc-line" />)
+  it('uses the caller size without adding a LINE-only wrapper', () => {
+    const { container } = render(<SyncProviderIcon providerType="hhc-line" className="size-4" />)
 
-    const image = screen.getByRole('img', { name: 'LINE' })
-    const imageWidth = Number(image.getAttribute('width'))
-    const imageHeight = Number(image.getAttribute('height'))
-    const wrapper = image.parentElement
-    expect(wrapper).not.toBeNull()
-    expect(imageWidth).toBeGreaterThanOrEqual(20)
-    expect(imageHeight).toBeGreaterThanOrEqual(20)
-    expect(image).toHaveAttribute('src', expect.stringContaining('line-brand-icon'))
-    expect(Number.parseFloat(wrapper?.style.padding ?? '')).toBeGreaterThanOrEqual(imageWidth / 2)
-  })
-
-  it('rejects caller visual effects across the LINE icon subtree', () => {
-    const { container } = render(
-      <SyncProviderIcon
-        providerType="hhc-line"
-        className="size-6 text-danger bg-danger shadow-lg mask animate-spin decoration-solid"
-      />
-    )
-
-    for (const element of container.querySelectorAll('*')) {
-      expect(element?.getAttribute('class') ?? '').not.toMatch(
-        /(?:^|\s)(?:text-|bg-|shadow|drop-shadow|mask|animate-|decoration-)/
-      )
-    }
+    const icon = screen.getByRole('img', { name: 'LINE' })
+    expect(icon.tagName).toBe('svg')
+    expect(icon).toHaveClass('size-4')
+    expect(icon).toHaveAttribute('viewBox', '0 0 24 24')
+    expect(icon).toHaveAttribute('fill', 'currentColor')
+    expect(container.firstElementChild).toBe(icon)
   })
 })

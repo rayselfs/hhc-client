@@ -165,8 +165,8 @@ export default function FileExplorerFAB({
                       isDisabled={isAddHhcLineDisabled}
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
-                      <span aria-hidden="true">
-                        <SyncProviderIcon providerType="hhc-line" className="size-5" />
+                      <span aria-hidden="true" className="size-4 shrink-0">
+                        <SyncProviderIcon providerType="hhc-line" className="size-4" />
                       </span>
                       {t('fileExplorer.contextMenu.addHhcLine')}
                     </Dropdown.Item>

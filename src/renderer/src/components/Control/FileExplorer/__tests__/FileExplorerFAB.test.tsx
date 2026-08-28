@@ -48,6 +48,7 @@ describe('FileExplorerFAB HHC LINE action', () => {
     const onAddHhcLine = vi.fn()
     render(<FileExplorerFAB onAddHhcLine={onAddHhcLine} />)
 
+    expect(screen.getByRole('img', { name: 'LINE', hidden: true })).toHaveClass('size-4')
     await userEvent.click(screen.getByRole('button', { name: 'Sync LINE group' }))
 
     expect(onAddHhcLine).toHaveBeenCalledTimes(1)
