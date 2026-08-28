@@ -36,9 +36,21 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
     .click({ position: { x: 160, y: 120 } })
   const textBox = page.locator('[data-text-content][contenteditable="true"]')
   await textBox.pressSequentially('Supercalifragilisticexpialidocious')
-  expect(
-    await textBox.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)
-  ).toBe(true)
+  await textBox.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  )
+  const textMetrics = await textBox.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      scrollHeight: element.scrollHeight,
+      lineHeight: Number.parseFloat(style.lineHeight),
+      verticalPadding: Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+    }
+  })
+  expect(textMetrics.scrollHeight).toBeLessThanOrEqual(
+    textMetrics.lineHeight + textMetrics.verticalPadding + 1
+  )
   await page.getByRole('button', { name: /^(Home|常用)$/ }).click()
 
   await page.setViewportSize({ width: 1470, height: 726 })

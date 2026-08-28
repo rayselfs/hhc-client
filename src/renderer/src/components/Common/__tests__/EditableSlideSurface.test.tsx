@@ -208,6 +208,49 @@ describe('EditableSlideSurface', () => {
     )
   })
 
+  it('cancels a pending input commit when East Asian composition starts', () => {
+    mockTextMeasurement()
+    const flushAnimationFrame = mockAnimationFrame()
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: '', width: 80, height: 30, autoWidth: true })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSurfaceHarness
+        document={withText}
+        slideId={slideId}
+        selectedElementId={text.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    handleUpdate.mockClear()
+    const textBox = screen.getByRole('textbox')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'provisional'
+    fireEvent.input(textBox)
+    fireEvent.compositionStart(textBox)
+    textBox.textContent = 'ㄓ'
+
+    act(() => flushAnimationFrame())
+
+    expect(handleUpdate).not.toHaveBeenCalled()
+
+    textBox.textContent = '中'
+    fireEvent.compositionEnd(textBox)
+    expect(handleUpdate).not.toHaveBeenCalled()
+
+    act(() => flushAnimationFrame())
+
+    expect(handleUpdate).toHaveBeenCalledWith(
+      slideId,
+      text.id,
+      expect.objectContaining({ text: '中' })
+    )
+  })
+
   it('keeps focus and editing active while text commits update the document', () => {
     mockTextMeasurement()
     const document = createBlankEditablePresentationDocument('Sunday')

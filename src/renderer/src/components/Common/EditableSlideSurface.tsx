@@ -944,6 +944,7 @@ function TextElementContent({
     cancelPendingTextCommit()
     textFrameRef.current = window.requestAnimationFrame(() => {
       textFrameRef.current = null
+      if (isComposingRef.current) return
       const content = contentRef.current
       if (content) commitText(content.textContent ?? '')
     })
@@ -1013,6 +1014,7 @@ function TextElementContent({
         padding: `${TEXT_PADDING_Y}px ${TEXT_PADDING_X}px`,
         width: editing && element.autoWidth === true ? 'max-content' : undefined,
         minWidth: editing && element.autoWidth === true ? '100%' : undefined,
+        height: editing && element.autoWidth === true ? 'auto' : undefined,
         whiteSpace: editing && element.autoWidth === true ? 'pre' : 'pre-wrap',
         overflowWrap: editing && element.autoWidth === true ? 'normal' : 'break-word'
       }}
@@ -1023,6 +1025,7 @@ function TextElementContent({
       }}
       onCompositionStart={() => {
         isComposingRef.current = true
+        cancelPendingTextCommit()
       }}
       onCompositionEnd={() => {
         isComposingRef.current = false
