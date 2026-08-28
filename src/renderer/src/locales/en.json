@@ -588,6 +588,7 @@
     "insert": "Insert",
     "design": "Design",
     "fit": "Fit",
+    "clipboard": "Clipboard",
     "ribbonGroups": {
       "font": "Font",
       "paragraph": "Paragraph",
@@ -606,6 +607,9 @@
     "untitledName": "Untitled Presentation",
     "text": "Text",
     "image": "Image",
+    "picture": "Picture",
+    "shapes": "Shapes",
+    "textBox": "Text Box",
     "moveSlideUp": "Move Up",
     "moveSlideDown": "Move Down",
     "copyElement": "Copy Element",

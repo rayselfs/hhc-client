@@ -366,13 +366,13 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     renderEditableDeck(sourceItem)
 
     const frame = await screen.findByTestId('presentation-ribbon-frame')
-    expect(frame).toHaveClass('h-28')
+    expect(frame).toHaveClass('h-24')
 
     fireEvent.click(screen.getByRole('button', { name: '插入' }))
-    expect(frame).toHaveClass('h-28')
+    expect(frame).toHaveClass('h-24')
 
     fireEvent.click(screen.getByRole('button', { name: '設計' }))
-    expect(frame).toHaveClass('h-28')
+    expect(frame).toHaveClass('h-24')
   })
 
   it('does not mount off-screen editable slide previews', async () => {
@@ -432,16 +432,18 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     await screen.findByTestId('presentation-ribbon-frame')
     const groups = screen.getAllByTestId('presentation-ribbon-group')
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Clipboard',
+      'Slides',
       'Font',
       'Paragraph',
-      'Position',
+      'Insert',
       'Arrange'
     ])
     groups.forEach((group) => expect(group).toHaveClass('shrink-0'))
     const surface = window.document.querySelector('[data-ribbon-surface]')
     expect(surface).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
     const fontGroup = screen.getByRole('group', { name: 'Font' })
-    expect(fontGroup).toHaveClass('w-[440px]')
+    expect(fontGroup).toHaveClass('w-[376px]')
     const fontRows = fontGroup.querySelector('.grid.grid-rows-2')?.children
     expect(fontRows).toHaveLength(2)
     const firstRow = fontRows?.[0]
@@ -450,8 +452,8 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     const sizeSelect = Array.from(fontGroup.querySelectorAll('select')).find(
       (select) => select !== familySelect
     )
-    expect(familySelect).toHaveClass('min-w-44', 'flex-1')
-    expect(sizeSelect).toHaveClass('w-20')
+    expect(familySelect).toHaveClass('min-w-32', 'flex-1')
+    expect(sizeSelect).toHaveClass('w-14')
     expect(firstRow).toContainElement(familySelect)
     expect(firstRow).toContainElement(sizeSelect!)
     expect(firstRow).toContainElement(screen.getByRole('button', { name: 'Increase font size' }))
@@ -462,6 +464,8 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     expect(secondRow).toContainElement(screen.getByRole('button', { name: 'Clear formatting' }))
     expect(screen.getByRole('group', { name: 'Arrange' }).querySelector('.flex-wrap')).toBeNull()
     ;[
+      'Bring Forward',
+      'Send Backward',
       'Align objects left',
       'Align objects center',
       'Align objects right',
@@ -601,45 +605,5 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
         .getAllByTestId('presentation-ribbon-group')
         .map((group) => group.getAttribute('aria-label'))
     ).toEqual(['Adjust', 'Arrange', 'Size'])
-  })
-
-  it('updates selected text box height from numeric controls', async () => {
-    const document = createBlankEditablePresentationDocument('Sunday')
-    const slideId = document.slideOrder[0]
-    const text = createTextElement({ text: 'Height', width: 220, height: 40, autoWidth: false })
-    const withText = addElementToSlide(document, slideId, text)
-    const sourceItem = makeFile({
-      id: 'editable-deck',
-      name: 'Sunday Editable',
-      url: 'blob:editable-deck',
-      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
-    })
-    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withText, revision: 0 })
-
-    renderEditableDeck(sourceItem)
-
-    const textBoxes = await screen.findAllByRole('textbox')
-    const mainTextBox = textBoxes[textBoxes.length - 1]
-    if (!mainTextBox) throw new Error('main text box not found')
-    fireEvent.click(mainTextBox)
-    fireEvent.change(screen.getByLabelText('height'), { target: { value: '96' } })
-
-    await waitFor(() =>
-      expect(mocks.persistEditablePresentationRevision).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          itemId: 'editable-deck',
-          sourceBlobId: 'editable-deck',
-          document: expect.objectContaining({
-            slides: expect.objectContaining({
-              [slideId]: expect.objectContaining({
-                elements: expect.objectContaining({
-                  [text.id]: expect.objectContaining({ height: 96 })
-                })
-              })
-            })
-          })
-        })
-      )
-    )
   })
 })

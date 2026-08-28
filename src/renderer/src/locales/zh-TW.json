@@ -588,6 +588,7 @@
     "insert": "插入",
     "design": "設計",
     "fit": "符合視窗",
+    "clipboard": "剪貼簿",
     "ribbonGroups": {
       "font": "字型",
       "paragraph": "段落",
@@ -606,6 +607,9 @@
     "untitledName": "未命名簡報",
     "text": "文字",
     "image": "圖片",
+    "picture": "圖片",
+    "shapes": "圖案",
+    "textBox": "文字方塊",
     "moveSlideUp": "上移",
     "moveSlideDown": "下移",
     "copyElement": "複製物件",

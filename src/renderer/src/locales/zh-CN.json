@@ -588,6 +588,7 @@
     "insert": "插入",
     "design": "设计",
     "fit": "适合窗口",
+    "clipboard": "剪贴板",
     "ribbonGroups": {
       "font": "字体",
       "paragraph": "段落",
@@ -606,6 +607,9 @@
     "untitledName": "未命名演示文稿",
     "text": "文字",
     "image": "图片",
+    "picture": "图片",
+    "shapes": "形状",
+    "textBox": "文本框",
     "moveSlideUp": "上移",
     "moveSlideDown": "下移",
     "copyElement": "复制对象",

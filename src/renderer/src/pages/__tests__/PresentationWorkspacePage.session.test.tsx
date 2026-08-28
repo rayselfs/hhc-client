@@ -212,6 +212,49 @@ describe('PresentationWorkspacePage session integration', () => {
     usePresentationWorkspaceStore.getState().openDocument(item)
   })
 
+  it('orders Home around supported commands without captions or geometry fields', async () => {
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const homeRibbon = await screen.findByTestId('presentation-ribbon-frame')
+    const homeGroups = within(homeRibbon).getAllByRole('group')
+
+    expect(homeGroups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Clipboard',
+      'Slides',
+      'Font',
+      'Paragraph',
+      'Insert',
+      'Arrange'
+    ])
+    expect(within(homeRibbon).getByRole('button', { name: 'Paste' })).toBeDisabled()
+    expect(within(homeRibbon).getByRole('button', { name: 'New Slide' })).toBeEnabled()
+    expect(within(homeRibbon).getByRole('button', { name: 'Picture' })).toBeEnabled()
+    expect(within(homeRibbon).getByRole('button', { name: 'Shapes' })).toBeEnabled()
+    expect(within(homeRibbon).getByRole('button', { name: 'Text Box' })).toBeEnabled()
+    expect(homeGroups.every((group) => group.querySelector('p') === null)).toBe(true)
+    expect(within(homeRibbon).queryAllByRole('spinbutton')).toHaveLength(0)
+  })
+
+  it('keeps text formatting on Home without adding a Text contextual tab', async () => {
+    renderEditableWorkspaceWithText()
+    const textElement = (await screen.findAllByText('Font target'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+
+    expect(textElement).not.toBeNull()
+    fireEvent.pointerDown(textElement!, { clientX: 10, clientY: 10 })
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^(Text|文字格式)$/ })).not.toBeInTheDocument()
+    )
+    expect(screen.getByRole('group', { name: 'Font' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Paragraph' })).toBeInTheDocument()
+  })
+
   it('loads each installed font once from the font selector first gesture', async () => {
     let resolveFonts!: (families: string[]) => void
     mocks.queryLocalFontFamiliesOnce.mockReturnValue(
@@ -452,41 +495,6 @@ describe('PresentationWorkspacePage session integration', () => {
       expect(afterUndo.type === 'text' ? afterUndo.autoSize : null).toBe('content')
     }
   )
-
-  it('keeps content-height text content-height when the inspector changes width', async () => {
-    let registry: PresentationSessionRegistry | null = null
-    render(
-      <PresentationSessionRegistryProvider>
-        <Workspace showPage onSession={(next) => (registry = next)} />
-      </PresentationSessionRegistryProvider>
-    )
-    await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
-    const session = registry!.get('deck-1')!
-    const document = session.getSnapshot().renderedDocument
-    const slideId = document.slideOrder[0]
-    const text = createTextElement({
-      text: 'Content height',
-      width: 220,
-      height: 40,
-      autoSize: 'content',
-      autoWidth: false
-    })
-    act(() => session.commit(addElementToSlide(document, slideId, text)))
-
-    const textElement = (await screen.findAllByText('Content height'))
-      .at(-1)
-      ?.closest('[data-slide-element]')
-    expect(textElement).not.toBeNull()
-    fireEvent.pointerDown(textElement!, { clientX: 10, clientY: 10 })
-    fireEvent.change(screen.getByLabelText('width'), { target: { value: '280' } })
-
-    await waitFor(() => {
-      const updated = session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
-      expect(updated.type === 'text' ? updated.width : null).toBe(280)
-      expect(updated.type === 'text' ? updated.autoSize : null).toBe('content')
-      expect(updated.type === 'text' ? updated.autoWidth : null).toBe(false)
-    })
-  })
 
   it('does not expose dimensions-only Slide Size controls', async () => {
     render(

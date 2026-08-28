@@ -22,7 +22,9 @@ import {
   AlignVerticalSpaceAround,
   Baseline,
   Bold,
+  BringToFront,
   ChevronDown,
+  ClipboardPaste,
   Crop,
   Eraser,
   FileText,
@@ -33,6 +35,7 @@ import {
   Plus,
   RectangleHorizontal,
   RefreshCw,
+  SendToBack,
   StickyNote,
   Type,
   Underline,
@@ -66,7 +69,6 @@ import {
   DEFAULT_GRADIENT_BACKGROUND,
   duplicateEditableSlides,
   getSlideBackgroundPrimaryColor,
-  hasContentHeight,
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
   INSERTED_TEXT_FONT_SIZE_POINTS,
@@ -123,7 +125,7 @@ import { isFileItem, type FileItemRecord } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
-type RibbonTab = 'home' | 'insert' | 'design' | 'picture' | 'text'
+type RibbonTab = 'home' | 'insert' | 'design' | 'picture'
 type PresentationElementType = EditablePresentationElement['type']
 type ZoomMode = 'fit' | 'custom'
 
@@ -136,12 +138,14 @@ const BASE_RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
 const PRESENTATION_CANVAS_WIDTH = 1024
 const PRESENTATION_VIEWPORT_PADDING = 64
 const NATIVE_CONTROL_CLASS =
-  'presentation-native-control rounded-lg border border-divider bg-content2 px-3 text-sm text-foreground outline-none'
+  'presentation-native-control h-7 rounded-md border border-divider bg-content2 px-2 text-sm text-foreground outline-none'
 const RANGE_CLASS = 'presentation-range w-full'
 const RIBBON_ICON_BUTTON_CLASS =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-transparent px-2 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
+  'inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-transparent px-1.5 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
 const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
   'border-primary bg-primary text-white shadow-inner hover:border-primary hover:bg-primary/90 hover:text-white'
+const RIBBON_COMMAND_BUTTON_CLASS =
+  'inline-flex h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs text-default-500 transition-colors hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 disabled:cursor-not-allowed disabled:opacity-30'
 
 function RibbonGroup({
   label,
@@ -157,10 +161,9 @@ function RibbonGroup({
       role="group"
       aria-label={label}
       data-testid="presentation-ribbon-group"
-      className={`flex h-full shrink-0 flex-col border-r border-divider px-3 pb-1 pt-2 last:border-r-0 ${className}`}
+      className={`flex h-full shrink-0 flex-col border-r border-divider px-2 py-1 last:border-r-0 ${className}`}
     >
       <div className="min-h-0 flex-1">{children}</div>
-      <p className="mt-1 text-center text-[10px] leading-3 text-default-400">{label}</p>
     </section>
   )
 }
@@ -1244,22 +1247,32 @@ function EditableSessionDocumentView({
     )
   }
 
+  const showShapeMenu = (event: React.MouseEvent): void => {
+    showMenu(
+      [
+        {
+          id: 'insert-rectangle',
+          label: t('presentationWorkspace.rectangle', 'Rectangle'),
+          onAction: () => addShape('rectangle')
+        },
+        {
+          id: 'insert-ellipse',
+          label: t('presentationWorkspace.ellipse', 'Ellipse'),
+          onAction: () => addShape('ellipse')
+        },
+        {
+          id: 'insert-line',
+          label: t('presentationWorkspace.line', 'Line'),
+          onAction: addLine
+        }
+      ],
+      event
+    )
+  }
+
   const collapseSlideSelectionToActive = (): void => {
     if (!activeSlideId || selectedSlideIds.size <= 1) return
     setSelectedSlideIds(new Set([activeSlideId]))
-  }
-
-  const updateSelectedNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
-    const next = Number(value)
-    if (!Number.isFinite(next)) return
-    updateSelectedElement({
-      [key]: next,
-      ...(selectedElement?.type === 'text' && key === 'width'
-        ? { autoWidth: false, autoSize: hasContentHeight(selectedElement) ? 'content' : 'fixed' }
-        : selectedElement?.type === 'text' && key === 'height'
-          ? { autoWidth: false, autoSize: 'fixed' as const }
-          : {})
-    } as Partial<EditablePresentationElement>)
   }
 
   const flashRibbonAction = (actionId: string): void => {
@@ -1297,9 +1310,9 @@ function EditableSessionDocumentView({
         >
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.adjust', 'Adjust')}
-            className="w-[660px]"
+            className="w-[600px]"
           >
-            <div className="grid h-full grid-cols-[240px_120px_140px_140px] items-center gap-2">
+            <div className="grid h-full grid-cols-[220px_100px_110px_110px] items-center gap-2">
               <ControlSlider
                 label={t('presentationWorkspace.transparency', 'Transparency')}
                 value={
@@ -1313,7 +1326,7 @@ function EditableSessionDocumentView({
               <label className="flex items-center gap-2 text-default-500">
                 <span>{t('presentationWorkspace.borderColor', 'Border')}</span>
                 <input
-                  className="h-9 w-12 rounded bg-transparent"
+                  className="h-7 w-10 rounded-md bg-transparent"
                   type="color"
                   disabled={!selectedImageElement}
                   value={selectedImageElement?.borderColor ?? '#ffffff'}
@@ -1325,7 +1338,7 @@ function EditableSessionDocumentView({
               <label className="flex items-center gap-2 text-default-500">
                 <span>{t('presentationWorkspace.borderWidth', 'Width')}</span>
                 <select
-                  className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                  className={`w-16 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                   disabled={!selectedImageElement}
                   value={selectedImageElement?.borderWidth ?? 0}
                   onChange={(event) =>
@@ -1342,7 +1355,7 @@ function EditableSessionDocumentView({
               <label className="flex items-center gap-2 text-default-500">
                 <span>{t('presentationWorkspace.shadow', 'Shadow')}</span>
                 <select
-                  className={`h-9 w-28 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                  className={`w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                   disabled={!selectedImageElement}
                   value={selectedImageElement?.shadow ?? 'none'}
                   onChange={(event) =>
@@ -1362,7 +1375,7 @@ function EditableSessionDocumentView({
           </RibbonGroup>
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
-            className="w-48"
+            className="w-40"
           >
             <div className="grid h-full grid-rows-2 gap-1">
               <Button
@@ -1389,7 +1402,7 @@ function EditableSessionDocumentView({
           </RibbonGroup>
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.size', 'Size')}
-            className="w-28"
+            className="w-24"
           >
             <div className="flex h-full items-center justify-center">
               <Button
@@ -1419,9 +1432,9 @@ function EditableSessionDocumentView({
         >
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
-            className="w-[460px]"
+            className="w-[400px]"
           >
-            <div className="flex h-full items-center gap-1 [&>button]:h-16 [&>button]:min-w-20 [&>button]:flex-col [&>button]:gap-1">
+            <div className="flex h-full items-center gap-1 [&>button]:h-14 [&>button]:min-w-16 [&>button]:flex-col [&>button]:gap-1">
               <Button
                 size="sm"
                 variant={isTextInsertMode ? 'primary' : 'tertiary'}
@@ -1516,15 +1529,38 @@ function EditableSessionDocumentView({
         data-ribbon-surface
         className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
       >
+        <RibbonGroup label={t('presentationWorkspace.clipboard', 'Clipboard')} className="w-16">
+          <div className="flex h-full items-center justify-center">
+            <button
+              type="button"
+              className={RIBBON_COMMAND_BUTTON_CLASS}
+              disabled={!copiedElement && copiedSlideIds.length === 0}
+              onClick={() => (copiedElement ? pasteElement() : pasteSlide())}
+            >
+              <ClipboardPaste size={18} />
+              {t('presentationWorkspace.pasteElement', 'Paste')}
+            </button>
+          </div>
+        </RibbonGroup>
+
+        <RibbonGroup label={t('presentationWorkspace.slides', 'Slides')} className="w-20">
+          <div className="flex h-full items-center justify-center">
+            <button type="button" className={RIBBON_COMMAND_BUTTON_CLASS} onClick={addSlide}>
+              <Plus size={18} />
+              {t('presentationWorkspace.newSlide', 'New Slide')}
+            </button>
+          </div>
+        </RibbonGroup>
+
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.font', 'Font')}
-          className="w-[440px]"
+          className="w-[376px]"
         >
           <div className="grid h-full grid-rows-2 gap-1">
             <div className="flex items-center gap-1">
               <select
                 aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
-                className={`h-9 min-w-44 flex-1 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                className={`min-w-32 flex-1 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
                 onPointerDown={loadLocalFontsOnFirstGesture}
@@ -1553,7 +1589,8 @@ function EditableSessionDocumentView({
                 </button>
               )}
               <select
-                className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                aria-label={t('presentationWorkspace.fontSize', 'Font size')}
+                className={`w-14 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={
                   selectedTextElement && document
@@ -1677,7 +1714,7 @@ function EditableSessionDocumentView({
 
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.paragraph', 'Paragraph')}
-          className="w-44"
+          className="w-28"
         >
           <div className="grid h-full grid-rows-2 gap-1">
             <div className="flex items-center gap-1">
@@ -1720,26 +1757,38 @@ function EditableSessionDocumentView({
         </RibbonGroup>
 
         <RibbonGroup
-          label={t('presentationWorkspace.ribbonGroups.position', 'Position')}
-          className="w-48"
+          label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
+          className="w-44"
         >
-          <div className="grid h-full grid-cols-2 grid-rows-2 gap-1">
-            {(['x', 'y', 'width', 'height'] as const).map((key) => (
-              <label
-                key={key}
-                className="flex items-center gap-1 text-xs uppercase text-default-400"
-              >
-                <span className="w-3">{key === 'width' ? 'w' : key === 'height' ? 'h' : key}</span>
-                <input
-                  className={`h-8 min-w-0 flex-1 px-2 ${NATIVE_CONTROL_CLASS}`}
-                  type="number"
-                  disabled={!selectedElement}
-                  value={selectedElement ? Math.round(selectedElement[key]) : 0}
-                  onChange={(event) => updateSelectedNumber(key, event.currentTarget.value)}
-                  aria-label={key}
-                />
-              </label>
-            ))}
+          <div className="flex h-full items-center gap-1">
+            <button
+              type="button"
+              className={RIBBON_COMMAND_BUTTON_CLASS}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              <ImagePlus size={18} />
+              {t('presentationWorkspace.picture', 'Picture')}
+            </button>
+            <button
+              type="button"
+              className={RIBBON_COMMAND_BUTTON_CLASS}
+              onClick={showShapeMenu}
+              aria-haspopup="menu"
+            >
+              <RectangleHorizontal size={18} />
+              {t('presentationWorkspace.shapes', 'Shapes')}
+            </button>
+            <button
+              type="button"
+              className={`${RIBBON_COMMAND_BUTTON_CLASS} ${
+                isTextInsertMode ? RIBBON_ICON_BUTTON_ACTIVE_CLASS : ''
+              }`}
+              aria-pressed={isTextInsertMode}
+              onClick={() => setIsTextInsertMode((enabled) => !enabled)}
+            >
+              <Type size={18} />
+              {t('presentationWorkspace.textBox', 'Text Box')}
+            </button>
           </div>
         </RibbonGroup>
 
@@ -1747,7 +1796,25 @@ function EditableSessionDocumentView({
           label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
           className="w-44"
         >
-          <div data-ribbon-no-wrap className="grid h-full grid-cols-4 grid-rows-2 gap-1">
+          <div data-ribbon-no-wrap className="grid h-full grid-cols-5 grid-rows-2 gap-1">
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={!selectedElement}
+              onClick={() => selectedElement && reorderElement(selectedElement.id, 'bring-forward')}
+              aria-label={t('presentationWorkspace.bringForward', 'Bring Forward')}
+            >
+              <BringToFront size={17} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={!selectedElement}
+              onClick={() => selectedElement && reorderElement(selectedElement.id, 'send-backward')}
+              aria-label={t('presentationWorkspace.sendBackward', 'Send Backward')}
+            >
+              <SendToBack size={17} />
+            </button>
             {(
               [
                 ['left', AlignHorizontalJustifyStart, 'Align objects left'],
@@ -1873,7 +1940,7 @@ function EditableSessionDocumentView({
     )
   }
 
-  const ribbonHeightClass = 'h-28'
+  const ribbonHeightClass = 'h-24'
 
   return (
     <>
@@ -2767,12 +2834,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     setBackgroundPanel({ itemId: activeItemId, isOpen: false })
   }
   const ribbonTabs = useMemo<RibbonTab[]>(
-    () =>
-      selectedElementType === 'image'
-        ? [...BASE_RIBBON_TABS, 'picture']
-        : selectedElementType === 'text'
-          ? [...BASE_RIBBON_TABS, 'text']
-          : BASE_RIBBON_TABS,
+    () => (selectedElementType === 'image' ? [...BASE_RIBBON_TABS, 'picture'] : BASE_RIBBON_TABS),
     [selectedElementType]
   )
   const effectiveActiveRibbon = ribbonTabs.includes(activeRibbon) ? activeRibbon : 'home'
@@ -2810,8 +2872,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
       home: '常用',
       insert: '插入',
       design: '設計',
-      picture: '圖片格式',
-      text: '文字格式'
+      picture: '圖片格式'
     }
     return t(`presentationWorkspace.${tab}`, fallbacks[tab])
   }

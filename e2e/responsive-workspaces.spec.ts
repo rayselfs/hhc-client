@@ -66,10 +66,12 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const presentationStage = page.locator('.presentation-stage')
   const notes = page.getByRole('button', { name: /Toggle Notes|切換備忘稿/ })
   const zoom = page.getByRole('button', { name: /Reset zoom|重設縮放/ })
+  const ribbon = page.locator('[data-ribbon-surface]')
   const viewport = page.getByTestId('presentation-canvas-viewport')
   const canvas = page.getByTestId('presentation-canvas')
   await expect(notes).toBeVisible()
   await expect(zoom).toBeVisible()
+  expect(await ribbon.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   const expectedFitZoom = async (): Promise<number> =>
     viewport.evaluate((element) =>
@@ -199,8 +201,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
 
   const navigator = page.locator('.workspace-navigator-slot')
   const stage = page.locator('.workspace-stage-slot')
-  const slidesTrigger = page.getByRole('button', { name: /Slides|投影片/ })
-  const ribbon = page.locator('[data-ribbon-surface]')
+  const slidesTrigger = page.getByRole('button', { name: /^(Slides|投影片|幻灯片)$/ })
 
   const presentationProjectionAction = page.getByRole('button', {
     name: /Start projection|開始投影|开始投影/
@@ -212,6 +213,8 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await expect(navigator).toBeHidden()
   await expect(slidesTrigger).toBeVisible()
   await expect(stage).toBeVisible()
+  await expect(presentationStage).toBeVisible()
+  await expect(statusBar).toBeVisible()
   await expect(ribbon).toHaveCSS('overflow-x', 'auto')
   const ribbonMetrics = await ribbon.evaluate((element) => ({
     clientWidth: element.clientWidth,
