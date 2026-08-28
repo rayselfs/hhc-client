@@ -29,6 +29,10 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
   await expect(page).toHaveURL(/#\/presentations\//)
 
+  const fit = page.getByRole('button', { name: /^Fit$|^符合視窗$/ })
+  const zoomSlider = page.getByRole('slider', { name: /Zoom|縮放/ })
+  await expect(fit).toHaveAttribute('aria-pressed', 'true')
+
   await page.getByRole('button', { name: /^(Insert|插入)$/ }).click()
   await page.getByRole('button', { name: /^(Text|文字)$/ }).click()
   await page
@@ -60,6 +64,52 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const zoom = page.getByRole('button', { name: /Reset zoom|重設縮放/ })
   await expect(notes).toBeVisible()
   await expect(zoom).toBeVisible()
+
+  const fitZoom = Number(await zoomSlider.inputValue())
+  await notes.click()
+  const notesEditor = page.getByRole('textbox', { name: /Notes|備忘稿/ })
+  await notesEditor.fill('Responsive speaker note')
+  await expect.poll(async () => Number(await zoomSlider.inputValue())).toBeLessThan(fitZoom)
+  await notes.click()
+  await notes.click()
+  await expect(notesEditor).toHaveValue('Responsive speaker note')
+  await notes.click()
+
+  const viewport = page.getByTestId('presentation-canvas-viewport')
+  const viewportBox = await viewport.boundingBox()
+  const zoomBeforeWheel = await zoom.textContent()
+  const ctrlWheelPrevented = await viewport.evaluate(
+    (element, position) => {
+      const event = new WheelEvent('wheel', {
+        bubbles: true,
+        cancelable: true,
+        clientX: position.x,
+        clientY: position.y,
+        ctrlKey: true,
+        deltaY: -100
+      })
+      element.dispatchEvent(event)
+      return event.defaultPrevented
+    },
+    { x: viewportBox!.x + viewportBox!.width / 2, y: viewportBox!.y + 100 }
+  )
+  expect(ctrlWheelPrevented).toBe(true)
+  await expect.poll(() => zoom.textContent()).not.toBe(zoomBeforeWheel)
+
+  await zoomSlider.fill('200')
+  const overflow = await viewport.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth
+  }))
+  expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth)
+  const statusBar = page.getByTestId('presentation-status-bar')
+  const [statusBox, customStageBox] = await Promise.all([
+    statusBar.boundingBox(),
+    presentationStage.boundingBox()
+  ])
+  expect(statusBox!.y + statusBox!.height).toBeLessThanOrEqual(
+    customStageBox!.y + customStageBox!.height
+  )
 
   const [slotBox, stageBox] = await Promise.all([
     stageSlot.boundingBox(),

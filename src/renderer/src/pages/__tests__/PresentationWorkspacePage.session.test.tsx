@@ -12,7 +12,8 @@ import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
-  createTextElement
+  createTextElement,
+  insertBlankEditableSlide
 } from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -24,6 +25,29 @@ const mocks = vi.hoisted(() => ({
   persistEditablePresentationRevision: vi.fn(),
   refreshEditablePresentationThumbnail: vi.fn()
 }))
+
+interface ResizeObserverRecord {
+  callback: ResizeObserverCallback
+  targets: Set<Element>
+}
+
+let resizeObserverRecords: ResizeObserverRecord[] = []
+
+function resizeElement(element: Element, width: number, height: number): void {
+  const record = resizeObserverRecords.find(({ targets }) => targets.has(element))
+  expect(record).toBeDefined()
+  act(() =>
+    record!.callback(
+      [
+        {
+          target: element,
+          contentRect: new DOMRect(0, 0, width, height)
+        } as ResizeObserverEntry
+      ],
+      {} as ResizeObserver
+    )
+  )
+}
 
 vi.mock('react-i18next', async () => {
   const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next')
@@ -106,6 +130,27 @@ function Workspace({
 
 describe('PresentationWorkspacePage session integration', () => {
   beforeEach(() => {
+    resizeObserverRecords = []
+    globalThis.ResizeObserver = class {
+      private readonly record: ResizeObserverRecord
+
+      constructor(callback: ResizeObserverCallback) {
+        this.record = { callback, targets: new Set() }
+        resizeObserverRecords.push(this.record)
+      }
+
+      observe = (target: Element): void => {
+        this.record.targets.add(target)
+      }
+
+      unobserve = (target: Element): void => {
+        this.record.targets.delete(target)
+      }
+
+      disconnect = (): void => {
+        this.record.targets.clear()
+      }
+    }
     const item = makeEditableItem()
     const document = createBlankEditablePresentationDocument('Sunday')
     mocks.loadEditablePresentationSnapshot.mockReset()
@@ -371,6 +416,151 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.click(screen.getByRole('button', { name: /Design|設計/ }))
 
     expect(screen.queryByText(/Slide Size|投影片大小/)).not.toBeInTheDocument()
+  })
+
+  it('starts in Fit mode and recalculates when Notes changes the viewport height', async () => {
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const viewport = await screen.findByTestId('presentation-canvas-viewport')
+    resizeElement(viewport, 1050, 486)
+
+    expect(screen.getByRole('button', { name: 'Fit' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('73')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    resizeElement(viewport, 1050, 400)
+
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toBeVisible()
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('58')
+    expect(screen.getByRole('button', { name: 'Reset zoom' })).toBeVisible()
+  })
+
+  it('commits Notes across slide, pane, document, and unmount boundaries without no-op history', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const { document, slideId: secondSlideId } = insertBlankEditableSlide(sourceDocument, 1)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+    let registry: PresentationSessionRegistry | null = null
+    const { rerender } = render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
+      target: { value: 'Remember the closing prayer' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: '2' }))
+
+    const session = registry!.get('deck-1')!
+    const firstSlideId = document.slideOrder[0]
+    expect(session.getSnapshot().renderedDocument.slides[firstSlideId].notes).toBe(
+      'Remember the closing prayer'
+    )
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(secondSlideId)
+
+    fireEvent.click(screen.getByRole('button', { name: '1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    const historyLength = session.getSnapshot().history.past.length
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue(
+      'Remember the closing prayer'
+    )
+    expect(session.getSnapshot().history.past).toHaveLength(historyLength)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
+      target: { value: 'Updated before leaving the document' }
+    })
+    const secondItem = makeEditableItem('deck-2', 'Sermon.lpdeck')
+    useFileExplorerStore.setState((state) => ({
+      items: { ...state.items, [secondItem.id]: secondItem },
+      _itemsArray: [...state._itemsArray, secondItem]
+    }))
+    act(() => usePresentationWorkspaceStore.getState().openDocument(secondItem))
+
+    await waitFor(() =>
+      expect(session.getSnapshot().renderedDocument.slides[firstSlideId].notes).toBe(
+        'Updated before leaving the document'
+      )
+    )
+
+    act(() => usePresentationWorkspaceStore.getState().setActiveDocument('deck-1'))
+    await screen.findByTestId('presentation-canvas-viewport')
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
+      target: { value: 'Updated before unmount' }
+    })
+    rerender(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage={false} onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    expect(session.getSnapshot().renderedDocument.slides[firstSlideId].notes).toBe(
+      'Updated before unmount'
+    )
+  })
+
+  it('anchors Ctrl and macOS Meta wheel zoom while leaving ordinary wheel scrolling alone', async () => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const viewport = await screen.findByTestId('presentation-canvas-viewport')
+    resizeElement(viewport, 1050, 486)
+    Object.defineProperties(viewport, {
+      scrollLeft: { value: 200, writable: true },
+      scrollTop: { value: 100, writable: true }
+    })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 1050,
+      bottom: 486,
+      width: 1050,
+      height: 486,
+      toJSON: () => undefined
+    })
+
+    const ordinaryWheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 100 })
+    fireEvent(viewport, ordinaryWheel)
+    expect(ordinaryWheel.defaultPrevented).toBe(false)
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('73')
+
+    const ctrlWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 300,
+      clientY: 200,
+      ctrlKey: true,
+      deltaY: -100
+    })
+    fireEvent(viewport, ctrlWheel)
+    expect(ctrlWheel.defaultPrevented).toBe(true)
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('78')
+    expect(viewport.scrollLeft).toBeCloseTo(234.25, 1)
+    expect(viewport.scrollTop).toBeCloseTo(120.55, 1)
+
+    const metaWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 300,
+      clientY: 200,
+      metaKey: true,
+      deltaY: -100
+    })
+    fireEvent(viewport, metaWheel)
+    expect(metaWheel.defaultPrevented).toBe(true)
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('83')
   })
 
   it('keeps the editable stage and Ribbon inside the shared responsive workspace shell', async () => {

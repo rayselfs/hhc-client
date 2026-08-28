@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -102,6 +109,10 @@ import {
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
+import {
+  calculateAnchoredScroll,
+  calculateFitZoomPercent
+} from '@renderer/lib/presentation-viewport'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
 import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
@@ -117,6 +128,7 @@ import type { SlideHandle } from '@aiden0z/pptx-renderer'
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
 type RibbonTab = 'home' | 'insert' | 'design' | 'picture' | 'text'
 type PresentationElementType = EditablePresentationElement['type']
+type ZoomMode = 'fit' | 'custom'
 
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
 const FONT_SIZES = [
@@ -124,6 +136,8 @@ const FONT_SIZES = [
 ]
 const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
 const BASE_RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
+const PRESENTATION_CANVAS_WIDTH = 1024
+const PRESENTATION_VIEWPORT_PADDING = 64
 const NATIVE_CONTROL_CLASS =
   'presentation-native-control rounded-lg border border-divider bg-content2 px-3 text-sm text-foreground outline-none'
 const RANGE_CLASS = 'presentation-range w-full'
@@ -600,7 +614,16 @@ function EditableSessionDocumentView({
       : Math.min(lastActiveSlideIndex, Math.max(0, document.slideOrder.length - 1))
   const activeSlideId = document.slideOrder[activeSlideIndex] ?? null
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const canvasViewportRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
+  const pendingZoomAnchorRef = useRef<{
+    left: number
+    top: number
+    anchorX: number
+    anchorY: number
+    previousZoom: number
+    nextZoom: number
+  } | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(() => new Set())
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
@@ -617,9 +640,15 @@ function EditableSessionDocumentView({
   const [isLoadingLocalFonts, setIsLoadingLocalFonts] = useState(false)
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
+  const [zoomMode, setZoomMode] = useState<ZoomMode>('fit')
   const [zoomPercent, setZoomPercent] = useState(100)
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [notesDraftBySlideId, setNotesDraftBySlideId] = useState<Record<string, string>>({})
+  const notesBoundaryRef = useRef<{ slideId: string | null; draft: string }>({
+    slideId: null,
+    draft: ''
+  })
   const [cropElementId, setCropElementId] = useState<string | null>(null)
   const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
   const formatBackgroundTriggerRef = useRef<HTMLButtonElement>(null)
@@ -654,6 +683,49 @@ function EditableSessionDocumentView({
   )
 
   useEffect(() => {
+    const viewport = canvasViewportRef.current
+    if (!viewport) return
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return
+      setViewportSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (zoomMode !== 'fit' || viewportSize.width <= 0 || viewportSize.height <= 0) return
+    setZoomPercent(
+      calculateFitZoomPercent(
+        viewportSize.width,
+        viewportSize.height,
+        PRESENTATION_CANVAS_WIDTH,
+        (PRESENTATION_CANVAS_WIDTH * document.height) / document.width,
+        PRESENTATION_VIEWPORT_PADDING
+      )
+    )
+  }, [document.height, document.width, viewportSize, zoomMode])
+
+  useLayoutEffect(() => {
+    const pending = pendingZoomAnchorRef.current
+    const viewport = canvasViewportRef.current
+    if (!pending || !viewport || pending.nextZoom !== zoomPercent) return
+    viewport.scrollLeft = calculateAnchoredScroll(
+      pending.left,
+      pending.anchorX,
+      pending.previousZoom,
+      pending.nextZoom
+    )
+    viewport.scrollTop = calculateAnchoredScroll(
+      pending.top,
+      pending.anchorY,
+      pending.previousZoom,
+      pending.nextZoom
+    )
+    pendingZoomAnchorRef.current = null
+  }, [zoomPercent])
+
+  useEffect(() => {
     setSlideCount(deck.itemId, document.slideOrder.length)
     if (activeSlideId !== storedActiveSlideId) {
       setActiveSlideId(deck.itemId, activeSlideId)
@@ -669,6 +741,7 @@ function EditableSessionDocumentView({
   ])
 
   const activateSlide = (slideId: string | null): void => {
+    commitNotes()
     if (slideId) {
       const index = document.slideOrder.indexOf(slideId)
       if (index >= 0) setLastActiveSlideIndex(index)
@@ -689,6 +762,18 @@ function EditableSessionDocumentView({
   const notesDraft = activeSlideId
     ? (notesDraftBySlideId[activeSlideId] ?? activeSlide?.notes ?? '')
     : ''
+  notesBoundaryRef.current = { slideId: activeSlideId, draft: notesDraft }
+
+  useEffect(
+    () => () => {
+      const { slideId, draft } = notesBoundaryRef.current
+      if (!slideId) return
+      const currentDocument = session.getSnapshot().renderedDocument
+      if (draft === currentDocument.slides[slideId]?.notes) return
+      session.commit(updateSlideNotes(currentDocument, slideId, draft))
+    },
+    [session]
+  )
 
   useEffect(() => {
     onSelectedElementTypeChange(selectedElement?.type ?? null)
@@ -709,6 +794,43 @@ function EditableSessionDocumentView({
     clearTextCommitTimer()
     session.commit(nextDocument)
   }
+
+  function commitNotes(slideId = activeSlideId, draft = notesDraft): void {
+    if (!slideId) return
+    const currentDocument = session.getSnapshot().renderedDocument
+    if (draft === currentDocument.slides[slideId]?.notes) return
+    session.commit(updateSlideNotes(currentDocument, slideId, draft))
+  }
+
+  const setCustomZoom = (nextZoom: number): void => {
+    setZoomMode('custom')
+    setZoomPercent(Math.max(25, Math.min(200, nextZoom)))
+  }
+
+  useEffect(() => {
+    const viewport = canvasViewportRef.current
+    if (!viewport) return
+    const handleWheel = (event: WheelEvent): void => {
+      if (!(event.ctrlKey || event.metaKey)) return
+      event.preventDefault()
+      if (event.deltaY === 0) return
+      const nextZoom = Math.max(25, Math.min(200, zoomPercent + (event.deltaY < 0 ? 5 : -5)))
+      setZoomMode('custom')
+      if (nextZoom === zoomPercent) return
+      const rect = viewport.getBoundingClientRect()
+      pendingZoomAnchorRef.current = {
+        left: viewport.scrollLeft,
+        top: viewport.scrollTop,
+        anchorX: event.clientX - rect.left,
+        anchorY: event.clientY - rect.top,
+        previousZoom: zoomPercent,
+        nextZoom
+      }
+      setZoomPercent(nextZoom)
+    }
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    return () => viewport.removeEventListener('wheel', handleWheel)
+  }, [zoomPercent])
 
   const previewTextElement = (
     slideId: string,
@@ -1154,11 +1276,6 @@ function EditableSessionDocumentView({
           ? { autoWidth: false, autoSize: 'fixed' as const }
           : {})
     } as Partial<EditablePresentationElement>)
-  }
-
-  const commitNotes = (): void => {
-    if (!activeSlideId || notesDraft === activeSlide?.notes) return
-    commitDocument(updateSlideNotes(document, activeSlideId, notesDraft))
   }
 
   const flashRibbonAction = (actionId: string): void => {
@@ -1964,10 +2081,14 @@ function EditableSessionDocumentView({
           }
           stage={
             <StageViewport className="presentation-stage relative flex min-h-0 flex-col bg-[#111217]">
-              <div className="flex flex-1 items-center justify-center overflow-auto p-8">
+              <div
+                ref={canvasViewportRef}
+                data-testid="presentation-canvas-viewport"
+                className="flex flex-1 items-center justify-center overflow-auto p-8"
+              >
                 <div
-                  className="relative max-w-none shrink-0 transition-[width] duration-150"
-                  style={{ width: `${Math.max(320, 1024 * (zoomPercent / 100))}px` }}
+                  className="relative max-w-none shrink-0"
+                  style={{ width: `${PRESENTATION_CANVAS_WIDTH * (zoomPercent / 100)}px` }}
                 >
                   <EditableSlideSurface
                     document={document}
@@ -2076,7 +2197,7 @@ function EditableSessionDocumentView({
                         [activeSlideId]: value
                       }))
                     }}
-                    onBlur={commitNotes}
+                    onBlur={() => commitNotes()}
                     aria-label={t('presentationWorkspace.notes', 'Notes')}
                     placeholder={t(
                       'presentationWorkspace.notesPlaceholder',
@@ -2085,7 +2206,10 @@ function EditableSessionDocumentView({
                   />
                 </label>
               )}
-              <div className="flex h-8 items-center gap-3 border-t border-divider bg-content1 px-3 text-xs text-default-500">
+              <div
+                data-testid="presentation-status-bar"
+                className="flex h-8 items-center gap-3 border-t border-divider bg-content1 px-3 text-xs text-default-500"
+              >
                 <span>
                   {t('presentationWorkspace.slide', 'Slide')} {activeSlideIndex + 1} /{' '}
                   {document.slideOrder.length}
@@ -2119,7 +2243,7 @@ function EditableSessionDocumentView({
                     isIconOnly
                     size="sm"
                     variant="ghost"
-                    onPress={() => setZoomPercent((value) => Math.max(25, value - 25))}
+                    onPress={() => setCustomZoom(zoomPercent - 25)}
                     aria-label={t('presentationWorkspace.zoomOut', 'Zoom out')}
                   >
                     <ZoomOut size={14} />
@@ -2131,22 +2255,30 @@ function EditableSessionDocumentView({
                     max={200}
                     step={5}
                     value={zoomPercent}
-                    onChange={(event) => setZoomPercent(Number(event.currentTarget.value))}
+                    onChange={(event) => setCustomZoom(Number(event.currentTarget.value))}
                     aria-label={t('presentationWorkspace.zoom', 'Zoom')}
                   />
                   <button
                     type="button"
                     className="w-11 rounded px-1 text-right tabular-nums hover:bg-content2"
-                    onClick={() => setZoomPercent(100)}
+                    onClick={() => setCustomZoom(100)}
                     aria-label={t('presentationWorkspace.resetZoom', 'Reset zoom')}
                   >
                     {zoomPercent}%
                   </button>
                   <Button
+                    size="sm"
+                    variant={zoomMode === 'fit' ? 'primary' : 'ghost'}
+                    onPress={() => setZoomMode('fit')}
+                    aria-pressed={zoomMode === 'fit'}
+                  >
+                    {t('presentationWorkspace.fit', 'Fit')}
+                  </Button>
+                  <Button
                     isIconOnly
                     size="sm"
                     variant="ghost"
-                    onPress={() => setZoomPercent((value) => Math.min(200, value + 25))}
+                    onPress={() => setCustomZoom(zoomPercent + 25)}
                     aria-label={t('presentationWorkspace.zoomIn', 'Zoom in')}
                   >
                     <ZoomIn size={14} />
