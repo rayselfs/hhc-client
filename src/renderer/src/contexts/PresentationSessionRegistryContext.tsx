@@ -19,6 +19,7 @@ export interface PresentationSessionRegistry {
   redo?(itemId: string): boolean
   hasLiveEditor?(itemId: string): boolean
   hasPendingEditorWork?(itemId: string): boolean
+  hasComposingEditor?(itemId: string): boolean
   notifyEditorLifecycle?(itemId: string): void
   hasUnsafeWork(): boolean
   getUnsafeItemIds(): string[]
@@ -27,7 +28,8 @@ export interface PresentationSessionRegistry {
     itemId: string,
     finalize: () => boolean,
     hasUnsafeWork?: () => boolean,
-    hasLiveEditor?: () => boolean
+    hasLiveEditor?: () => boolean,
+    hasComposing?: () => boolean
   ): () => void
 }
 
@@ -53,6 +55,7 @@ export function PresentationSessionRegistryProvider({
         finalize: () => boolean
         hasUnsafeWork: () => boolean
         hasLiveEditor: () => boolean
+        hasComposing: () => boolean
       }
     >()
   )
@@ -212,6 +215,8 @@ export function PresentationSessionRegistryProvider({
       hasLiveEditor: (itemId) => editorFinalizersRef.current.get(itemId)?.hasLiveEditor() ?? false,
       hasPendingEditorWork: (itemId) =>
         editorFinalizersRef.current.get(itemId)?.hasUnsafeWork() ?? false,
+      hasComposingEditor: (itemId) =>
+        editorFinalizersRef.current.get(itemId)?.hasComposing() ?? false,
       notifyEditorLifecycle: () => notify(),
       hasUnsafeWork: () => getUnsafeItemIds().length > 0,
       getUnsafeItemIds,
@@ -223,9 +228,15 @@ export function PresentationSessionRegistryProvider({
         itemId,
         finalize,
         hasUnsafeWork = () => false,
-        hasLiveEditor = () => false
+        hasLiveEditor = () => false,
+        hasComposing = () => false
       ) => {
-        editorFinalizersRef.current.set(itemId, { finalize, hasUnsafeWork, hasLiveEditor })
+        editorFinalizersRef.current.set(itemId, {
+          finalize,
+          hasUnsafeWork,
+          hasLiveEditor,
+          hasComposing
+        })
         notify()
         return () => {
           if (editorFinalizersRef.current.get(itemId)?.finalize === finalize) {

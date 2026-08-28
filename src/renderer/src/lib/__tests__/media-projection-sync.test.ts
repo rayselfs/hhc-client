@@ -1078,7 +1078,7 @@ describe('media projection sync', () => {
     })
   })
 
-  it('uses the registry-finalized editable document for its projection payload', async () => {
+  it('uses the current preflight-finalized editable document for its projection payload', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const activeSlideId = document.slideOrder[0]
     const calls: string[] = []
@@ -1093,7 +1093,6 @@ describe('media projection sync', () => {
       })
     } as unknown as PresentationEditorSession
     registryMocks.get.mockReturnValue(session)
-    registryMocks.finalizeAndFlush.mockResolvedValue(document)
     usePresentationWorkspaceStore.getState().setActiveSlideId('editable-deck', activeSlideId)
     useMediaProjectionStore.setState({
       playlist: [makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)],
@@ -1105,8 +1104,8 @@ describe('media projection sync', () => {
     renderSync()
 
     await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
-    expect(registryMocks.finalizeAndFlush).toHaveBeenCalledWith('editable-deck')
-    expect(calls).toEqual([])
+    expect(registryMocks.finalizeAndFlush).not.toHaveBeenCalled()
+    expect(calls).toEqual(['snapshot'])
     expect(mockStartProjection).toHaveBeenCalledWith(
       'media',
       [
@@ -1124,27 +1123,95 @@ describe('media projection sync', () => {
     )
   })
 
-  it('does not project when registered live composition blocks finalization', async () => {
+  it('keeps media start and navigation state atomic when editable finalization is blocked', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const other = makeFile('other', 'other.png')
     const session = {
-      commitDraft: vi.fn(),
-      flush: vi.fn(),
-      getSnapshot: vi.fn()
+      getSnapshot: vi.fn(() => ({ history: { present: document } }))
     } as unknown as PresentationEditorSession
     registryMocks.get.mockReturnValue(session)
     registryMocks.finalizeAndFlush.mockResolvedValue(null)
     useMediaProjectionStore.setState({
-      playlist: [makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)],
+      playlist: [],
       currentIndex: 0,
-      isPresenting: true,
-      typeStates: { presentation: { slideIndex: 0, slideCount: 1 } }
+      isPresenting: false,
+      sessionRevision: 7,
+      snapshot: null
     })
-
     renderSync()
 
-    await waitFor(() =>
-      expect(registryMocks.finalizeAndFlush).toHaveBeenCalledWith('editable-deck')
-    )
-    expect(session.getSnapshot).not.toHaveBeenCalled()
+    const started = await useMediaProjectionStore.getState().startPresentation([editable], 0)
+
+    expect(started).toBe(false)
+    expect(useMediaProjectionStore.getState()).toMatchObject({
+      playlist: [],
+      currentIndex: 0,
+      isPresenting: false,
+      sessionRevision: 7
+    })
+    expect(mockStartProjection).not.toHaveBeenCalled()
+
+    useMediaProjectionStore.setState({
+      playlist: [editable, other],
+      currentIndex: 0,
+      isPresenting: true,
+      isEnded: false
+    })
+    const advanced = await useMediaProjectionStore.getState().next()
+    expect(advanced).toBe(false)
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
+
+    useMediaProjectionStore.setState({ currentIndex: 1 })
+    const reversed = await useMediaProjectionStore.getState().prev()
+    expect(reversed).toBe(false)
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
+  })
+
+  it('retries an editable start once after finalization succeeds', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const activeSlideId = document.slideOrder[0]
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const session = {
+      getSnapshot: vi.fn(() => ({ history: { present: document } }))
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(session)
+    registryMocks.finalizeAndFlush.mockResolvedValueOnce(null).mockResolvedValueOnce(document)
+    usePresentationWorkspaceStore.getState().setActiveSlideId(editable.id, activeSlideId)
+    useMediaProjectionStore.setState({ playlist: [], isPresenting: false, snapshot: null })
+    renderSync()
+
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toBe(false)
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toBe(true)
+    await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
+    expect(useMediaProjectionStore.getState()).toMatchObject({
+      playlist: [editable],
+      currentIndex: 0,
+      isPresenting: true
+    })
+  })
+
+  it('keeps editable start state unchanged when finalization rejects', async () => {
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const session = { getSnapshot: vi.fn() } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(session)
+    registryMocks.finalizeAndFlush.mockRejectedValueOnce(new Error('persist failed'))
+    useMediaProjectionStore.setState({
+      playlist: [],
+      currentIndex: 0,
+      isPresenting: false,
+      sessionRevision: 3,
+      snapshot: null
+    })
+    renderSync()
+
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toBe(false)
+    expect(useMediaProjectionStore.getState()).toMatchObject({
+      playlist: [],
+      currentIndex: 0,
+      isPresenting: false,
+      sessionRevision: 3
+    })
     expect(mockStartProjection).not.toHaveBeenCalled()
   })
 })

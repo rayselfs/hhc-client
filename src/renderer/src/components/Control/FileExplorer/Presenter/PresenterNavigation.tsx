@@ -35,7 +35,7 @@ export default function PresenterNavigation(): React.JSX.Element {
           variant="outline"
           isIconOnly
           isDisabled={!canPrev}
-          onPress={() => prev()}
+          onPress={() => void prev()}
           className="w-12 h-12 rounded-full shrink-0"
           aria-label={t('presenter.prev')}
         >
@@ -63,7 +63,7 @@ export default function PresenterNavigation(): React.JSX.Element {
           variant="outline"
           isIconOnly
           isDisabled={!canNext}
-          onPress={() => next()}
+          onPress={() => void next()}
           className="w-12 h-12 rounded-full shrink-0 size-5"
           aria-label={t('presenter.next')}
         >

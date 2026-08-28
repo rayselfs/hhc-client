@@ -625,7 +625,7 @@ function EditableSessionDocumentView({
   const canvasRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
   const textEditorFinalizerRef = useRef<
-    ((() => boolean) & { hasUnsafeWork?: () => boolean }) | null
+    ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean }) | null
   >(null)
   const pendingZoomAnchorRef = useRef<{
     clientX: number
@@ -668,7 +668,11 @@ function EditableSessionDocumentView({
     []
   )
   const setTextEditorFinalizer = useCallback(
-    (finalize: (() => boolean) | null): void => {
+    (
+      finalize:
+        | ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean })
+        | null
+    ): void => {
       textEditorFinalizerRef.current = finalize
       registry.notifyEditorLifecycle?.(deck.itemId)
     },
@@ -681,7 +685,8 @@ function EditableSessionDocumentView({
         deck.itemId,
         finalizeTextEditor,
         () => textEditorFinalizerRef.current?.hasUnsafeWork?.() ?? false,
-        () => textEditorFinalizerRef.current !== null
+        () => textEditorFinalizerRef.current !== null,
+        () => textEditorFinalizerRef.current?.isComposing?.() ?? false
       ),
     [deck.itemId, finalizeTextEditor, registry]
   )

@@ -75,7 +75,7 @@ export default function PresenterSidebar({
         <div className="px-4 pb-4">
           <div
             className="relative aspect-video bg-surface-secondary rounded-2xl overflow-hidden cursor-default"
-            onClick={() => useMediaProjectionStore.getState().next()}
+            onClick={() => void useMediaProjectionStore.getState().next()}
           >
             {nextItem === null && (
               <span className="absolute inset-0 flex items-center justify-center text-foreground/50 text-base">

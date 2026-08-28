@@ -955,7 +955,8 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.compositionStart(content)
     content.textContent = 'Provisional'
     fireEvent.input(content)
-    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled()
 
     expect(content).toHaveAttribute('contenteditable', 'true')
     expect(

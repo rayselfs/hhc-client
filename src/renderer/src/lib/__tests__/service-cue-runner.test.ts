@@ -119,6 +119,45 @@ describe('projectServiceCue', () => {
     expect(startProjection).not.toHaveBeenCalled()
   })
 
+  it('reports an editable finalization block without claiming a media cue projected', async () => {
+    const startProjection = vi.fn(() => Promise.resolve())
+    const file = makeFile('deck', 'application/vnd.librepresenter.presentation+json')
+    const cue: ServiceCue = {
+      id: 'media-cue',
+      type: 'media',
+      title: 'Deck',
+      fileItemId: file.id,
+      fileName: file.name,
+      notes: '',
+      completed: false,
+      createdAt: 0,
+      updatedAt: 0
+    }
+    const startMediaPresentation = vi.fn(() =>
+      Promise.resolve({
+        summary: { ready: 0, preparing: 0, unsupported: 0, missing: 0, failed: 1 },
+        items: [
+          {
+            itemId: file.id,
+            blobId: file.id,
+            status: 'failed' as const,
+            reason: 'presentation-finalization-blocked',
+            support: null
+          }
+        ]
+      })
+    )
+
+    await expect(
+      projectServiceCue(cue, {
+        startProjection,
+        getFileItem: () => file,
+        startMediaPresentation
+      })
+    ).resolves.toEqual({ status: 'not-ready', reason: 'presentation-finalization-blocked' })
+    expect(startProjection).not.toHaveBeenCalled()
+  })
+
   it('projects bible chapter payload for bible cues', async () => {
     const startProjection = vi.fn(() => Promise.resolve())
     const cue: ServiceCue = {

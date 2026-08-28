@@ -35,7 +35,7 @@ interface EditableSlideSurfaceProps {
     additive: boolean
   ) => void
   onEditingElementChange?: (elementId: string | null) => void
-  onTextEditFinalizerChange?: (finalize: (() => boolean) | null) => void
+  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
   onTransformStart?: (elementId: string) => EditablePresentationElement | undefined
@@ -49,7 +49,10 @@ interface EditableSlideSurfaceProps {
   ) => void
 }
 
-type TextEditFinalizer = (() => boolean) & { hasUnsafeWork?: () => boolean }
+type TextEditFinalizer = (() => boolean) & {
+  hasUnsafeWork?: () => boolean
+  isComposing?: () => boolean
+}
 
 interface DragState {
   elementId: string
@@ -602,7 +605,7 @@ function SlideElement({
   ) => void
   onStartTextEdit: () => void
   onFinishTextEdit: () => void
-  onTextEditFinalizerChange: (finalize: (() => boolean) | null) => void
+  onTextEditFinalizerChange: (finalize: TextEditFinalizer | null) => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
     left: element.x,
@@ -902,7 +905,7 @@ function renderElementContent(
   ) => void,
   onStartTextEdit?: () => void,
   onFinishTextEdit?: () => void,
-  onTextEditFinalizerChange?: (finalize: (() => boolean) | null) => void
+  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
 ): React.ReactNode {
   if (element.type === 'text') {
     return (
@@ -1117,7 +1120,7 @@ function TextElementContent({
   ) => void
   onStartTextEdit?: () => void
   onFinishTextEdit?: () => void
-  onTextEditFinalizerChange?: (finalize: (() => boolean) | null) => void
+  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
   const isComposingRef = useRef(false)
@@ -1239,6 +1242,7 @@ function TextElementContent({
     if (!editing) return
     const finalize: TextEditFinalizer = () => finalizeTextEditRef.current()
     finalize.hasUnsafeWork = () => hasPendingTextRef.current
+    finalize.isComposing = () => isComposingRef.current
     registeredFinalizerRef.current = finalize
     notifyTextEditLifecycle()
     return () => {
@@ -1318,6 +1322,7 @@ function TextElementContent({
       }}
       onCompositionEnd={() => {
         isComposingRef.current = false
+        notifyTextEditLifecycle()
         if (!editing) return
         if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
         else scheduleTextCommit()

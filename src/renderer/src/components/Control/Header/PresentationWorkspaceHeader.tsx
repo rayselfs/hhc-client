@@ -43,11 +43,24 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     () => (activeItemId ? (registry.hasPendingEditorWork?.(activeItemId) ?? false) : false),
     () => false
   )
+  const hasComposingEditor = useSyncExternalStore(
+    registry.subscribe,
+    () => (activeItemId ? (registry.hasComposingEditor?.(activeItemId) ?? false) : false),
+    () => false
+  )
+  const activeSnapshot = activeSession?.getSnapshot()
   const canUndo =
-    activeDocument?.canUndo === true ||
-    activeSession?.getSnapshot().draftKind !== null ||
-    hasPendingEditorWork
-  const canRedo = activeDocument?.canRedo === true
+    activeSnapshot !== undefined &&
+    !hasComposingEditor &&
+    (activeSnapshot.history.past.length > 0 ||
+      activeSnapshot.draftKind !== null ||
+      hasPendingEditorWork)
+  const canRedo =
+    activeSnapshot !== undefined &&
+    !hasComposingEditor &&
+    activeSnapshot.draftKind === null &&
+    !hasPendingEditorWork &&
+    activeSnapshot.history.future.length > 0
 
   useEffect(() => {
     if (!editingItemId) return

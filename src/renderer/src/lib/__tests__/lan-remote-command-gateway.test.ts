@@ -23,7 +23,7 @@ beforeEach(() => {
 })
 
 it('executes presentation commands through media projection store', async () => {
-  const next = vi.fn()
+  const next = vi.fn(() => true)
   useMediaProjectionStore.setState({
     next,
     playlist: [makeFile('first'), makeFile('second')],

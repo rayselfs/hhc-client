@@ -18,6 +18,7 @@ import {
   isEditablePresentationMimeType,
   isPresentationMimeType
 } from '@renderer/lib/presentation-media'
+import { registerMediaProjectionPreflight } from '@renderer/lib/media-projection-preflight'
 
 function playlistContentChanged(
   prev: { id: string; mimeType: string; name: string }[],
@@ -68,6 +69,32 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   } | null>(null)
   const { auth, onAccessRevoked } = options
   const sessionUserId = auth?.getSession()?.userId ?? null
+
+  useEffect(
+    () =>
+      registerMediaProjectionPreflight(async (items) => {
+        for (const item of items) {
+          if (!isEditablePresentationMimeType(item.mimeType)) continue
+          const session = registry.get(item.id)
+          if (!session) continue
+          const snapshot = session.getSnapshot()
+          if (
+            !registry.hasPendingEditorWork?.(item.id) &&
+            snapshot.draftKind === null &&
+            snapshot.save?.status === 'saved'
+          ) {
+            continue
+          }
+          try {
+            if (!(await registry.finalizeAndFlush(item.id))) return false
+          } catch {
+            return false
+          }
+        }
+        return true
+      }),
+    [registry]
+  )
 
   const releaseLease = useCallback((leaseId: string): void => {
     const release = window.api?.hhcAssets?.releaseContentLease
@@ -243,14 +270,11 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
       if (basePayload && item && isEditablePresentationMimeType(item.mimeType)) {
         const session = registry.get(item.id)
         if (session) {
-          const document = await registry.finalizeAndFlush(item.id)
-          payload = document
-            ? buildEditableSlideProjectionPayload(
-                basePayload,
-                document,
-                usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
-              )
-            : null
+          payload = buildEditableSlideProjectionPayload(
+            basePayload,
+            session.getSnapshot().history.present,
+            usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
+          )
         } else {
           payload = await buildFileProjectionPayloadWithEditableSlide(currentState)
         }
