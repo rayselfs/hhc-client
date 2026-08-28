@@ -871,7 +871,7 @@ describe('EditableSlideSurface', () => {
     const surface = getSlideSurface(container)
     const topLeft = screen.getByLabelText('Resize text box top left')
     const bottomRight = screen.getByLabelText('Resize text box bottom right')
-    mockOverlappingHandleRects(surface, topLeft, bottomRight)
+    mockHandleCenterTie(surface, topLeft, bottomRight)
 
     const paintedIndicator = withinResizeHandle(bottomRight)
     fireEvent.pointerDown(paintedIndicator, { clientX: 100, clientY: 100, pointerId: 1 })
@@ -880,6 +880,45 @@ describe('EditableSlideSurface', () => {
     expect(onTransformPreview).toHaveBeenLastCalledWith(
       text.id,
       expect.objectContaining({ x: 80, y: 80, width: 80, height: 44 })
+    )
+  })
+
+  it('keeps six-handle text ties in the stable subset order', () => {
+    const onTransformStart = vi.fn(() => text)
+    const onTransformPreview = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      x: 100,
+      y: 100,
+      width: 60,
+      height: 24,
+      text: 'Small',
+      autoSize: 'content',
+      autoWidth: false
+    })
+    const { container } = render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+      />
+    )
+    const surface = getSlideSurface(container)
+    const topLeft = screen.getByLabelText('Resize text box top left')
+    const right = screen.getByLabelText('Resize text box right')
+    mockHandleCenterTie(surface, topLeft, right)
+
+    const paintedIndicator = withinResizeHandle(right)
+    fireEvent.pointerDown(paintedIndicator, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(paintedIndicator, { clientX: 95, clientY: 95, pointerId: 1 })
+
+    expect(onTransformPreview).toHaveBeenLastCalledWith(
+      text.id,
+      expect.objectContaining({ x: 80, width: 80 })
     )
   })
 
@@ -1628,18 +1667,18 @@ function mockSurfaceRect(surface: HTMLElement): void {
   })
 }
 
-function mockOverlappingHandleRects(
+function mockHandleCenterTie(
   surface: HTMLElement,
-  topLeft: HTMLElement,
-  bottomRight: HTMLElement
+  preferred: HTMLElement,
+  painted: HTMLElement
 ): void {
   vi.spyOn(surface, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 480, 270))
-  vi.spyOn(topLeft, 'getBoundingClientRect').mockReturnValue(rect(92.5, 92.5, 25, 25))
-  vi.spyOn(bottomRight, 'getBoundingClientRect').mockReturnValue(rect(87.5, 87.5, 25, 25))
-  vi.spyOn(withinResizeHandle(topLeft), 'getBoundingClientRect').mockReturnValue(
+  vi.spyOn(preferred, 'getBoundingClientRect').mockReturnValue(rect(92.5, 92.5, 25, 25))
+  vi.spyOn(painted, 'getBoundingClientRect').mockReturnValue(rect(87.5, 87.5, 25, 25))
+  vi.spyOn(withinResizeHandle(preferred), 'getBoundingClientRect').mockReturnValue(
     rect(89, 89, 12, 12)
   )
-  vi.spyOn(withinResizeHandle(bottomRight), 'getBoundingClientRect').mockReturnValue(
+  vi.spyOn(withinResizeHandle(painted), 'getBoundingClientRect').mockReturnValue(
     rect(99, 99, 12, 12)
   )
 }

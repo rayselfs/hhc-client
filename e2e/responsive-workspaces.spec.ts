@@ -29,6 +29,30 @@ const HANDLE_LABELS: Record<ResizeHandle, string> = {
   w: 'left'
 }
 
+type GeometryChange = Record<'x' | 'y' | 'width' | 'height', boolean>
+
+const FIXED_GEOMETRY_CHANGES: Record<ResizeHandle, GeometryChange> = {
+  nw: { x: true, y: true, width: true, height: true },
+  n: { x: false, y: true, width: false, height: true },
+  ne: { x: false, y: true, width: true, height: true },
+  e: { x: false, y: false, width: true, height: false },
+  se: { x: false, y: false, width: true, height: true },
+  s: { x: false, y: false, width: false, height: true },
+  sw: { x: true, y: false, width: true, height: true },
+  w: { x: true, y: false, width: true, height: false }
+}
+
+const CONTENT_HEIGHT_GEOMETRY_CHANGES: Record<ResizeHandle, GeometryChange> = {
+  nw: { x: true, y: false, width: true, height: false },
+  n: { x: false, y: false, width: false, height: false },
+  ne: { x: false, y: false, width: true, height: false },
+  e: { x: false, y: false, width: true, height: false },
+  se: { x: false, y: false, width: true, height: false },
+  s: { x: false, y: false, width: false, height: false },
+  sw: { x: true, y: false, width: true, height: false },
+  w: { x: true, y: false, width: true, height: false }
+}
+
 async function selectSlideElement(element: Locator): Promise<void> {
   await element.scrollIntoViewIfNeeded()
   await element.evaluate((target) => (target as HTMLElement).click())
@@ -164,14 +188,19 @@ async function dragResizeHandle(
   const target = await pointerTarget.boundingBox()
   expect(target).not.toBeNull()
   const sign = inward ? 1 : -1
-  const dx = direction.includes('w') ? 24 * sign : direction.includes('e') ? -24 * sign : 0
+  const orthogonalDelta = 11
+  const dx = direction.includes('w')
+    ? 24 * sign
+    : direction.includes('e')
+      ? -24 * sign
+      : orthogonalDelta
   const dy = horizontalOnly
-    ? 0
+    ? orthogonalDelta
     : direction.includes('n')
       ? 24 * sign
       : direction.includes('s')
         ? -24 * sign
-        : 0
+        : orthogonalDelta
   const x = target!.x + target!.width / 2
   const y = target!.y + target!.height / 2
   await page.mouse.move(x, y)
@@ -197,6 +226,16 @@ async function dragResizeHandle(
     width: Number.parseFloat((element as HTMLElement).style.width),
     height: Number.parseFloat((element as HTMLElement).style.height)
   }))
+  const expectedChanges = horizontalOnly
+    ? CONTENT_HEIGHT_GEOMETRY_CHANGES[direction]
+    : FIXED_GEOMETRY_CHANGES[direction]
+  for (const property of ['x', 'y', 'width', 'height'] as const) {
+    if (expectedChanges[property]) {
+      expect(after[property], `${direction} ${property}`).not.toBe(before[property])
+    } else {
+      expect(after[property], `${direction} ${property}`).toBe(before[property])
+    }
+  }
   if (direction.includes('w')) {
     if (inward) expect(after.x, direction).toBeGreaterThan(before.x)
     else expect(after.x, direction).toBeLessThan(before.x)
@@ -885,6 +924,21 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
         true,
         false
       )
+    }
+    if (zoomPercent === '25') {
+      for (const direction of contentTextHandles) {
+        await dragResizeHandle(
+          page,
+          page.getByRole('button', {
+            name: `Resize text box ${HANDLE_LABELS[direction]}`,
+            exact: true
+          }),
+          direction,
+          true,
+          false,
+          'indicator'
+        )
+      }
     }
     await expectTextInteriorAndFrameMove(page, elements.nth(0))
 
