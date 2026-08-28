@@ -52,7 +52,15 @@ const storeState = {
       }
     }>
   },
-  typeStates: {} as { video?: { currentTime?: number; duration?: number } },
+  typeStates: {} as {
+    video?: {
+      hasStarted?: boolean
+      isPlaying?: boolean
+      isEnded?: boolean
+      currentTime?: number
+      duration?: number
+    }
+  },
   setTypeState: vi.fn(),
   next: mockNext,
   exit: mockExit,
@@ -329,6 +337,24 @@ describe('copied media preview identity', () => {
       isPlaying: true,
       isEnded: false
     })
+  })
+
+  it('renders projection playback state as the authoritative control state', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    const { container, rerender } = render(<VideoPreview item={item} />)
+
+    await waitFor(() => expect(container.querySelector('video')).not.toBeNull())
+    storeState.typeStates.video = {
+      hasStarted: true,
+      isPlaying: false,
+      isEnded: true,
+      currentTime: 42,
+      duration: 183
+    }
+    rerender(<VideoPreview item={item} />)
+
+    expect(screen.getByText('00:42 / 03:03')).toBeInTheDocument()
+    expect(container.querySelector('input.video-seek-range')).toHaveValue('42')
   })
 
   it('seeks a video relative to the current playback time', async () => {
