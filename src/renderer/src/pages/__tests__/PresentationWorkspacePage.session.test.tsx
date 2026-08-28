@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PresentationWorkspacePage from '../PresentationWorkspacePage'
 import PresentationWorkspaceHeader from '@renderer/components/Control/Header/PresentationWorkspaceHeader'
 import PresentationElectronCloseBridge from '@renderer/contexts/PresentationElectronCloseBridge'
@@ -175,6 +175,10 @@ async function renderWorkspaceSession(): Promise<PresentationEditorSession> {
 }
 
 describe('PresentationWorkspacePage session integration', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   beforeEach(() => {
     resizeObserverRecords = []
     globalThis.ResizeObserver = class {
@@ -465,6 +469,14 @@ describe('PresentationWorkspacePage session integration', () => {
     await waitFor(() => expect(zoom).toHaveValue('73'))
   })
 
+  it('uses the default Windows resolver after platform-scoped shortcut tests', async () => {
+    const session = await renderWorkspaceSession()
+
+    fireEvent.keyDown(document, { code: 'KeyM', key: 'm', ctrlKey: true })
+
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(2)
+  })
+
   it('navigates slides and progresses Enter/Escape editor state without stealing caret keys', async () => {
     const source = createBlankEditablePresentationDocument('Sunday')
     const firstSlideId = source.slideOrder[0]
@@ -501,8 +513,15 @@ describe('PresentationWorkspacePage session integration', () => {
 
     fireEvent.keyDown(content, { code: 'Escape', key: 'Escape' })
     expect(content).toHaveAttribute('contenteditable', 'false')
+    expect(content).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Bold' })).toBeEnabled()
-    fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
+    fireEvent.keyDown(content, { code: 'KeyB', key: 'b', ctrlKey: true })
+    expect(session.getSnapshot().history.past).toHaveLength(historyLength + 1)
+    expect(
+      session.getSnapshot().renderedDocument.slides[firstSlideId].elements[text.id]
+    ).toMatchObject({ bold: true })
+
+    fireEvent.keyDown(content, { code: 'Escape', key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled()
 
     const textInsert = screen.getByRole('button', { name: 'Text Box' })

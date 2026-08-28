@@ -76,9 +76,10 @@ const INPUT_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!target || !(target instanceof Element)) return false
   if (INPUT_TAGS.has(target.tagName)) return true
-  if (target.getAttribute('contenteditable') === 'true') return true
+  const contentEditable = target.getAttribute('contenteditable')
+  if (contentEditable === 'true') return true
   const role = target.getAttribute('role')
-  if (role === 'textbox' || role === 'searchbox') return true
+  if ((role === 'textbox' || role === 'searchbox') && contentEditable !== 'false') return true
   return false
 }
 
