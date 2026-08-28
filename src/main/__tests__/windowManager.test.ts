@@ -164,6 +164,16 @@ describe('WindowManager', () => {
     expect(optimizer.watchWindowShortcuts).not.toHaveBeenCalled()
   })
 
+  it('accepts the first click on the main control window', () => {
+    const wm = WindowManager.getInstance()
+
+    wm.createMainWindow()
+
+    expect(FakeBrowserWindow.instances[0].options).toMatchObject({
+      acceptFirstMouse: true
+    })
+  })
+
   it('rejects external top-level navigation and allows the loaded app document', () => {
     const wm = WindowManager.getInstance()
     wm.createMainWindow()

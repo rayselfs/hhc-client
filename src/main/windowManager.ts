@@ -99,6 +99,7 @@ export class WindowManager {
       width: 1200,
       height: 800,
       show: false,
+      acceptFirstMouse: true,
       autoHideMenuBar: true,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
