@@ -90,6 +90,60 @@ describe('T5 — generateImageThumbnail yield', () => {
     vi.unstubAllGlobals()
   })
 
+  it('yields before serializing an image canvas', async () => {
+    const imageFile = makeFile('test.jpg', 1024, 'image/jpeg')
+    const schedulerYield = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('scheduler', { yield: schedulerYield })
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn().mockReturnValue('blob:mock'),
+      revokeObjectURL: vi.fn()
+    })
+
+    let storedOnload: (() => void) | undefined
+    function MockImage(this: { naturalWidth: number; naturalHeight: number }): void {
+      this.naturalWidth = 200
+      this.naturalHeight = 150
+      Object.defineProperty(this, 'onload', {
+        get() {
+          return storedOnload
+        },
+        set(fn: () => void) {
+          storedOnload = fn
+        }
+      })
+      Object.defineProperty(this, 'src', {
+        set() {
+          storedOnload?.()
+        }
+      })
+    }
+    vi.stubGlobal('Image', MockImage)
+
+    const mockContext = {
+      fillStyle: '',
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      clearRect: vi.fn()
+    }
+    const mockCanvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn().mockReturnValue(mockContext),
+      toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,xyz')
+    }
+    const createElement = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag === 'canvas') return mockCanvas as unknown as HTMLCanvasElement
+      return document.createElement.call(document, tag)
+    })
+
+    await generateThumbnail(imageFile)
+
+    expect(schedulerYield.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCanvas.toDataURL.mock.invocationCallOrder[0]
+    )
+    createElement.mockRestore()
+  })
+
   it('returns a dataUrl string for a valid image file', async () => {
     const imageFile = makeFile('test.jpg', 1024, 'image/jpeg')
 
