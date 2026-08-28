@@ -537,6 +537,58 @@ describe('EditableSlideSurface', () => {
     expect(Number.parseFloat(frame.style.outlineWidth) * scale).toBe(1.5)
   })
 
+  it.each([0.5, 1, 2])('centres text handles on frame edges at scale %s', (scale) => {
+    mockSurfaceScale(scale)
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Resize me' })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    const offset = `${-6 / scale}px`
+    const topLeft = screen.getByLabelText('Resize text box top left')
+    const right = screen.getByLabelText('Resize text box right')
+    expect(topLeft.style.top).toBe(offset)
+    expect(topLeft.style.left).toBe(offset)
+    expect(right.style.right).toBe(offset)
+  })
+
+  it.each([0, Number.POSITIVE_INFINITY])(
+    'keeps selection geometry finite for document width %s',
+    (width) => {
+      mockSurfaceScale(1)
+      const document = createBlankEditablePresentationDocument('Sunday')
+      document.width = width
+      const slideId = document.slideOrder[0]
+      const text = createTextElement({ text: 'Resize me' })
+      const withText = addElementToSlide(document, slideId, text)
+
+      render(
+        <EditableSlideSurface
+          document={withText}
+          slideId={slideId}
+          editable
+          selectedElementId={text.id}
+        />
+      )
+
+      const handle = screen.getByLabelText('Resize text box top left')
+      const edge = screen.getByTestId('text-frame-edge-left')
+      for (const value of [handle.style.width, handle.style.borderWidth, edge.style.width]) {
+        expect(Number.parseFloat(value)).toBeGreaterThan(0)
+        expect(Number.isFinite(Number.parseFloat(value))).toBe(true)
+      }
+    }
+  )
+
   it('resizes content-height text box width without changing its height', () => {
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')

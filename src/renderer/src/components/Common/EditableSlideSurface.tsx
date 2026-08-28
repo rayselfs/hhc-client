@@ -126,7 +126,7 @@ export default function EditableSlideSurface({
     if (!surface) return
     const updateScale = (): void => {
       const rect = surface.getBoundingClientRect()
-      if (rect.width > 0) setSurfaceScale(rect.width / document.width)
+      setSurfaceScale(normalizeSurfaceScale(rect.width / document.width))
     }
     updateScale()
     if (!('ResizeObserver' in window)) return
@@ -625,9 +625,15 @@ function ElementHandles({
           <button
             key={`resize-text-${handle}`}
             type="button"
-            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]`}
+            className={`${getHandleCursorClass(handle)} absolute rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]`}
             aria-label={`Resize text box ${handleToLabel(handle)}`}
-            style={{ zIndex: 20, width: handleSize, height: handleSize, borderWidth }}
+            style={{
+              ...getTextHandlePositionStyle(handle, handleSize),
+              zIndex: 20,
+              width: handleSize,
+              height: handleSize,
+              borderWidth
+            }}
             onPointerDown={(event) => onResizePointerDown(event, handle)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -1165,6 +1171,31 @@ function getHandlePositionClass(handle: ResizeHandle): string {
       ? '-right-2'
       : 'left-1/2 -translate-x-1/2'
   return `${vertical} ${horizontal}`
+}
+
+function getTextHandlePositionStyle(handle: ResizeHandle, handleSize: number): React.CSSProperties {
+  const offset = -handleSize / 2
+  const vertical = handle.includes('n')
+    ? { top: offset }
+    : handle.includes('s')
+      ? { bottom: offset }
+      : { top: '50%' }
+  const horizontal = handle.includes('w')
+    ? { left: offset }
+    : handle.includes('e')
+      ? { right: offset }
+      : { left: '50%' }
+  const transform = [
+    !handle.includes('n') && !handle.includes('s') ? 'translateY(-50%)' : '',
+    !handle.includes('w') && !handle.includes('e') ? 'translateX(-50%)' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+  return { ...vertical, ...horizontal, transform: transform || undefined }
+}
+
+function normalizeSurfaceScale(scale: number): number {
+  return Number.isFinite(scale) && scale > 0 ? scale : 1
 }
 
 function getHandleCursorClass(handle: ResizeHandle): string {
