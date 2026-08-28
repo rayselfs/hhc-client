@@ -1,27 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Locator } from '@playwright/test'
 import { completeOnboarding } from './helpers'
-
-async function getProjectionActionBox(action: Locator): Promise<{
-  x: number
-  y: number
-  width: number
-  height: number
-}> {
-  return action.evaluate((element) => {
-    const icon = element.querySelector('svg')
-    if (!icon) throw new Error('Projection action icon not found')
-    const rect = icon.getBoundingClientRect()
-    const width = element.offsetWidth
-    const height = element.offsetHeight
-    return {
-      x: rect.x + rect.width / 2 - width / 2,
-      y: rect.y + rect.height / 2 - height / 2,
-      width,
-      height
-    }
-  })
-}
 
 test('keeps the editable presentation stage primary at the 900px breakpoint', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
@@ -34,7 +12,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
     name: /Start projection|開始投影|开始投影/
   })
   await expect(projectionAction).toBeVisible()
-  const normalProjectionBox = await getProjectionActionBox(projectionAction)
+  const normalProjectionBox = await projectionAction.boundingBox()
   await page.getByLabel(/New|新增/).click()
   await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
   await expect(page).toHaveURL(/#\/presentations\//)
@@ -48,22 +26,14 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
     name: /Start projection|開始投影|开始投影/
   })
   await expect(presentationProjectionAction).toBeVisible()
-  const presentationProjectionBox = await getProjectionActionBox(presentationProjectionAction)
-  expect(presentationProjectionBox.width).toBe(40)
-  expect(presentationProjectionBox.height).toBe(40)
-  expect(Math.abs(presentationProjectionBox.y - normalProjectionBox.y)).toBeLessThanOrEqual(1)
-  expect(
-    Math.abs(
-      1200 -
-        presentationProjectionBox.x -
-        presentationProjectionBox.width -
-        (1200 - normalProjectionBox.x - normalProjectionBox.width)
-    )
-  ).toBeLessThanOrEqual(1)
-  expect(Math.abs(presentationProjectionBox.y - 8)).toBeLessThanOrEqual(1)
-  expect(
-    Math.abs(1200 - presentationProjectionBox.x - presentationProjectionBox.width - 8)
-  ).toBeLessThanOrEqual(1)
+  const presentationProjectionBox = await presentationProjectionAction.boundingBox()
+  for (const box of [normalProjectionBox, presentationProjectionBox]) {
+    expect(box).not.toBeNull()
+    expect(box!.width).toBe(40)
+    expect(box!.height).toBe(40)
+    expect(Math.abs(box!.y - 8)).toBeLessThanOrEqual(1)
+    expect(Math.abs(1200 - box!.x - box!.width - 8)).toBeLessThanOrEqual(1)
+  }
   expect(await ribbon.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   await page.setViewportSize({ width: 900, height: 800 })
