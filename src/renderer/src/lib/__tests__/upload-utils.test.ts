@@ -69,6 +69,18 @@ function setStorageEstimate(estimate?: StorageEstimate): void {
   })
 }
 
+function expectFolderYieldOrder(addFolder: { mock: { invocationCallOrder: number[] } }): void {
+  const addFolderCalls = addFolder.mock.invocationCallOrder
+  const yieldCalls = vi.mocked(yieldToMain).mock.invocationCallOrder
+
+  expect(addFolderCalls).toHaveLength(3)
+  expect(yieldCalls).toHaveLength(3)
+  for (let index = 0; index < 3; index++) {
+    expect(addFolderCalls[index]).toBeLessThan(yieldCalls[index])
+    if (index < 2) expect(yieldCalls[index]).toBeLessThan(addFolderCalls[index + 1])
+  }
+}
+
 beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.clearAllMocks()
@@ -244,13 +256,15 @@ describe('folder upload yielding', () => {
     const files = [
       setRelativePath(makeFile('a.png', 100), 'Root/One/a.png'),
       setRelativePath(makeFile('b.png', 100), 'Root/One/b.png'),
-      setRelativePath(makeFile('c.png', 100), 'Root/Two/c.png')
+      setRelativePath(makeFile('c.png', 100), 'Root/One/c.png'),
+      setRelativePath(makeFile('d.png', 100), 'Root/Two/d.png')
     ]
 
     await uploadFolderFiles(files, 'root', addFolder)
 
     expect(addFolder).toHaveBeenCalledTimes(3)
     expect(yieldToMain).toHaveBeenCalledTimes(3)
+    expectFolderYieldOrder(addFolder)
   })
 
   it('yields once for each newly created dragged nested folder, not duplicate paths', async () => {
@@ -281,8 +295,12 @@ describe('folder upload yielding', () => {
       }
     }
     const root = directoryEntry('Root', [
-      directoryEntry('One', [fileEntry(makeFile('a.png', 100)), fileEntry(makeFile('b.png', 100))]),
-      directoryEntry('Two', [fileEntry(makeFile('c.png', 100))])
+      directoryEntry('One', [
+        fileEntry(makeFile('a.png', 100)),
+        fileEntry(makeFile('b.png', 100)),
+        fileEntry(makeFile('c.png', 100))
+      ]),
+      directoryEntry('Two', [fileEntry(makeFile('d.png', 100))])
     ])
     const items = {
       0: { webkitGetAsEntry: () => root },
@@ -293,6 +311,7 @@ describe('folder upload yielding', () => {
 
     expect(addFolder).toHaveBeenCalledTimes(3)
     expect(yieldToMain).toHaveBeenCalledTimes(3)
+    expectFolderYieldOrder(addFolder)
   })
 })
 
