@@ -530,6 +530,12 @@ describe('editable presentation documents', () => {
       autoWidth: false,
       autoSize: 'fixed'
     })
+
+    expect(createTextElement({ autoSize: 'content', autoWidth: false, width: 360 })).toMatchObject({
+      autoWidth: false,
+      autoSize: 'content',
+      width: 360
+    })
   })
 
   it('centers inserted images within 60 percent of the slide while preserving aspect ratio', () => {

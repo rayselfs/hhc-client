@@ -79,7 +79,8 @@ const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
 
 const IMAGE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-const TEXT_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const CONTENT_TEXT_HANDLES: ResizeHandle[] = ['nw', 'w', 'sw', 'ne', 'e', 'se']
+const FIXED_TEXT_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
 export default function EditableSlideSurface({
   document,
@@ -189,7 +190,7 @@ export default function EditableSlideSurface({
       updates = {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false,
-        autoSize: 'fixed'
+        autoSize: drag.original.autoSize === 'content' ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'image' && drag.handle) {
       updates = calculateImageResize(
@@ -279,7 +280,8 @@ export default function EditableSlideSurface({
         y: Math.max(0, Math.min(document.height - INSERTED_TEXT_CLICK_SIZE.height, insert.startY)),
         width: INSERTED_TEXT_CLICK_SIZE.width,
         height: INSERTED_TEXT_CLICK_SIZE.height,
-        autoSize: 'content'
+        autoSize: 'content',
+        autoWidth: true
       })
       return
     }
@@ -293,7 +295,8 @@ export default function EditableSlideSurface({
       y: Math.max(0, Math.min(document.height - height, y)),
       width,
       height,
-      autoSize: 'fixed'
+      autoSize: 'content',
+      autoWidth: false
     })
   }
 
@@ -355,7 +358,8 @@ export default function EditableSlideSurface({
       y: Math.max(0, Math.min(document.height - INSERTED_TEXT_CLICK_SIZE.height, point.y)),
       width: INSERTED_TEXT_CLICK_SIZE.width,
       height: INSERTED_TEXT_CLICK_SIZE.height,
-      autoSize: 'content'
+      autoSize: 'content',
+      autoWidth: true
     })
   }
 
@@ -574,9 +578,10 @@ function ElementHandles({
   onPointerCancel: (event: React.PointerEvent) => void
 }): React.JSX.Element {
   if (element.type === 'text') {
+    const handles = element.autoSize === 'content' ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
     return (
       <>
-        {TEXT_HANDLES.map((handle) => (
+        {handles.map((handle) => (
           <button
             key={`resize-text-${handle}`}
             type="button"
@@ -747,10 +752,16 @@ function calculateTextResize(
 ): Partial<EditablePresentationElement> {
   const hasWest = handle.includes('w')
   const hasEast = handle.includes('e')
+  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
+  if (element.autoSize === 'content') {
+    return {
+      x: hasWest ? element.x + (element.width - width) : element.x,
+      width
+    } as Partial<EditablePresentationElement>
+  }
+
   const hasNorth = handle.includes('n')
   const hasSouth = handle.includes('s')
-
-  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
   const height = Math.max(TEXT_MIN_HEIGHT, element.height + (hasSouth ? dy : hasNorth ? -dy : 0))
 
   return {
@@ -801,8 +812,10 @@ function measureAutoSizedTextElement(
   measure.remove()
 
   const updates: Partial<EditablePresentationElement> = {}
-  if (Math.abs(width - element.width) >= 1) updates.width = width
-  if (Math.abs(height - element.height) >= 1) updates.height = height
+  if (element.autoWidth === true && Math.abs(width - element.width) >= 1) updates.width = width
+  if (element.autoSize === 'content' && Math.abs(height - element.height) >= 1) {
+    updates.height = height
+  }
   return updates
 }
 

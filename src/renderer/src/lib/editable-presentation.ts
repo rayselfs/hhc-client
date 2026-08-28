@@ -48,7 +48,8 @@ export interface EditableTextInsertFrame {
   y: number
   width: number
   height: number
-  autoSize?: EditableTextAutoSize
+  autoSize: EditableTextAutoSize
+  autoWidth: boolean
 }
 
 export interface EditableImageInsertInput {

@@ -37,11 +37,12 @@ describe('EditableSlideSurface', () => {
       y: 100,
       width: 24,
       height: 32,
-      autoSize: 'content'
+      autoSize: 'content',
+      autoWidth: true
     })
   })
 
-  it('creates a minimum 80 x 40 fixed text box from a small drag while text insert mode is active', () => {
+  it('creates a minimum 80 x 40 content-height text box from a small drag while text insert mode is active', () => {
     const handleInsertText = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -66,7 +67,8 @@ describe('EditableSlideSurface', () => {
       y: 100,
       width: 80,
       height: 40,
-      autoSize: 'fixed'
+      autoSize: 'content',
+      autoWidth: false
     })
   })
 
@@ -477,20 +479,28 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
+    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     expect(screen.getByLabelText('Resize text box top left')).toHaveClass('rounded-[2px]')
     expect(screen.getByLabelText('Resize text box top left')).toHaveClass('size-4')
     expect(screen.getByLabelText('Resize text box top left')).toHaveClass('border-2')
     expect(screen.getByLabelText('Resize text box top left')).toHaveClass('bg-white')
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Resize text box bottom')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Resize element')).not.toBeInTheDocument()
   })
 
-  it('resizes text box height from side handles', () => {
+  it('resizes content-height text box width without changing its height', () => {
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
-    const text = createTextElement({ text: 'Resize me', width: 220, height: 40, autoWidth: false })
+    const text = createTextElement({
+      text: 'Resize me',
+      width: 220,
+      height: 40,
+      autoSize: 'content',
+      autoWidth: false
+    })
     const withText = addElementToSlide(document, slideId, text)
 
     render(
@@ -503,18 +513,48 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    const bottomHandle = screen.getByLabelText('Resize text box bottom')
-    fireEvent.pointerDown(bottomHandle, { clientX: 0, clientY: 0, pointerId: 1 })
-    fireEvent.pointerMove(bottomHandle, { clientX: 0, clientY: 24, pointerId: 1 })
+    const rightHandle = screen.getByLabelText('Resize text box right')
+    fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 24, pointerId: 1 })
 
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
       text.id,
       expect.objectContaining({
-        height: 64,
-        autoWidth: false
+        width: 244,
+        autoWidth: false,
+        autoSize: 'content'
       })
     )
+    const updates = handleUpdate.mock.calls[0]?.[2]
+    expect(updates).not.toHaveProperty('height')
+    expect(updates).not.toHaveProperty('y')
+  })
+
+  it('renders eight resize handles for imported fixed text frames', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Imported frame',
+      width: 220,
+      height: 40,
+      autoSize: 'fixed',
+      autoWidth: false
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
+    expect(screen.getByLabelText('Resize text box top')).toBeInTheDocument()
+    expect(screen.getByLabelText('Resize text box bottom')).toBeInTheDocument()
   })
 
   it('renders selected images with native-like resize handles and applied effects', () => {

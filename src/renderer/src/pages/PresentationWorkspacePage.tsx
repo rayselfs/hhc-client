@@ -817,12 +817,14 @@ function EditableSessionDocumentView({
   const addTextElement = (frame?: EditableTextInsertFrame): void => {
     if (!document || !activeSlideId) return
     const autoSize = frame?.autoSize ?? 'content'
+    const autoWidth = frame?.autoWidth ?? true
     const nextFrame = frame ?? {
       x: 260,
       y: 220,
       width: INSERTED_TEXT_CLICK_SIZE.width,
       height: INSERTED_TEXT_CLICK_SIZE.height,
-      autoSize
+      autoSize,
+      autoWidth
     }
     const width =
       autoSize === 'content'
@@ -839,7 +841,7 @@ function EditableSessionDocumentView({
       y: Math.max(0, Math.min(document.height - textHeight, nextFrame.y)),
       width,
       height: textHeight,
-      autoWidth: autoSize === 'content',
+      autoWidth: nextFrame.autoWidth,
       autoSize,
       fontSize,
       text: ''
