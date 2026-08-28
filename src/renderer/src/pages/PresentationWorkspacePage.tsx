@@ -622,7 +622,9 @@ function EditableSessionDocumentView({
   const canvasViewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
-  const textEditorFinalizerRef = useRef<(() => boolean) | null>(null)
+  const textEditorFinalizerRef = useRef<
+    ((() => boolean) & { hasUnsafeWork?: () => boolean }) | null
+  >(null)
   const pendingZoomAnchorRef = useRef<{
     clientX: number
     clientY: number
@@ -663,12 +665,22 @@ function EditableSessionDocumentView({
     (): boolean => textEditorFinalizerRef.current?.() ?? true,
     []
   )
-  const setTextEditorFinalizer = useCallback((finalize: (() => boolean) | null): void => {
-    textEditorFinalizerRef.current = finalize
-  }, [])
+  const setTextEditorFinalizer = useCallback(
+    (finalize: (() => boolean) | null): void => {
+      textEditorFinalizerRef.current = finalize
+      registry.notifyEditorLifecycle?.(deck.itemId)
+    },
+    [deck.itemId, registry]
+  )
 
   useEffect(
-    () => registry.registerEditorFinalizer?.(deck.itemId, finalizeTextEditor),
+    () =>
+      registry.registerEditorFinalizer?.(
+        deck.itemId,
+        finalizeTextEditor,
+        () => textEditorFinalizerRef.current?.hasUnsafeWork?.() ?? false,
+        () => textEditorFinalizerRef.current !== null
+      ),
     [deck.itemId, finalizeTextEditor, registry]
   )
   const pressedRibbonTimeoutRef = useRef<number | null>(null)
@@ -2028,11 +2040,16 @@ function EditableSessionDocumentView({
       if (isContentEditable && event.key !== 'Escape') return
 
       if (event.key === 'Escape') {
-        if (editingElementId || session.getSnapshot().draftKind !== null) {
+        if (event.isComposing || event.keyCode === 229) return
+        if (editingElementId) {
           event.preventDefault()
-          clearTextCommitTimer()
-          if (session.getSnapshot().draftKind !== null) session.cancelDraft()
-          setEditingElementId(null)
+          if (!finalizeTextEditor()) return
+          commitTextDraft()
+          return
+        }
+        if (session.getSnapshot().draftKind !== null) {
+          event.preventDefault()
+          session.cancelDraft()
           return
         }
         if (selectedElementIds.size > 0) {

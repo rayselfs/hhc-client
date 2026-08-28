@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
 import { Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
@@ -38,7 +38,12 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const [editingName, setEditingName] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
   const activeSession = activeItemId ? registry.get(activeItemId) : undefined
-  const canUndo = activeDocument?.canUndo === true
+  const hasLiveEditor = useSyncExternalStore(
+    registry.subscribe,
+    () => (activeItemId ? (registry.hasLiveEditor?.(activeItemId) ?? false) : false),
+    () => false
+  )
+  const canUndo = activeDocument?.canUndo === true || hasLiveEditor
   const canRedo = activeDocument?.canRedo === true
 
   useEffect(() => {
@@ -200,7 +205,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         config: SHORTCUTS.PRESENTATION.UNDO,
         description: t('presentationWorkspace.undo', 'Undo'),
         handler: () => {
-          if (activeDocument?.canUndo) activeSession?.undo()
+          if (activeItemId && canUndo) registry.undo?.(activeItemId)
         }
       },
       {
@@ -208,7 +213,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         config: SHORTCUTS.PRESENTATION.REDO,
         description: t('presentationWorkspace.redo', 'Redo'),
         handler: () => {
-          if (activeDocument?.canRedo) activeSession?.redo()
+          if (activeItemId && canRedo) registry.redo?.(activeItemId)
         }
       }
     ],
@@ -232,7 +237,9 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         variant="ghost"
         className="relative z-10"
         isDisabled={!canUndo}
-        onPress={() => activeSession?.undo()}
+        onPress={() => {
+          if (activeItemId) registry.undo?.(activeItemId)
+        }}
         aria-label={t('presentationWorkspace.undo', 'Undo')}
       >
         <Undo2 size={18} />
@@ -242,7 +249,9 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         variant="ghost"
         className="relative z-10"
         isDisabled={!canRedo}
-        onPress={() => activeSession?.redo()}
+        onPress={() => {
+          if (activeItemId) registry.redo?.(activeItemId)
+        }}
         aria-label={t('presentationWorkspace.redo', 'Redo')}
       >
         <Redo2 size={18} />

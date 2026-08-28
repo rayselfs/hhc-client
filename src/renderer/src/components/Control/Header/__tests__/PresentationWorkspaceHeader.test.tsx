@@ -181,6 +181,15 @@ function createRegistry(session: PresentationEditorSession): PresentationSession
     close: vi.fn().mockResolvedValue(true),
     flushAll: vi.fn().mockResolvedValue(undefined),
     discardAll: vi.fn().mockResolvedValue(undefined),
+    undo: vi.fn(() => {
+      session.undo()
+      return true
+    }),
+    redo: vi.fn(() => {
+      session.redo()
+      return true
+    }),
+    hasLiveEditor: vi.fn(() => false),
     hasUnsafeWork: vi.fn(() => false),
     getUnsafeItemIds: vi.fn(() => []),
     subscribe: vi.fn(() => () => undefined)

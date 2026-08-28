@@ -197,6 +197,34 @@ describe('PresentationSessionRegistryContext', () => {
     expect(usePresentationWorkspaceStore.getState().activeItemId).toBe(secondItem.id)
   })
 
+  it('treats pending live editor DOM as unsafe before a session draft exists', async () => {
+    const item = makeEditableItem('deck-1')
+    const session = createFakeSession(makeDocument('Sunday', item.id))
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: session.getSnapshot().renderedDocument,
+      revision: 0
+    })
+    mocks.createPresentationEditorSession.mockReturnValue(session)
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <RegistryProbe onRegistry={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await registry!.open(item)
+    let pending = true
+    registry!.registerEditorFinalizer!(
+      item.id,
+      () => true,
+      () => pending
+    )
+
+    expect(registry!.hasUnsafeWork()).toBe(true)
+    expect(registry!.getUnsafeItemIds()).toEqual([item.id])
+    pending = false
+    expect(registry!.hasUnsafeWork()).toBe(false)
+  })
+
   it('keeps the previous tab active when its flush fails', async () => {
     const firstItem = makeEditableItem('deck-1')
     const secondItem = makeEditableItem('deck-2')

@@ -47,6 +47,8 @@ interface EditableSlideSurfaceProps {
   ) => void
 }
 
+type TextEditFinalizer = (() => boolean) & { hasUnsafeWork?: () => boolean }
+
 interface DragState {
   elementId: string
   mode: 'move' | 'resize' | 'crop'
@@ -943,6 +945,7 @@ function TextElementContent({
   const blurFrameRef = useRef<number | null>(null)
   const textFrameRef = useRef<number | null>(null)
   const pendingBlurTextRef = useRef<string | null>(null)
+  const hasPendingTextRef = useRef(false)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
 
   const cancelPendingBlur = (): void => {
@@ -960,6 +963,7 @@ function TextElementContent({
         ? measureAutoSizedTextElement(contentRef.current, element, text)
         : {})
     } as Partial<EditablePresentationElement>)
+    hasPendingTextRef.current = false
   }
 
   const cancelPendingTextCommit = (): void => {
@@ -1017,7 +1021,10 @@ function TextElementContent({
       if (!editingRef.current) return true
       if (isComposingRef.current) return false
       const content = contentRef.current
-      if (!content) return true
+      if (!content) {
+        hasPendingTextRef.current = false
+        return true
+      }
       cancelPendingBlur()
       cancelPendingTextCommit()
       onTextEditFinalizerChange?.(null)
@@ -1029,7 +1036,9 @@ function TextElementContent({
 
   useLayoutEffect(() => {
     if (!editing) return
-    onTextEditFinalizerChange?.(() => finalizeTextEditRef.current())
+    const finalize: TextEditFinalizer = () => finalizeTextEditRef.current()
+    finalize.hasUnsafeWork = () => hasPendingTextRef.current
+    onTextEditFinalizerChange?.(finalize)
     return () => onTextEditFinalizerChange?.(null)
   }, [editing, onTextEditFinalizerChange])
 
@@ -1048,6 +1057,7 @@ function TextElementContent({
     if (editing) return
     initializedEditingElementRef.current = null
     cancelPendingTextCommit()
+    hasPendingTextRef.current = false
   }, [editing])
 
   useEffect(() => {
@@ -1086,11 +1096,13 @@ function TextElementContent({
       }}
       onInput={() => {
         if (!editing) return
+        hasPendingTextRef.current = true
         if (isComposingRef.current) return
         scheduleTextCommit()
       }}
       onCompositionStart={() => {
         isComposingRef.current = true
+        hasPendingTextRef.current = true
         cancelPendingTextCommit()
       }}
       onCompositionEnd={() => {
@@ -1120,6 +1132,7 @@ function TextElementContent({
       }}
       onBlur={(event) => {
         cancelPendingTextCommit()
+        hasPendingTextRef.current = true
         pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
         scheduleBlurCommit()
       }}

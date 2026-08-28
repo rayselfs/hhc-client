@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import PresentationWorkspacePage from '../PresentationWorkspacePage'
 import PresentationWorkspaceHeader from '@renderer/components/Control/Header/PresentationWorkspaceHeader'
+import PresentationNavigationGuard from '@renderer/components/Control/PresentationNavigationGuard'
 import PresentationElectronCloseBridge from '@renderer/contexts/PresentationElectronCloseBridge'
 import {
   PresentationSessionRegistryProvider,
@@ -31,7 +33,8 @@ const mocks = vi.hoisted(() => ({
   queryLocalFontFamiliesOnce: vi.fn(),
   supportsLocalFontAccess: vi.fn(),
   showMenu: vi.fn(),
-  toastWarning: vi.fn()
+  toastWarning: vi.fn(),
+  requestCloseDecision: vi.fn()
 }))
 
 interface ResizeObserverRecord {
@@ -152,7 +155,7 @@ vi.mock('@renderer/contexts/ContextMenuContext', () => ({
 }))
 
 vi.mock('@renderer/contexts/PresentationCloseDecisionContext', () => ({
-  usePresentationCloseDecision: () => vi.fn()
+  usePresentationCloseDecision: () => mocks.requestCloseDecision
 }))
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
@@ -210,6 +213,29 @@ function HeaderWorkspace(): React.JSX.Element {
       <PresentationWorkspaceHeader />
       <PresentationWorkspacePage />
     </ShortcutScopeProvider>
+  )
+}
+
+function HeaderWorkspaceWithSession({
+  onSession
+}: {
+  onSession: (session: PresentationSessionRegistry) => void
+}): React.JSX.Element {
+  onSession(usePresentationSessionRegistry())
+  return <HeaderWorkspace />
+}
+
+function GuardedWorkspace({
+  onSession
+}: {
+  onSession: (session: PresentationSessionRegistry) => void
+}): React.JSX.Element {
+  onSession(usePresentationSessionRegistry())
+  return (
+    <>
+      <PresentationNavigationGuard />
+      <PresentationWorkspacePage />
+    </>
   )
 }
 
@@ -293,6 +319,8 @@ describe('PresentationWorkspacePage session integration', () => {
     mocks.supportsLocalFontAccess.mockReturnValue(true)
     mocks.showMenu.mockReset()
     mocks.toastWarning.mockReset()
+    mocks.requestCloseDecision.mockReset()
+    mocks.requestCloseDecision.mockResolvedValue('keep-editing')
     useFileExplorerStore.setState({
       items: { [item.id]: item },
       _itemsArray: [item]
@@ -605,6 +633,254 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(textInsert).toHaveAttribute('aria-pressed', 'true')
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
     expect(textInsert).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('finalizes pending text on Escape instead of discarding its active edit transaction', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const historyLength = session.getSnapshot().history.past.length
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    content.textContent = 'Keep me'
+    fireEvent.input(content)
+    fireEvent.keyDown(content, { key: 'Escape', code: 'Escape' })
+
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      text: 'Keep me'
+    })
+    expect(session.getSnapshot().history.past).toHaveLength(historyLength + 1)
+    act(() => flushAnimationFrame())
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      text: 'Keep me'
+    })
+  })
+
+  it('keeps composition active on Escape and exposes pending DOM text as unsafe work', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.compositionStart(content)
+    content.textContent = 'Provisional'
+    fireEvent.input(content)
+    expect(registry!.hasUnsafeWork()).toBe(true)
+    fireEvent.keyDown(content, { key: 'Escape', code: 'Escape', keyCode: 229, isComposing: true })
+
+    expect(content).toHaveAttribute('contenteditable', 'true')
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Before' })
+    fireEvent.compositionEnd(content)
+    act(() => flushAnimationFrame())
+    fireEvent.keyDown(content, { key: 'Escape', code: 'Escape' })
+
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Provisional' })
+  })
+
+  it('reports regular pending editor input as unsafe before its animation frame', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    content.textContent = 'Pending navigation text'
+    fireEvent.input(content)
+
+    expect(registry!.hasUnsafeWork()).toBe(true)
+    act(() => flushAnimationFrame())
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Pending navigation text' })
+  })
+
+  it('blocks real navigation and browser unload until live pending text finalizes', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    const router = createMemoryRouter(
+      [
+        {
+          path: '*',
+          element: (
+            <PresentationSessionRegistryProvider>
+              <GuardedWorkspace onSession={(next) => (registry = next)} />
+            </PresentationSessionRegistryProvider>
+          )
+        }
+      ],
+      { initialEntries: ['/presentations/deck-1'] }
+    )
+    render(<RouterProvider router={router} />)
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    content.textContent = 'Navigate safely'
+    fireEvent.input(content)
+    const unload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(unload)
+    expect(unload.defaultPrevented).toBe(true)
+
+    await act(() => router.navigate('/files'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/files'))
+    act(() => flushAnimationFrame())
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Navigate safely' })
+  })
+
+  it('keeps real navigation blocked through composition until compositionend', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    const router = createMemoryRouter(
+      [
+        {
+          path: '*',
+          element: (
+            <PresentationSessionRegistryProvider>
+              <GuardedWorkspace onSession={(next) => (registry = next)} />
+            </PresentationSessionRegistryProvider>
+          )
+        }
+      ],
+      { initialEntries: ['/presentations/deck-1'] }
+    )
+    render(<RouterProvider router={router} />)
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.compositionStart(content)
+    content.textContent = 'Composed navigation text'
+    fireEvent.input(content)
+
+    await act(() => router.navigate('/files'))
+    expect(router.state.location.pathname).toBe('/presentations/deck-1')
+    fireEvent.compositionEnd(content)
+    act(() => flushAnimationFrame())
+    await act(() => router.navigate('/files'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/files'))
+  })
+
+  it('finalizes live text before header Undo and does not reapply its queued frame', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <HeaderWorkspaceWithSession onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    content.textContent = 'Undo target'
+    fireEvent.input(content)
+    const undo = screen.getByRole('button', { name: 'Undo' })
+    expect(undo).toBeEnabled()
+    fireEvent.click(undo)
+
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Before' })
+    act(() => flushAnimationFrame())
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Before' })
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }))
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Undo target' })
+    fireEvent.keyDown(document, { key: 'z', code: 'KeyZ', ctrlKey: true })
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Before' })
+  })
+
+  it('blocks header Undo while text composition is active', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <HeaderWorkspaceWithSession onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.compositionStart(content)
+    content.textContent = 'Provisional'
+    fireEvent.input(content)
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(content).toHaveAttribute('contenteditable', 'true')
+    expect(
+      registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Before' })
   })
 
   it('lets Enter activate Shapes while a text frame is selected', async () => {

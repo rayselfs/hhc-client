@@ -13,10 +13,19 @@ export interface PresentationSessionRegistry {
   close(itemId: string, decision?: CloseDecision): Promise<boolean>
   flushAll(): Promise<void>
   discardAll(): Promise<void>
+  undo?(itemId: string): boolean
+  redo?(itemId: string): boolean
+  hasLiveEditor?(itemId: string): boolean
+  notifyEditorLifecycle?(itemId: string): void
   hasUnsafeWork(): boolean
   getUnsafeItemIds(): string[]
   subscribe(listener: () => void): () => void
-  registerEditorFinalizer?(itemId: string, finalize: () => boolean): () => void
+  registerEditorFinalizer?(
+    itemId: string,
+    finalize: () => boolean,
+    hasUnsafeWork?: () => boolean,
+    hasLiveEditor?: () => boolean
+  ): () => void
 }
 
 const PresentationSessionRegistryContext = createContext<PresentationSessionRegistry | null>(null)
@@ -34,7 +43,16 @@ export function PresentationSessionRegistryProvider({
   const sessionsRef = useRef(new Map<string, PresentationEditorSession>())
   const openingRef = useRef(new Map<string, Promise<PresentationEditorSession>>())
   const sessionUnsubscribersRef = useRef(new Map<string, () => void>())
-  const editorFinalizersRef = useRef(new Map<string, () => boolean>())
+  const editorFinalizersRef = useRef(
+    new Map<
+      string,
+      {
+        finalize: () => boolean
+        hasUnsafeWork: () => boolean
+        hasLiveEditor: () => boolean
+      }
+    >()
+  )
   const listenersRef = useRef(new Set<() => void>())
 
   const registry = useMemo<PresentationSessionRegistry>(() => {
@@ -102,11 +120,21 @@ export function PresentationSessionRegistryProvider({
 
     const getUnsafeItemIds = (): string[] =>
       [...sessionsRef.current.entries()]
-        .filter(([, session]) => isSessionUnsafe(session))
+        .filter(
+          ([itemId, session]) =>
+            isSessionUnsafe(session) || editorFinalizersRef.current.get(itemId)?.hasUnsafeWork()
+        )
         .map(([itemId]) => itemId)
 
     const finalizeEditor = (itemId: string): boolean =>
-      editorFinalizersRef.current.get(itemId)?.() ?? true
+      editorFinalizersRef.current.get(itemId)?.finalize() ?? true
+
+    const moveHistory = (itemId: string, direction: 'undo' | 'redo'): boolean => {
+      const session = sessionsRef.current.get(itemId)
+      if (!session || !finalizeEditor(itemId)) return false
+      session[direction]()
+      return true
+    }
 
     return {
       open,
@@ -165,17 +193,28 @@ export function PresentationSessionRegistryProvider({
         const unsafeSessions = [...sessionsRef.current.values()].filter(isSessionUnsafe)
         await Promise.all(unsafeSessions.map((session) => session.discard()))
       },
+      undo: (itemId) => moveHistory(itemId, 'undo'),
+      redo: (itemId) => moveHistory(itemId, 'redo'),
+      hasLiveEditor: (itemId) => editorFinalizersRef.current.get(itemId)?.hasLiveEditor() ?? false,
+      notifyEditorLifecycle: () => notify(),
       hasUnsafeWork: () => getUnsafeItemIds().length > 0,
       getUnsafeItemIds,
       subscribe: (listener) => {
         listenersRef.current.add(listener)
         return () => listenersRef.current.delete(listener)
       },
-      registerEditorFinalizer: (itemId, finalize) => {
-        editorFinalizersRef.current.set(itemId, finalize)
+      registerEditorFinalizer: (
+        itemId,
+        finalize,
+        hasUnsafeWork = () => false,
+        hasLiveEditor = () => false
+      ) => {
+        editorFinalizersRef.current.set(itemId, { finalize, hasUnsafeWork, hasLiveEditor })
+        notify()
         return () => {
-          if (editorFinalizersRef.current.get(itemId) === finalize) {
+          if (editorFinalizersRef.current.get(itemId)?.finalize === finalize) {
             editorFinalizersRef.current.delete(itemId)
+            notify()
           }
         }
       }
