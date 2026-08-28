@@ -1089,6 +1089,7 @@
     "noMediaSelected": "未选择媒体",
     "grid": "网格",
     "zoom": "缩放",
+    "fit": "适合窗口",
     "next": "下一张",
     "prev": "上一张",
     "slideInfo": "第 {{current}} 张投影片（共 {{total}} 张）",

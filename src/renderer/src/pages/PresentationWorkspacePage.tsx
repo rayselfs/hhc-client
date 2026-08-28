@@ -109,10 +109,7 @@ import {
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
-import {
-  calculateAnchoredScroll,
-  calculateFitZoomPercent
-} from '@renderer/lib/presentation-viewport'
+import { calculateFitZoomPercent } from '@renderer/lib/presentation-viewport'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
 import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
@@ -615,13 +612,13 @@ function EditableSessionDocumentView({
   const activeSlideId = document.slideOrder[activeSlideIndex] ?? null
   const imageInputRef = useRef<HTMLInputElement>(null)
   const canvasViewportRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
   const pendingZoomAnchorRef = useRef<{
-    left: number
-    top: number
-    anchorX: number
-    anchorY: number
-    previousZoom: number
+    clientX: number
+    clientY: number
+    logicalX: number
+    logicalY: number
     nextZoom: number
   } | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
@@ -644,11 +641,6 @@ function EditableSessionDocumentView({
   const [zoomPercent, setZoomPercent] = useState(100)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [isNotesOpen, setIsNotesOpen] = useState(false)
-  const [notesDraftBySlideId, setNotesDraftBySlideId] = useState<Record<string, string>>({})
-  const notesBoundaryRef = useRef<{ slideId: string | null; draft: string }>({
-    slideId: null,
-    draft: ''
-  })
   const [cropElementId, setCropElementId] = useState<string | null>(null)
   const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
   const formatBackgroundTriggerRef = useRef<HTMLButtonElement>(null)
@@ -709,19 +701,12 @@ function EditableSessionDocumentView({
   useLayoutEffect(() => {
     const pending = pendingZoomAnchorRef.current
     const viewport = canvasViewportRef.current
-    if (!pending || !viewport || pending.nextZoom !== zoomPercent) return
-    viewport.scrollLeft = calculateAnchoredScroll(
-      pending.left,
-      pending.anchorX,
-      pending.previousZoom,
-      pending.nextZoom
-    )
-    viewport.scrollTop = calculateAnchoredScroll(
-      pending.top,
-      pending.anchorY,
-      pending.previousZoom,
-      pending.nextZoom
-    )
+    const canvas = canvasRef.current
+    if (!pending || !viewport || !canvas || pending.nextZoom !== zoomPercent) return
+    const rect = canvas.getBoundingClientRect()
+    const scale = zoomPercent / 100
+    viewport.scrollLeft += rect.left + pending.logicalX * scale - pending.clientX
+    viewport.scrollTop += rect.top + pending.logicalY * scale - pending.clientY
     pendingZoomAnchorRef.current = null
   }, [zoomPercent])
 
@@ -759,18 +744,11 @@ function EditableSessionDocumentView({
       ? (projectedPresentationState?.slideIndex ?? 0)
       : -1
 
-  const notesDraft = activeSlideId
-    ? (notesDraftBySlideId[activeSlideId] ?? activeSlide?.notes ?? '')
-    : ''
-  notesBoundaryRef.current = { slideId: activeSlideId, draft: notesDraft }
+  const notesDraft = activeSlide?.notes ?? ''
 
   useEffect(
     () => () => {
-      const { slideId, draft } = notesBoundaryRef.current
-      if (!slideId) return
-      const currentDocument = session.getSnapshot().renderedDocument
-      if (draft === currentDocument.slides[slideId]?.notes) return
-      session.commit(updateSlideNotes(currentDocument, slideId, draft))
+      if (session.getSnapshot().draftKind === 'notes') session.commitDraft()
     },
     [session]
   )
@@ -795,11 +773,8 @@ function EditableSessionDocumentView({
     session.commit(nextDocument)
   }
 
-  function commitNotes(slideId = activeSlideId, draft = notesDraft): void {
-    if (!slideId) return
-    const currentDocument = session.getSnapshot().renderedDocument
-    if (draft === currentDocument.slides[slideId]?.notes) return
-    session.commit(updateSlideNotes(currentDocument, slideId, draft))
+  function commitNotes(): void {
+    if (session.getSnapshot().draftKind === 'notes') session.commitDraft()
   }
 
   const setCustomZoom = (nextZoom: number): void => {
@@ -817,13 +792,15 @@ function EditableSessionDocumentView({
       const nextZoom = Math.max(25, Math.min(200, zoomPercent + (event.deltaY < 0 ? 5 : -5)))
       setZoomMode('custom')
       if (nextZoom === zoomPercent) return
-      const rect = viewport.getBoundingClientRect()
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const scale = zoomPercent / 100
       pendingZoomAnchorRef.current = {
-        left: viewport.scrollLeft,
-        top: viewport.scrollTop,
-        anchorX: event.clientX - rect.left,
-        anchorY: event.clientY - rect.top,
-        previousZoom: zoomPercent,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        logicalX: (event.clientX - rect.left) / scale,
+        logicalY: (event.clientY - rect.top) / scale,
         nextZoom
       }
       setZoomPercent(nextZoom)
@@ -2084,104 +2061,108 @@ function EditableSessionDocumentView({
               <div
                 ref={canvasViewportRef}
                 data-testid="presentation-canvas-viewport"
-                className="flex flex-1 items-center justify-center overflow-auto p-8"
+                className="min-h-0 flex-1 overflow-auto"
               >
-                <div
-                  className="relative max-w-none shrink-0"
-                  style={{ width: `${PRESENTATION_CANVAS_WIDTH * (zoomPercent / 100)}px` }}
-                >
-                  <EditableSlideSurface
-                    document={document}
-                    slideId={activeSlideId}
-                    editable
-                    showBorder
-                    selectedElementId={selectedElementId}
-                    selectedElementIds={selectedElementIds}
-                    editingElementId={editingElementId}
-                    cropElementId={cropElementId}
-                    isTextInsertMode={isTextInsertMode}
-                    onSelectElement={selectElement}
-                    onMarqueeSelect={(bounds, additive) => {
-                      if (!activeSlide) return
-                      const matches = selectElementsInBounds(activeSlide, bounds)
-                      setSelectedElementIds((current) => {
-                        const next = additive ? new Set(current) : new Set<string>()
-                        matches.forEach((elementId) => next.add(elementId))
-                        setSelectedElementId(
-                          matches.at(-1) ?? (additive ? selectedElementId : null)
-                        )
-                        return next
-                      })
-                    }}
-                    onEditingElementChange={(elementId) => {
-                      if (elementId === null) commitTextDraft()
-                      setEditingElementId(elementId)
-                    }}
-                    onInsertText={addTextElement}
-                    onElementContextMenu={showElementContextMenu}
-                    onTransformStart={() => session.beginDraft('pointer')}
-                    onTransformPreview={(elementId, updates) => {
-                      const snapshot = session.getSnapshot()
-                      const preview = snapshot.renderedDocument
-                      const base = snapshot.history.present
-                      const current = base.slides[activeSlideId]?.elements[elementId]
-                      let nextUpdates = updates
-                      if (current && (updates.x !== undefined || updates.y !== undefined)) {
-                        const snapped = snapElementPosition(
-                          { ...current, ...updates },
-                          { width: preview.width, height: preview.height },
-                          8
-                        )
-                        nextUpdates = { ...updates, x: snapped.x, y: snapped.y }
-                        setSnapGuides({
-                          vertical: snapped.verticalGuide,
-                          horizontal: snapped.horizontalGuide
-                        })
-                      }
-                      if (
-                        current &&
-                        selectedElementIds.size > 1 &&
-                        updates.width === undefined &&
-                        updates.height === undefined &&
-                        (nextUpdates.x !== undefined || nextUpdates.y !== undefined)
-                      ) {
-                        session.previewDraft(
-                          nudgeElements(
-                            base,
-                            activeSlideId,
-                            [...selectedElementIds],
-                            (nextUpdates.x ?? current.x) - current.x,
-                            (nextUpdates.y ?? current.y) - current.y
+                <div className="flex h-max min-h-full w-max min-w-full p-8">
+                  <div
+                    ref={canvasRef}
+                    data-testid="presentation-canvas"
+                    className="relative m-auto max-w-none shrink-0"
+                    style={{ width: `${PRESENTATION_CANVAS_WIDTH * (zoomPercent / 100)}px` }}
+                  >
+                    <EditableSlideSurface
+                      document={document}
+                      slideId={activeSlideId}
+                      editable
+                      showBorder
+                      selectedElementId={selectedElementId}
+                      selectedElementIds={selectedElementIds}
+                      editingElementId={editingElementId}
+                      cropElementId={cropElementId}
+                      isTextInsertMode={isTextInsertMode}
+                      onSelectElement={selectElement}
+                      onMarqueeSelect={(bounds, additive) => {
+                        if (!activeSlide) return
+                        const matches = selectElementsInBounds(activeSlide, bounds)
+                        setSelectedElementIds((current) => {
+                          const next = additive ? new Set(current) : new Set<string>()
+                          matches.forEach((elementId) => next.add(elementId))
+                          setSelectedElementId(
+                            matches.at(-1) ?? (additive ? selectedElementId : null)
                           )
+                          return next
+                        })
+                      }}
+                      onEditingElementChange={(elementId) => {
+                        if (elementId === null) commitTextDraft()
+                        setEditingElementId(elementId)
+                      }}
+                      onInsertText={addTextElement}
+                      onElementContextMenu={showElementContextMenu}
+                      onTransformStart={() => session.beginDraft('pointer')}
+                      onTransformPreview={(elementId, updates) => {
+                        const snapshot = session.getSnapshot()
+                        const preview = snapshot.renderedDocument
+                        const base = snapshot.history.present
+                        const current = base.slides[activeSlideId]?.elements[elementId]
+                        let nextUpdates = updates
+                        if (current && (updates.x !== undefined || updates.y !== undefined)) {
+                          const snapped = snapElementPosition(
+                            { ...current, ...updates },
+                            { width: preview.width, height: preview.height },
+                            8
+                          )
+                          nextUpdates = { ...updates, x: snapped.x, y: snapped.y }
+                          setSnapGuides({
+                            vertical: snapped.verticalGuide,
+                            horizontal: snapped.horizontalGuide
+                          })
+                        }
+                        if (
+                          current &&
+                          selectedElementIds.size > 1 &&
+                          updates.width === undefined &&
+                          updates.height === undefined &&
+                          (nextUpdates.x !== undefined || nextUpdates.y !== undefined)
+                        ) {
+                          session.previewDraft(
+                            nudgeElements(
+                              base,
+                              activeSlideId,
+                              [...selectedElementIds],
+                              (nextUpdates.x ?? current.x) - current.x,
+                              (nextUpdates.y ?? current.y) - current.y
+                            )
+                          )
+                          return
+                        }
+                        session.previewDraft(
+                          updateElementInSlide(preview, activeSlideId, elementId, nextUpdates)
                         )
-                        return
-                      }
-                      session.previewDraft(
-                        updateElementInSlide(preview, activeSlideId, elementId, nextUpdates)
-                      )
-                    }}
-                    onTransformCommit={() => {
-                      setSnapGuides({})
-                      session.commitDraft()
-                    }}
-                    onTransformCancel={() => {
-                      setSnapGuides({})
-                      session.cancelDraft()
-                    }}
-                    onUpdateElement={previewTextElement}
-                  />
-                  {snapGuides.vertical !== undefined && (
-                    <span
-                      className="pointer-events-none absolute inset-y-0 w-px bg-primary"
-                      style={{ left: `${(snapGuides.vertical / document.width) * 100}%` }}
+                      }}
+                      onTransformCommit={() => {
+                        setSnapGuides({})
+                        session.commitDraft()
+                      }}
+                      onTransformCancel={() => {
+                        setSnapGuides({})
+                        session.cancelDraft()
+                      }}
+                      onUpdateElement={previewTextElement}
                     />
-                  )}
-                  {snapGuides.horizontal !== undefined && (
-                    <span
-                      className="pointer-events-none absolute inset-x-0 h-px bg-primary"
-                      style={{ top: `${(snapGuides.horizontal / document.height) * 100}%` }}
-                    />
-                  )}
+                    {snapGuides.vertical !== undefined && (
+                      <span
+                        className="pointer-events-none absolute inset-y-0 w-px bg-primary"
+                        style={{ left: `${(snapGuides.vertical / document.width) * 100}%` }}
+                      />
+                    )}
+                    {snapGuides.horizontal !== undefined && (
+                      <span
+                        className="pointer-events-none absolute inset-x-0 h-px bg-primary"
+                        style={{ top: `${(snapGuides.horizontal / document.height) * 100}%` }}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
               {isNotesOpen && (
@@ -2191,11 +2172,17 @@ function EditableSessionDocumentView({
                     className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
                     value={notesDraft}
                     onChange={(event) => {
-                      const value = event.currentTarget.value
-                      setNotesDraftBySlideId((current) => ({
-                        ...current,
-                        [activeSlideId]: value
-                      }))
+                      if (!activeSlideId) return
+                      if (session.getSnapshot().draftKind !== 'notes') {
+                        session.beginDraft('notes')
+                      }
+                      session.previewDraft(
+                        updateSlideNotes(
+                          session.getSnapshot().renderedDocument,
+                          activeSlideId,
+                          event.currentTarget.value
+                        )
+                      )
                     }}
                     onBlur={() => commitNotes()}
                     aria-label={t('presentationWorkspace.notes', 'Notes')}
@@ -2253,7 +2240,7 @@ function EditableSessionDocumentView({
                     type="range"
                     min={25}
                     max={200}
-                    step={5}
+                    step={1}
                     value={zoomPercent}
                     onChange={(event) => setCustomZoom(Number(event.currentTarget.value))}
                     aria-label={t('presentationWorkspace.zoom', 'Zoom')}

@@ -5,10 +5,23 @@ export function calculateFitZoomPercent(
   canvasHeight: number,
   padding: number
 ): number {
+  if (
+    [viewportWidth, viewportHeight, canvasWidth, canvasHeight, padding].some(
+      (value) => !Number.isFinite(value)
+    ) ||
+    viewportWidth <= 0 ||
+    viewportHeight <= 0 ||
+    canvasWidth <= 0 ||
+    canvasHeight <= 0 ||
+    padding < 0
+  ) {
+    return 25
+  }
   const zoom = Math.floor(
     Math.min((viewportWidth - padding) / canvasWidth, (viewportHeight - padding) / canvasHeight) *
       100
   )
+  if (!Number.isFinite(zoom) || zoom <= 0) return 25
   return Math.max(25, Math.min(200, zoom))
 }
 

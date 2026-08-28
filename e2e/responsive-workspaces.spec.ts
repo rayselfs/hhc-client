@@ -62,46 +62,120 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const presentationStage = page.locator('.presentation-stage')
   const notes = page.getByRole('button', { name: /Toggle Notes|切換備忘稿/ })
   const zoom = page.getByRole('button', { name: /Reset zoom|重設縮放/ })
+  const viewport = page.getByTestId('presentation-canvas-viewport')
+  const canvas = page.getByTestId('presentation-canvas')
   await expect(notes).toBeVisible()
   await expect(zoom).toBeVisible()
 
-  const fitZoom = Number(await zoomSlider.inputValue())
+  const expectedFitZoom = async (): Promise<number> =>
+    viewport.evaluate((element) =>
+      Math.max(
+        25,
+        Math.min(
+          200,
+          Math.floor(
+            Math.min((element.clientWidth - 64) / 1024, (element.clientHeight - 64) / 576) * 100
+          )
+        )
+      )
+    )
+  const expectExactFitGeometry = async (): Promise<number> => {
+    const expected = await expectedFitZoom()
+    await expect(zoomSlider).toHaveValue(String(expected))
+    await expect(zoom).toHaveText(`${expected}%`)
+    await expect
+      .poll(async () => (await canvas.boundingBox())?.width)
+      .toBeCloseTo((1024 * expected) / 100, 0)
+    return expected
+  }
+
+  const fitZoom = await expectExactFitGeometry()
   await notes.click()
   const notesEditor = page.getByRole('textbox', { name: /Notes|備忘稿/ })
   await notesEditor.fill('Responsive speaker note')
   await expect.poll(async () => Number(await zoomSlider.inputValue())).toBeLessThan(fitZoom)
+  await expectExactFitGeometry()
   await notes.click()
   await notes.click()
   await expect(notesEditor).toHaveValue('Responsive speaker note')
   await notes.click()
 
-  const viewport = page.getByTestId('presentation-canvas-viewport')
+  await zoomSlider.fill('150')
+  await expect(zoomSlider).toHaveValue('150')
+  await viewport.evaluate((element) => {
+    element.scrollLeft = 220
+    element.scrollTop = 140
+  })
   const viewportBox = await viewport.boundingBox()
+  const canvasBeforeWheel = await canvas.boundingBox()
+  const pointer = {
+    x: viewportBox!.x + viewportBox!.width * 0.31,
+    y: viewportBox!.y + viewportBox!.height * 0.37
+  }
+  const logicalBeforeWheel = {
+    x: ((pointer.x - canvasBeforeWheel!.x) * 1024) / canvasBeforeWheel!.width,
+    y: ((pointer.y - canvasBeforeWheel!.y) * 576) / canvasBeforeWheel!.height
+  }
   const zoomBeforeWheel = await zoom.textContent()
-  const ctrlWheelPrevented = await viewport.evaluate(
-    (element, position) => {
-      const event = new WheelEvent('wheel', {
-        bubbles: true,
-        cancelable: true,
-        clientX: position.x,
-        clientY: position.y,
-        ctrlKey: true,
-        deltaY: -100
-      })
-      element.dispatchEvent(event)
-      return event.defaultPrevented
-    },
-    { x: viewportBox!.x + viewportBox!.width / 2, y: viewportBox!.y + 100 }
-  )
+  const ctrlWheelPrevented = await viewport.evaluate((element, position) => {
+    const event = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      clientX: position.x,
+      clientY: position.y,
+      ctrlKey: true,
+      deltaY: -100
+    })
+    element.dispatchEvent(event)
+    return event.defaultPrevented
+  }, pointer)
   expect(ctrlWheelPrevented).toBe(true)
   await expect.poll(() => zoom.textContent()).not.toBe(zoomBeforeWheel)
+  const canvasAfterWheel = await canvas.boundingBox()
+  expect(((pointer.x - canvasAfterWheel!.x) * 1024) / canvasAfterWheel!.width).toBeCloseTo(
+    logicalBeforeWheel.x,
+    0
+  )
+  expect(((pointer.y - canvasAfterWheel!.y) * 576) / canvasAfterWheel!.height).toBeCloseTo(
+    logicalBeforeWheel.y,
+    0
+  )
 
   await zoomSlider.fill('200')
-  const overflow = await viewport.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth
-  }))
+  await expect(zoomSlider).toHaveValue('200')
+  const overflow = await viewport.evaluate((element) => {
+    element.scrollLeft = 0
+    element.scrollTop = 0
+    return {
+      clientWidth: element.clientWidth,
+      clientHeight: element.clientHeight,
+      scrollWidth: element.scrollWidth,
+      scrollHeight: element.scrollHeight
+    }
+  })
   expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth)
+  expect(overflow.scrollHeight).toBeGreaterThan(overflow.clientHeight)
+  const [viewportAtStart, canvasAtStart] = await Promise.all([
+    viewport.boundingBox(),
+    canvas.boundingBox()
+  ])
+  expect(canvasAtStart!.x - viewportAtStart!.x).toBeCloseTo(32, 0)
+  expect(canvasAtStart!.y - viewportAtStart!.y).toBeCloseTo(32, 0)
+  await viewport.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth - element.clientWidth
+    element.scrollTop = element.scrollHeight - element.clientHeight
+  })
+  const [viewportAtEnd, canvasAtEnd] = await Promise.all([
+    viewport.boundingBox(),
+    canvas.boundingBox()
+  ])
+  expect(viewportAtEnd!.x + viewportAtEnd!.width - canvasAtEnd!.x - canvasAtEnd!.width).toBeCloseTo(
+    32,
+    0
+  )
+  expect(
+    viewportAtEnd!.y + viewportAtEnd!.height - canvasAtEnd!.y - canvasAtEnd!.height
+  ).toBeCloseTo(32, 0)
   const statusBar = page.getByTestId('presentation-status-bar')
   const [statusBox, customStageBox] = await Promise.all([
     statusBar.boundingBox(),

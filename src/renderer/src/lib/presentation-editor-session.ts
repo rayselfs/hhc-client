@@ -11,7 +11,7 @@ import {
   type PresentationSaveState
 } from './presentation-save-coordinator'
 
-export type PresentationDraftKind = 'pointer' | 'text'
+export type PresentationDraftKind = 'pointer' | 'text' | 'notes'
 
 export interface PresentationSessionSnapshot {
   history: PresentationHistoryState

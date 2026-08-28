@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PresentationWorkspacePage from '../PresentationWorkspacePage'
 import PresentationWorkspaceHeader from '@renderer/components/Control/Header/PresentationWorkspaceHeader'
+import PresentationElectronCloseBridge from '@renderer/contexts/PresentationElectronCloseBridge'
 import {
   PresentationSessionRegistryProvider,
   usePresentationSessionRegistry,
@@ -439,12 +440,12 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(screen.getByRole('button', { name: 'Reset zoom' })).toBeVisible()
   })
 
-  it('commits Notes across slide, pane, document, and unmount boundaries without no-op history', async () => {
+  it('keeps committed Notes in session history across Undo and Redo', async () => {
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
     const { document, slideId: secondSlideId } = insertBlankEditableSlide(sourceDocument, 1)
     mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
     let registry: PresentationSessionRegistry | null = null
-    const { rerender } = render(
+    render(
       <PresentationSessionRegistryProvider>
         <Workspace showPage onSession={(next) => (registry = next)} />
       </PresentationSessionRegistryProvider>
@@ -465,43 +466,124 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(secondSlideId)
 
     fireEvent.click(screen.getByRole('button', { name: '1' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
-    const historyLength = session.getSnapshot().history.past.length
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    act(() => session.undo())
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('')
+    act(() => session.redo())
     expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue(
       'Remember the closing prayer'
     )
-    expect(session.getSnapshot().history.past).toHaveLength(historyLength)
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
-      target: { value: 'Updated before leaving the document' }
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    const historyLength = session.getSnapshot().history.past.length
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    expect(session.getSnapshot().history.past).toHaveLength(historyLength)
+  })
+
+  it('flushes a focused Notes draft before registry activation and close', async () => {
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
+    const session = registry!.get('deck-1')!
+    const firstSlideId = session.getSnapshot().renderedDocument.slideOrder[0]
     const secondItem = makeEditableItem('deck-2', 'Sermon.lpdeck')
     useFileExplorerStore.setState((state) => ({
       items: { ...state.items, [secondItem.id]: secondItem },
       _itemsArray: [...state._itemsArray, secondItem]
     }))
-    act(() => usePresentationWorkspaceStore.getState().openDocument(secondItem))
+    await act(async () => {
+      await registry!.open(secondItem)
+    })
 
-    await waitFor(() =>
-      expect(session.getSnapshot().renderedDocument.slides[firstSlideId].notes).toBe(
-        'Updated before leaving the document'
-      )
-    )
-
-    act(() => usePresentationWorkspaceStore.getState().setActiveDocument('deck-1'))
-    await screen.findByTestId('presentation-canvas-viewport')
     fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
     fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
-      target: { value: 'Updated before unmount' }
+      target: { value: 'Updated before activation' }
     })
-    rerender(
+    expect(session.getSnapshot().draftKind).toBe('notes')
+    expect(registry!.hasUnsafeWork()).toBe(true)
+    await act(async () => {
+      await registry!.activate(secondItem.id)
+    })
+
+    expect(mocks.persistEditablePresentationRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'deck-1',
+        document: expect.objectContaining({
+          slides: expect.objectContaining({
+            [firstSlideId]: expect.objectContaining({ notes: 'Updated before activation' })
+          })
+        })
+      })
+    )
+
+    await act(async () => {
+      await registry!.activate('deck-1')
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
+      target: { value: 'Updated before close' }
+    })
+    await act(async () => {
+      await registry!.close('deck-1')
+    })
+    expect(mocks.persistEditablePresentationRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'deck-1',
+        document: expect.objectContaining({
+          slides: expect.objectContaining({
+            [firstSlideId]: expect.objectContaining({ notes: 'Updated before close' })
+          })
+        })
+      })
+    )
+  })
+
+  it('flushes a focused Notes draft through the Electron app-close bridge', async () => {
+    let registry: PresentationSessionRegistry | null = null
+    let closeRequested: (() => void) | null = null
+    const confirmClose = vi.fn().mockResolvedValue({ closing: true })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        app: {
+          onCloseRequested: vi.fn((listener: () => void) => {
+            closeRequested = listener
+            return () => undefined
+          }),
+          confirmClose
+        }
+      } as unknown as Window['api']
+    })
+    render(
       <PresentationSessionRegistryProvider>
-        <Workspace showPage={false} onSession={(next) => (registry = next)} />
+        <PresentationElectronCloseBridge />
+        <Workspace showPage onSession={(next) => (registry = next)} />
       </PresentationSessionRegistryProvider>
     )
-    expect(session.getSnapshot().renderedDocument.slides[firstSlideId].notes).toBe(
-      'Updated before unmount'
+    await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
+    const session = registry!.get('deck-1')!
+    const firstSlideId = session.getSnapshot().renderedDocument.slideOrder[0]
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
+      target: { value: 'Updated before app close' }
+    })
+
+    act(() => closeRequested?.())
+
+    await waitFor(() => expect(confirmClose).toHaveBeenCalledTimes(1))
+    expect(mocks.persistEditablePresentationRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'deck-1',
+        document: expect.objectContaining({
+          slides: expect.objectContaining({
+            [firstSlideId]: expect.objectContaining({ notes: 'Updated before app close' })
+          })
+        })
+      })
     )
   })
 
@@ -547,8 +629,8 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent(viewport, ctrlWheel)
     expect(ctrlWheel.defaultPrevented).toBe(true)
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('78')
-    expect(viewport.scrollLeft).toBeCloseTo(234.25, 1)
-    expect(viewport.scrollTop).toBeCloseTo(120.55, 1)
+    expect(viewport.scrollLeft).toBeCloseTo(220.55, 1)
+    expect(viewport.scrollTop).toBeCloseTo(113.7, 1)
 
     const metaWheel = new WheelEvent('wheel', {
       bubbles: true,
