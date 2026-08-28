@@ -181,6 +181,11 @@ function createRegistry(session: PresentationEditorSession): PresentationSession
     close: vi.fn().mockResolvedValue(true),
     flushAll: vi.fn().mockResolvedValue(undefined),
     discardAll: vi.fn().mockResolvedValue(undefined),
+    finalizeAndFlush: vi.fn(async () => {
+      session.commitDraft()
+      await session.flush()
+      return session.getSnapshot().history.present
+    }),
     undo: vi.fn(() => {
       session.undo()
       return true
@@ -190,6 +195,7 @@ function createRegistry(session: PresentationEditorSession): PresentationSession
       return true
     }),
     hasLiveEditor: vi.fn(() => false),
+    hasPendingEditorWork: vi.fn(() => false),
     hasUnsafeWork: vi.fn(() => false),
     getUnsafeItemIds: vi.fn(() => []),
     subscribe: vi.fn(() => () => undefined)

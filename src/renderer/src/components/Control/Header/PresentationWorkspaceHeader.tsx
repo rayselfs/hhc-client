@@ -38,12 +38,15 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const [editingName, setEditingName] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
   const activeSession = activeItemId ? registry.get(activeItemId) : undefined
-  const hasLiveEditor = useSyncExternalStore(
+  const hasPendingEditorWork = useSyncExternalStore(
     registry.subscribe,
-    () => (activeItemId ? (registry.hasLiveEditor?.(activeItemId) ?? false) : false),
+    () => (activeItemId ? (registry.hasPendingEditorWork?.(activeItemId) ?? false) : false),
     () => false
   )
-  const canUndo = activeDocument?.canUndo === true || hasLiveEditor
+  const canUndo =
+    activeDocument?.canUndo === true ||
+    activeSession?.getSnapshot().draftKind !== null ||
+    hasPendingEditorWork
   const canRedo = activeDocument?.canRedo === true
 
   useEffect(() => {
@@ -136,11 +139,8 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     let slideIndex = 0
     let slideCount = activeDocument.slideCount
     if (isEditablePresentationMimeType(item.mimeType)) {
-      const session = registry.get(item.id)
-      if (!session) return
-      session.commitDraft()
-      await session.flush()
-      const document = session.getSnapshot().history.present
+      const document = await registry.finalizeAndFlush(item.id)
+      if (!document) throw new Error('Presentation text composition is still active')
       slideIndex = Math.max(0, document.slideOrder.indexOf(activeSlideId ?? ''))
       slideCount = document.slideOrder.length
     } else if (activeSlideId?.startsWith('pptx-slide-')) {

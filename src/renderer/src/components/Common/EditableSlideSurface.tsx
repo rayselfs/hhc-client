@@ -1129,7 +1129,12 @@ function TextElementContent({
   const pendingBlurTextRef = useRef<string | null>(null)
   const hasPendingTextRef = useRef(false)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
+  const registeredFinalizerRef = useRef<TextEditFinalizer | null>(null)
   const contentHeight = hasContentHeight(element)
+
+  const notifyTextEditLifecycle = useCallback((): void => {
+    onTextEditFinalizerChange?.(registeredFinalizerRef.current)
+  }, [onTextEditFinalizerChange])
 
   const settlePendingText = (): void => {
     if (isComposingRef.current || !hasPendingTextRef.current) return
@@ -1153,6 +1158,7 @@ function TextElementContent({
         : {})
     } as Partial<EditablePresentationElement>)
     hasPendingTextRef.current = false
+    notifyTextEditLifecycle()
   }
 
   const cancelPendingTextCommit = (): void => {
@@ -1221,7 +1227,8 @@ function TextElementContent({
       }
       cancelPendingBlur()
       cancelPendingTextCommit()
-      onTextEditFinalizerChange?.(null)
+      registeredFinalizerRef.current = null
+      notifyTextEditLifecycle()
       commitText(content.textContent ?? '')
       onFinishTextEdit?.()
       return true
@@ -1232,9 +1239,15 @@ function TextElementContent({
     if (!editing) return
     const finalize: TextEditFinalizer = () => finalizeTextEditRef.current()
     finalize.hasUnsafeWork = () => hasPendingTextRef.current
-    onTextEditFinalizerChange?.(finalize)
-    return () => onTextEditFinalizerChange?.(null)
-  }, [editing, onTextEditFinalizerChange])
+    registeredFinalizerRef.current = finalize
+    notifyTextEditLifecycle()
+    return () => {
+      if (registeredFinalizerRef.current === finalize) {
+        registeredFinalizerRef.current = null
+        notifyTextEditLifecycle()
+      }
+    }
+  }, [editing, notifyTextEditLifecycle])
 
   useLayoutEffect(() => {
     if (!editing || element.locked) return
@@ -1293,12 +1306,14 @@ function TextElementContent({
       onInput={() => {
         if (!editing) return
         hasPendingTextRef.current = true
+        notifyTextEditLifecycle()
         if (isComposingRef.current) return
         scheduleTextCommit()
       }}
       onCompositionStart={() => {
         isComposingRef.current = true
         hasPendingTextRef.current = true
+        notifyTextEditLifecycle()
         cancelPendingTextCommit()
       }}
       onCompositionEnd={() => {
@@ -1329,6 +1344,7 @@ function TextElementContent({
       onBlur={(event) => {
         cancelPendingTextCommit()
         hasPendingTextRef.current = true
+        notifyTextEditLifecycle()
         pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
         scheduleBlurCommit()
       }}

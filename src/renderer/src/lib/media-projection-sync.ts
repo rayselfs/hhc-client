@@ -10,7 +10,7 @@ import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { isElectron } from '@renderer/lib/env'
 import type { HhcLineCloudAuth } from '@renderer/lib/cloud-provider'
 import {
-  buildEditableProjectionPayloadForSession,
+  buildEditableSlideProjectionPayload,
   buildFileProjectionPayload,
   buildFileProjectionPayloadWithEditableSlide
 } from '@renderer/lib/media-projection-payload'
@@ -242,13 +242,18 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
       let payload = basePayload
       if (basePayload && item && isEditablePresentationMimeType(item.mimeType)) {
         const session = registry.get(item.id)
-        payload = session
-          ? await buildEditableProjectionPayloadForSession(
-              basePayload,
-              session,
-              usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
-            )
-          : await buildFileProjectionPayloadWithEditableSlide(currentState)
+        if (session) {
+          const document = await registry.finalizeAndFlush(item.id)
+          payload = document
+            ? buildEditableSlideProjectionPayload(
+                basePayload,
+                document,
+                usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
+              )
+            : null
+        } else {
+          payload = await buildFileProjectionPayloadWithEditableSlide(currentState)
+        }
       }
       if (!payload) return
 

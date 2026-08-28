@@ -24,6 +24,7 @@ import {
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
+import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import type { FileItemRecord } from '@shared/types/folder'
 
 const mocks = vi.hoisted(() => ({
@@ -34,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   supportsLocalFontAccess: vi.fn(),
   showMenu: vi.fn(),
   toastWarning: vi.fn(),
+  toastDanger: vi.fn(),
+  startMediaProjection: vi.fn(),
   requestCloseDecision: vi.fn()
 }))
 
@@ -162,6 +165,11 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({ isProjectionOpen: false, stopProjection: vi.fn() })
 }))
 
+vi.mock('@renderer/lib/projection-actions', () => ({
+  startMediaProjection: mocks.startMediaProjection,
+  stopProjectionSession: vi.fn()
+}))
+
 vi.mock('@renderer/lib/editable-presentation', async () => {
   const actual = await vi.importActual<typeof import('@renderer/lib/editable-presentation')>(
     '@renderer/lib/editable-presentation'
@@ -189,7 +197,7 @@ vi.mock('@renderer/lib/local-fonts', async () => {
 })
 
 vi.mock('@heroui/react/toast', () => ({
-  toast: { warning: mocks.toastWarning }
+  toast: { warning: mocks.toastWarning, danger: mocks.toastDanger }
 }))
 
 function makeEditableItem(id = 'deck-1', name = 'Sunday.lpdeck'): FileItemRecord {
@@ -319,6 +327,14 @@ describe('PresentationWorkspacePage session integration', () => {
     mocks.supportsLocalFontAccess.mockReturnValue(true)
     mocks.showMenu.mockReset()
     mocks.toastWarning.mockReset()
+    mocks.toastDanger.mockReset()
+    mocks.startMediaProjection.mockReset()
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: [
+        { itemId: item.id, blobId: item.id, status: 'ready', reason: 'ready', support: 'native' }
+      ]
+    })
     mocks.requestCloseDecision.mockReset()
     mocks.requestCloseDecision.mockResolvedValue('keep-editing')
     useFileExplorerStore.setState({
@@ -865,7 +881,13 @@ describe('PresentationWorkspacePage session integration', () => {
     const flushAnimationFrame = mockAnimationFrame()
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
     const slideId = sourceDocument.slideOrder[0]
-    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    const text = createTextElement({
+      text: 'Before',
+      width: 120,
+      height: 40,
+      autoSize: 'fixed',
+      autoWidth: false
+    })
     mocks.loadEditablePresentationSnapshot.mockResolvedValue({
       document: addElementToSlide(sourceDocument, slideId, text),
       revision: 0
@@ -879,6 +901,15 @@ describe('PresentationWorkspacePage session integration', () => {
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
     const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+    act(() => content.blur())
+    act(() => flushAnimationFrame())
+    expect(registry!.get('deck-1')!.getSnapshot().draftKind).toBeNull()
+    expect(registry!.get('deck-1')!.getSnapshot().history.past).toHaveLength(0)
+    expect(registry!.hasPendingEditorWork?.('deck-1')).toBe(false)
+    expect(usePresentationWorkspaceStore.getState().getActiveDocument()?.canUndo).toBe(false)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled())
     fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
     content.textContent = 'Undo target'
     fireEvent.input(content)
@@ -930,6 +961,62 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(
       registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
     ).toMatchObject({ text: 'Before' })
+  })
+
+  it('finalizes pending DOM text before Header starts projection and blocks composition', async () => {
+    const user = userEvent.setup()
+    const flushAnimationFrame = mockAnimationFrame()
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    await (
+      await openFileExplorerDB()
+    ).put('folder-items', useFileExplorerStore.getState().items['deck-1']!)
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <HeaderWorkspaceWithSession onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    if (!content) throw new Error('presentation text box not found')
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    content.textContent = 'Projected text'
+    fireEvent.input(content)
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(1))
+    expect(
+      registry!.get('deck-1')!.getSnapshot().history.present.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Projected text' })
+    act(() => flushAnimationFrame())
+    expect(
+      registry!.get('deck-1')!.getSnapshot().history.present.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Projected text' })
+
+    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.compositionStart(content)
+    content.textContent = 'Provisional'
+    fireEvent.input(content)
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    await waitFor(() =>
+      expect(mocks.toastDanger).toHaveBeenCalledWith('Unable to save presentation')
+    )
+    expect(mocks.startMediaProjection).toHaveBeenCalledTimes(1)
+    fireEvent.compositionEnd(content)
+    content.textContent = 'Final composition'
+    fireEvent.input(content)
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+    await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(2))
+    expect(
+      registry!.get('deck-1')!.getSnapshot().history.present.slides[slideId].elements[text.id]
+    ).toMatchObject({ text: 'Final composition' })
   })
 
   it('lets Enter activate Shapes while a text frame is selected', async () => {

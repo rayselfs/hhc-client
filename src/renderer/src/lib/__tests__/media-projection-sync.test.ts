@@ -10,7 +10,8 @@ import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { HhcAssetApiError } from '../hhc-asset-api'
 
 const registryMocks = vi.hoisted(() => ({
-  get: vi.fn()
+  get: vi.fn(),
+  finalizeAndFlush: vi.fn()
 }))
 const mockProject = vi.fn()
 const mockStartProjection = vi.fn(() => Promise.resolve())
@@ -137,6 +138,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'api', { configurable: true, value: undefined })
   projectionState.activeOwner = 'media'
   registryMocks.get.mockReturnValue(undefined)
+  registryMocks.finalizeAndFlush.mockResolvedValue(null)
   remoteMocks.prepare.mockResolvedValue(null)
   remoteMocks.ensurePersistent.mockResolvedValue(false)
   usePresentationWorkspaceStore.setState({ activeSlideIdByItemId: {} })
@@ -1076,7 +1078,7 @@ describe('media projection sync', () => {
     })
   })
 
-  it('flushes an open editable session before projecting its active slide ID', async () => {
+  it('uses the registry-finalized editable document for its projection payload', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const activeSlideId = document.slideOrder[0]
     const calls: string[] = []
@@ -1091,6 +1093,7 @@ describe('media projection sync', () => {
       })
     } as unknown as PresentationEditorSession
     registryMocks.get.mockReturnValue(session)
+    registryMocks.finalizeAndFlush.mockResolvedValue(document)
     usePresentationWorkspaceStore.getState().setActiveSlideId('editable-deck', activeSlideId)
     useMediaProjectionStore.setState({
       playlist: [makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)],
@@ -1102,7 +1105,8 @@ describe('media projection sync', () => {
     renderSync()
 
     await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
-    expect(calls).toEqual(['commit', 'flush', 'snapshot'])
+    expect(registryMocks.finalizeAndFlush).toHaveBeenCalledWith('editable-deck')
+    expect(calls).toEqual([])
     expect(mockStartProjection).toHaveBeenCalledWith(
       'media',
       [
@@ -1120,13 +1124,14 @@ describe('media projection sync', () => {
     )
   })
 
-  it('does not project when an open editable session cannot flush', async () => {
+  it('does not project when registered live composition blocks finalization', async () => {
     const session = {
       commitDraft: vi.fn(),
-      flush: vi.fn().mockRejectedValue(new Error('quota exceeded')),
+      flush: vi.fn(),
       getSnapshot: vi.fn()
     } as unknown as PresentationEditorSession
     registryMocks.get.mockReturnValue(session)
+    registryMocks.finalizeAndFlush.mockResolvedValue(null)
     useMediaProjectionStore.setState({
       playlist: [makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)],
       currentIndex: 0,
@@ -1136,7 +1141,9 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    await waitFor(() => expect(session.flush).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(registryMocks.finalizeAndFlush).toHaveBeenCalledWith('editable-deck')
+    )
     expect(session.getSnapshot).not.toHaveBeenCalled()
     expect(mockStartProjection).not.toHaveBeenCalled()
   })

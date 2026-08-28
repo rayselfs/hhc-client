@@ -225,6 +225,39 @@ describe('PresentationSessionRegistryContext', () => {
     expect(registry!.hasUnsafeWork()).toBe(false)
   })
 
+  it('finalizes a live editor before preparing its current document for projection', async () => {
+    const item = makeEditableItem('deck-1')
+    const document = makeDocument('Sunday', item.id)
+    const session = createFakeSession(document, 'dirty')
+    session.getSnapshot().draftKind = 'text'
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+    mocks.createPresentationEditorSession.mockReturnValue(session)
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <RegistryProbe onRegistry={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await registry!.open(item)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(item.id, finalize)
+    const finalizeAndFlush = (
+      registry! as PresentationSessionRegistry & {
+        finalizeAndFlush?: (itemId: string) => Promise<EditablePresentationDocument | null>
+      }
+    ).finalizeAndFlush
+
+    expect(finalizeAndFlush).toBeTypeOf('function')
+    if (!finalizeAndFlush) return
+    await expect(finalizeAndFlush(item.id)).resolves.toBe(document)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.commitDraft).mock.invocationCallOrder[0]
+    )
+    expect(vi.mocked(session.commitDraft).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.flush).mock.invocationCallOrder[0]
+    )
+  })
+
   it('keeps the previous tab active when its flush fails', async () => {
     const firstItem = makeEditableItem('deck-1')
     const secondItem = makeEditableItem('deck-2')

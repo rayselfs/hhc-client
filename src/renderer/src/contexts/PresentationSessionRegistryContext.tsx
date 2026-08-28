@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { getBlobId } from '@renderer/lib/blob-identity'
+import type { EditablePresentationDocument } from '@renderer/lib/editable-presentation'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -9,6 +10,7 @@ export type CloseDecision = 'keep-editing' | 'retry' | 'discard'
 export interface PresentationSessionRegistry {
   open(item: FileItemRecord): Promise<PresentationEditorSession>
   get(itemId: string): PresentationEditorSession | undefined
+  finalizeAndFlush(itemId: string): Promise<EditablePresentationDocument | null>
   activate(itemId: string): Promise<boolean>
   close(itemId: string, decision?: CloseDecision): Promise<boolean>
   flushAll(): Promise<void>
@@ -16,6 +18,7 @@ export interface PresentationSessionRegistry {
   undo?(itemId: string): boolean
   redo?(itemId: string): boolean
   hasLiveEditor?(itemId: string): boolean
+  hasPendingEditorWork?(itemId: string): boolean
   notifyEditorLifecycle?(itemId: string): void
   hasUnsafeWork(): boolean
   getUnsafeItemIds(): string[]
@@ -136,9 +139,20 @@ export function PresentationSessionRegistryProvider({
       return true
     }
 
+    const finalizeAndFlush = async (
+      itemId: string
+    ): Promise<EditablePresentationDocument | null> => {
+      const session = sessionsRef.current.get(itemId)
+      if (!session || !finalizeEditor(itemId)) return null
+      if (session.getSnapshot().draftKind !== null) session.commitDraft()
+      if (isSessionUnsafe(session)) await session.flush()
+      return session.getSnapshot().history.present
+    }
+
     return {
       open,
       get: (itemId) => sessionsRef.current.get(itemId),
+      finalizeAndFlush,
       activate: async (itemId) => {
         const workspace = usePresentationWorkspaceStore.getState()
         const previousItemId = workspace.activeItemId
@@ -196,6 +210,8 @@ export function PresentationSessionRegistryProvider({
       undo: (itemId) => moveHistory(itemId, 'undo'),
       redo: (itemId) => moveHistory(itemId, 'redo'),
       hasLiveEditor: (itemId) => editorFinalizersRef.current.get(itemId)?.hasLiveEditor() ?? false,
+      hasPendingEditorWork: (itemId) =>
+        editorFinalizersRef.current.get(itemId)?.hasUnsafeWork() ?? false,
       notifyEditorLifecycle: () => notify(),
       hasUnsafeWork: () => getUnsafeItemIds().length > 0,
       getUnsafeItemIds,

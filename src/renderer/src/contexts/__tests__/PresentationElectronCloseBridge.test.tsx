@@ -31,6 +31,7 @@ function createRegistry(): PresentationSessionRegistry {
   return {
     open: vi.fn(),
     get: vi.fn(),
+    finalizeAndFlush: vi.fn(),
     activate: vi.fn(),
     close: vi.fn(),
     flushAll: vi.fn().mockResolvedValue(undefined),
