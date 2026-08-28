@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   EditablePresentationDocument,
   EditablePresentationElement,
@@ -33,6 +33,7 @@ interface EditableSlideSurfaceProps {
     additive: boolean
   ) => void
   onEditingElementChange?: (elementId: string | null) => void
+  onTextEditFinalizerChange?: (finalize: (() => boolean) | null) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
   onTransformStart?: () => void
@@ -99,6 +100,7 @@ export default function EditableSlideSurface({
   onSelectElement,
   onMarqueeSelect,
   onEditingElementChange,
+  onTextEditFinalizerChange,
   onInsertText,
   onElementContextMenu,
   onTransformStart,
@@ -112,9 +114,20 @@ export default function EditableSlideSurface({
   const dragRef = useRef<DragState | null>(null)
   const textInsertRef = useRef<TextInsertState | null>(null)
   const marqueeRef = useRef<MarqueeState | null>(null)
+  const textEditFinalizerRef = useRef<(() => boolean) | null>(null)
   const scaleRef = useRef({ x: 1, y: 1 })
   const [surfaceScale, setSurfaceScale] = useState(1)
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
+
+  const setTextEditFinalizer = useCallback(
+    (finalize: (() => boolean) | null): void => {
+      textEditFinalizerRef.current = finalize
+      onTextEditFinalizerChange?.(finalize)
+    },
+    [onTextEditFinalizerChange]
+  )
+
+  const finalizeTextEdit = (): boolean => textEditFinalizerRef.current?.() ?? true
 
   const orderedElements = useMemo(() => {
     if (!slide) return []
@@ -150,6 +163,7 @@ export default function EditableSlideSurface({
     handle?: ResizeHandle
   ): void => {
     if (!editable || element.locked) return
+    if (!finalizeTextEdit()) return
     event.preventDefault()
     event.stopPropagation()
     const rect = surfaceRef.current?.getBoundingClientRect()
@@ -381,6 +395,7 @@ export default function EditableSlideSurface({
       onPointerDown={(event) => {
         if (!editable) return
         if (startTextInsert(event)) return
+        if (!finalizeTextEdit()) return
         onEditingElementChange?.(null)
         if (!(event.metaKey || event.ctrlKey)) onSelectElement?.(null, event)
         startMarquee(event)
@@ -436,6 +451,7 @@ export default function EditableSlideSurface({
               onEditingElementChange?.(element.id)
             }}
             onFinishTextEdit={() => onEditingElementChange?.(null)}
+            onTextEditFinalizerChange={setTextEditFinalizer}
           />
         ))}
         {marquee && (
@@ -485,7 +501,8 @@ function SlideElement({
   onResizePointerDown,
   onCropPointerDown,
   onStartTextEdit,
-  onFinishTextEdit
+  onFinishTextEdit,
+  onTextEditFinalizerChange
 }: {
   document: EditablePresentationDocument
   slide: EditablePresentationSlide
@@ -511,6 +528,7 @@ function SlideElement({
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onStartTextEdit: () => void
   onFinishTextEdit: () => void
+  onTextEditFinalizerChange: (finalize: (() => boolean) | null) => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
     left: element.x,
@@ -551,7 +569,8 @@ function SlideElement({
         editing,
         onUpdateElement,
         onStartTextEdit,
-        onFinishTextEdit
+        onFinishTextEdit,
+        onTextEditFinalizerChange
       )}
       {editable && primarySelected && !element.locked && (
         <ElementHandles
@@ -697,7 +716,8 @@ function renderElementContent(
     updates: Partial<EditablePresentationElement>
   ) => void,
   onStartTextEdit?: () => void,
-  onFinishTextEdit?: () => void
+  onFinishTextEdit?: () => void,
+  onTextEditFinalizerChange?: (finalize: (() => boolean) | null) => void
 ): React.ReactNode {
   if (element.type === 'text') {
     return (
@@ -709,6 +729,7 @@ function renderElementContent(
         onUpdateElement={onUpdateElement}
         onStartTextEdit={onStartTextEdit}
         onFinishTextEdit={onFinishTextEdit}
+        onTextEditFinalizerChange={onTextEditFinalizerChange}
       />
     )
   }
@@ -897,7 +918,8 @@ function TextElementContent({
   editing,
   onUpdateElement,
   onStartTextEdit,
-  onFinishTextEdit
+  onFinishTextEdit,
+  onTextEditFinalizerChange
 }: {
   element: Extract<EditablePresentationElement, { type: 'text' }>
   slideId: string
@@ -910,11 +932,12 @@ function TextElementContent({
   ) => void
   onStartTextEdit?: () => void
   onFinishTextEdit?: () => void
+  onTextEditFinalizerChange?: (finalize: (() => boolean) | null) => void
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
   const isComposingRef = useRef(false)
   const editingRef = useRef(editing)
-  const commitTextRef = useRef<(text: string) => void>(() => {})
+  const finalizeTextEditRef = useRef<() => boolean>(() => true)
   const initializedEditingElementRef = useRef<string | null>(null)
   const blurFrameRef = useRef<number | null>(null)
   const textFrameRef = useRef<number | null>(null)
@@ -938,10 +961,6 @@ function TextElementContent({
     } as Partial<EditablePresentationElement>)
   }
 
-  useLayoutEffect(() => {
-    commitTextRef.current = commitText
-  })
-
   const cancelPendingTextCommit = (): void => {
     if (textFrameRef.current == null) return
     window.cancelAnimationFrame(textFrameRef.current)
@@ -955,6 +974,19 @@ function TextElementContent({
       if (isComposingRef.current) return
       const content = contentRef.current
       if (content) commitText(content.textContent ?? '')
+    })
+  }
+
+  const scheduleBlurCommit = (): void => {
+    if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+    blurFrameRef.current = window.requestAnimationFrame(() => {
+      blurFrameRef.current = null
+      const content = contentRef.current
+      if (!editingRef.current || !content || window.document.activeElement === content) return
+      if (isComposingRef.current) return
+      pendingBlurTextRef.current = null
+      commitText(content.textContent ?? '')
+      onFinishTextEdit?.()
     })
   }
 
@@ -980,6 +1012,27 @@ function TextElementContent({
   }, [editing])
 
   useLayoutEffect(() => {
+    finalizeTextEditRef.current = (): boolean => {
+      if (!editingRef.current) return true
+      if (isComposingRef.current) return false
+      const content = contentRef.current
+      if (!content) return true
+      cancelPendingBlur()
+      cancelPendingTextCommit()
+      onTextEditFinalizerChange?.(null)
+      commitText(content.textContent ?? '')
+      onFinishTextEdit?.()
+      return true
+    }
+  })
+
+  useLayoutEffect(() => {
+    if (!editing) return
+    onTextEditFinalizerChange?.(() => finalizeTextEditRef.current())
+    return () => onTextEditFinalizerChange?.(null)
+  }, [editing, onTextEditFinalizerChange])
+
+  useLayoutEffect(() => {
     if (!editing || element.locked) return
     const content = contentRef.current
     if (!content) return
@@ -998,13 +1051,7 @@ function TextElementContent({
 
   useEffect(() => {
     return () => {
-      if (blurFrameRef.current != null) {
-        window.cancelAnimationFrame(blurFrameRef.current)
-        blurFrameRef.current = null
-        const text = pendingBlurTextRef.current
-        pendingBlurTextRef.current = null
-        if (editingRef.current && text !== null) commitTextRef.current(text)
-      }
+      cancelPendingBlur()
       cancelPendingTextCommit()
     }
   }, [])
@@ -1048,7 +1095,8 @@ function TextElementContent({
       onCompositionEnd={() => {
         isComposingRef.current = false
         if (!editing) return
-        scheduleTextCommit()
+        if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
+        else scheduleTextCommit()
       }}
       onPointerDown={(event) => {
         if (!editable) return
@@ -1070,18 +1118,9 @@ function TextElementContent({
         }
       }}
       onBlur={(event) => {
-        const target = event.currentTarget
         cancelPendingTextCommit()
-        if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
-        pendingBlurTextRef.current = target.textContent ?? ''
-        blurFrameRef.current = window.requestAnimationFrame(() => {
-          blurFrameRef.current = null
-          pendingBlurTextRef.current = null
-          if (!editingRef.current || window.document.activeElement === target) return
-          isComposingRef.current = false
-          commitText(target.textContent ?? '')
-          onFinishTextEdit?.()
-        })
+        pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
+        scheduleBlurCommit()
       }}
     >
       {editing

@@ -16,6 +16,7 @@ export interface PresentationSessionRegistry {
   hasUnsafeWork(): boolean
   getUnsafeItemIds(): string[]
   subscribe(listener: () => void): () => void
+  registerEditorFinalizer?(itemId: string, finalize: () => boolean): () => void
 }
 
 const PresentationSessionRegistryContext = createContext<PresentationSessionRegistry | null>(null)
@@ -33,6 +34,7 @@ export function PresentationSessionRegistryProvider({
   const sessionsRef = useRef(new Map<string, PresentationEditorSession>())
   const openingRef = useRef(new Map<string, Promise<PresentationEditorSession>>())
   const sessionUnsubscribersRef = useRef(new Map<string, () => void>())
+  const editorFinalizersRef = useRef(new Map<string, () => boolean>())
   const listenersRef = useRef(new Set<() => void>())
 
   const registry = useMemo<PresentationSessionRegistry>(() => {
@@ -103,6 +105,9 @@ export function PresentationSessionRegistryProvider({
         .filter(([, session]) => isSessionUnsafe(session))
         .map(([itemId]) => itemId)
 
+    const finalizeEditor = (itemId: string): boolean =>
+      editorFinalizersRef.current.get(itemId)?.() ?? true
+
     return {
       open,
       get: (itemId) => sessionsRef.current.get(itemId),
@@ -112,6 +117,7 @@ export function PresentationSessionRegistryProvider({
         if (previousItemId === itemId) return true
         const previousSession = previousItemId ? sessionsRef.current.get(previousItemId) : undefined
         if (previousSession) {
+          if (!finalizeEditor(previousItemId!)) return false
           try {
             await previousSession.flush()
           } catch {
@@ -125,6 +131,7 @@ export function PresentationSessionRegistryProvider({
         if (decision === 'keep-editing') return false
         const session = sessionsRef.current.get(itemId)
         if (session) {
+          if (!finalizeEditor(itemId)) return false
           if (decision === 'discard') {
             await session.discard()
           } else {
@@ -138,16 +145,23 @@ export function PresentationSessionRegistryProvider({
           sessionUnsubscribersRef.current.delete(itemId)
           session.dispose()
           sessionsRef.current.delete(itemId)
+          editorFinalizersRef.current.delete(itemId)
         }
         usePresentationWorkspaceStore.getState().closeDocument(itemId)
         notify()
         return true
       },
       flushAll: async () => {
+        for (const itemId of editorFinalizersRef.current.keys()) {
+          if (!finalizeEditor(itemId)) throw new Error('Text composition is still active')
+        }
         const unsafeSessions = [...sessionsRef.current.values()].filter(isSessionUnsafe)
         await Promise.all(unsafeSessions.map((session) => session.flush()))
       },
       discardAll: async () => {
+        for (const itemId of editorFinalizersRef.current.keys()) {
+          if (!finalizeEditor(itemId)) throw new Error('Text composition is still active')
+        }
         const unsafeSessions = [...sessionsRef.current.values()].filter(isSessionUnsafe)
         await Promise.all(unsafeSessions.map((session) => session.discard()))
       },
@@ -156,6 +170,14 @@ export function PresentationSessionRegistryProvider({
       subscribe: (listener) => {
         listenersRef.current.add(listener)
         return () => listenersRef.current.delete(listener)
+      },
+      registerEditorFinalizer: (itemId, finalize) => {
+        editorFinalizersRef.current.set(itemId, finalize)
+        return () => {
+          if (editorFinalizersRef.current.get(itemId) === finalize) {
+            editorFinalizersRef.current.delete(itemId)
+          }
+        }
       }
     }
   }, [])
@@ -166,6 +188,7 @@ export function PresentationSessionRegistryProvider({
       for (const session of sessionsRef.current.values()) session.dispose()
       sessionUnsubscribersRef.current.clear()
       sessionsRef.current.clear()
+      editorFinalizersRef.current.clear()
       openingRef.current.clear()
       listenersRef.current.clear()
     },

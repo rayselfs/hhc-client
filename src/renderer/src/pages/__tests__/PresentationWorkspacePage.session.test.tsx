@@ -915,11 +915,11 @@ describe('PresentationWorkspacePage session integration', () => {
 
     expect(
       registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
-    ).toMatchObject({ width: 104 })
+    ).toMatchObject({ text: 'Pending blur text', width: 104 })
     act(() => registry!.get('deck-1')!.undo())
     expect(
       registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
-    ).toMatchObject({ width: 80 })
+    ).toMatchObject({ text: 'Pending blur text', width: 80 })
   })
 
   it('does not expose dimensions-only Slide Size controls', async () => {

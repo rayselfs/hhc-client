@@ -184,9 +184,15 @@ describe('PresentationSessionRegistryContext', () => {
     )
     await registry!.open(firstItem)
     await registry!.open(secondItem)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(firstItem.id, finalize)
 
     await expect(registry!.activate(secondItem.id)).resolves.toBe(true)
 
+    expect(finalize).toHaveBeenCalledTimes(1)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(firstSession.flush).mock.invocationCallOrder[0]
+    )
     expect(firstSession.flush).toHaveBeenCalledTimes(1)
     expect(usePresentationWorkspaceStore.getState().activeItemId).toBe(secondItem.id)
   })
@@ -267,9 +273,15 @@ describe('PresentationSessionRegistryContext', () => {
       </PresentationSessionRegistryProvider>
     )
     await registry!.open(item)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(item.id, finalize)
 
     await expect(registry!.close(item.id)).resolves.toBe(true)
 
+    expect(finalize).toHaveBeenCalledTimes(1)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.flush).mock.invocationCallOrder[0]
+    )
     expect(session.flush).toHaveBeenCalledTimes(1)
     expect(session.dispose).toHaveBeenCalledTimes(1)
     expect(registry!.get(item.id)).toBeUndefined()
@@ -292,9 +304,15 @@ describe('PresentationSessionRegistryContext', () => {
       </PresentationSessionRegistryProvider>
     )
     await registry!.open(item)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(item.id, finalize)
 
     await expect(registry!.close(item.id, 'discard')).resolves.toBe(true)
 
+    expect(finalize).toHaveBeenCalledTimes(1)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.discard).mock.invocationCallOrder[0]
+    )
     expect(session.discard).toHaveBeenCalledTimes(1)
     expect(session.flush).not.toHaveBeenCalled()
     expect(session.dispose).toHaveBeenCalledTimes(1)

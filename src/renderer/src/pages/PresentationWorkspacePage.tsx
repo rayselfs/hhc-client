@@ -597,6 +597,7 @@ function EditableSessionDocumentView({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const { showMenu } = useContextMenu()
+  const registry = usePresentationSessionRegistry()
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
   const setActiveSlideId = usePresentationWorkspaceStore((state) => state.setActiveSlideId)
   const storedActiveSlideId = usePresentationWorkspaceStore((state) =>
@@ -621,6 +622,7 @@ function EditableSessionDocumentView({
   const canvasViewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
+  const textEditorFinalizerRef = useRef<(() => boolean) | null>(null)
   const pendingZoomAnchorRef = useRef<{
     clientX: number
     clientY: number
@@ -656,6 +658,19 @@ function EditableSessionDocumentView({
     vertical?: number
     horizontal?: number
   }>({})
+
+  const finalizeTextEditor = useCallback(
+    (): boolean => textEditorFinalizerRef.current?.() ?? true,
+    []
+  )
+  const setTextEditorFinalizer = useCallback((finalize: (() => boolean) | null): void => {
+    textEditorFinalizerRef.current = finalize
+  }, [])
+
+  useEffect(
+    () => registry.registerEditorFinalizer?.(deck.itemId, finalizeTextEditor),
+    [deck.itemId, finalizeTextEditor, registry]
+  )
   const pressedRibbonTimeoutRef = useRef<number | null>(null)
   const projectionPlaylist = useMediaProjectionStore((state) => state.playlist)
   const projectionIndex = useMediaProjectionStore((state) => state.currentIndex)
@@ -733,13 +748,15 @@ function EditableSessionDocumentView({
     storedActiveSlideId
   ])
 
-  const activateSlide = (slideId: string | null): void => {
+  const activateSlide = (slideId: string | null): boolean => {
+    if (!finalizeTextEditor()) return false
     commitNotes()
     if (slideId) {
       const index = document.slideOrder.indexOf(slideId)
       if (index >= 0) setLastActiveSlideIndex(index)
     }
     setActiveSlideId(deck.itemId, slideId)
+    return true
   }
 
   const activeSlide = activeSlideId ? document.slides[activeSlideId] : null
@@ -777,6 +794,7 @@ function EditableSessionDocumentView({
   }
 
   const commitDocument = (nextDocument: EditablePresentationDocument): void => {
+    if (!finalizeTextEditor()) return
     clearTextCommitTimer()
     session.commit(nextDocument)
   }
@@ -985,6 +1003,7 @@ function EditableSessionDocumentView({
   const selectSlide = (index: number, event: React.MouseEvent | React.KeyboardEvent): void => {
     const slideId = document.slideOrder[index]
     if (!slideId) return
+    if (!finalizeTextEditor()) return
     commitTextDraft()
 
     if (event.shiftKey) {
@@ -1069,9 +1088,14 @@ function EditableSessionDocumentView({
 
   const deleteSlide = (): void => {
     if (!document || document.slideOrder.length <= 1) return
-    const removingIds = getSelectedSlideIds()
+    if (!finalizeTextEditor()) return
+    const currentDocument = session.getSnapshot().renderedDocument
+    const removingIds = currentDocument.slideOrder.filter((slideId) =>
+      selectedSlideIds.has(slideId)
+    )
+    if (removingIds.length === 0 && activeSlideId) removingIds.push(activeSlideId)
     if (removingIds.length === 0) return
-    const nextDocument = removeEditableSlides(document, removingIds)
+    const nextDocument = removeEditableSlides(currentDocument, removingIds)
     const nextIndex = Math.min(activeSlideIndex, Math.max(0, nextDocument.slideOrder.length - 1))
     const nextSlideId = nextDocument.slideOrder[nextIndex]
     commitDocument(nextDocument)
@@ -1083,11 +1107,11 @@ function EditableSessionDocumentView({
   }
 
   const deleteElement = (): void => {
-    if (editingElementId) return
     if (!document || !activeSlideId || selectedElementIds.size === 0) return
+    if (!finalizeTextEditor()) return
     const nextDocument = [...selectedElementIds].reduce(
       (current, elementId) => removeElementFromSlide(current, activeSlideId, elementId),
-      document
+      session.getSnapshot().renderedDocument
     )
     commitDocument(nextDocument)
     setSelectedElementId(null)
@@ -1994,6 +2018,7 @@ function EditableSessionDocumentView({
         )
         const nextSlideId = document.slideOrder[nextIndex]
         if (nextSlideId && nextSlideId !== activeSlideId) {
+          if (!finalizeTextEditor()) return
           commitTextDraft()
           activateSlide(nextSlideId)
           setSelectedSlideIds(new Set([nextSlideId]))
@@ -2322,6 +2347,7 @@ function EditableSessionDocumentView({
                         if (elementId === null) commitTextDraft()
                         setEditingElementId(elementId)
                       }}
+                      onTextEditFinalizerChange={setTextEditorFinalizer}
                       onInsertText={addTextElement}
                       onElementContextMenu={showElementContextMenu}
                       onTransformStart={() => session.beginDraft('pointer')}

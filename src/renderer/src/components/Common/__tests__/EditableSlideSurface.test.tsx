@@ -319,7 +319,7 @@ describe('EditableSlideSurface', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('contenteditable', 'true')
   })
 
-  it('persists pending blur text when the editor unmounts', () => {
+  it('does not write pending blur text from passive editor unmount', () => {
     const flushAnimationFrame = mockAnimationFrame()
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -344,10 +344,59 @@ describe('EditableSlideSurface', () => {
     unmount()
     act(() => flushAnimationFrame())
 
+    expect(handleUpdate).not.toHaveBeenCalled()
+  })
+
+  it('defers a composing blur finalization until compositionend and keeps auto-size geometry', () => {
+    mockTextMeasurement()
+    const flushAnimationFrame = mockAnimationFrame()
+    const handleUpdate = vi.fn()
+    let finalize: () => boolean = () => true
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'First',
+      width: 80,
+      height: 30,
+      autoSize: 'content',
+      autoWidth: true
+    })
+    const withText = addElementToSlide(document, slideId, text)
+    render(
+      <>
+        <button type="button">Finish composition</button>
+        <EditableSlideSurface
+          document={withText}
+          slideId={slideId}
+          editable
+          selectedElementId={text.id}
+          editingElementId={text.id}
+          onUpdateElement={handleUpdate}
+          onTextEditFinalizerChange={(next) => {
+            if (next) finalize = next
+          }}
+        />
+      </>
+    )
+
+    const textBox = screen.getByRole('textbox')
+    fireEvent.compositionStart(textBox)
+    textBox.textContent = 'Final title'
+    screen.getByRole('button', { name: 'Finish composition' }).focus()
+    fireEvent.blur(textBox)
+    act(() => flushAnimationFrame())
+
+    expect(finalize()).toBe(false)
+    expect(handleUpdate).not.toHaveBeenCalled()
+
+    fireEvent.compositionEnd(textBox)
+    act(() => flushAnimationFrame())
+
+    expect(handleUpdate).toHaveBeenCalledTimes(1)
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
       text.id,
-      expect.objectContaining({ text: 'Final text' })
+      expect.objectContaining({ text: 'Final title', width: 148, height: 82 })
     )
   })
 
