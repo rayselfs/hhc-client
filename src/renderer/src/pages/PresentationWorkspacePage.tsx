@@ -1947,7 +1947,7 @@ function EditableSessionDocumentView({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.defaultPrevented) return
-      const target = event.target instanceof HTMLElement ? event.target : null
+      const target = event.target instanceof Element ? event.target : null
       if (target?.closest('[role="menu"], [role="dialog"]')) return
       const isFormControl = Boolean(target?.closest('input, select, textarea'))
       if (isFormControl) return
@@ -1959,7 +1959,8 @@ function EditableSessionDocumentView({
         (event.key === 'Delete' || event.key === 'Backspace')
       if (isActionControl && !isTabDelete) return
       const isContentEditable =
-        target?.isContentEditable || target?.getAttribute('contenteditable') === 'true'
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.getAttribute('contenteditable') === 'true')
       if (isContentEditable && event.key !== 'Escape') return
 
       if (event.key === 'Escape') {

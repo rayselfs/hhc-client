@@ -561,6 +561,26 @@ describe('PresentationWorkspacePage session integration', () => {
       'contenteditable',
       'false'
     )
+
+    const svg = shapes.querySelector('svg')
+    expect(svg).not.toBeNull()
+    const label = document.createElement('span')
+    shapes.appendChild(label)
+    for (const target of [svg!, label]) {
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        code: 'Enter',
+        key: 'Enter'
+      })
+      act(() => target.dispatchEvent(event))
+
+      expect(event.defaultPrevented).toBe(false)
+      expect(document.querySelector('.presentation-stage [data-text-content]')).toHaveAttribute(
+        'contenteditable',
+        'false'
+      )
+    }
   })
 
   it.each(['menu', 'dialog'] as const)(
