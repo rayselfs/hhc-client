@@ -51,8 +51,19 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
 }))
 
 vi.mock('@renderer/components/Common/PptxSlideSurface', () => ({
-  default: ({ source }: { source: { url: string } }) => (
-    <div data-testid="pptx-surface" data-source-url={source.url} />
+  default: ({
+    source,
+    verifyNativeFile
+  }: {
+    source: { id: string; url: string }
+    verifyNativeFile?: boolean
+  }) => (
+    <div
+      data-testid="pptx-surface"
+      data-source-id={source.id}
+      data-source-url={source.url}
+      data-verify-native-file={String(verifyNativeFile)}
+    />
   )
 }))
 
@@ -156,6 +167,22 @@ describe('FileProjection copied media identity', () => {
       })
     })
     expect(getByAltText('copy.png')).toHaveAttribute('src', 'blob:projection-source')
+  })
+
+  it('reuses an authorized native PPT source without another native availability check', () => {
+    const { getByTestId } = render(
+      <FileProjection
+        fileName="copy.pptx"
+        initialItemId="copied-item"
+        initialBlobId="source-blob"
+        initialMimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      />
+    )
+
+    const surface = getByTestId('pptx-surface')
+    expect(surface).toHaveAttribute('data-source-id', 'copied-item')
+    expect(surface).toHaveAttribute('data-source-url', 'blob:source-blob')
+    expect(surface).toHaveAttribute('data-verify-native-file', 'false')
   })
 
   it('applies video seek after metadata is available', async () => {

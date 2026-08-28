@@ -28,7 +28,7 @@ import {
   useFavoritesExplorerSettings,
   useTrashExplorerSettings
 } from '@renderer/stores/file-explorer'
-import { getPresentableItems } from '@renderer/lib/presentability'
+import { getProjectionPlaylist } from '@renderer/lib/presentability'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import {
@@ -78,7 +78,7 @@ export default function Header(): React.JSX.Element {
   const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
   const presentableItems = useMemo(
     () =>
-      getPresentableItems(
+      getProjectionPlaylist(
         fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
       ),
     [currentFolderId, fileItems]

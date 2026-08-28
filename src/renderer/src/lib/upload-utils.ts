@@ -1,6 +1,6 @@
 import { toast } from '@heroui/react/toast'
 import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
+import { generateThumbnail, yieldToMain } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail } from '@renderer/lib/thumbnail-db'
 import { isWeb } from '@renderer/lib/env'
 import {
@@ -259,6 +259,7 @@ export async function uploadFolderFiles(
         const parentId =
           depth === 1 ? currentFolderId : (pathToFolderId.get(parentPath) ?? currentFolderId)
         const id = addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
+        await yieldToMain()
         pathToFolderId.set(folderPath, id)
       }
     }
@@ -324,6 +325,7 @@ export async function uploadFromDataTransfer(
         const parentId =
           depth === 1 ? targetFolderId : (pathToFolderId.get(parentPath) ?? targetFolderId)
         const id = addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
+        await yieldToMain()
         pathToFolderId.set(folderPath, id)
       }
     }

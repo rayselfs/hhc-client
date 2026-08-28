@@ -18,7 +18,8 @@ vi.mock('@renderer/stores/file-explorer', () => ({
 
 vi.mock('@renderer/lib/thumbnail-generator', () => ({
   generateThumbnail: vi.fn().mockResolvedValue(null),
-  generateAllPdfPageThumbnails: vi.fn().mockResolvedValue([])
+  generateAllPdfPageThumbnails: vi.fn().mockResolvedValue([]),
+  yieldToMain: vi.fn().mockResolvedValue(undefined)
 }))
 
 vi.mock('@renderer/lib/thumbnail-db', () => ({
@@ -42,6 +43,7 @@ vi.mock('@renderer/lib/media-job-queue', () => ({
 import { toast } from '@heroui/react/toast'
 import { addFileItemToStore } from '@renderer/stores/file-explorer'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
+import { yieldToMain } from '@renderer/lib/thumbnail-generator'
 import { isWeb } from '@renderer/lib/env'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -65,6 +67,18 @@ function setStorageEstimate(estimate?: StorageEstimate): void {
     configurable: true,
     value: estimate ? { estimate: vi.fn().mockResolvedValue(estimate) } : undefined
   })
+}
+
+function expectFolderYieldOrder(addFolder: { mock: { invocationCallOrder: number[] } }): void {
+  const addFolderCalls = addFolder.mock.invocationCallOrder
+  const yieldCalls = vi.mocked(yieldToMain).mock.invocationCallOrder
+
+  expect(addFolderCalls).toHaveLength(3)
+  expect(yieldCalls).toHaveLength(3)
+  for (let index = 0; index < 3; index++) {
+    expect(addFolderCalls[index]).toBeLessThan(yieldCalls[index])
+    if (index < 2) expect(yieldCalls[index]).toBeLessThan(addFolderCalls[index + 1])
+  }
 }
 
 beforeEach(async () => {
@@ -225,6 +239,79 @@ describe('uploadFiles web preflight', () => {
 
     expect(addFileItemToStore).toHaveBeenCalledWith(supported, 'id-Sunday', 'video/x-matroska')
     expect(toast.warning).not.toHaveBeenCalled()
+  })
+})
+
+describe('folder upload yielding', () => {
+  beforeEach(() => {
+    vi.mocked(isWeb).mockReturnValue(false)
+  })
+
+  it('yields once for each newly created nested folder, not duplicate paths', async () => {
+    const addFolder = vi.fn((name: string) => `id-${name}`)
+    vi.mocked(useFileExplorerStore.getState).mockReturnValue({
+      addFolder,
+      getChildFolders: vi.fn(() => [])
+    } as never)
+    const files = [
+      setRelativePath(makeFile('a.png', 100), 'Root/One/a.png'),
+      setRelativePath(makeFile('b.png', 100), 'Root/One/b.png'),
+      setRelativePath(makeFile('c.png', 100), 'Root/One/c.png'),
+      setRelativePath(makeFile('d.png', 100), 'Root/Two/d.png')
+    ]
+
+    await uploadFolderFiles(files, 'root', addFolder)
+
+    expect(addFolder).toHaveBeenCalledTimes(3)
+    expect(yieldToMain).toHaveBeenCalledTimes(3)
+    expectFolderYieldOrder(addFolder)
+  })
+
+  it('yields once for each newly created dragged nested folder, not duplicate paths', async () => {
+    const addFolder = vi.fn((name: string) => `id-${name}`)
+    vi.mocked(useFileExplorerStore.getState).mockReturnValue({
+      addFolder,
+      getChildFolders: vi.fn(() => [])
+    } as never)
+    const fileEntry = (file: File): object => ({
+      isFile: true,
+      isDirectory: false,
+      name: file.name,
+      file: (resolve: (value: File) => void) => resolve(file)
+    })
+    const directoryEntry = (name: string, entries: object[]): object => {
+      let read = false
+      return {
+        isFile: false,
+        isDirectory: true,
+        name,
+        createReader: () => ({
+          readEntries: (resolve: (value: object[]) => void) => {
+            const batch = read ? [] : entries
+            read = true
+            resolve(batch)
+          }
+        })
+      }
+    }
+    const root = directoryEntry('Root', [
+      directoryEntry('One', [
+        fileEntry(makeFile('a.png', 100)),
+        fileEntry(makeFile('b.png', 100)),
+        fileEntry(makeFile('c.png', 100))
+      ]),
+      directoryEntry('Two', [fileEntry(makeFile('d.png', 100))])
+    ])
+    const items = {
+      0: { webkitGetAsEntry: () => root },
+      length: 1
+    } as unknown as DataTransferItemList
+
+    await uploadFromDataTransfer(items, 'root')
+
+    expect(addFolder).toHaveBeenCalledTimes(3)
+    expect(yieldToMain).toHaveBeenCalledTimes(3)
+    expectFolderYieldOrder(addFolder)
   })
 })
 

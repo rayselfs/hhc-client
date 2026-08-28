@@ -61,7 +61,7 @@ import {
   getSlideBackgroundPrimaryColor,
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
-  INSERTED_TEXT_FONT_SIZE,
+  INSERTED_TEXT_FONT_SIZE_POINTS,
   insertBlankEditableSlide,
   normalizeSlideBackground,
   presentationCanvasPxToPoints,
@@ -118,7 +118,9 @@ type RibbonTab = 'home' | 'insert' | 'design' | 'picture' | 'text'
 type PresentationElementType = EditablePresentationElement['type']
 
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
-const FONT_SIZES = [12, 14, 16, 18, 24, 32, 44, 56, 72, 96]
+const FONT_SIZES = [
+  8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96
+]
 const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
 const BASE_RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
 const NATIVE_CONTROL_CLASS =
@@ -830,14 +832,16 @@ function EditableSessionDocumentView({
       autoSize === 'content'
         ? nextFrame.height
         : Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.height, nextFrame.height)
+    const fontSize = presentationPointsToCanvasPx(INSERTED_TEXT_FONT_SIZE_POINTS, document.width)
+    const textHeight = Math.max(height, Math.ceil(fontSize * 1.15))
     const element = createTextElement({
       x: Math.max(0, Math.min(document.width - width, nextFrame.x)),
-      y: Math.max(0, Math.min(document.height - height, nextFrame.y)),
+      y: Math.max(0, Math.min(document.height - textHeight, nextFrame.y)),
       width,
-      height,
+      height: textHeight,
       autoWidth: autoSize === 'content',
       autoSize,
-      fontSize: INSERTED_TEXT_FONT_SIZE,
+      fontSize,
       text: ''
     })
     commitDocument(addElementToSlide(document, activeSlideId, element))
@@ -1408,13 +1412,13 @@ function EditableSessionDocumentView({
       >
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.font', 'Font')}
-          className="w-[520px]"
+          className="w-[440px]"
         >
           <div className="grid h-full grid-rows-2 gap-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <select
                 aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
-                className={`h-9 w-64 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                className={`h-9 min-w-44 flex-1 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
                 onChange={(event) =>
@@ -1441,7 +1445,7 @@ function EditableSessionDocumentView({
                 </button>
               )}
               <select
-                className={`h-9 w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={
                   selectedTextElement && document
@@ -1488,18 +1492,6 @@ function EditableSessionDocumentView({
               >
                 <span className="text-sm leading-none">A</span>
                 <ChevronDown className="size-3" />
-              </button>
-              <button
-                type="button"
-                className={textButtonClass(false, 'clear-formatting')}
-                disabled={textDisabled}
-                onClick={() => {
-                  flashRibbonAction('clear-formatting')
-                  clearTextFormatting()
-                }}
-                aria-label={t('presentationWorkspace.clearFormatting', 'Clear formatting')}
-              >
-                <Eraser size={18} />
               </button>
             </div>
             <div className="flex items-center gap-1">
@@ -1559,6 +1551,18 @@ function EditableSessionDocumentView({
                   }
                 />
               </label>
+              <button
+                type="button"
+                className={textButtonClass(false, 'clear-formatting')}
+                disabled={textDisabled}
+                onClick={() => {
+                  flashRibbonAction('clear-formatting')
+                  clearTextFormatting()
+                }}
+                aria-label={t('presentationWorkspace.clearFormatting', 'Clear formatting')}
+              >
+                <Eraser size={18} />
+              </button>
             </div>
           </div>
         </RibbonGroup>

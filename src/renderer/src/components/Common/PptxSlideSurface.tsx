@@ -13,6 +13,7 @@ interface PptxSlideSurfaceProps {
   source: PresentationSource
   slideIndex: number
   className?: string
+  verifyNativeFile?: boolean
   onReady?: (info: { slideCount: number; width: number; height: number }) => void
   onError?: (error: Error) => void
 }
@@ -21,6 +22,7 @@ export default function PptxSlideSurface({
   source,
   slideIndex,
   className,
+  verifyNativeFile,
   onReady,
   onError
 }: PptxSlideSurfaceProps): React.JSX.Element {
@@ -50,11 +52,14 @@ export default function PptxSlideSurface({
       setStatus('loading')
       setError(null)
       try {
-        const buffer = await readPresentationArrayBuffer({
-          id: sourceId,
-          url: sourceUrl,
-          mimeType: sourceMimeType
-        })
+        const buffer = await readPresentationArrayBuffer(
+          {
+            id: sourceId,
+            url: sourceUrl,
+            mimeType: sourceMimeType
+          },
+          { verifyNativeFile }
+        )
         if (cancelled) return
         const handle = await openPptxViewer(buffer, target, { renderMode: 'slide' })
         if (cancelled) {
@@ -84,7 +89,7 @@ export default function PptxSlideSurface({
       viewerRef.current?.destroy()
       viewerRef.current = null
     }
-  }, [onError, onReady, sourceId, sourceMimeType, sourceUrl])
+  }, [onError, onReady, sourceId, sourceMimeType, sourceUrl, verifyNativeFile])
 
   useEffect(() => {
     const current = viewerRef.current

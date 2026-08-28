@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react'
+import { render, renderHook, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createFolderContextMenu } from '../createFolderContextMenu'
 
@@ -28,6 +28,13 @@ describe('createFolderContextMenu HHC LINE action', () => {
     const entries = showMenu.mock.calls[0][0]
     const action = entries.find((entry: { id?: string }) => entry?.id === 'add-hhc-line')
     expect(action.label).toBe('folder.contextMenu.addHhcLine')
+    expect(action.iconSlotClassName).toBe('size-10')
+    render(action.icon)
+    expect(screen.getByRole('img', { name: 'LINE' })).toHaveAttribute(
+      'src',
+      expect.stringContaining('line-brand-icon')
+    )
+    expect(document.querySelector('svg.lucide-cloud')).not.toBeInTheDocument()
     action.onAction()
     expect(onAddHhcLine).toHaveBeenCalledTimes(1)
   })

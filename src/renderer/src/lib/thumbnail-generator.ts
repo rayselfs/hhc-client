@@ -7,7 +7,7 @@ const THUMBNAIL_MAX_SIZE = 256
 const JPEG_QUALITY = 0.8
 const MAX_PDF_THUMBNAIL_SIZE = 50 * 1024 * 1024
 
-const yieldToMain = (): Promise<void> =>
+export const yieldToMain = (): Promise<void> =>
   typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function'
     ? scheduler.yield()
     : new Promise<void>((resolve) => setTimeout(resolve, 0))
@@ -70,6 +70,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 
 async function generateImageThumbnail(file: File): Promise<string | null> {
   const image = await loadImage(file)
+  await yieldToMain()
   const dataUrl = drawContainFit(image, image.naturalWidth, image.naturalHeight)
   await yieldToMain()
   return dataUrl
@@ -146,6 +147,7 @@ async function generatePdfThumbnail(file: File): Promise<string | null> {
 
     await page.render({ canvas, canvasContext: context, viewport: renderViewport }).promise
 
+    await yieldToMain()
     return drawContainFit(canvas, canvas.width, canvas.height, '#ffffff')
   } finally {
     await pdf.loadingTask.destroy()
@@ -205,6 +207,7 @@ export async function generateAllPdfPageThumbnails(
           context.fillStyle = '#ffffff'
           context.fillRect(0, 0, canvas.width, canvas.height)
           await page.render({ canvas, canvasContext: context, viewport: renderViewport }).promise
+          await yieldToMain()
           const dataUrl = drawContainFit(canvas, canvas.width, canvas.height, '#ffffff')
           if (dataUrl) dataUrls.push(dataUrl)
         }

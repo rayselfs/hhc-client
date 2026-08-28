@@ -143,7 +143,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       if (Number.isInteger(parsedIndex) && parsedIndex >= 0) slideIndex = parsedIndex
     }
     if (from === 'beginning') slideIndex = 0
-    await startMediaProjection(
+    const report = await startMediaProjection(
       [item],
       0,
       { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
@@ -155,6 +155,9 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         }
       }
     )
+    if (report.items.find((entry) => entry.itemId === item.id)?.status === 'ready') {
+      navigate('/media')
+    }
   }
 
   const runPresentAction = (from: 'beginning' | 'current'): void => {
@@ -213,12 +216,12 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   )
 
   return (
-    <header className="relative flex h-11 shrink-0 items-end gap-1 bg-content1/80 px-3">
+    <header className="relative flex h-14 shrink-0 items-center gap-1 bg-content1/80 px-2">
       <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-divider" />
       <Button
         isIconOnly
         variant="ghost"
-        className="relative z-10 mb-1"
+        className="relative z-10"
         onPress={() => void runPresentationSafeAction(() => navigate('/files'))}
         aria-label={t('presentationWorkspace.backToFiles')}
       >
@@ -227,7 +230,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       <Button
         isIconOnly
         variant="ghost"
-        className="relative z-10 mb-1"
+        className="relative z-10"
         isDisabled={!canUndo}
         onPress={() => activeSession?.undo()}
         aria-label={t('presentationWorkspace.undo', 'Undo')}
@@ -237,7 +240,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       <Button
         isIconOnly
         variant="ghost"
-        className="relative z-10 mb-1"
+        className="relative z-10"
         isDisabled={!canRedo}
         onPress={() => activeSession?.redo()}
         aria-label={t('presentationWorkspace.redo', 'Redo')}
@@ -249,7 +252,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
           key={deck.itemId}
           role="button"
           tabIndex={0}
-          className={`relative flex h-10 max-w-56 items-center gap-2 rounded-t-xl border px-3 text-sm ${
+          className={`relative flex h-10 max-w-56 self-end items-center gap-2 rounded-t-xl border px-3 text-sm ${
             deck.itemId === activeItemId
               ? 'z-20 -mb-px border-divider border-b-background bg-background text-foreground shadow-sm'
               : 'z-10 mb-px border-transparent bg-content2 text-default-500 hover:text-foreground'
@@ -312,7 +315,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         </div>
       ))}
       {activeDocument?.saveStatus && (
-        <div className="relative z-10 mb-1 ml-2 flex items-center gap-2 text-xs text-default-500">
+        <div className="relative z-10 ml-2 flex items-center gap-2 text-xs text-default-500">
           <span role={activeDocument.saveStatus === 'error' ? 'alert' : undefined}>
             {t(
               `presentationWorkspace.saveStatus.${activeDocument.saveStatus}`,
@@ -335,7 +338,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
           )}
         </div>
       )}
-      <div className="relative z-10 mb-1 ml-auto flex items-center">
+      <div className="relative z-10 ml-auto flex items-center">
         <Button
           size="lg"
           isIconOnly

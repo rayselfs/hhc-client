@@ -169,7 +169,7 @@ const DEFAULT_FONT_FAMILY = 'Inter Variable'
 export const DEFAULT_SLIDE_BACKGROUND_COLOR = '#ffffff'
 const DEFAULT_FOREGROUND_COLOR = '#111827'
 export type EditableTextAutoSize = 'content' | 'fixed'
-export const INSERTED_TEXT_FONT_SIZE = 24
+export const INSERTED_TEXT_FONT_SIZE_POINTS = 18
 export const INSERTED_TEXT_CLICK_SIZE = { width: 24, height: 32 } as const
 export const INSERTED_TEXT_DRAG_MIN_SIZE = { width: 80, height: 40 } as const
 export const INSERTED_IMAGE_MAX_SLIDE_RATIO = 0.6
@@ -387,7 +387,8 @@ export function createTextElement(
     (input.autoWidth === true || (input.autoWidth === undefined && input.width == null)
       ? 'content'
       : 'fixed')
-  const fontSize = input.fontSize ?? INSERTED_TEXT_FONT_SIZE
+  const fontSize =
+    input.fontSize ?? presentationPointsToCanvasPx(INSERTED_TEXT_FONT_SIZE_POINTS, DEFAULT_WIDTH)
   const lineHeight = input.lineHeight ?? 1.15
   return {
     id: crypto.randomUUID(),

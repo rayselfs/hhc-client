@@ -1,4 +1,6 @@
-import { renderHook, render, screen, act, fireEvent } from '@testing-library/react'
+import { renderHook, render, screen, act, fireEvent, createEvent } from '@testing-library/react'
+import { FolderSync } from 'lucide-react'
+import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { ContextMenuProvider, useContextMenu, type ContextMenuEntry } from '../ContextMenuContext'
 
 function renderWithProvider(ui: React.ReactElement): ReturnType<typeof render> {
@@ -25,6 +27,62 @@ describe('ContextMenuContext', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
+  it.each([[[] as ContextMenuEntry[]], [['separator'] as ContextMenuEntry[]]])(
+    'prevents the browser menu but does not render an empty menu for %j',
+    (items) => {
+      function TestComponent(): React.JSX.Element {
+        const { showMenu } = useContextMenu()
+        return (
+          <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+            target
+          </div>
+        )
+      }
+
+      renderWithProvider(<TestComponent />)
+      const target = screen.getByTestId('target')
+      const event = createEvent.contextMenu(target)
+
+      fireEvent(target, event)
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    }
+  )
+
+  it.each([[[] as ContextMenuEntry[]], [['separator'] as ContextMenuEntry[]]])(
+    'closes an open menu and restores its trigger focus for %j',
+    (emptyItems) => {
+      const items: ContextMenuEntry[] = [{ id: 'action', label: 'Action', onAction: vi.fn() }]
+
+      function TestComponent(): React.JSX.Element {
+        const { showMenu } = useContextMenu()
+        return (
+          <>
+            <button type="button" data-testid="trigger" onContextMenu={(e) => showMenu(items, e)}>
+              target
+            </button>
+            <div data-testid="empty-target" onContextMenu={(e) => showMenu(emptyItems, e)}>
+              empty target
+            </div>
+          </>
+        )
+      }
+
+      renderWithProvider(<TestComponent />)
+      const trigger = screen.getByTestId('trigger')
+      trigger.focus()
+      fireEvent.contextMenu(trigger)
+      expect(screen.getByRole('menu')).toBeInTheDocument()
+      expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Action' }))
+
+      fireEvent.contextMenu(screen.getByTestId('empty-target'))
+
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(document.activeElement).toBe(trigger)
+    }
+  )
+
   it('shows menu on showMenu call', () => {
     const items: ContextMenuEntry[] = [{ id: 'copy', label: 'Copy', onAction: vi.fn() }]
 
@@ -46,6 +104,48 @@ describe('ContextMenuContext', () => {
 
     expect(screen.getByRole('menu')).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
+  })
+
+  it('uses the requested LINE icon slot without changing normal icon slots', () => {
+    const items: ContextMenuEntry[] = [
+      {
+        id: 'line',
+        label: 'Sync LINE group',
+        icon: <SyncProviderIcon providerType="hhc-line" />,
+        iconSlotClassName: 'size-10',
+        onAction: vi.fn()
+      },
+      {
+        id: 'local',
+        label: 'Sync local folder',
+        icon: <FolderSync />,
+        onAction: vi.fn()
+      }
+    ]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'))
+
+    const lineItem = screen.getByRole('menuitem', { name: 'Sync LINE group' })
+    const lineSlot = lineItem.querySelector('img[alt="LINE"]')?.parentElement?.parentElement
+    expect(lineItem).toBeInTheDocument()
+    expect(lineSlot).toHaveClass('size-10')
+    expect(lineSlot).toHaveAttribute('aria-hidden', 'true')
+    expect(lineSlot).not.toHaveClass('overflow-hidden')
+    expect(lineSlot?.querySelector('img')).toHaveAttribute('width', '20')
+    expect(lineSlot?.querySelector('img')).toHaveAttribute('height', '20')
+    expect(
+      screen.getByRole('menuitem', { name: 'Sync local folder' }).querySelector(':scope > span')
+    ).toHaveClass('h-4', 'w-4')
   })
 
   it('calls onAction and closes menu on item click', () => {

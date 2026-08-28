@@ -402,7 +402,7 @@ test('restores the HHC account session without storing the access token', async 
 
   await page.getByRole('link', { name: /files/i }).click()
   await page.getByLabel('New').click()
-  await page.getByRole('menuitem', { name: 'Add LINE media folder' }).click()
+  await page.getByRole('menuitem', { name: 'Sync LINE group' }).click()
   await page.getByRole('button', { name: collection.name }).click()
   await page.getByRole('button', { name: 'Add Folder' }).click()
   const importedCollection = page.locator(`span[title="${collection.name}"]`)
@@ -493,6 +493,43 @@ test('restores the HHC account session without storing the access token', async 
   await context.unrouteAll({ behavior: 'ignoreErrors' })
 })
 
+test('excludes presentations from a mixed folder media playlist', async ({ page, context }) => {
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64'
+  )
+
+  await page.goto('/')
+  await completeOnboarding(page)
+  await page.getByRole('link', { name: /files/i }).click()
+  const upload = page.locator('input[type="file"]:not([webkitdirectory])').first()
+  await upload.setInputFiles({ name: 'First.png', mimeType: 'image/png', buffer: png })
+  await upload.setInputFiles({ name: 'Clip.mp4', mimeType: 'video/mp4', buffer: TINY_MP4 })
+  await upload.setInputFiles({
+    name: 'Bulletin.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from(
+      '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0/Kids[]>>endobj\nxref\n0 3\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \ntrailer<</Size 3/Root 1 0 R>>\nstartxref\n109\n%%EOF'
+    )
+  })
+  await upload.setInputFiles(
+    resolve(process.cwd(), 'src/renderer/src/lib/__fixtures__/pptx/text-placeholder-layout.pptx')
+  )
+  await expect(page.getByText('text-placeholder-layout.pptx')).toBeVisible()
+
+  const projectionPromise = context.waitForEvent('page')
+  await page.getByRole('button', { name: /Start projection|開始投影/ }).click()
+  const projection = await projectionPromise
+  await expect(page).toHaveURL(/#\/media$/)
+  await expect(projection.getByRole('img', { name: 'First.png' })).toBeVisible()
+  await page.getByRole('button', { name: /Grid|網格|网格/ }).click()
+
+  await expect(page.getByRole('button', { name: /First\.png 1/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Clip\.mp4 2/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Bulletin\.pdf 3/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /text-placeholder-layout\.pptx/ })).toHaveCount(0)
+})
+
 test('uses full-window Media controls and closes from the control workspace', async ({
   page,
   context
@@ -557,7 +594,7 @@ test('uses full-window Media controls and closes from the control workspace', as
   await expect.poll(() => headerProjection.isClosed()).toBe(true)
 })
 
-test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ page }) => {
+test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await completeOnboarding(page)
@@ -629,6 +666,12 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   await expect(inspector.locator('.workspace-inspector-content-close:visible')).toHaveCount(1)
   await inspector.locator('.workspace-inspector-content-close').click()
   await expect(formatBackgroundTrigger).toBeFocused()
+
+  const projectionPromise = context.waitForEvent('page')
+  await page.getByRole('button', { name: /Start projection|開始投影/ }).click()
+  const projection = await projectionPromise
+  await expect(projection.getByText(/主愛永不止息/)).toBeVisible()
+  await expect(page).toHaveURL(/#\/media$/)
 })
 
 export {}

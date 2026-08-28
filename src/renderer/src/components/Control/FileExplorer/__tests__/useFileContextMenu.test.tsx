@@ -54,6 +54,18 @@ const folder: FolderRecord = {
 
 const folderImage: FileItemRecord = { ...image, id: 'folder-image-1', parentId: folder.id }
 const otherImage: FileItemRecord = { ...image, id: 'other-image', name: 'Other.png' }
+const presentation: FileItemRecord = {
+  ...image,
+  id: 'deck-1',
+  name: 'Deck.pptx',
+  mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+}
+const folderPresentation: FileItemRecord = {
+  ...presentation,
+  id: 'folder-deck-1',
+  parentId: folder.id
+}
+let fileMenuItem: FileItemRecord = image
 
 function ContextMenuProbe(): React.JSX.Element {
   const menu = useFileContextMenu()
@@ -62,7 +74,7 @@ function ContextMenuProbe(): React.JSX.Element {
       <button
         onClick={() => {
           menu.showItemMenu({
-            item: image,
+            item: fileMenuItem,
             isAlreadySelected: true,
             event: { preventDefault: vi.fn(), stopPropagation: vi.fn() } as never,
             setSelected: vi.fn(),
@@ -110,12 +122,22 @@ describe.each(['file', 'folder'] as const)('useFileContextMenu %s Project action
     mocks.navigate.mockReset()
     mocks.showMenu.mockReset()
     mocks.startMediaProjection.mockReset()
+    fileMenuItem = image
     useFileExplorerStore.setState({
       currentFolderId: 'root',
       folders: { [folder.id]: folder },
-      items: { [image.id]: image, [otherImage.id]: otherImage, [folderImage.id]: folderImage },
-      _itemsArray: [image, otherImage, folderImage],
-      _itemsByParent: { root: [image, otherImage], [folder.id]: [folderImage] }
+      items: {
+        [image.id]: image,
+        [otherImage.id]: otherImage,
+        [presentation.id]: presentation,
+        [folderImage.id]: folderImage,
+        [folderPresentation.id]: folderPresentation
+      },
+      _itemsArray: [image, otherImage, presentation, folderImage, folderPresentation],
+      _itemsByParent: {
+        root: [image, otherImage, presentation],
+        [folder.id]: [folderImage, folderPresentation]
+      }
     })
     render(
       <MemoryRouter>
@@ -143,6 +165,24 @@ describe.each(['file', 'folder'] as const)('useFileContextMenu %s Project action
   })
 
   if (kind === 'file') {
+    it('starts a directly requested presentation alone at index zero', async () => {
+      fileMenuItem = presentation
+      mocks.startMediaProjection.mockResolvedValue({
+        summary: { ready: 1 },
+        items: [{ itemId: presentation.id, status: 'ready' }]
+      })
+
+      act(() => openProjectMenu(kind)())
+
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
+      expect(mocks.startMediaProjection).toHaveBeenCalledWith(
+        [presentation],
+        0,
+        expect.any(Object),
+        { prioritizeStartItem: true }
+      )
+    })
+
     it('does not enter Media when another item is ready but the requested item is preparing', async () => {
       mocks.startMediaProjection.mockResolvedValue({
         summary: { ready: 1 },

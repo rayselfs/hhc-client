@@ -18,6 +18,10 @@ import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
+import type {
+  PresentationReadinessReport,
+  PresentationReadinessStatus
+} from '@renderer/lib/presentation-readiness'
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -27,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   loadEditablePresentation: vi.fn(),
   startMediaProjection: vi.fn(),
   stopProjectionSession: vi.fn(),
+  toastDanger: vi.fn(),
   isProjectionOpen: false,
   stopProjection: vi.fn()
 }))
@@ -38,6 +43,10 @@ vi.mock('react-i18next', async () => {
     useTranslation: () => ({ t: (_key: string, fallback?: string) => fallback ?? _key })
   }
 })
+
+vi.mock('@heroui/react/toast', () => ({
+  toast: { danger: mocks.toastDanger, warning: vi.fn() }
+}))
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
@@ -96,6 +105,38 @@ function makeEditableItem(id = 'deck-1'): FileItemRecord {
     url: `blob:${id}`,
     size: 1024,
     mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+  }
+}
+
+function makeReadinessReport(
+  item: FileItemRecord,
+  status: PresentationReadinessStatus,
+  readyItems = 0
+): PresentationReadinessReport {
+  return {
+    summary: {
+      ready: (status === 'ready' ? 1 : 0) + readyItems,
+      preparing: status === 'preparing' ? 1 : 0,
+      unsupported: status === 'unsupported' ? 1 : 0,
+      missing: status === 'missing' ? 1 : 0,
+      failed: status === 'failed' ? 1 : 0
+    },
+    items: [
+      {
+        itemId: item.id,
+        blobId: item.id,
+        status,
+        reason: `${status}-fixture`,
+        support: 'native'
+      },
+      ...Array.from({ length: readyItems }, (_, index) => ({
+        itemId: `other-ready-${index}`,
+        blobId: `other-ready-${index}`,
+        status: 'ready' as const,
+        reason: 'ready-fixture',
+        support: 'native' as const
+      }))
+    ]
   }
 }
 
@@ -178,9 +219,7 @@ describe('PresentationWorkspaceHeader', () => {
       put: vi.fn().mockResolvedValue(undefined)
     }
     mocks.openFileExplorerDB.mockResolvedValue(db)
-    mocks.startMediaProjection.mockResolvedValue({
-      summary: { ready: 1, unsupported: 0, failed: 0 }
-    })
+    mocks.startMediaProjection.mockResolvedValue(makeReadinessReport(item, 'ready'))
     useFileExplorerStore.setState({
       items: { [item.id]: item },
       _itemsArray: [item]
@@ -310,6 +349,54 @@ describe('PresentationWorkspaceHeader', () => {
     })
     expect(session.commitDraft).toHaveBeenCalledTimes(1)
     expect(session.flush).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
+  })
+
+  it('aligns only document tabs to the bottom of the normal 56px header frame', () => {
+    const { container } = renderHeader()
+
+    const header = container.querySelector('header')
+    expect(header).toHaveClass('h-14', 'items-center', 'px-2')
+    expect(header?.querySelector('.mb-1')).toBeNull()
+    expect(screen.getByText('Sunday.lpdeck').closest('[role="button"]')).toHaveClass('self-end')
+    expect(screen.getByRole('button', { name: 'Start projection' })).toHaveClass(
+      'size-10',
+      'min-w-10'
+    )
+  })
+
+  it('keeps the presentation editor open when the requested item failed', async () => {
+    const user = userEvent.setup()
+    mocks.startMediaProjection.mockResolvedValue(makeReadinessReport(item, 'failed', 1))
+    renderHeader()
+
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(1))
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it('keeps the presentation editor open when no items are ready', async () => {
+    const user = userEvent.setup()
+    mocks.startMediaProjection.mockResolvedValue(makeReadinessReport(item, 'preparing'))
+    renderHeader()
+
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(1))
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it('keeps the presentation editor open when projection start is rejected', async () => {
+    const user = userEvent.setup()
+    mocks.startMediaProjection.mockRejectedValue(new Error('projection unavailable'))
+    renderHeader()
+
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(1))
+    expect(mocks.navigate).not.toHaveBeenCalled()
+    expect(mocks.toastDanger).toHaveBeenCalledWith('Unable to save presentation')
   })
 
   it('stops an open projection from the same header button', async () => {
@@ -339,6 +426,7 @@ describe('PresentationWorkspaceHeader', () => {
       expect.any(Object),
       expect.objectContaining({ presentationState: { slideIndex: 0, slideCount: 2 } })
     )
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
 
     fireEvent.keyDown(document, { code: 'F5', key: 'F5', shiftKey: true })
     await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(2))

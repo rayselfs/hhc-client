@@ -72,3 +72,15 @@ export function getPresentableItems(
       isPresentable(item.mimeType, platform)
   )
 }
+
+export function getProjectionPlaylist(
+  items: AnyItemRecord[],
+  requestedItem?: FileItemRecord,
+  platform = getPresentabilityPlatform()
+): FileItemRecord[] {
+  const presentable = getPresentableItems(items, platform)
+  if (requestedItem && getMediaType(requestedItem.mimeType, platform) === 'presentation') {
+    return presentable.filter((item) => item.id === requestedItem.id)
+  }
+  return presentable.filter((item) => getMediaType(item.mimeType, platform) !== 'presentation')
+}

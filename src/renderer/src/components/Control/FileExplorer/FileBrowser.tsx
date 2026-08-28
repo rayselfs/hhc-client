@@ -43,7 +43,7 @@ import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
-import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
+import { getProjectionPlaylist, isPresentable } from '@renderer/lib/presentability'
 import { presentMediaItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
@@ -763,10 +763,10 @@ export function FileBrowser({
         return
       }
       if (file && isPresentable(file.mimeType)) {
-        const presentableFiles = getPresentableItems(sortedFileItems)
+        const playlist = getProjectionPlaylist(sortedFileItems, file)
         void presentMediaItem({
           item: file,
-          playlist: presentableFiles,
+          playlist,
           start: (items, startIndex, _, options) =>
             startMediaProjection(
               items,
@@ -988,16 +988,19 @@ export function FileBrowser({
       {
         config: SHORTCUTS.MEDIA.START_FROM_CURRENT,
         handler: () => {
-          const presentable = getPresentableItems(sortedFileItems)
-          if (presentable.length === 0) {
+          const requestedItem = sortedFileItems.find((item) => selectedIds.has(item.id))
+          const playlist = getProjectionPlaylist(sortedFileItems, requestedItem)
+          if (playlist.length === 0) {
             toast.warning(t('fileExplorer.noProjectableFiles'))
             return
           }
-          const firstSelected = [...selectedIds].find((id) => presentable.some((f) => f.id === id))
-          const idx = firstSelected ? presentable.findIndex((f) => f.id === firstSelected) : 0
+          const startIndex = requestedItem
+            ? playlist.findIndex((entry) => entry.id === requestedItem.id)
+            : 0
+          if (startIndex < 0) return
           void startMediaProjection(
-            presentable,
-            Math.max(0, idx),
+            playlist,
+            startIndex,
             { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
             { prioritizeStartItem: true }
           )

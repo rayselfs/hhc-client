@@ -1,5 +1,6 @@
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
+import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import type { FolderRecord, FolderItem } from '@shared/types/folder'
 import {
   Copy,
@@ -393,7 +394,8 @@ export function createFolderContextMenu(
                     {
                       id: 'add-hhc-line',
                       label: tKey('addHhcLine'),
-                      icon: React.createElement(Cloud, { size: 14 }),
+                      icon: React.createElement(SyncProviderIcon, { providerType: 'hhc-line' }),
+                      iconSlotClassName: 'size-10',
                       disabled: isAddHhcLineDisabled,
                       onAction: onAddHhcLine
                     } as ContextMenuEntry
