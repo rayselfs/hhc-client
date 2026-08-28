@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 import { useState } from 'react'
 import type { ComponentProps, JSX } from 'react'
@@ -6,6 +6,7 @@ import EditableSlideSurface from '../EditableSlideSurface'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
+  createShapeElement,
   createTextElement,
   updateElementInSlide,
   type EditablePresentationDocument,
@@ -709,40 +710,113 @@ describe('EditableSlideSurface', () => {
     )
 
     expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
-    expect(screen.getByLabelText('Resize text box top left')).toHaveClass('rounded-[2px]')
-    expect(screen.getByLabelText('Resize text box top left')).toHaveClass('bg-white')
+    const topLeft = screen.getByLabelText('Resize text box top left')
+    expect(topLeft).toHaveClass('rounded-[2px]')
+    expect(withinResizeHandle(topLeft)).toHaveClass('bg-white')
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box bottom')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Resize element')).not.toBeInTheDocument()
   })
 
-  it.each([0.5, 1, 2])('keeps text selection chrome at 12 screen px at scale %s', (scale) => {
-    mockSurfaceScale(scale)
-    const document = createBlankEditablePresentationDocument('Sunday')
-    const slideId = document.slideOrder[0]
-    const text = createTextElement({ text: 'Resize me' })
-    const withText = addElementToSlide(document, slideId, text)
+  it.each([0.25, 1, 2])(
+    'keeps text resize targets at 24 screen px and visual knobs at 12 px at scale %s',
+    (scale) => {
+      mockSurfaceScale(scale)
+      const document = createBlankEditablePresentationDocument('Sunday')
+      const slideId = document.slideOrder[0]
+      const text = createTextElement({ text: 'Resize me' })
+      const withText = addElementToSlide(document, slideId, text)
 
-    render(
-      <EditableSlideSurface
-        document={withText}
-        slideId={slideId}
-        editable
-        selectedElementId={text.id}
-      />
-    )
+      render(
+        <EditableSlideSurface
+          document={withText}
+          slideId={slideId}
+          editable
+          selectedElementId={text.id}
+        />
+      )
 
-    const handle = screen.getByLabelText('Resize text box top left')
-    const leftEdge = screen.getByTestId('text-frame-edge-left')
-    const frame = screen.getByRole('textbox').parentElement
-    if (!(frame instanceof HTMLElement)) throw new Error('text frame not found')
-    expect(Number.parseFloat(handle.style.width) * scale).toBe(12)
-    expect(Number.parseFloat(handle.style.height) * scale).toBe(12)
-    expect(Number.parseFloat(handle.style.borderWidth) * scale).toBe(1.5)
-    expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
-    expect(Number.parseFloat(frame.style.outlineWidth) * scale).toBe(1.5)
-  })
+      const handle = screen.getByLabelText('Resize text box top left')
+      const indicator = withinResizeHandle(handle)
+      const leftEdge = screen.getByTestId('text-frame-edge-left')
+      const frame = screen.getByRole('textbox').parentElement
+      if (!(frame instanceof HTMLElement)) throw new Error('text frame not found')
+      expect(Number.parseFloat(handle.style.width) * scale).toBeGreaterThanOrEqual(24)
+      expect(Number.parseFloat(handle.style.height) * scale).toBeGreaterThanOrEqual(24)
+      expect(Number.parseFloat(indicator.style.width) * scale).toBe(12)
+      expect(Number.parseFloat(indicator.style.height) * scale).toBe(12)
+      expect(Number.parseFloat(indicator.style.borderWidth) * scale).toBe(1.5)
+      expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
+      expect(Number.parseFloat(frame.style.outlineWidth) * scale).toBe(1.5)
+    }
+  )
+
+  it.each([0.25, 1, 2])(
+    'keeps image, crop, and generic resize targets at least 24 screen px at scale %s',
+    (scale) => {
+      mockSurfaceScale(scale)
+      const source = createBlankEditablePresentationDocument('Sunday')
+      const slideId = source.slideOrder[0]
+      const image: EditableImageElement = {
+        id: 'image-1',
+        type: 'image',
+        assetId: 'asset-1',
+        x: 100,
+        y: 100,
+        width: 320,
+        height: 180,
+        rotation: 0,
+        opacity: 1
+      }
+      const withImage = addElementToSlide(
+        {
+          ...source,
+          assets: {
+            'asset-1': {
+              id: 'asset-1',
+              name: 'photo.png',
+              mimeType: 'image/png',
+              dataUrl: 'data:image/png;base64,AAA='
+            }
+          }
+        },
+        slideId,
+        image
+      )
+      const imageView = render(
+        <EditableSlideSurface
+          document={withImage}
+          slideId={slideId}
+          editable
+          selectedElementId={image.id}
+        />
+      )
+      expectScreenHitTarget(screen.getByLabelText('Resize image right'), scale)
+      imageView.rerender(
+        <EditableSlideSurface
+          document={withImage}
+          slideId={slideId}
+          editable
+          selectedElementId={image.id}
+          cropElementId={image.id}
+        />
+      )
+      expectScreenHitTarget(screen.getByLabelText('Crop image right'), scale)
+      imageView.unmount()
+
+      const shape = createShapeElement('rectangle')
+      render(
+        <EditableSlideSurface
+          document={addElementToSlide(source, slideId, shape)}
+          slideId={slideId}
+          editable
+          selectedElementId={shape.id}
+        />
+      )
+      expectScreenHitTarget(screen.getByLabelText('Resize element'), scale)
+    }
+  )
 
   it.each([0.5, 1, 2])('centres text handles on frame edges at scale %s', (scale) => {
     mockSurfaceScale(scale)
@@ -760,7 +834,7 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    const offset = `${-6 / scale}px`
+    const offset = `${-12.5 / scale}px`
     const expected = {
       'top left': { top: offset, left: offset, transform: '' },
       top: { top: offset, left: '50%', transform: 'translateX(-50%)' },
@@ -798,7 +872,8 @@ describe('EditableSlideSurface', () => {
 
       const handle = screen.getByLabelText('Resize text box top left')
       const edge = screen.getByTestId('text-frame-edge-left')
-      for (const value of [handle.style.width, handle.style.borderWidth, edge.style.width]) {
+      const indicator = withinResizeHandle(handle)
+      for (const value of [handle.style.width, indicator.style.borderWidth, edge.style.width]) {
         expect(Number.parseFloat(value)).toBeGreaterThan(0)
         expect(Number.isFinite(Number.parseFloat(value))).toBe(true)
       }
@@ -844,6 +919,186 @@ describe('EditableSlideSurface', () => {
     const updates = handleUpdate.mock.calls[0]?.[2]
     expect(updates).not.toHaveProperty('height')
     expect(updates).not.toHaveProperty('y')
+  })
+
+  it('resizes fixed text frames by handle direction in one transaction per arrow key', () => {
+    const onTransformStart = vi.fn(() => text)
+    const onTransformPreview = vi.fn()
+    const onTransformCommit = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Keyboard resize',
+      x: 100,
+      y: 80,
+      width: 220,
+      height: 40,
+      autoSize: 'fixed',
+      autoWidth: false
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+        onTransformCommit={onTransformCommit}
+      />
+    )
+
+    fireEvent.keyDown(screen.getByLabelText('Resize text box right'), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByLabelText('Resize text box left'), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByLabelText('Resize text box top'), {
+      key: 'ArrowUp',
+      shiftKey: true
+    })
+
+    expect(onTransformStart).toHaveBeenCalledTimes(3)
+    expect(onTransformPreview.mock.calls.map((call) => call[1])).toEqual([
+      expect.objectContaining({ width: 221 }),
+      expect.objectContaining({ x: 101, width: 219 }),
+      expect.objectContaining({ y: 70, height: 50 })
+    ])
+    expect(onTransformCommit).toHaveBeenCalledTimes(3)
+  })
+
+  it('keeps content-height keyboard resize horizontal-only', () => {
+    const onTransformStart = vi.fn(() => text)
+    const onTransformPreview = vi.fn()
+    const onTransformCommit = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Content height',
+      width: 220,
+      height: 40,
+      autoSize: 'content',
+      autoWidth: false
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+        onTransformCommit={onTransformCommit}
+      />
+    )
+
+    const handle = screen.getByLabelText('Resize text box top right')
+    const vertical = createEvent.keyDown(handle, { key: 'ArrowUp' })
+    fireEvent(handle, vertical)
+    expect(vertical.defaultPrevented).toBe(false)
+    expect(onTransformPreview).not.toHaveBeenCalled()
+
+    const horizontal = createEvent.keyDown(handle, { key: 'ArrowRight', shiftKey: true })
+    fireEvent(handle, horizontal)
+    expect(horizontal.defaultPrevented).toBe(true)
+    expect(onTransformPreview).toHaveBeenCalledWith(
+      text.id,
+      expect.objectContaining({ width: 230, autoSize: 'content', autoWidth: false })
+    )
+    expect(onTransformPreview.mock.calls[0]?.[1]).not.toHaveProperty('height')
+    expect(onTransformCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies arrow geometry to image resize, crop, and generic handles', () => {
+    const handleUpdate = vi.fn()
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const image: EditableImageElement = {
+      id: 'image-1',
+      type: 'image',
+      assetId: 'asset-1',
+      x: 100,
+      y: 100,
+      width: 320,
+      height: 180,
+      rotation: 0,
+      opacity: 1
+    }
+    const withImage = addElementToSlide(
+      {
+        ...source,
+        assets: {
+          'asset-1': {
+            id: 'asset-1',
+            name: 'photo.png',
+            mimeType: 'image/png',
+            dataUrl: 'data:image/png;base64,AAA='
+          }
+        }
+      },
+      slideId,
+      image
+    )
+    const view = render(
+      <EditableSlideSurface
+        document={withImage}
+        slideId={slideId}
+        editable
+        selectedElementId={image.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    fireEvent.keyDown(screen.getByLabelText('Resize image right'), { key: 'ArrowRight' })
+    expect(handleUpdate).toHaveBeenLastCalledWith(
+      slideId,
+      image.id,
+      expect.objectContaining({ width: 321, height: 180 })
+    )
+
+    handleUpdate.mockClear()
+    view.rerender(
+      <EditableSlideSurface
+        document={withImage}
+        slideId={slideId}
+        editable
+        selectedElementId={image.id}
+        cropElementId={image.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+    fireEvent.keyDown(screen.getByLabelText('Crop image left'), {
+      key: 'ArrowRight',
+      shiftKey: true
+    })
+    expect(handleUpdate).toHaveBeenLastCalledWith(
+      slideId,
+      image.id,
+      expect.objectContaining({ crop: expect.objectContaining({ left: 3.125 }) })
+    )
+    view.unmount()
+
+    handleUpdate.mockClear()
+    const shape = createShapeElement('rectangle', { height: 220 })
+    render(
+      <EditableSlideSurface
+        document={addElementToSlide(source, slideId, shape)}
+        slideId={slideId}
+        editable
+        selectedElementId={shape.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+    fireEvent.keyDown(screen.getByLabelText('Resize element'), {
+      key: 'ArrowDown',
+      shiftKey: true
+    })
+    expect(handleUpdate).toHaveBeenLastCalledWith(
+      slideId,
+      shape.id,
+      expect.objectContaining({ width: shape.width, height: 230 })
+    )
   })
 
   it('renders eight resize handles for imported fixed text frames', () => {
@@ -1166,6 +1421,17 @@ function getSlideSurface(container: HTMLElement): HTMLElement {
   const surface = container.querySelector('[data-slide-surface]')
   if (!(surface instanceof HTMLElement)) throw new Error('slide surface not found')
   return surface
+}
+
+function withinResizeHandle(handle: HTMLElement): HTMLElement {
+  const indicator = handle.querySelector('[data-resize-handle-indicator]')
+  if (!(indicator instanceof HTMLElement)) throw new Error('resize handle indicator not found')
+  return indicator
+}
+
+function expectScreenHitTarget(handle: HTMLElement, scale: number): void {
+  expect(Number.parseFloat(handle.style.width) * scale).toBeGreaterThanOrEqual(24)
+  expect(Number.parseFloat(handle.style.height) * scale).toBeGreaterThanOrEqual(24)
 }
 
 function mockSurfaceRect(surface: HTMLElement): void {

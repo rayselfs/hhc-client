@@ -2488,40 +2488,46 @@ function EditableSessionDocumentView({
                 </div>
               </div>
               {isNotesOpen && (
-                <label className="border-t border-divider bg-content1/95 px-4 py-2 text-xs text-default-500">
-                  <span className="sr-only">{t('presentationWorkspace.notes', 'Notes')}</span>
-                  <textarea
-                    className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
-                    value={notesDraft}
-                    onChange={(event) => {
-                      if (!activeSlideId) return
-                      const snapshot = session.getSnapshot()
-                      const nextNotes = event.currentTarget.value
-                      const storedNotes =
-                        snapshot.history.present.slides[activeSlideId]?.notes ?? ''
-                      if (nextNotes === storedNotes) {
-                        if (snapshot.draftKind === 'notes') session.cancelDraft()
-                        return
-                      }
-                      if (snapshot.draftKind !== 'notes') {
-                        session.beginDraft('notes')
-                      }
-                      session.previewDraft(
-                        updateSlideNotes(
-                          session.getSnapshot().renderedDocument,
-                          activeSlideId,
-                          nextNotes
+                <section
+                  id="presentation-notes-region"
+                  aria-label={t('presentationWorkspace.notes', 'Notes')}
+                  className="border-t border-divider bg-content1/95 px-4 py-2 text-xs text-default-500"
+                >
+                  <label>
+                    <span className="sr-only">{t('presentationWorkspace.notes', 'Notes')}</span>
+                    <textarea
+                      className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
+                      value={notesDraft}
+                      onChange={(event) => {
+                        if (!activeSlideId) return
+                        const snapshot = session.getSnapshot()
+                        const nextNotes = event.currentTarget.value
+                        const storedNotes =
+                          snapshot.history.present.slides[activeSlideId]?.notes ?? ''
+                        if (nextNotes === storedNotes) {
+                          if (snapshot.draftKind === 'notes') session.cancelDraft()
+                          return
+                        }
+                        if (snapshot.draftKind !== 'notes') {
+                          session.beginDraft('notes')
+                        }
+                        session.previewDraft(
+                          updateSlideNotes(
+                            session.getSnapshot().renderedDocument,
+                            activeSlideId,
+                            nextNotes
+                          )
                         )
-                      )
-                    }}
-                    onBlur={() => commitNotes()}
-                    aria-label={t('presentationWorkspace.notes', 'Notes')}
-                    placeholder={t(
-                      'presentationWorkspace.notesPlaceholder',
-                      'Add speaker notes for this slide'
-                    )}
-                  />
-                </label>
+                      }}
+                      onBlur={() => commitNotes()}
+                      aria-label={t('presentationWorkspace.notes', 'Notes')}
+                      placeholder={t(
+                        'presentationWorkspace.notesPlaceholder',
+                        'Add speaker notes for this slide'
+                      )}
+                    />
+                  </label>
+                </section>
               )}
               <div
                 data-testid="presentation-status-bar"
@@ -2549,6 +2555,8 @@ function EditableSessionDocumentView({
                     setIsNotesOpen((open) => !open)
                   }}
                   aria-label={t('presentationWorkspace.toggleNotes', 'Toggle Notes')}
+                  aria-controls="presentation-notes-region"
+                  aria-expanded={isNotesOpen}
                 >
                   <StickyNote size={14} />
                   <span className="hidden lg:inline">
@@ -3181,6 +3189,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
             role="tab"
             aria-selected={effectiveActiveRibbon === tab}
             aria-controls="presentation-ribbon-panel"
+            aria-expanded={effectiveActiveRibbon === tab ? isRibbonOpen : undefined}
             tabIndex={effectiveActiveRibbon === tab ? 0 : -1}
             className={`h-9 w-16 rounded-t-lg text-sm transition-colors ${
               effectiveActiveRibbon === tab

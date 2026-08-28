@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   InspectorPanel,
   NavigatorRail,
@@ -9,6 +9,8 @@ import {
 } from '../WorkspacePrimitives'
 
 describe('ResponsivePanelGroup', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   it('keeps one primary stage and exposes mutually exclusive panel sheets', async () => {
     const user = userEvent.setup()
     const { container } = render(
@@ -46,6 +48,11 @@ describe('ResponsivePanelGroup', () => {
     expect(container.querySelector('.workspace-inspector-slot')).toHaveClass(
       'workspace-overlay-open'
     )
+    expect(container.querySelector('.workspace-inspector-slot')).not.toHaveAttribute(
+      'role',
+      'dialog'
+    )
+    expect(container.querySelector('.workspace-stage-slot')).not.toHaveAttribute('inert')
   })
 
   it('uses a controlled overlay value and reports trigger and close changes', async () => {
@@ -107,4 +114,99 @@ describe('ResponsivePanelGroup', () => {
 
     expect(trigger).toHaveFocus()
   })
+
+  it('contains focus in a labelled compact overlay and hides background panes', async () => {
+    mockCompactViewport()
+    const user = userEvent.setup()
+    const { container } = render(
+      <ResponsivePanelGroup
+        navigatorLabel="Slides"
+        inspectorLabel="Format"
+        navigator={
+          <NavigatorRail>
+            <button type="button">Slide 1</button>
+          </NavigatorRail>
+        }
+        stage={
+          <StageViewport>
+            <button type="button">Stage action</button>
+          </StageViewport>
+        }
+        inspector={
+          <InspectorPanel>
+            <button type="button">Apply format</button>
+          </InspectorPanel>
+        }
+      />
+    )
+
+    const trigger = screen.getByRole('button', { name: 'Slides' })
+    await user.click(trigger)
+
+    const overlay = screen.getByRole('dialog', { name: 'Slides' })
+    const close = within(overlay).getByRole('button', { name: 'Close Slides' })
+    const stage = container.querySelector('.workspace-stage-slot')
+    const inspector = container.querySelector('.workspace-inspector-slot')
+    expect(stage).toHaveAttribute('inert')
+    expect(stage).toHaveAttribute('aria-hidden', 'true')
+    expect(inspector).toHaveAttribute('inert')
+    expect(inspector).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.queryByRole('button', { name: 'Stage action' })).not.toBeInTheDocument()
+    await waitFor(() => expect(close).toHaveFocus())
+
+    await user.tab()
+    expect(within(overlay).getByRole('button', { name: 'Slide 1' })).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(close).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(trigger).toHaveFocus())
+    expect(stage).not.toHaveAttribute('inert')
+    expect(stage).not.toHaveAttribute('aria-hidden')
+    expect(screen.getByRole('button', { name: 'Stage action' })).toBeEnabled()
+  })
+
+  it('moves compact overlay focus and isolation when switching panes', async () => {
+    mockCompactViewport()
+    const user = userEvent.setup()
+    const { container } = render(
+      <ResponsivePanelGroup
+        navigatorLabel="Slides"
+        inspectorLabel="Format"
+        navigator={<NavigatorRail>Slide navigator</NavigatorRail>}
+        stage={<StageViewport>Editing stage</StageViewport>}
+        inspector={<InspectorPanel>Format inspector</InspectorPanel>}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Slides' }))
+    await user.click(screen.getByRole('button', { name: 'Format' }))
+
+    const overlay = screen.getByRole('dialog', { name: 'Format' })
+    await waitFor(() =>
+      expect(within(overlay).getByRole('button', { name: 'Close Format' })).toHaveFocus()
+    )
+    expect(container.querySelector('.workspace-navigator-slot')).toHaveAttribute('inert')
+    expect(container.querySelector('.workspace-navigator-slot')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    )
+    expect(container.querySelector('.workspace-inspector-slot')).not.toHaveAttribute('inert')
+  })
 })
+
+function mockCompactViewport(): void {
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query) =>
+      ({
+        matches: query.includes('max-width'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(() => false)
+      }) as MediaQueryList
+  )
+}

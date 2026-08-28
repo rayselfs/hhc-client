@@ -377,6 +377,7 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(home).toHaveAttribute('aria-selected', 'true')
     expect(home).toHaveAttribute('tabindex', '0')
     expect(home).toHaveAttribute('aria-controls', panel.id)
+    expect(home).toHaveAttribute('aria-expanded', 'true')
     expect(panel).toHaveAttribute('aria-labelledby', home.id)
 
     home.focus()
@@ -398,6 +399,11 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(home).toHaveAttribute('aria-selected', 'true')
     expect(insert).toHaveAttribute('aria-selected', 'false')
     expect(panel).toHaveAttribute('aria-labelledby', home.id)
+
+    await user.click(home)
+    expect(home).toHaveAttribute('aria-expanded', 'false')
+    await user.click(home)
+    expect(home).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('changes Ribbon tabs with arrow keys without nudging the selected image', async () => {
@@ -1372,6 +1378,54 @@ describe('PresentationWorkspacePage session integration', () => {
     })
   })
 
+  it('commits one history entry for each keyboard resize action', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({
+      text: 'Keyboard frame',
+      x: 100,
+      y: 80,
+      width: 220,
+      height: 40,
+      autoSize: 'fixed',
+      autoWidth: false
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const initialHistoryLength = session.getSnapshot().history.past.length
+    const textFrame = (await screen.findAllByText('Keyboard frame'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(textFrame).not.toBeNull()
+    fireEvent.click(textFrame!)
+
+    const firstHandle = screen.getByLabelText('Resize text box right')
+    const firstResize = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true
+    })
+    fireEvent(firstHandle, firstResize)
+
+    expect(firstResize.defaultPrevented).toBe(true)
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      x: 100,
+      width: 221
+    })
+    expect(session.getSnapshot().history.past).toHaveLength(initialHistoryLength + 1)
+
+    const secondHandle = screen.getByLabelText('Resize text box right')
+    fireEvent.keyDown(secondHandle, { key: 'ArrowRight', shiftKey: true })
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      x: 100,
+      width: 231
+    })
+    expect(session.getSnapshot().history.past).toHaveLength(initialHistoryLength + 2)
+  })
+
   it('does not select a generated shape while composition blocks the mutation', async () => {
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
     const slideId = sourceDocument.slideOrder[0]
@@ -1646,12 +1700,22 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(screen.getByRole('button', { name: 'Fit' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('73')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle Notes' }))
+    const notesToggle = screen.getByRole('button', { name: 'Toggle Notes' })
+    expect(notesToggle).toHaveAttribute('aria-controls', 'presentation-notes-region')
+    expect(notesToggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(notesToggle)
     resizeElement(viewport, 1050, 400)
 
+    const notesRegion = screen.getByRole('region', { name: 'Notes' })
+    expect(notesRegion).toHaveAttribute('id', 'presentation-notes-region')
+    expect(notesToggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('textbox', { name: 'Notes' })).toBeVisible()
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('58')
     expect(screen.getByRole('button', { name: 'Reset zoom' })).toBeVisible()
+
+    fireEvent.click(notesToggle)
+    expect(notesToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('region', { name: 'Notes' })).not.toBeInTheDocument()
   })
 
   it('keeps committed Notes in session history across Undo and Redo', async () => {

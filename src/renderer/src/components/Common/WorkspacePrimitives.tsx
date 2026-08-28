@@ -1,8 +1,11 @@
 import {
+  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ComponentPropsWithoutRef,
   type CSSProperties,
+  type KeyboardEvent,
   type ReactNode,
   type RefObject
 } from 'react'
@@ -98,7 +101,15 @@ export function ResponsivePanelGroup({
   const [uncontrolledOverlay, setUncontrolledOverlay] = useState<WorkspaceOverlay>(null)
   const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
   const inspectorTriggerRef = useRef<HTMLButtonElement>(null)
+  const navigatorSlotRef = useRef<HTMLDivElement>(null)
+  const inspectorSlotRef = useRef<HTMLDivElement>(null)
+  const compactNavigator = useMediaQuery('(max-width: 1023px)')
+  const compactInspector = useMediaQuery('(max-width: 1279px)')
   const overlay = controlledOverlay === undefined ? uncontrolledOverlay : controlledOverlay
+  const compactOverlay =
+    (overlay === 'navigator' && compactNavigator) || (overlay === 'inspector' && compactInspector)
+      ? overlay
+      : null
   const setOverlay = (nextOverlay: WorkspaceOverlay): void => {
     if (controlledOverlay === undefined) setUncontrolledOverlay(nextOverlay)
     onOverlayChange?.(nextOverlay)
@@ -115,6 +126,39 @@ export function ResponsivePanelGroup({
     '--workspace-navigator-width': `${navigatorWidth}px`,
     '--workspace-inspector-width': `${inspectorWidth}px`
   } as CSSProperties
+  const closeCompactOverlay = (): void => {
+    if (compactOverlay === 'navigator') closeNavigator()
+    else if (compactOverlay === 'inspector') closeInspector()
+  }
+  const trapCompactOverlayFocus = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeCompactOverlay()
+      return
+    }
+    if (event.key !== 'Tab') return
+    const focusable = getFocusableElements(event.currentTarget)
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
+  useLayoutEffect(() => {
+    const slot =
+      compactOverlay === 'navigator'
+        ? navigatorSlotRef.current
+        : compactOverlay === 'inspector'
+          ? inspectorSlotRef.current
+          : null
+    slot?.querySelector<HTMLElement>('.workspace-overlay-close')?.focus()
+  }, [compactOverlay])
 
   return (
     <div
@@ -149,19 +193,39 @@ export function ResponsivePanelGroup({
         )}
       </div>
       <div
+        ref={navigatorSlotRef}
         className={`workspace-navigator-slot ${overlay === 'navigator' ? 'workspace-overlay-open' : ''}`}
+        role={compactOverlay === 'navigator' ? 'dialog' : undefined}
+        aria-modal={compactOverlay === 'navigator' ? true : undefined}
+        aria-label={compactOverlay === 'navigator' ? navigatorLabel : undefined}
+        aria-hidden={compactOverlay !== null && compactOverlay !== 'navigator' ? true : undefined}
+        inert={compactOverlay !== null && compactOverlay !== 'navigator'}
+        onKeyDown={compactOverlay === 'navigator' ? trapCompactOverlayFocus : undefined}
       >
         {navigator}
         {overlay === 'navigator' && (
           <OverlayClose label={`Close ${navigatorLabel}`} onPress={closeNavigator} />
         )}
       </div>
-      <div className="workspace-stage-slot flex min-h-0 min-w-0">{stage}</div>
+      <div
+        className="workspace-stage-slot flex min-h-0 min-w-0"
+        aria-hidden={compactOverlay !== null ? true : undefined}
+        inert={compactOverlay !== null}
+      >
+        {stage}
+      </div>
       {inspector && (
         <div
+          ref={inspectorSlotRef}
           className={`workspace-inspector-slot ${
             overlay === 'inspector' ? 'workspace-overlay-open' : ''
           }`}
+          role={compactOverlay === 'inspector' ? 'dialog' : undefined}
+          aria-modal={compactOverlay === 'inspector' ? true : undefined}
+          aria-label={compactOverlay === 'inspector' ? inspectorLabel : undefined}
+          aria-hidden={compactOverlay !== null && compactOverlay !== 'inspector' ? true : undefined}
+          inert={compactOverlay !== null && compactOverlay !== 'inspector'}
+          onKeyDown={compactOverlay === 'inspector' ? trapCompactOverlayFocus : undefined}
         >
           {inspector}
           {overlay === 'inspector' && (
@@ -171,6 +235,28 @@ export function ResponsivePanelGroup({
       )}
     </div>
   )
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const media = window.matchMedia(query)
+    const update = (event: MediaQueryListEvent): void => setMatches(event.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [query])
+  return matches
+}
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => {
+    const style = window.getComputedStyle(element)
+    return style.display !== 'none' && style.visibility !== 'hidden'
+  })
 }
 
 function OverlayClose({

@@ -83,6 +83,10 @@ const TEXT_AUTO_MIN_WIDTH = INSERTED_TEXT_CLICK_SIZE.width
 const TEXT_FRAME_HIT_AREA = 6
 const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
+const RESIZE_HIT_TARGET_SIZE = 25
+const TEXT_HANDLE_SIZE = 12
+const IMAGE_HANDLE_SIZE = 16
+const GENERIC_HANDLE_SIZE = 20
 
 const IMAGE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const CONTENT_TEXT_HANDLES: ResizeHandle[] = ['nw', 'w', 'sw', 'ne', 'e', 'se']
@@ -230,6 +234,51 @@ export default function EditableSlideSurface({
     } else {
       onUpdateElement?.(slideId, drag.elementId, updates)
     }
+  }
+
+  const resizeWithKeyboard = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    element: EditablePresentationElement,
+    handle: ResizeHandle,
+    mode: 'resize' | 'crop'
+  ): void => {
+    const horizontalOnly = element.type === 'text' && hasContentHeight(element)
+    const delta = getKeyboardResizeDelta(event, handle, horizontalOnly)
+    if (!delta || !finalizeTextEdit()) return
+    const original = onTransformStart ? onTransformStart(element.id) : element
+    if (!original) return
+
+    let updates: Partial<EditablePresentationElement>
+    if (mode === 'crop' && original.type === 'image') {
+      updates = {
+        crop: calculateImageCrop(original.crop, handle, delta.dx, delta.dy, original)
+      } as Partial<EditablePresentationElement>
+    } else if (original.type === 'text') {
+      updates = {
+        ...calculateTextResize(original, handle, delta.dx, delta.dy),
+        autoWidth: false,
+        autoSize: hasContentHeight(original) ? 'content' : 'fixed'
+      } as Partial<EditablePresentationElement>
+    } else if (original.type === 'image') {
+      updates = calculateImageResize(
+        original,
+        handle,
+        delta.dx,
+        delta.dy
+      ) as Partial<EditablePresentationElement>
+    } else {
+      updates = {
+        width: Math.max(MIN_ELEMENT_SIZE, original.width + delta.dx),
+        height: Math.max(MIN_ELEMENT_SIZE, original.height + delta.dy)
+      } as Partial<EditablePresentationElement>
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    onEditingElementChange?.(null)
+    if (onTransformPreview) onTransformPreview(element.id, updates)
+    else onUpdateElement?.(slideId, element.id, updates)
+    onTransformCommit?.()
   }
 
   const endDrag = (event: React.PointerEvent): void => {
@@ -449,6 +498,10 @@ export default function EditableSlideSurface({
             onUpdateElement={onUpdateElement}
             onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
             onCropPointerDown={(event, handle) => startDrag(event, element, 'crop', handle)}
+            onResizeKeyDown={(event, handle) =>
+              resizeWithKeyboard(event, element, handle, 'resize')
+            }
+            onCropKeyDown={(event, handle) => resizeWithKeyboard(event, element, handle, 'crop')}
             onStartTextEdit={() => {
               onSelectElement?.(element.id)
               onEditingElementChange?.(element.id)
@@ -503,6 +556,8 @@ function SlideElement({
   onUpdateElement,
   onResizePointerDown,
   onCropPointerDown,
+  onResizeKeyDown,
+  onCropKeyDown,
   onStartTextEdit,
   onFinishTextEdit,
   onTextEditFinalizerChange
@@ -529,6 +584,8 @@ function SlideElement({
   ) => void
   onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
+  onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
+  onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onStartTextEdit: () => void
   onFinishTextEdit: () => void
   onTextEditFinalizerChange: (finalize: (() => boolean) | null) => void
@@ -583,6 +640,8 @@ function SlideElement({
           onMovePointerDown={onPointerDown}
           onResizePointerDown={onResizePointerDown}
           onCropPointerDown={onCropPointerDown}
+          onResizeKeyDown={onResizeKeyDown}
+          onCropKeyDown={onCropKeyDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
@@ -599,6 +658,8 @@ function ElementHandles({
   onMovePointerDown,
   onResizePointerDown,
   onCropPointerDown,
+  onResizeKeyDown,
+  onCropKeyDown,
   onPointerMove,
   onPointerUp,
   onPointerCancel
@@ -609,6 +670,8 @@ function ElementHandles({
   onMovePointerDown: (event: React.PointerEvent) => void
   onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
+  onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
+  onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onPointerMove: (event: React.PointerEvent) => void
   onPointerUp: (event: React.PointerEvent) => void
   onPointerCancel: (event: React.PointerEvent) => void
@@ -616,7 +679,8 @@ function ElementHandles({
   if (element.type === 'text') {
     const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
     const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
-    const handleSize = 12 / surfaceScale
+    const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+    const handleSize = TEXT_HANDLE_SIZE / surfaceScale
     const borderWidth = 1.5 / surfaceScale
     return (
       <>
@@ -649,26 +713,36 @@ function ElementHandles({
           <button
             key={`resize-text-${handle}`}
             type="button"
-            className={`${getHandleCursorClass(handle)} absolute rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]`}
+            className={`${getHandleCursorClass(handle)} absolute flex items-center justify-center rounded-[2px]`}
             aria-label={`Resize text box ${handleToLabel(handle)}`}
             style={{
-              ...getTextHandlePositionStyle(handle, handleSize),
+              ...getTextHandlePositionStyle(handle, hitTargetSize),
               zIndex: 20,
-              width: handleSize,
-              height: handleSize,
-              borderWidth
+              width: hitTargetSize,
+              height: hitTargetSize
             }}
             onPointerDown={(event) => onResizePointerDown(event, handle)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
-          />
+            onKeyDown={(event) => onResizeKeyDown(event, handle)}
+          >
+            <span
+              data-resize-handle-indicator
+              aria-hidden="true"
+              className="pointer-events-none rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
+              style={{ width: handleSize, height: handleSize, borderWidth }}
+            />
+          </button>
         ))}
       </>
     )
   }
 
   if (element.type === 'image') {
+    const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+    const handleSize = IMAGE_HANDLE_SIZE / surfaceScale
+    const borderWidth = 1 / surfaceScale
     return (
       <>
         {cropMode && (
@@ -678,32 +752,65 @@ function ElementHandles({
           <button
             key={`${cropMode ? 'crop' : 'resize'}-${handle}`}
             type="button"
-            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute size-4 rounded-full border border-white ${
-              cropMode ? 'bg-warning' : 'bg-primary'
-            }`}
+            className={`${getHandleCursorClass(handle)} absolute flex items-center justify-center rounded-full`}
             aria-label={`${cropMode ? 'Crop' : 'Resize'} image ${handleToLabel(handle)}`}
+            style={{
+              ...getTextHandlePositionStyle(handle, hitTargetSize),
+              zIndex: 20,
+              width: hitTargetSize,
+              height: hitTargetSize
+            }}
             onPointerDown={(event) =>
               cropMode ? onCropPointerDown(event, handle) : onResizePointerDown(event, handle)
             }
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
-          />
+            onKeyDown={(event) =>
+              cropMode ? onCropKeyDown(event, handle) : onResizeKeyDown(event, handle)
+            }
+          >
+            <span
+              data-resize-handle-indicator
+              aria-hidden="true"
+              className={`pointer-events-none rounded-full border border-white ${
+                cropMode ? 'bg-warning' : 'bg-primary'
+              }`}
+              style={{ width: handleSize, height: handleSize, borderWidth }}
+            />
+          </button>
         ))}
       </>
     )
   }
 
+  const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+  const handleSize = GENERIC_HANDLE_SIZE / surfaceScale
+  const borderWidth = 1 / surfaceScale
   return (
     <button
       type="button"
-      className="absolute -bottom-2 -right-2 size-5 cursor-nwse-resize rounded-full border border-white bg-primary"
+      className="absolute flex cursor-nwse-resize items-center justify-center rounded-full"
       aria-label="Resize element"
+      style={{
+        ...getTextHandlePositionStyle('se', hitTargetSize),
+        zIndex: 20,
+        width: hitTargetSize,
+        height: hitTargetSize
+      }}
       onPointerDown={(event) => onResizePointerDown(event, 'se')}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-    />
+      onKeyDown={(event) => onResizeKeyDown(event, 'se')}
+    >
+      <span
+        data-resize-handle-indicator
+        aria-hidden="true"
+        className="pointer-events-none rounded-full border border-white bg-primary"
+        style={{ width: handleSize, height: handleSize, borderWidth }}
+      />
+    </button>
   )
 }
 
@@ -1271,20 +1378,6 @@ function getImageShadow(
   return undefined
 }
 
-function getHandlePositionClass(handle: ResizeHandle): string {
-  const vertical = handle.includes('n')
-    ? '-top-2'
-    : handle.includes('s')
-      ? '-bottom-2'
-      : 'top-1/2 -translate-y-1/2'
-  const horizontal = handle.includes('w')
-    ? '-left-2'
-    : handle.includes('e')
-      ? '-right-2'
-      : 'left-1/2 -translate-x-1/2'
-  return `${vertical} ${horizontal}`
-}
-
 function getTextHandlePositionStyle(handle: ResizeHandle, handleSize: number): React.CSSProperties {
   const offset = -handleSize / 2
   const vertical = handle.includes('n')
@@ -1308,6 +1401,35 @@ function getTextHandlePositionStyle(handle: ResizeHandle, handleSize: number): R
 
 function normalizeSurfaceScale(scale: number): number {
   return Number.isFinite(scale) && scale > 0 ? scale : 1
+}
+
+function getKeyboardResizeDelta(
+  event: React.KeyboardEvent<HTMLButtonElement>,
+  handle: ResizeHandle,
+  horizontalOnly: boolean
+): { dx: number; dy: number } | null {
+  const step = event.shiftKey ? 10 : 1
+  if (event.key === 'ArrowLeft' && (handle.includes('w') || handle.includes('e'))) {
+    return { dx: -step, dy: 0 }
+  }
+  if (event.key === 'ArrowRight' && (handle.includes('w') || handle.includes('e'))) {
+    return { dx: step, dy: 0 }
+  }
+  if (
+    !horizontalOnly &&
+    event.key === 'ArrowUp' &&
+    (handle.includes('n') || handle.includes('s'))
+  ) {
+    return { dx: 0, dy: -step }
+  }
+  if (
+    !horizontalOnly &&
+    event.key === 'ArrowDown' &&
+    (handle.includes('n') || handle.includes('s'))
+  ) {
+    return { dx: 0, dy: step }
+  }
+  return null
 }
 
 function getHandleCursorClass(handle: ResizeHandle): string {

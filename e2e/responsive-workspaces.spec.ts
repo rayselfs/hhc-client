@@ -61,6 +61,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   )
   const homeTab = page.getByRole('tab', { name: /^(Home|常用)$/ })
   await homeTab.click()
+  await expect(homeTab).toHaveAttribute('aria-expanded', 'true')
 
   const shapes = page.getByRole('button', { name: /^(Shapes|圖案|形状)$/ })
   const shapesBox = await shapes.boundingBox()
@@ -80,11 +81,13 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const ribbonPanel = page.locator('#presentation-ribbon-panel')
   await homeTab.click()
   await expect(ribbonPanel).toHaveAttribute('inert', '')
+  await expect(homeTab).toHaveAttribute('aria-expanded', 'false')
   await homeTab.focus()
   await page.keyboard.press('Tab')
   expect(await ribbonPanel.evaluate((panel) => !panel.contains(document.activeElement))).toBe(true)
   await homeTab.click()
   await expect(ribbonPanel).toHaveCSS('height', '96px')
+  await expect(homeTab).toHaveAttribute('aria-expanded', 'true')
 
   await page.setViewportSize({ width: 1470, height: 726 })
   const stageSlot = page.locator('.workspace-stage-slot')
@@ -95,8 +98,22 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const viewport = page.getByTestId('presentation-canvas-viewport')
   const canvas = page.getByTestId('presentation-canvas')
   await expect(notes).toBeVisible()
+  await expect(notes).toHaveAttribute('aria-controls', 'presentation-notes-region')
+  await expect(notes).toHaveAttribute('aria-expanded', 'false')
   await expect(zoom).toBeVisible()
   expect(await ribbon.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+
+  const resizeHandle = page
+    .locator('.presentation-stage')
+    .getByRole('button', { name: 'Resize text box right' })
+  for (const zoomPercent of ['25', '100', '200']) {
+    await zoomSlider.fill(zoomPercent)
+    const handleBox = await resizeHandle.boundingBox()
+    expect(handleBox).not.toBeNull()
+    expect(handleBox!.width).toBeGreaterThanOrEqual(24)
+    expect(handleBox!.height).toBeGreaterThanOrEqual(24)
+  }
+  await fit.click()
 
   const expectedFitZoom = async (): Promise<number> =>
     viewport.evaluate((element) =>
@@ -123,10 +140,13 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const fitZoom = await expectExactFitGeometry()
   await notes.click()
   const notesEditor = page.getByRole('textbox', { name: /Notes|備忘稿/ })
+  await expect(notes).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.locator('#presentation-notes-region')).toBeVisible()
   await notesEditor.fill('Responsive speaker note')
   await expect.poll(async () => Number(await zoomSlider.inputValue())).toBeLessThan(fitZoom)
   await expectExactFitGeometry()
   await notes.click()
+  await expect(notes).toHaveAttribute('aria-expanded', 'false')
   await notes.click()
   await expect(notesEditor).toHaveValue('Responsive speaker note')
   await notes.click()
@@ -265,15 +285,40 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
 
   await page.getByRole('tab', { name: /Design|設計/ }).click()
   await page.getByRole('button', { name: /Format Background|設定背景格式/ }).click()
-  await expect(page.locator('.workspace-inspector-slot')).toBeVisible()
+  const inspectorOverlay = page.getByRole('dialog', {
+    name: /Format Background|設定背景格式/
+  })
+  const navigatorSlot = page.locator('.workspace-navigator-slot')
+  await expect(inspectorOverlay).toBeVisible()
   await expect(navigator).toBeHidden()
+  await expect(stage).toHaveAttribute('inert', '')
+  await expect(stage).toHaveAttribute('aria-hidden', 'true')
+  await expect(navigatorSlot).toHaveAttribute('inert', '')
+  await expect(navigatorSlot).toHaveAttribute('aria-hidden', 'true')
+  await expect(page.getByRole('button', { name: /^(Fit|符合視窗)$/ })).toHaveCount(0)
+  const inspectorFocusables = inspectorOverlay.locator(
+    'button:visible, input:visible, select:visible, textarea:visible, [tabindex]:not([tabindex="-1"]):visible'
+  )
+  await expect(inspectorFocusables.last()).toBeFocused()
+  await inspectorFocusables.last().press('Tab')
+  await expect(inspectorFocusables.first()).toBeFocused()
+  await inspectorFocusables.first().press('Shift+Tab')
+  await expect(inspectorFocusables.last()).toBeFocused()
 
   await slidesTrigger.click()
-  await expect(navigator).toBeVisible()
+  const slidesOverlay = page.getByRole('dialog', { name: /^(Slides|投影片|幻灯片)$/ })
+  await expect(slidesOverlay).toBeVisible()
   await expect(page.locator('.workspace-inspector-slot')).toHaveCount(0)
-  await page.getByRole('button', { name: /Close (Slides|投影片|幻灯片)/ }).click()
+  await expect(
+    slidesOverlay.getByRole('button', { name: /Close (Slides|投影片|幻灯片)/ })
+  ).toBeFocused()
+  await slidesOverlay.press('Escape')
   await expect(navigator).toBeHidden()
+  await expect(slidesTrigger).toBeFocused()
   await expect(stage).toBeVisible()
+  await expect(stage).not.toHaveAttribute('inert')
+  await expect(stage).not.toHaveAttribute('aria-hidden')
+  await expect(page.getByRole('button', { name: /^(Fit|符合視窗)$/ })).toBeVisible()
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
