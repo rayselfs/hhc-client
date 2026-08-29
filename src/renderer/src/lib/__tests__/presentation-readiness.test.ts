@@ -98,6 +98,7 @@ describe('analyzePresentationReadiness', () => {
     })
   })
   it('uses embedded VLC for Electron native videos when available', async () => {
+    const probe = vi.fn().mockResolvedValue({ durationMs: 120000 })
     vi.stubGlobal('window', {
       api: {
         nativeFs: {
@@ -105,7 +106,7 @@ describe('analyzePresentationReadiness', () => {
         },
         projectionVlc: {
           getInfo: vi.fn().mockResolvedValue({ status: 'ready' }),
-          probe: vi.fn().mockResolvedValue({ durationMs: 120000 })
+          probe
         }
       }
     })
@@ -127,49 +128,50 @@ describe('analyzePresentationReadiness', () => {
       status: 'ready',
       reason: 'ready-vlc-embedded',
       support: 'desktop-engine',
-      playbackMode: 'vlc-embedded',
-      seekable: true,
-      durationMs: 120000
+      playbackMode: 'vlc-embedded'
     })
+    expect(report.items[0]).not.toHaveProperty('seekable')
+    expect(report.items[0]).not.toHaveProperty('durationMs')
+    expect(probe).not.toHaveBeenCalled()
   })
 
-  it('shares an in-flight VLC metadata probe for the same native video', async () => {
-    let resolveProbe: ((value: { durationMs: number }) => void) | undefined
-    const probe = vi.fn(
-      () =>
-        new Promise<{ durationMs: number }>((resolve) => {
-          resolveProbe = resolve
-        })
-    )
-    vi.stubGlobal('window', {
-      api: {
-        nativeFs: {
-          exists: vi.fn().mockResolvedValue(true)
-        },
+  it('omits inferred seekability for remote desktop-engine video', async () => {
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'remote-file',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'movie.mkv',
+      mimeType: 'video/x-matroska',
+      itemId: 'remote-item',
+      status: 'remote-only'
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
         projectionVlc: {
-          getInfo: vi.fn().mockResolvedValue({ status: 'ready' }),
-          probe
+          getInfo: vi.fn().mockResolvedValue({ status: 'ready' })
         }
       }
     })
-    await (
-      await openFileExplorerDB()
-    ).put('file-blobs', {
-      id: 'source-video',
-      storage: 'native-fs',
-      refCount: 1
+
+    const report = await analyzePresentationReadiness(
+      [file('remote-item', 'movie.mkv', 'video/x-matroska', 'hhc-line:remote-file')],
+      'electron'
+    )
+
+    expect(report.items[0]).toMatchObject({
+      status: 'ready',
+      support: 'desktop-engine',
+      playbackMode: 'vlc-embedded'
     })
-    const source = [file('source-video', 'source.mkv', 'video/x-matroska')]
-
-    const first = analyzePresentationReadiness(source, 'electron')
-    await vi.waitFor(() => expect(probe).toHaveBeenCalledOnce())
-    const second = analyzePresentationReadiness(source, 'electron')
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(probe).toHaveBeenCalledOnce()
-
-    resolveProbe?.({ durationMs: 120000 })
-    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
-    expect(probe).toHaveBeenCalledOnce()
+    expect(report.items[0]).not.toHaveProperty('seekable')
   })
 
   it('fails when VLC is unavailable for Electron desktop-engine videos', async () => {

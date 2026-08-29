@@ -46,4 +46,47 @@ describe('source media metadata authorization', () => {
     expect(canCommit).toHaveBeenCalled()
     await expect(getDerivedAsset('guarded-image', 'media-metadata')).resolves.toBeUndefined()
   })
+
+  it('reads native video metadata without invoking VLC', async () => {
+    const probe = vi.fn()
+    vi.stubGlobal('window', {
+      api: {
+        nativeFs: {
+          exists: vi.fn().mockResolvedValue(true),
+          getUrl: vi.fn(() => 'hhc-media://file/native-video')
+        },
+        projectionVlc: { probe }
+      }
+    })
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'native-video',
+      storage: 'native-fs',
+      refCount: 1
+    })
+    const originalCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      if (tagName !== 'video') return originalCreateElement(tagName, options)
+      const video = {
+        preload: '',
+        onloadedmetadata: null as (() => void) | null,
+        onerror: null as (() => void) | null,
+        videoWidth: 1920,
+        videoHeight: 1080,
+        duration: 12,
+        set src(_value: string) {
+          queueMicrotask(() => this.onloadedmetadata?.())
+        },
+        removeAttribute: vi.fn(),
+        load: vi.fn()
+      }
+      return video as unknown as HTMLVideoElement
+    })
+
+    await expect(ensureSourceMediaMetadata('native-video', 'video/mp4')).resolves.toMatchObject({
+      kind: 'video',
+      durationMs: 12000
+    })
+    expect(probe).not.toHaveBeenCalled()
+  })
 })

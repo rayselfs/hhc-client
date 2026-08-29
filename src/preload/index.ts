@@ -131,8 +131,6 @@ const projectionVlcApi = {
   getInfo: () => typedInvoke('projection-vlc:get-info'),
   start: (request: IpcInvokeMap['projection-vlc:start']['args'][0]) =>
     typedInvoke('projection-vlc:start', request),
-  probe: (request: IpcInvokeMap['projection-vlc:probe']['args'][0]) =>
-    typedInvoke('projection-vlc:probe', request),
   control: (command: IpcInvokeMap['projection-vlc:control']['args'][0]) =>
     typedInvoke('projection-vlc:control', command),
   stop: (request: IpcInvokeMap['projection-vlc:stop']['args'][0]) =>

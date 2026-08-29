@@ -1,10 +1,4 @@
-import { isElectron } from './env'
-import {
-  getFileBlobRecord,
-  getFileSource,
-  openFileExplorerDB,
-  type FileSource
-} from './file-explorer-db'
+import { getFileSource, openFileExplorerDB, type FileSource } from './file-explorer-db'
 import { loadPdfjsLib } from './pdfjs-loader'
 import { getDerivedAsset, putDerivedAsset, type DerivedAssetMetadata } from './media-work-db'
 import type { SyncDownloadCommitGuard } from './sync-provider'
@@ -88,20 +82,6 @@ async function readPdfMetadata(url: string): Promise<DerivedAssetMetadata> {
   }
 }
 
-async function probeNativeVideo(blobId: string): Promise<DerivedAssetMetadata | null> {
-  if (!isElectron()) return null
-  const record = await getFileBlobRecord(blobId)
-  if (record?.storage !== 'native-fs') return null
-  if (!window.api?.projectionVlc?.probe) return null
-  try {
-    const result = await window.api.projectionVlc.probe({ sourceFileId: blobId })
-    return { kind: 'video', ...result }
-  } catch (error) {
-    console.warn('[media-metadata] Video probe failed', { blobId, error })
-    return null
-  }
-}
-
 async function loadSourceMediaMetadata(
   blobId: string,
   mimeType: string,
@@ -110,30 +90,21 @@ async function loadSourceMediaMetadata(
   const existing = await getSourceMediaMetadata(blobId)
   if (existing) return existing
 
-  let metadata: DerivedAssetMetadata | null = null
-  if (mimeType.startsWith('video/')) {
-    const record = await getFileBlobRecord(blobId)
-    metadata = await probeNativeVideo(blobId)
-    if (!metadata && record?.storage === 'native-fs') return null
-  }
-
-  if (!metadata) {
-    const db = await openFileExplorerDB()
-    const source = await getFileSource(db, blobId, mimeType)
-    if (!source) return null
-    metadata = await withSource(source, async (url) => {
-      if (mimeType.startsWith('image/')) return readImageMetadata(url)
-      if (mimeType.startsWith('video/')) {
-        try {
-          return await readVideoMetadata(url)
-        } catch {
-          return { kind: 'video', browserPlayback: 'unplayable' }
-        }
+  const db = await openFileExplorerDB()
+  const source = await getFileSource(db, blobId, mimeType)
+  if (!source) return null
+  const metadata = await withSource<DerivedAssetMetadata | null>(source, async (url) => {
+    if (mimeType.startsWith('image/')) return readImageMetadata(url)
+    if (mimeType.startsWith('video/')) {
+      try {
+        return await readVideoMetadata(url)
+      } catch {
+        return { kind: 'video', browserPlayback: 'unplayable' }
       }
-      if (mimeType === 'application/pdf') return readPdfMetadata(url)
-      return null
-    })
-  }
+    }
+    if (mimeType === 'application/pdf') return readPdfMetadata(url)
+    return null
+  })
 
   if (!metadata || (await guard?.()) === false) return null
   return putSourceMediaMetadata(blobId, metadata)

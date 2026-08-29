@@ -207,7 +207,9 @@ async function analyzePresentationItem(
         reason: 'ready-remote',
         support,
         playbackMode: support === 'desktop-engine' ? 'vlc-embedded' : 'native',
-        seekable: capability.kind === 'video' || capability.kind === 'audio',
+        ...(support !== 'desktop-engine'
+          ? { seekable: capability.kind === 'video' || capability.kind === 'audio' }
+          : {}),
         remoteItem: {
           providerConnectionId: syncEntry.providerConnectionId,
           remoteItemId: syncEntry.remoteItemId,
@@ -274,7 +276,9 @@ async function analyzePresentationItem(
   }
 
   const metadata =
-    capability.kind === 'video' ? await ensureSourceMediaMetadata(blobId, item.mimeType) : null
+    capability.kind === 'video' && support !== 'desktop-engine'
+      ? await ensureSourceMediaMetadata(blobId, item.mimeType)
+      : null
   const durationMs = metadata?.durationMs
 
   if (
@@ -299,9 +303,7 @@ async function analyzePresentationItem(
         status: 'ready',
         reason: 'ready-vlc-embedded',
         support,
-        playbackMode: 'vlc-embedded',
-        seekable: true,
-        durationMs
+        playbackMode: 'vlc-embedded'
       }
     }
 

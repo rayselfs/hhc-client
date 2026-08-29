@@ -94,7 +94,6 @@ vi.mock('electron-vlc-player', () => ({
     setPlayerWindowVisible: mockSetPlayerWindowVisible
   })),
   initLibVlc: vi.fn(),
-  probeMedia: vi.fn(() => ({ parsed: true, length: 1000 })),
   VlcPlayer: class MockVlcPlayer extends EventEmitter {
     window: typeof mockProjectionWindow
     playerId = 7
@@ -1047,11 +1046,8 @@ describe('projection-vlc listener cleanup', () => {
     expect(mockVlcPlayers).toHaveLength(0)
   })
 
-  it('rejects a malformed probe request before loading VLC', async () => {
-    await expect(
-      Promise.resolve().then(() => getHandler('projection-vlc:probe')(makeEvent(), null))
-    ).rejects.toThrow('Invalid VLC probe request')
-    expect(mockVlcPlayers).toHaveLength(0)
+  it('does not expose a synchronous VLC probe handler', () => {
+    expect(getHandler('projection-vlc:probe')).toBeUndefined()
   })
 
   it.each([

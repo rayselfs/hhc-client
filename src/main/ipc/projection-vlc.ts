@@ -5,8 +5,6 @@ import type {
   ProjectionVlcFailure,
   ProjectionVlcFailureCode,
   ProjectionVlcInfo,
-  ProjectionVlcProbeRequest,
-  ProjectionVlcProbeResult,
   ProjectionVlcStartRequest,
   ProjectionVlcStopRequest
 } from '@shared/ipc-channels'
@@ -161,13 +159,6 @@ function validateVlcStartRequest(value: unknown): ProjectionVlcStartRequest {
   return value as unknown as ProjectionVlcStartRequest
 }
 
-function validateVlcProbeRequest(value: unknown): ProjectionVlcProbeRequest {
-  if (!isRecord(value) || !isValidNativeFileId(value.sourceFileId)) {
-    throw new Error('Invalid VLC probe request')
-  }
-  return value as unknown as ProjectionVlcProbeRequest
-}
-
 function validateVlcControlRequest(value: unknown): ProjectionVlcControlRequest {
   if (
     !isRecord(value) ||
@@ -285,23 +276,6 @@ async function resolveVlcInfo(
   return {
     info: { status: 'ready', vlcDir: resolved.path },
     runtime: loaded.runtime
-  }
-}
-
-async function probeVlcMedia(
-  loadRuntime: LoadVlcPlayerRuntime,
-  request: ProjectionVlcProbeRequest
-): Promise<ProjectionVlcProbeResult> {
-  const { info, runtime } = await resolveVlcInfo(loadRuntime)
-  if (info.status !== 'ready' || !info.vlcDir) {
-    throw new Error(info.message ?? 'VLC runtime not found')
-  }
-  if (!runtime) throw new Error('VLC native binding unavailable')
-
-  runtime.initLibVlc(info.vlcDir)
-  const result = runtime.probeMedia(getNativeFilePath(request.sourceFileId), 5000)
-  return {
-    durationMs: result.parsed && result.length > 0 ? result.length : undefined
   }
 }
 
@@ -745,11 +719,6 @@ export function registerProjectionVlcHandlers(
   ipcMain.handle('projection-vlc:start', async (event, request: unknown) => {
     if (!isProjectionOrMainWindow(wm, event)) throw new Error('Unauthorized VLC access')
     await startVlc(wm, loadRuntime, validateVlcStartRequest(request))
-  })
-
-  ipcMain.handle('projection-vlc:probe', async (event, request: unknown) => {
-    if (!isKnownWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    return probeVlcMedia(loadRuntime, validateVlcProbeRequest(request))
   })
 
   ipcMain.handle('projection-vlc:control', (event, command: unknown) => {

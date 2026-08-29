@@ -95,14 +95,6 @@ export interface ProjectionVlcStartRequest {
   initialPlaybackState?: 'playing' | 'paused' | 'ended'
 }
 
-export interface ProjectionVlcProbeRequest {
-  sourceFileId: string
-}
-
-export interface ProjectionVlcProbeResult {
-  durationMs?: number
-}
-
 export type ProjectionVlcControlRequest =
   | { action: 'play'; itemId?: string }
   | { action: 'pause'; itemId?: string }
@@ -281,7 +273,6 @@ export interface IpcInvokeMap {
   'video-poster:generate': { args: [VideoPosterRequest]; result: VideoPosterResult }
   'projection-vlc:get-info': { args: []; result: ProjectionVlcInfo }
   'projection-vlc:start': { args: [ProjectionVlcStartRequest]; result: void }
-  'projection-vlc:probe': { args: [ProjectionVlcProbeRequest]; result: ProjectionVlcProbeResult }
   'projection-vlc:control': { args: [ProjectionVlcControlRequest]; result: void }
   'projection-vlc:stop': { args: [ProjectionVlcStopRequest]; result: void }
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
