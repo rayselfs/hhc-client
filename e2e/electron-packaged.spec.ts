@@ -332,7 +332,7 @@ test('VLC production matrix', async ({ browserName: _browserName }, testInfo) =>
       .windows()
       .find((window) => window.url().endsWith('#/projection'))
     if (!projection) throw new Error('Projection window did not open')
-    await testInfo.attach('vlc-projection.png', {
+    await testInfo.attach('projection-renderer.png', {
       body: await projection.screenshot(),
       contentType: 'image/png'
     })
