@@ -328,6 +328,14 @@ test('VLC production matrix', async ({ browserName: _browserName }, testInfo) =>
     await expectPlayingState(control, brokenItemId)
     await seekCurrentVideo(control, 4)
     await expectConfirmedSeek(control, brokenItemId, 3.5)
+    const projection = electronApp!
+      .windows()
+      .find((window) => window.url().endsWith('#/projection'))
+    if (!projection) throw new Error('Projection window did not open')
+    await testInfo.attach('vlc-projection.png', {
+      body: await projection.screenshot(),
+      contentType: 'image/png'
+    })
     await control.waitForTimeout(750)
     expect((await latestState(control))?.itemId).toBe(brokenItemId)
   })
