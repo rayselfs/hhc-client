@@ -9,8 +9,8 @@ import type {
   ProjectionVlcStopRequest
 } from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
-import { getNativeFilePath } from './native-fs'
 import { isKnownWindow } from './validate'
+import { resolveVideoPlaybackPath } from './video-remux'
 import { isValidNativeFileId } from '../../shared/native-media'
 import { resolveVlcRuntime } from '../video-engine-runtime'
 import {
@@ -62,7 +62,31 @@ const VLC_FAILURE_DETAILS: Record<
     message: 'VLC native playback is unavailable.'
   },
   'media-open-failed': { recoverable: true, message: 'VLC could not open this media.' },
-  'playback-failed': { recoverable: true, message: 'VLC playback stopped unexpectedly.' }
+  'playback-failed': { recoverable: true, message: 'VLC playback stopped unexpectedly.' },
+  'matroska-remux-failed': {
+    recoverable: true,
+    message: 'This Matroska video could not be prepared.'
+  },
+  'insufficient-storage': {
+    recoverable: true,
+    message: 'Not enough storage is available to prepare this video.'
+  },
+  'source-replaced': {
+    recoverable: true,
+    message: 'The source video changed while it was being prepared.'
+  },
+  'remux-timeout': { recoverable: true, message: 'Preparing this video timed out.' },
+  'remux-cancelled': { recoverable: true, message: 'Preparing this video was cancelled.' }
+}
+
+function remuxFailureCode(error: unknown): ProjectionVlcFailureCode {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('insufficient-storage')) return 'insufficient-storage'
+  if (message.includes('source-replaced')) return 'source-replaced'
+  if (message.includes('timed out')) return 'remux-timeout'
+  if (message.includes('aborted')) return 'remux-cancelled'
+  if (message.includes('runtime-missing')) return 'runtime-missing'
+  return 'matroska-remux-failed'
 }
 
 type ListenerTarget = {
@@ -152,7 +176,9 @@ function validateVlcStartRequest(value: unknown): ProjectionVlcStartRequest {
     !isOptionalFiniteNumber(value.initialPositionSeconds, 0) ||
     !isOptionalFiniteNumber(value.initialVolume, 0, 1) ||
     (value.initialPlaybackState !== undefined &&
-      !['playing', 'paused', 'ended'].includes(String(value.initialPlaybackState)))
+      !['playing', 'paused', 'ended'].includes(String(value.initialPlaybackState))) ||
+    (value.playbackVariant !== undefined &&
+      !['source', 'matroska-remux'].includes(String(value.playbackVariant)))
   ) {
     throw new Error('Invalid VLC start request')
   }
@@ -485,6 +511,18 @@ async function startVlc(
   }
   activeSession = session
   if (previousSession) destroySessionResources(previousSession)
+  let playbackPath: string
+  try {
+    playbackPath = await resolveVideoPlaybackPath(
+      request.sourceFileId,
+      request.playbackVariant ?? 'source'
+    )
+  } catch (error) {
+    if (ownsSession(wm, session)) publishFailure(wm, remuxFailureCode(error), session)
+    invalidateSession(session)
+    throw error
+  }
+  if (!ownsSession(wm, session)) return
   session.watchdog = setTimeout(() => {
     if (!ownsSession(wm, session)) return
     publishFailure(wm, 'media-open-failed', session)
@@ -637,7 +675,7 @@ async function startVlc(
       publishFailure(wm, 'playback-failed', session)
       invalidateSession(session)
     })
-    nextPlayer.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
+    nextPlayer.setSource(playbackPath, { autoplay: false })
     session.sourceInstalled = true
     session.phase = 'waiting-media'
     setNativePlayerWindowVisible(session, nextPlayer, false)

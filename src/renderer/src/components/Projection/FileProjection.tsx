@@ -30,6 +30,8 @@ type FileProjectionProps = {
   initialMimeType?: string
   initialStreamUrl?: string
   initialPlaybackMode?: 'native' | 'vlc-embedded'
+  initialPlaybackVariant?: 'source' | 'matroska-remux'
+  vlcStartRevision?: number
   initialSeekable?: boolean
   initialDurationMs?: number
   initialPresentation?: {
@@ -87,6 +89,8 @@ export default function FileProjection({
   initialMimeType,
   initialStreamUrl,
   initialPlaybackMode,
+  initialPlaybackVariant,
+  vlcStartRevision,
   initialSeekable,
   initialDurationMs,
   initialPresentation,
@@ -851,6 +855,8 @@ export default function FileProjection({
           blobId={initialBlobId}
           durationMs={durationMsRef.current}
           replayState={initialReplayState}
+          playbackVariant={initialPlaybackVariant}
+          startRevision={vlcStartRevision}
         />
       </div>
     )
@@ -995,12 +1001,16 @@ function VlcProjectionSurface({
   itemId,
   blobId,
   durationMs,
-  replayState
+  replayState,
+  playbackVariant,
+  startRevision
 }: {
   itemId: string | null
   blobId?: string
   durationMs?: number
   replayState?: ProjectionMediaReplayState | null
+  playbackVariant?: 'source' | 'matroska-remux'
+  startRevision?: number
 }): React.JSX.Element {
   useEffect(() => {
     if (!itemId || !blobId) return undefined
@@ -1012,6 +1022,7 @@ function VlcProjectionSurface({
         sourceFileId: blobId,
         container: '#vlc-player',
         durationMs,
+        playbackVariant,
         initialPositionSeconds:
           replayState?.itemId === itemId ? replayState.positionSeconds : undefined,
         initialVolume: replayState?.itemId === itemId ? replayState.volume : undefined,
@@ -1030,7 +1041,7 @@ function VlcProjectionSurface({
     return () => {
       void window.api?.projectionVlc?.stop({ itemId, attemptId })
     }
-  }, [blobId, durationMs, itemId, replayState])
+  }, [blobId, durationMs, itemId, playbackVariant, replayState, startRevision])
 
   return <div id="vlc-player" className="h-full w-full bg-black" />
 }

@@ -18,6 +18,7 @@ export interface ProjectionRenderState {
   fileControlEvent: { id: number; data: FileControlPayload } | null
   timerRingColor: string | null
   generation: number
+  vlcStartRevision: number
 }
 
 export type ProjectionRenderAction =
@@ -40,7 +41,8 @@ export const initialProjectionRenderState: ProjectionRenderState = {
   mediaReplayState: null,
   fileControlEvent: null,
   timerRingColor: null,
-  generation: 0
+  generation: 0,
+  vlcStartRevision: 0
 }
 
 export function reduceProjectionRenderState(
@@ -81,7 +83,8 @@ export function reduceProjectionRenderState(
       mediaReplayState,
       fileControlEvent: null,
       timerRingColor: snapshot.timer.ringColor?.color ?? null,
-      generation
+      generation,
+      vlcStartRevision: state.vlcStartRevision + 1
     }
   }
 

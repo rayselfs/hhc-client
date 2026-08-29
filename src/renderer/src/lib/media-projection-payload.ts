@@ -86,6 +86,7 @@ export function buildFileProjectionPayload({
     })),
     currentIndex,
     playbackMode: snapshotEntry?.playbackMode,
+    playbackVariant: snapshotEntry?.playbackVariant,
     seekable: snapshotEntry?.seekable,
     durationMs: snapshotEntry?.durationMs
   }

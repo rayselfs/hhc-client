@@ -63,6 +63,7 @@ it('applies a media replay in one reducer action', () => {
 
   expect(next).toMatchObject({
     generation: 3,
+    vlcStartRevision: 1,
     showDefault: false,
     activeContent: 'file',
     fileData: mediaSnapshot.media.show,
@@ -79,6 +80,12 @@ it('applies a media replay in one reducer action', () => {
     volume: 0.35,
     isPlaying: true
   })
+
+  const retried = reduceProjectionRenderState(next, {
+    type: 'replay',
+    payload: { generation: 3, snapshot: mediaSnapshot }
+  })
+  expect(retried.vlcStartRevision).toBe(2)
 })
 
 it('selects intentional blackout without losing retained content', () => {

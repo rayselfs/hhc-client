@@ -278,6 +278,7 @@ describe('FileProjection copied media identity', () => {
         initialBlobId="video-blob"
         initialMimeType="video/x-matroska"
         initialPlaybackMode="vlc-embedded"
+        initialPlaybackVariant="matroska-remux"
         initialReplayState={{
           itemId: 'video-id',
           positionSeconds: 18,
@@ -300,7 +301,8 @@ describe('FileProjection copied media identity', () => {
           attemptId: expect.any(String),
           initialPositionSeconds: 18,
           initialVolume: 0.35,
-          initialPlaybackState: 'playing'
+          initialPlaybackState: 'playing',
+          playbackVariant: 'matroska-remux'
         })
       )
     })
@@ -340,6 +342,24 @@ describe('FileProjection copied media identity', () => {
       itemId: 'video-id',
       value: 20
     })
+  })
+
+  it('restarts embedded VLC exactly once for a same-generation replay revision', async () => {
+    const props = {
+      generation: 4,
+      fileName: 'clip.mkv',
+      initialItemId: 'video-id',
+      initialBlobId: 'video-blob',
+      initialMimeType: 'video/x-matroska',
+      initialPlaybackMode: 'vlc-embedded' as const,
+      initialPlaybackVariant: 'matroska-remux' as const
+    }
+    const { rerender } = render(<FileProjection {...props} vlcStartRevision={1} />)
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalledOnce())
+
+    rerender(<FileProjection {...props} vlcStartRevision={2} />)
+
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalledTimes(2))
   })
 
   it('uses live stream URLs without loading a stored source and ignores seek controls', async () => {

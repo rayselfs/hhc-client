@@ -125,7 +125,10 @@ function validateProjectionPayload(channel: string, data: unknown): boolean {
         typeof obj.mimeType === 'string' &&
         Array.isArray(obj.playlist) &&
         typeof obj.currentIndex === 'number' &&
-        Number.isInteger(obj.currentIndex)
+        Number.isInteger(obj.currentIndex) &&
+        (obj.playbackVariant === undefined ||
+          obj.playbackVariant === 'source' ||
+          obj.playbackVariant === 'matroska-remux')
       )
     case 'file:control':
       if (typeof obj.action !== 'string') return false

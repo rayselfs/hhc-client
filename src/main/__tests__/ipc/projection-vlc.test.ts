@@ -1,6 +1,14 @@
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const { mockResolveVideoPlaybackPath } = vi.hoisted(() => ({
+  mockResolveVideoPlaybackPath: vi.fn()
+}))
+
+vi.mock('../../ipc/video-remux', () => ({
+  resolveVideoPlaybackPath: mockResolveVideoPlaybackPath
+}))
+
 const mockMainWindow = { id: 1 }
 const mockProjectionWindow = new EventEmitter() as EventEmitter & {
   id: number
@@ -170,6 +178,9 @@ beforeEach(() => {
   mockConstructError = null
   mockDestroyImplementation = () => undefined
   mockSetSourceImplementation = () => undefined
+  mockResolveVideoPlaybackPath.mockImplementation(
+    async (sourceFileId: string) => `/native-files/${sourceFileId}`
+  )
   vi.mocked(resolveVlcRuntime).mockReturnValue({ status: 'ready', path: '/vlc' })
   mockWindowManager.getProjectionState.mockReturnValue({
     exists: true,
@@ -179,6 +190,57 @@ beforeEach(() => {
 })
 
 describe('projection-vlc listener cleanup', () => {
+  it('owns and queues controls while resolving a Matroska derivative', async () => {
+    const derivative = deferred<string>()
+    mockResolveVideoPlaybackPath.mockReturnValueOnce(derivative.promise)
+    const start = getHandler('projection-vlc:start')
+    const starting = start(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player',
+      playbackVariant: 'matroska-remux'
+    }) as Promise<void>
+    await vi.waitFor(() => expect(mockResolveVideoPlaybackPath).toHaveBeenCalledOnce())
+
+    getHandler('projection-vlc:control')(makeEvent(), {
+      action: 'volume',
+      itemId: 'item-1',
+      value: 0.4
+    })
+    getHandler('projection-vlc:control')(makeEvent(), { action: 'pause', itemId: 'item-1' })
+    expect(mockVlcPlayers).toHaveLength(0)
+
+    derivative.resolve('/cache/item-1.mkv')
+    await starting
+    expect(mockResolveVideoPlaybackPath).toHaveBeenCalledWith(
+      '550e8400-e29b-41d4-a716-446655440000',
+      'matroska-remux'
+    )
+    expect(mockVlcPlayers[0].setSource).toHaveBeenCalledWith('/cache/item-1.mkv', {
+      autoplay: false
+    })
+    expect(mockVlcPlayers[0].setVolume).toHaveBeenCalledWith(40)
+  })
+
+  it('publishes a stable recoverable remux failure without embedding VLC', async () => {
+    mockResolveVideoPlaybackPath.mockRejectedValueOnce(new Error('insufficient-storage'))
+
+    await expect(
+      getHandler('projection-vlc:start')(makeEvent(), {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player',
+        playbackVariant: 'matroska-remux'
+      })
+    ).rejects.toThrow('insufficient-storage')
+
+    expect(mockVlcPlayers).toHaveLength(0)
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+      'projection-vlc:failure',
+      expect.objectContaining({ itemId: 'item-1', code: 'insufficient-storage', recoverable: true })
+    )
+  })
+
   it('publishes a VLC started acknowledgement only after startup succeeds', async () => {
     await getHandler('projection-vlc:start')(makeEvent(), {
       itemId: 'item-1',
@@ -1029,6 +1091,15 @@ describe('projection-vlc listener cleanup', () => {
         sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
         container: '#vlc-player',
         initialPlaybackState: 'buffering'
+      }
+    ],
+    [
+      'unknown playback variant',
+      {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player',
+        playbackVariant: 'transcode'
       }
     ],
     [

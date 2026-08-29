@@ -139,6 +139,7 @@ function setRemoteDesktopEngineItem(): FileItemRecord {
           mimeType: item.mimeType,
           sourceUrl: item.url,
           playbackMode: 'vlc-embedded',
+          playbackVariant: 'matroska-remux',
           seekable: true,
           remoteItem: {
             providerConnectionId: 'hhc-line:user-1',
@@ -856,6 +857,7 @@ describe('media projection sync', () => {
             mimeType: 'video/x-matroska',
             sourceUrl: 'blob:source-blob',
             playbackMode: 'vlc-embedded',
+            playbackVariant: 'matroska-remux',
             seekable: true,
             durationMs: 15000
           }
@@ -874,6 +876,7 @@ describe('media projection sync', () => {
             itemId: 'vlc-item',
             blobId: 'source-blob',
             playbackMode: 'vlc-embedded',
+            playbackVariant: 'matroska-remux',
             seekable: true,
             durationMs: 15000
           })

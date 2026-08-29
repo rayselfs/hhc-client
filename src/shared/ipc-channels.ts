@@ -70,6 +70,11 @@ export type ProjectionVlcFailureCode =
   | 'binding-unavailable'
   | 'media-open-failed'
   | 'playback-failed'
+  | 'matroska-remux-failed'
+  | 'insufficient-storage'
+  | 'source-replaced'
+  | 'remux-timeout'
+  | 'remux-cancelled'
 
 export interface ProjectionVlcFailure {
   itemId?: string
@@ -93,6 +98,7 @@ export interface ProjectionVlcStartRequest {
   initialPositionSeconds?: number
   initialVolume?: number
   initialPlaybackState?: 'playing' | 'paused' | 'ended'
+  playbackVariant?: 'source' | 'matroska-remux'
 }
 
 export type ProjectionVlcControlRequest =

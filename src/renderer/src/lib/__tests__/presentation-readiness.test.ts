@@ -128,7 +128,8 @@ describe('analyzePresentationReadiness', () => {
       status: 'ready',
       reason: 'ready-vlc-embedded',
       support: 'desktop-engine',
-      playbackMode: 'vlc-embedded'
+      playbackMode: 'vlc-embedded',
+      playbackVariant: 'matroska-remux'
     })
     expect(report.items[0]).not.toHaveProperty('seekable')
     expect(report.items[0]).not.toHaveProperty('durationMs')
@@ -169,7 +170,8 @@ describe('analyzePresentationReadiness', () => {
     expect(report.items[0]).toMatchObject({
       status: 'ready',
       support: 'desktop-engine',
-      playbackMode: 'vlc-embedded'
+      playbackMode: 'vlc-embedded',
+      playbackVariant: 'matroska-remux'
     })
     expect(report.items[0]).not.toHaveProperty('seekable')
   })
@@ -344,6 +346,7 @@ describe('analyzePresentationReadiness', () => {
       support: 'native',
       seekable: mimeType.startsWith('audio/') || mimeType.startsWith('video/')
     })
+    expect(report.items[0]).not.toHaveProperty('playbackVariant')
   })
 
   it('fails unsupported HHC remote media without requesting a source', async () => {

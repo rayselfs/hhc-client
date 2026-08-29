@@ -141,6 +141,7 @@ export interface AppMessages {
     playlist: Array<{ id: string; name: string; mimeType: string }>
     currentIndex: number
     playbackMode?: 'native' | 'vlc-embedded'
+    playbackVariant?: 'source' | 'matroska-remux'
     streamUrl?: string
     seekable?: boolean
     durationMs?: number

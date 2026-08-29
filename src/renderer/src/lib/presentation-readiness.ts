@@ -35,6 +35,7 @@ export interface PresentationReadinessItem {
   support: MediaSupportMode | null
   derivativeId?: string
   playbackMode?: 'native' | 'vlc-embedded'
+  playbackVariant?: 'source' | 'matroska-remux'
   seekable?: boolean
   durationMs?: number
   remoteItem?: {
@@ -58,6 +59,7 @@ export interface PresentationSnapshotEntry {
   sourceUrl: string
   derivativeId?: string
   playbackMode?: 'native' | 'vlc-embedded'
+  playbackVariant?: 'source' | 'matroska-remux'
   seekable?: boolean
   durationMs?: number
   remoteItem?: {
@@ -102,6 +104,7 @@ export function createPresentationSnapshot(
       sourceUrl: item.url,
       derivativeId: readinessByItemId.get(item.id)?.derivativeId,
       playbackMode: readinessByItemId.get(item.id)?.playbackMode,
+      playbackVariant: readinessByItemId.get(item.id)?.playbackVariant,
       seekable: readinessByItemId.get(item.id)?.seekable,
       durationMs: readinessByItemId.get(item.id)?.durationMs,
       remoteItem: readinessByItemId.get(item.id)?.remoteItem
@@ -207,6 +210,9 @@ async function analyzePresentationItem(
         reason: 'ready-remote',
         support,
         playbackMode: support === 'desktop-engine' ? 'vlc-embedded' : 'native',
+        ...(support === 'desktop-engine' && capability.canonicalMimeType === 'video/x-matroska'
+          ? { playbackVariant: 'matroska-remux' as const }
+          : {}),
         ...(support !== 'desktop-engine'
           ? { seekable: capability.kind === 'video' || capability.kind === 'audio' }
           : {}),
@@ -303,7 +309,10 @@ async function analyzePresentationItem(
         status: 'ready',
         reason: 'ready-vlc-embedded',
         support,
-        playbackMode: 'vlc-embedded'
+        playbackMode: 'vlc-embedded',
+        ...(capability.canonicalMimeType === 'video/x-matroska'
+          ? { playbackVariant: 'matroska-remux' as const }
+          : {})
       }
     }
 
