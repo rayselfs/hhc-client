@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { cleanup, renderHook, act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBlankEditablePresentationDocument } from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
@@ -8,6 +8,7 @@ import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { HhcAssetApiError } from '../hhc-asset-api'
+import { resetMediaProjectionPreflightForTests } from '../media-projection-preflight'
 
 const registryMocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -20,6 +21,7 @@ const remoteMocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   ensurePersistent: vi.fn()
 }))
+const payloadMocks = vi.hoisted(() => ({ fallback: vi.fn() }))
 const projectionState = { activeOwner: 'media' as 'media' | 'timer' | 'bible' }
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
@@ -39,6 +41,12 @@ vi.mock('../hhc-line-connect', () => ({
   prepareHhcLinePresentationSource: remoteMocks.prepare,
   ensureHhcLineDesktopItemAvailableForPresentation: remoteMocks.ensurePersistent
 }))
+
+vi.mock('../media-projection-payload', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../media-projection-payload')>()
+  payloadMocks.fallback.mockImplementation(actual.buildFileProjectionPayloadWithEditableSlide)
+  return { ...actual, buildFileProjectionPayloadWithEditableSlide: payloadMocks.fallback }
+})
 
 import { useMediaProjectionSync } from '../media-projection-sync'
 
@@ -134,7 +142,10 @@ function setRemoteDesktopEngineItem(): FileItemRecord {
 }
 
 beforeEach(() => {
+  resetMediaProjectionPreflightForTests()
   vi.clearAllMocks()
+  registryMocks.get.mockReset()
+  registryMocks.finalizeAndFlush.mockReset()
   Object.defineProperty(window, 'api', { configurable: true, value: undefined })
   projectionState.activeOwner = 'media'
   registryMocks.get.mockReturnValue(undefined)
@@ -158,7 +169,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
+  resetMediaProjectionPreflightForTests()
 })
 
 describe('media projection sync', () => {
@@ -1248,19 +1261,24 @@ describe('media projection sync', () => {
       sessionRevision: 11,
       snapshot: null
     })
-    renderSync()
+    resetMediaProjectionPreflightForTests()
+    const rendered = renderSync()
+    await act(async () => {
+      await Promise.resolve()
+    })
 
     const start = useMediaProjectionStore.getState().startPresentation([editable], 0)
     await waitFor(() => expect(registryMocks.finalizeAndFlush).toHaveBeenCalledWith(editable.id))
     registryMocks.get.mockReturnValue(reopenedSession)
     pending.resolve(document)
 
-    expect(await start).toEqual({ status: 'blocked' })
+    expect(await start).toEqual({ status: 'superseded' })
     expect(useMediaProjectionStore.getState()).toMatchObject({
       isPresenting: false,
       sessionRevision: 11
     })
     expect(mockStartProjection).not.toHaveBeenCalled()
+    rendered.unmount()
   })
 
   it('revalidates a clean editable session at the store commit boundary', async () => {
@@ -1346,5 +1364,117 @@ describe('media projection sync', () => {
 
     expect(useMediaProjectionStore.getState().currentItem()?.id).toBe(replacement.id)
     expect(mockStartProjection).not.toHaveBeenCalled()
+  })
+
+  it('abandons an explicit no-session fallback when a same-id session appears during loading', async () => {
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const pending = deferred<unknown>()
+    payloadMocks.fallback.mockReturnValueOnce(pending.promise)
+    useMediaProjectionStore.setState({
+      playlist: [],
+      currentIndex: 0,
+      isPresenting: false,
+      sessionRevision: 20,
+      snapshot: null
+    })
+    registryMocks.get.mockReturnValue(undefined)
+    renderSync()
+
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'success'
+    })
+    await waitFor(() => expect(payloadMocks.fallback).toHaveBeenCalledOnce())
+    registryMocks.get.mockReturnValue({
+      getSnapshot: vi.fn()
+    } as unknown as PresentationEditorSession)
+    pending.resolve({ itemId: editable.id })
+
+    await act(async () => {
+      await pending.promise
+    })
+
+    expect(mockStartProjection).not.toHaveBeenCalled()
+    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
+  })
+
+  it('abandons a session-owned editable payload when that session is replaced during source loading', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const replacementDocument = createBlankEditablePresentationDocument('Replacement')
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const pending = deferred<{
+      providerConnectionId: string
+      remoteItemId: string
+      rootRemoteFolderId: string
+      source: { kind: 'ticket'; url: string; expiresAt: number; etag: string }
+    }>()
+    const session = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: document },
+        draftKind: null,
+        save: { status: 'saved' }
+      }))
+    } as unknown as PresentationEditorSession
+    const replacement = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: replacementDocument },
+        draftKind: null,
+        save: { status: 'saved' }
+      }))
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(session)
+    projectionState.activeOwner = 'timer'
+    const rendered = renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
+      }
+    })
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'success'
+    })
+    mockStartProjection.mockClear()
+    projectionState.activeOwner = 'media'
+    rendered.rerender()
+    const remoteEntry = {
+      index: 0,
+      itemId: editable.id,
+      blobId: editable.id,
+      name: editable.name,
+      mimeType: editable.mimeType,
+      sourceUrl: editable.url,
+      remoteItem: {
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1',
+        rootRemoteFolderId: 'collection-1'
+      }
+    }
+    useMediaProjectionStore.setState({
+      snapshot: { id: 'snapshot', createdAt: 1, entries: [remoteEntry] },
+      isEnded: true
+    })
+    remoteMocks.prepare.mockReturnValueOnce(pending.promise)
+    useMediaProjectionStore.setState({ isEnded: false })
+    await waitFor(() => expect(remoteMocks.prepare).toHaveBeenCalledOnce())
+
+    registryMocks.get.mockReturnValue(replacement)
+    pending.resolve({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      rootRemoteFolderId: 'collection-1',
+      source: {
+        kind: 'ticket',
+        url: 'https://www.alive.org.tw/api/assets/content?ticket=stale',
+        expiresAt: Date.now() + 60_000,
+        etag: 'etag-1'
+      }
+    })
+    await act(async () => {
+      await pending.promise
+    })
+
+    expect(mockStartProjection).not.toHaveBeenCalled()
+    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
   })
 })

@@ -1,8 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from '@heroui/react/toast'
 import type { FileItemRecord } from '@shared/types/folder'
 import type { MediaTypeDescriptor } from '@renderer/lib/presenter-registry'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import {
+  resolveMediaProjectionAction,
+  useMediaProjectionStore,
+  type MediaProjectionActionResult
+} from '@renderer/stores/media-projection'
 
 interface MediaPreviewProps {
   currentItem: FileItemRecord | null
@@ -79,6 +84,15 @@ export default function MediaPreview({
 
   const PreviewComponent = descriptor?.PreviewComponent ?? null
 
+  const advance = async (): Promise<void> => {
+    if (
+      (await resolveMediaProjectionAction(next() as MediaProjectionActionResult)).status ===
+      'blocked'
+    ) {
+      toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
+    }
+  }
+
   return (
     <div
       ref={previewBoxRef}
@@ -103,7 +117,7 @@ export default function MediaPreview({
             onExit()
             return
           }
-          if (descriptor?.clickToAdvance && zoomLevel <= 1) next()
+          if (descriptor?.clickToAdvance && zoomLevel <= 1) void advance()
         }}
       >
         {isEnded ? (

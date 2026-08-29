@@ -52,10 +52,15 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   const { project, startProjection, stopProjection, activeOwner } = useProjection()
   const registry = usePresentationSessionRegistry()
   const projectSequenceRef = useRef(0)
-  const finalizedEditableDocumentsRef = useRef(
+  const editableOwnershipRef = useRef(
     new Map<
       string,
-      { session: PresentationEditorSession; document: EditablePresentationDocument }
+      | {
+          kind: 'session'
+          session: PresentationEditorSession
+          document: EditablePresentationDocument
+        }
+      | { kind: 'none' }
     >()
   )
   const didInitializeRef = useRef(false)
@@ -86,10 +91,15 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           session: PresentationEditorSession
           document: EditablePresentationDocument
         }> = []
+        const ownedWithoutSession: string[] = []
         for (const item of items) {
           if (!isEditablePresentationMimeType(item.mimeType)) continue
           const session = registry.get(item.id)
-          if (!session) continue
+          if (!session) {
+            editableOwnershipRef.current.set(item.id, { kind: 'none' })
+            ownedWithoutSession.push(item.id)
+            continue
+          }
           const snapshot = session.getSnapshot()
           let document = snapshot.history.present
           if (
@@ -97,7 +107,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
             snapshot.draftKind === null &&
             snapshot.save?.status === 'saved'
           ) {
-            finalizedEditableDocumentsRef.current.set(item.id, { session, document })
+            editableOwnershipRef.current.set(item.id, { kind: 'session', session, document })
             ownedDocuments.push({ itemId: item.id, session, document })
             continue
           }
@@ -111,7 +121,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           } catch {
             return false
           }
-          finalizedEditableDocumentsRef.current.set(item.id, { session, document })
+          editableOwnershipRef.current.set(item.id, { kind: 'session', session, document })
           ownedDocuments.push({ itemId: item.id, session, document })
         }
         return {
@@ -124,7 +134,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
                 snapshot.history.present === document &&
                 snapshot.draftKind == null
               )
-            })
+            }) && ownedWithoutSession.every((itemId) => registry.get(itemId) === undefined)
         }
       }),
     [registry]
@@ -315,24 +325,37 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
       let payload = basePayload
       if (basePayload && item && isEditablePresentationMimeType(item.mimeType)) {
         const session = registry.get(item.id)
-        if (session) {
-          const finalized = finalizedEditableDocumentsRef.current.get(item.id)
-          const snapshot = session.getSnapshot()
+        let ownership = editableOwnershipRef.current.get(item.id)
+        let initialSnapshot: ReturnType<PresentationEditorSession['getSnapshot']> | undefined
+        if (!ownership) {
+          if (session) {
+            initialSnapshot = session.getSnapshot()
+            if (initialSnapshot.draftKind != null) return
+            ownership = { kind: 'session', session, document: initialSnapshot.history.present }
+          } else {
+            ownership = { kind: 'none' }
+          }
+          editableOwnershipRef.current.set(item.id, ownership)
+        }
+        if (ownership?.kind === 'session') {
+          if (session !== ownership.session) return
+          const snapshot = initialSnapshot ?? session.getSnapshot()
+          if (snapshot.history.present !== ownership.document || snapshot.draftKind != null) return
+          payload = buildEditableSlideProjectionPayload(
+            basePayload,
+            ownership.document,
+            usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
+          )
+        } else if (ownership?.kind === 'none') {
+          if (session) return
+          payload = await buildFileProjectionPayloadWithEditableSlide(currentState)
           if (
-            finalized &&
-            (finalized.session !== session ||
-              snapshot.history.present !== finalized.document ||
-              snapshot.draftKind != null)
+            sequence !== projectSequenceRef.current ||
+            registry.get(item.id) !== undefined ||
+            useMediaProjectionStore.getState().sessionRevision !== state.sessionRevision
           ) {
             return
           }
-          payload = buildEditableSlideProjectionPayload(
-            basePayload,
-            finalized?.document ?? snapshot.history.present,
-            usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
-          )
-        } else {
-          payload = await buildFileProjectionPayloadWithEditableSlide(currentState)
         }
       }
       if (!payload) return

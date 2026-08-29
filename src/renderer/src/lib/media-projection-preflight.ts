@@ -22,3 +22,7 @@ export function prepareMediaProjection(
 ): boolean | MediaProjectionPreflightResult | Promise<boolean | MediaProjectionPreflightResult> {
   return preflight?.(items) ?? true
 }
+
+export function resetMediaProjectionPreflightForTests(): void {
+  preflight = null
+}
