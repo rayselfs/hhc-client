@@ -1,4 +1,8 @@
 {
+  "app": {
+    "name": "HHC 投影系统",
+    "description": "专为教会聚会设计的投影系统。"
+  },
   "nav": {
     "timer": "计时器",
     "bible": "圣经",
@@ -10,7 +14,7 @@
     "trash": "回收站"
   },
   "welcome": {
-    "title": "欢迎使用 LibrePresenter",
+    "title": "欢迎使用 HHC 投影系统",
     "subtitle": "让我们设置您的偏好",
     "language": "语言",
     "timezone": "时区",
@@ -562,7 +566,7 @@
       "unsupportedFiles": "有 {{count}} 个文件格式不支持，已保留但禁用。",
       "unlink": "取消连接",
       "unlinkTitle": "取消连接 {{name}}？",
-      "unlinkDescription": "这会从 LibrePresenter 移除同步来源并清除本机同步缓存，不会更改原始本机或云端文件。",
+      "unlinkDescription": "这会从 HHC 投影系统移除同步来源并清除本机同步缓存，不会更改原始本机或云端文件。",
       "unlinked": "已取消同步文件夹连接。",
       "unlinkFailed": "无法取消同步文件夹连接。"
     },
@@ -754,9 +758,17 @@
     "checkForUpdates": "检查更新",
     "upToDate": "已是最新版本",
     "updateAvailable": "更新 {{version}}",
+    "downloadUpdate": "下载更新 {{version}}",
+    "installUpdate": "安装更新",
+    "installUpdateTitle": "现在安装更新？",
+    "installUpdateConfirm": "HHC 投影系统将关闭并安装已下载的更新。",
+    "installNow": "现在安装",
     "checking": "检查中...",
     "downloadingUpdate": "下载中...",
     "downloadingUpdateProgress": "下载中 {{percent}}%",
+    "verifyingUpdate": "正在验证下载...",
+    "installerOpened": "已打开安装程序",
+    "updateFailed": "更新失败",
     "keyboardShortcuts": "键盘快捷键",
     "closeApp": "关闭应用程序",
     "closeAppTitle": "关闭应用程序",
@@ -765,14 +777,24 @@
   "about": {
     "title": "关于",
     "description": "投影软件。",
-    "tagline": "为教会与现场活动打造的开源投影软件。",
+    "tagline": "专为教会聚会设计的投影系统。",
     "version": "版本",
     "license": "授权",
     "openSourceLicenses": "开源授权",
     "viewLicenses": "查看授权",
-    "licensesIntro": "LibrePresenter 与内置视频组件使用的授权。",
+    "licensesIntro": "HHC 投影系统与内置视频组件使用的授权。",
     "source": "来源",
     "back": "返回"
+  },
+  "macUpdate": {
+    "title": "安装 HHC 投影系统",
+    "dmgOpened": "已打开验证完成的 DMG。请将 HHC 投影系统拖到“应用程序”并替换现有 App。",
+    "openAnyway": "系统设置 → 隐私与安全性 → 仍要打开",
+    "fallback": "若 macOS 仍阻止已安装的 App，请复制以下命令并在“终端”运行：",
+    "gatekeeperWarning": "此命令会绕过 HHC 投影系统的 Gatekeeper 限制。",
+    "copyCommand": "复制命令",
+    "commandCopied": "已复制命令",
+    "copyFailed": "复制失败"
   },
   "preferences": {
     "title": "偏好设置",
@@ -833,7 +855,7 @@
       },
       "oneDrive": {
         "title": "OneDrive",
-        "description": "OneDrive 文件夹是只读来源。LibrePresenter 不会上传、重命名、移动或删除远程文件。",
+        "description": "OneDrive 文件夹是只读来源。HHC 投影系统不会上传、重命名、移动或删除远程文件。",
         "connectedAccount": "已连接帐号",
         "noConnectedAccount": "尚未连接 OneDrive 帐号。",
         "connect": "登录",
@@ -844,7 +866,7 @@
         "connectFailed": "无法连接 OneDrive。",
         "disconnect": "登出",
         "disconnectTitle": "登出 OneDrive？",
-        "disconnectDescription": "这会从 LibrePresenter 移除 OneDrive 来源并清除本机同步缓存，不会更改远程文件。",
+        "disconnectDescription": "这会从 HHC 投影系统移除 OneDrive 来源并清除本机同步缓存，不会更改远程文件。",
         "disconnected": "已登出 OneDrive。",
         "disconnectFailed": "无法登出 OneDrive。"
       },

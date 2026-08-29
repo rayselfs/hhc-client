@@ -18,7 +18,7 @@ interface WebOneDriveCredentialDB extends DBSchema {
   }
 }
 
-const DB_NAME = 'libre-presenter-onedrive-web-credentials'
+const DB_NAME = 'hhc-presenter-onedrive-web-credentials'
 const DB_VERSION = 1
 const TOKEN_EXPIRY_SKEW_MS = 60_000
 

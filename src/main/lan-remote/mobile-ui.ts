@@ -4,7 +4,7 @@ export function getLanRemoteMobileHtml(sessionToken: string | null = null): stri
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LibrePresenter Remote</title>
+  <title>HHC Presenter Remote</title>
   <style>
     body{font-family:system-ui;margin:0;background:#111;color:#fff}
     main{display:grid;gap:12px;padding:16px}
@@ -38,13 +38,13 @@ export function getLanRemoteMobileHtml(sessionToken: string | null = null): stri
             : { requestId: crypto.randomUUID(), type }
       const response = await fetch('/command', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-libre-presenter-session': sessionToken },
+        headers: { 'content-type': 'application/json', 'x-hhc-presenter-session': sessionToken },
         body: JSON.stringify(command)
       })
       state.textContent = JSON.stringify(await response.json(), null, 2)
     }
     async function refreshState() {
-      const response = await fetch('/state', { headers: { 'x-libre-presenter-session': sessionToken } })
+      const response = await fetch('/state', { headers: { 'x-hhc-presenter-session': sessionToken } })
       state.textContent = JSON.stringify(await response.json(), null, 2)
     }
     document.querySelectorAll('button').forEach(button => {

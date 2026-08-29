@@ -4,7 +4,7 @@
 
 Soundboard is a top-level workspace for live audio cue playback. It is designed for
 church services and drama use cases where operators need mouse or MIDI-triggered
-audio pads without leaving LibrePresenter.
+audio pads without leaving HHC Presenter.
 
 ## Scope
 
@@ -47,7 +47,7 @@ interface SoundboardAssetRef {
 This keeps asset ownership in the File Explorer store and lets Soundboard reuse the
 same upload, storage, sync, and cleanup policies as the rest of the app.
 
-When a File Explorer item is deleted, LibrePresenter checks whether that item is
+When a File Explorer item is deleted, HHC Presenter checks whether that item is
 assigned to any pad and adds a warning to the delete confirmation.
 
 ## Upload And Storage

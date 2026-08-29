@@ -11,7 +11,7 @@ const KNOWN_INDEXED_DBS = [
   'hhc-media-work',
   'hhc-sync',
   'hhc-thumbnails',
-  'libre-presenter-onedrive-web-credentials'
+  'hhc-presenter-onedrive-web-credentials'
 ]
 
 async function deleteIndexedDB(name: string): Promise<void> {

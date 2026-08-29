@@ -36,15 +36,15 @@ describe('AboutDialog', () => {
   it('renders app icon, name, version, and description when open', () => {
     render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    const img = screen.getByAltText('LibrePresenter')
+    const img = screen.getByAltText('HHC Presenter')
     expect(img).toBeInTheDocument()
     expect(img.tagName).toBe('IMG')
 
-    expect(screen.getByText('LibrePresenter')).toBeInTheDocument()
+    expect(screen.getByText('HHC Presenter')).toBeInTheDocument()
     expect(screen.getByText(/^v/)).toBeInTheDocument()
     expect(screen.getByText('GPL-3.0-or-later')).toBeInTheDocument()
     expect(
-      screen.getByText('Open-source presentation software for churches and live events.')
+      screen.getByText('A projection system designed for church services.')
     ).toBeInTheDocument()
     expect(screen.getByText('Version')).toBeInTheDocument()
     expect(screen.getByText('License')).toBeInTheDocument()
@@ -75,7 +75,7 @@ describe('AboutDialog', () => {
   it('displays icon in the brand header', () => {
     render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    const img = screen.getByAltText('LibrePresenter')
+    const img = screen.getByAltText('HHC Presenter')
     const container = img.parentElement!
     expect(container.classList.contains('flex')).toBe(true)
     expect(container.classList.contains('items-start')).toBe(true)

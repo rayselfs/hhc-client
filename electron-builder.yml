@@ -1,9 +1,9 @@
-appId: org.librepresenter.app
-productName: LibrePresenter
+appId: tw.org.alive.presenter
+productName: HHC Presenter
 protocols:
-  name: LibrePresenter
+  name: HHC Presenter
   schemes:
-    - librepresenter
+    - hhc-presenter
 directories:
   buildResources: build
 files:
@@ -26,13 +26,14 @@ extraResources:
       - '**/*'
 afterPack: ./scripts/after-pack.mjs
 win:
-  executableName: libre-presenter
+  executableName: hhc-presenter
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: hhc-presenter-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  artifactName: hhc-presenter-${version}-${arch}-mac.${ext}
   identity: null
   hardenedRuntime: false
   entitlementsInherit: build/entitlements.mac.plist
@@ -43,7 +44,7 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: hhc-presenter-${version}.${ext}
 linux:
   target:
     - AppImage
@@ -52,9 +53,9 @@ linux:
   maintainer: electronjs.org
   category: Utility
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: hhc-presenter-${version}.${ext}
 npmRebuild: false
 publish:
   provider: github
   owner: rayselfs
-  repo: libre-presenter
+  repo: hhc-presenter

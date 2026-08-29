@@ -2,7 +2,7 @@
 
 ## Goal
 
-Prepare LibrePresenter for public unsigned GitHub releases without paying for platform signing at this stage.
+Prepare HHC Presenter for public unsigned GitHub releases without paying for platform signing at this stage.
 
 ## Key Changes
 

@@ -229,7 +229,7 @@ describe('HhcAuthService authorization', () => {
     expect(authorize.pathname).toBe('/api/account/v1/oauth/authorize')
     expect(Object.fromEntries(authorize.searchParams)).toMatchObject({
       client_id: 'hhc-desktop',
-      redirect_uri: 'librepresenter://auth/account',
+      redirect_uri: 'hhc-presenter://auth/account',
       response_type: 'code',
       code_challenge_method: 'S256',
       scope: 'openid profile'
@@ -249,11 +249,11 @@ describe('HhcAuthService authorization', () => {
     expect(Object.fromEntries(tokenBody)).toEqual({
       grant_type: 'authorization_code',
       client_id: 'hhc-desktop',
-      redirect_uri: 'librepresenter://auth/account',
+      redirect_uri: 'hhc-presenter://auth/account',
       code_verifier: expect.any(String),
       code: 'authorization-code',
       device_id: expect.any(String),
-      device_name: expect.stringContaining('LibrePresenter Electron')
+      device_name: expect.stringContaining('HHC Presenter Electron')
     })
     expect(createHash('sha256').update(tokenBody.get('code_verifier')!).digest('base64url')).toBe(
       authorize.searchParams.get('code_challenge')
@@ -845,7 +845,7 @@ describe('HhcAuthService credentials and session', () => {
       client_id: 'hhc-desktop',
       refresh_token: 'refresh-1',
       device_id: installationId,
-      device_name: expect.stringContaining('LibrePresenter Electron')
+      device_name: expect.stringContaining('HHC Presenter Electron')
     })
     expect(currentStoredRecord()).toEqual({ installationId, refreshToken: 'refresh-2' })
 

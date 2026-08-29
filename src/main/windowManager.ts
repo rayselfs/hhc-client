@@ -108,7 +108,7 @@ export class WindowManager {
         nodeIntegration: false,
         backgroundThrottling: false
       },
-      title: 'LibrePresenter'
+      title: 'HHC Presenter'
     })
 
     this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {

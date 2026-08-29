@@ -25,7 +25,7 @@ import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 import { createHhcAuthService, registerHhcAuthIpc } from './ipc/hhc-auth'
 import { registerHhcAssetHandlers } from './ipc/hhc-assets'
-import { createLibrePresenterProtocolDispatcher } from './protocol-router'
+import { createHhcPresenterProtocolDispatcher } from './protocol-router'
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local-model', privileges: { secure: true, supportFetchAPI: true, stream: true } },
@@ -54,7 +54,7 @@ const wm = WindowManager.getInstance()
 const hhcAuthService = createHhcAuthService()
 let nativeMediaLeasesCleared = false
 let nativeMediaLeaseCleanupPending = false
-const protocolDispatcher = createLibrePresenterProtocolDispatcher({
+const protocolDispatcher = createHhcPresenterProtocolDispatcher({
   onAccountAuth: (action) => {
     const mainWindow = wm.getMainWindow()
     mainWindow?.show()
@@ -68,10 +68,10 @@ const protocolDispatcher = createLibrePresenterProtocolDispatcher({
 
 function registerAppProtocol(): void {
   if (process.defaultApp && process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('librepresenter', process.execPath, [process.argv[1]])
+    app.setAsDefaultProtocolClient('hhc-presenter', process.execPath, [process.argv[1]])
     return
   }
-  app.setAsDefaultProtocolClient('librepresenter')
+  app.setAsDefaultProtocolClient('hhc-presenter')
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
@@ -95,7 +95,7 @@ if (!gotSingleInstanceLock) {
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     await clearStaleNativeMediaLeasesOnStartup()
-    electronApp.setAppUserModelId('org.librepresenter.app')
+    electronApp.setAppUserModelId('tw.org.alive.presenter')
     registerAppProtocol()
 
     app.on('browser-window-created', (_, window) => {

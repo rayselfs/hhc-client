@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico" />
-    <title>OneDrive Sign In | LibrePresenter</title>
+    <title>OneDrive 登入 | HHC 投影系統</title>
     <style>
       :root {
         color-scheme: dark;
@@ -90,7 +90,7 @@
     <main>
       <img src="/favicon.ico" alt="" />
       <h1>OneDrive 登入完成</h1>
-      <p id="message">正在回到 LibrePresenter。若視窗沒有自動關閉，可以直接關閉此頁。</p>
+      <p id="message">正在回到 HHC 投影系統。若視窗沒有自動關閉，可以直接關閉此頁。</p>
       <div class="status" aria-live="polite">
         <span class="dot" aria-hidden="true"></span>
         <span id="status">正在連結帳號</span>
@@ -100,12 +100,12 @@
     <script>
       const callbackUrl = window.location.href
       const payload = {
-        type: 'libre-presenter:onedrive-callback',
+        type: 'hhc-presenter:onedrive-callback',
         url: callbackUrl
       }
 
       try {
-        localStorage.setItem('libre-presenter:onedrive-callback', callbackUrl)
+        localStorage.setItem('hhc-presenter:onedrive-callback', callbackUrl)
       } catch {}
 
       if (window.opener) {
@@ -113,7 +113,7 @@
         document.getElementById('status').textContent = '可以關閉此視窗'
         setTimeout(() => window.close(), 500)
       } else {
-        document.getElementById('message').textContent = '登入結果已保存。正在返回 LibrePresenter。'
+        document.getElementById('message').textContent = '登入結果已保存。正在返回 HHC 投影系統。'
         document.getElementById('status').textContent = '正在返回'
         setTimeout(() => window.location.replace('/'), 1200)
       }

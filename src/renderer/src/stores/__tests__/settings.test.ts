@@ -27,7 +27,7 @@ import {
   DEFAULT_LAN_REMOTE,
   getEffectiveOneDriveClientId,
   getDefaultSpeechSettings,
-  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
+  HHC_PRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
   normalizeSettingsState
 } from '@renderer/stores/settings'
 import { clearAllSiteData } from '@renderer/lib/site-data'
@@ -419,8 +419,8 @@ describe('speech settings', () => {
 })
 
 describe('OneDrive settings', () => {
-  it('uses the configured LibrePresenter Client ID', () => {
-    expect(getEffectiveOneDriveClientId()).toBe(LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID)
+  it('uses the configured HHC Presenter Client ID', () => {
+    expect(getEffectiveOneDriveClientId()).toBe(HHC_PRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID)
   })
 
   it('normalizes shared sync offline policy', () => {

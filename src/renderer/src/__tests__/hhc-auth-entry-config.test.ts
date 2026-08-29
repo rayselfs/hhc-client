@@ -22,6 +22,13 @@ const root = process.cwd()
 const read = (file: string): string => readFileSync(resolve(root, file), 'utf8')
 
 describe('HHC browser auth entry and hosting config', () => {
+  it('keeps the runtime AUMID aligned with the packaged app ID', () => {
+    const appId = read('electron-builder.yml').match(/^appId:\s*(.+)$/m)?.[1]
+
+    expect(appId).toBe('tw.org.alive.presenter')
+    expect(read('src/main/index.ts')).toContain(`setAppUserModelId('${appId}')`)
+  })
+
   it('dispatches the exact callback path before projection and control entries', () => {
     const main = read('src/renderer/src/main.tsx')
     expect(main.indexOf("window.location.pathname === '/oauth/callback'")).toBeGreaterThan(-1)
@@ -154,6 +161,7 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(checksumStep).toContain('release-artifacts')
     expect(checksumStep).toContain('sha256sum')
     expect(checksumStep).toContain('SHA256SUMS')
+    expect(checksumStep).toContain("-printf '%f\\0'")
     expect(checksumStep).toContain('test -s')
     expect(release).toContain('needs: [quality-gates, prepare, package]')
     expect(release.indexOf('- name: Download desktop artifacts')).toBeLessThan(

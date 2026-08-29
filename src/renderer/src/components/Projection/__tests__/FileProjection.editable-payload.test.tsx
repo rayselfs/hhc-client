@@ -36,7 +36,7 @@ describe('FileProjection editable payload', () => {
         fileName="Editable deck.lpdeck"
         initialItemId="editable-deck"
         initialBlobId="editable-deck"
-        initialMimeType="application/vnd.librepresenter.presentation+json"
+        initialMimeType="application/vnd.hhc.presenter+json"
         initialPresentation={{ slideIndex: 0, slideCount: 1 }}
         initialEditablePresentation={{
           width: 1024,

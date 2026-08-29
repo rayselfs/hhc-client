@@ -12,9 +12,9 @@ interface AboutDialogProps {
 
 const LICENSE_ITEMS = [
   {
-    name: 'LibrePresenter',
+    name: 'HHC Presenter',
     license: 'GPL-3.0-or-later',
-    url: 'https://github.com/rayselfs/libre-presenter/blob/main/LICENSE'
+    url: 'https://github.com/rayselfs/hhc-presenter/blob/main/LICENSE'
   },
   {
     name: 'VLC / libVLC',
@@ -58,12 +58,12 @@ export default function AboutDialog({ isOpen, onOpenChange }: AboutDialogProps):
                       <div className="flex items-start gap-4 border-b border-divider pb-5">
                         <img
                           src={appIcon}
-                          alt="LibrePresenter"
+                          alt={t('app.name')}
                           className="size-16 shrink-0 rounded-2xl"
                         />
                         <div className="min-w-0">
-                          <h2 className="text-xl font-semibold leading-tight">LibrePresenter</h2>
-                          <p className="mt-1 text-sm text-muted">{t('about.tagline')}</p>
+                          <h2 className="text-xl font-semibold leading-tight">{t('app.name')}</h2>
+                          <p className="mt-1 text-sm text-muted">{t('app.description')}</p>
                         </div>
                       </div>
 

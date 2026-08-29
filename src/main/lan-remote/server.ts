@@ -83,7 +83,7 @@ export function createLanRemoteServer(
   let latestAck: LanRemoteAck | null = null
 
   function isAuthorized(req: IncomingMessage): boolean {
-    const token = req.headers['x-libre-presenter-session']
+    const token = req.headers['x-hhc-presenter-session']
     return typeof token === 'string' && sessions.has(token)
   }
 

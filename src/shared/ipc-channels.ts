@@ -228,7 +228,9 @@ export type UpdateStatus =
   | 'available'
   | 'not-available'
   | 'downloading'
+  | 'verifying'
   | 'downloaded'
+  | 'installer-opened'
   | 'error'
 
 export interface IpcInvokeMap {
@@ -260,7 +262,8 @@ export interface IpcInvokeMap {
   'app:confirm-close': { args: []; result: { closing: boolean } }
   'app:clear-user-data': { args: []; result: void }
   'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
-  'update:download-and-install': { args: []; result: void }
+  'update:install-downloaded': { args: []; result: void }
+  'update:download-mac-installer': { args: []; result: void }
   'speech:saveKey': { args: [string, string]; result: void }
   'speech:loadKey': { args: [string]; result: string }
   'speech:deleteKey': { args: [string]; result: void }

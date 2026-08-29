@@ -104,11 +104,7 @@ describe('startPresentation', () => {
   })
 
   it('does not let an older editable start commit after a newer start or exit', async () => {
-    const editable = makeFile(
-      'editable',
-      'editable.lpdeck',
-      'application/vnd.librepresenter.presentation+json'
-    )
+    const editable = makeFile('editable', 'editable.lpdeck', 'application/vnd.hhc.presenter+json')
     const pending = deferred<boolean>()
     const unregister = registerMediaProjectionPreflight(() => pending.promise)
 
@@ -133,7 +129,7 @@ describe('startPresentation', () => {
 
   it('keeps only the newest pending navigation result', async () => {
     const editableFiles = ['one', 'two', 'three'].map((id) =>
-      makeFile(id, `${id}.lpdeck`, 'application/vnd.librepresenter.presentation+json')
+      makeFile(id, `${id}.lpdeck`, 'application/vnd.hhc.presenter+json')
     )
     const first = deferred<boolean>()
     const second = deferred<boolean>()
@@ -160,11 +156,7 @@ describe('startPresentation', () => {
   })
 
   it('does not overwrite presentation runtime state published during a pending navigation', async () => {
-    const presentation = makeFile(
-      'deck',
-      'deck.pptx',
-      'application/vnd.librepresenter.presentation+json'
-    )
+    const presentation = makeFile('deck', 'deck.pptx', 'application/vnd.hhc.presenter+json')
     const pending = deferred<boolean>()
     const unregister = registerMediaProjectionPreflight(() => pending.promise)
     useMediaProjectionStore.setState({
@@ -198,11 +190,7 @@ describe('startPresentation', () => {
   })
 
   it('does not revive a closed editable item after it reopens', async () => {
-    const editable = makeFile(
-      'editable',
-      'editable.lpdeck',
-      'application/vnd.librepresenter.presentation+json'
-    )
+    const editable = makeFile('editable', 'editable.lpdeck', 'application/vnd.hhc.presenter+json')
     const first = deferred<boolean>()
     const second = deferred<boolean>()
     let calls = 0

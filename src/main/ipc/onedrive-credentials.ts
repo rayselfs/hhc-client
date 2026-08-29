@@ -9,7 +9,7 @@ import type {
   OneDriveCredentialStatus
 } from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
-import { parseLibrePresenterProtocolUrl } from '../protocol-router'
+import { parseHhcPresenterProtocolUrl } from '../protocol-router'
 import { isMainWindow } from './validate'
 
 interface StoredOneDriveCredential {
@@ -26,7 +26,7 @@ const CONNECTION_ID_PATTERN = /^onedrive:[A-Za-z0-9._~-]{1,160}$/
 const CLIENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ONEDRIVE_TOKEN_ENDPOINT = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
 const MICROSOFT_GRAPH_ME_ENDPOINT = 'https://graph.microsoft.com/v1.0/me'
-export const ONEDRIVE_AUTH_REDIRECT_URI = 'librepresenter://auth/onedrive'
+export const ONEDRIVE_AUTH_REDIRECT_URI = 'hhc-presenter://auth/onedrive'
 const AUTH_CALLBACK_TIMEOUT_MS = 5 * 60_000
 const ACCESS_TOKEN_EXPIRY_SKEW_MS = 5 * 60_000
 
@@ -67,7 +67,7 @@ function validateClientId(clientId: unknown): string {
 }
 
 export function isOneDriveAuthCallbackUrl(value: string): boolean {
-  return parseLibrePresenterProtocolUrl(value).kind === 'onedrive-auth'
+  return parseHhcPresenterProtocolUrl(value).kind === 'onedrive-auth'
 }
 
 function settleAuthCallback(result: string | null): void {

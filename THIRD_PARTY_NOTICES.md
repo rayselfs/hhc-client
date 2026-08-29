@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-LibrePresenter includes and depends on open-source software. This file is a
+HHC Presenter includes and depends on open-source software. This file is a
 summary; bundled license texts and source/build metadata live under
 `resources/licenses/`.
 
@@ -21,7 +21,7 @@ Bundled notices:
 
 ### FFmpeg
 
-Desktop video poster generation uses FFmpeg. LibrePresenter uses FFmpeg only to
+Desktop video poster generation uses FFmpeg. HHC Presenter uses FFmpeg only to
 extract still-image posters; it is not exposed as a user-configurable transcoder.
 
 Bundled notices:
@@ -32,7 +32,7 @@ Bundled notices:
 
 ### electron-vlc-player
 
-LibrePresenter embeds libVLC through `electron-vlc-player`.
+HHC Presenter embeds libVLC through `electron-vlc-player`.
 
 Bundled notices:
 

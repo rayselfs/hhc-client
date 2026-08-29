@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-import { access, readdir, stat } from 'node:fs/promises'
+import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { extractFile, listPackage } from '@electron/asar'
 
@@ -116,10 +116,47 @@ async function hasAnyFile(dir, files) {
 async function checkResourceRoot(resourceRoot, target) {
   const failures = []
   const checks = targetChecks[target]
+  const normalizedRoot = toPosix(resourceRoot)
 
   if (!checks) {
     failures.push(`Unsupported package target: ${target}`)
     return failures
+  }
+
+  if (
+    target.startsWith('darwin-') &&
+    !normalizedRoot.endsWith('/HHC Presenter.app/Contents/Resources')
+  ) {
+    failures.push('macOS bundle must be named HHC Presenter.app')
+  }
+
+  if (target === 'win32-x64' && !(await exists(join(resourceRoot, '..', 'hhc-presenter.exe')))) {
+    failures.push('Windows executable must be named hhc-presenter.exe')
+  }
+
+  const updaterConfigPath = join(resourceRoot, 'app-update.yml')
+  if (!(await exists(updaterConfigPath))) {
+    failures.push('Missing app-update.yml')
+  } else {
+    const updaterConfig = await readFile(updaterConfigPath, 'utf8')
+    for (const expected of [
+      /^owner:\s*rayselfs\s*$/m,
+      /^repo:\s*hhc-presenter\s*$/m,
+      /^provider:\s*github\s*$/m,
+      /^updaterCacheDirName:\s*hhc-presenter-updater\s*$/m
+    ]) {
+      if (!expected.test(updaterConfig)) failures.push(`Invalid updater metadata: ${expected}`)
+    }
+  }
+
+  if (target.startsWith('darwin-')) {
+    const infoPlist = await readFile(join(resourceRoot, '..', 'Info.plist'), 'utf8')
+    if (!infoPlist.includes('<string>tw.org.alive.presenter</string>')) {
+      failures.push('macOS bundle identifier must be tw.org.alive.presenter')
+    }
+    if (!infoPlist.includes('<string>hhc-presenter</string>')) {
+      failures.push('macOS URL scheme must be hhc-presenter')
+    }
   }
 
   for (const file of licenseFiles) {
@@ -140,6 +177,13 @@ async function checkResourceRoot(resourceRoot, target) {
   const appAsar = join(resourceRoot, 'app.asar')
   if (await exists(appAsar)) {
     const packagedFiles = listPackage(appAsar)
+    const mainSource = extractFile(appAsar, 'out/main/index.js').toString('utf8')
+    if (!mainSource.includes('tw.org.alive.presenter')) {
+      failures.push('Packaged main process must use the HHC Presenter AUMID')
+    }
+    if (!mainSource.includes('hhc-presenter')) {
+      failures.push('Packaged main process must use the hhc-presenter protocol')
+    }
     if (packagedFiles.some((file) => file.startsWith('/.local-runtimes/'))) {
       failures.push('Local runtime downloads must not be embedded in app.asar')
     }

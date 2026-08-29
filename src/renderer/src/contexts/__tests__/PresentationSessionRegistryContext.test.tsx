@@ -48,7 +48,7 @@ function makeEditableItem(id: string): FileItemRecord {
     name: `${id}.lpdeck`,
     url: `blob:${id}`,
     size: 1024,
-    mimeType: 'application/vnd.librepresenter.presentation+json'
+    mimeType: 'application/vnd.hhc.presenter+json'
   }
 }
 

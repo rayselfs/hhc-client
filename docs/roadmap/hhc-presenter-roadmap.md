@@ -1,6 +1,8 @@
-# LibrePresenter Product Roadmap
+# HHC Presenter Product Roadmap
 
-LibrePresenter is open-source presentation software for churches and live events. The goal is not to clone ProPresenter feature-for-feature; the goal is to build the core operator workflows that make a presentation app dependable in a live room.
+HHC Presenter is a projection system designed for church services. The goal is not to clone
+ProPresenter feature-for-feature; the goal is to build the core operator workflows that make a
+projection app dependable in a live room.
 
 ## Product Direction
 
@@ -14,7 +16,7 @@ LibrePresenter is open-source presentation software for churches and live events
 
 M1–M9 below record the first product roadmap and current release readiness. Current reliability,
 Media, and PowerPoint-like Presentation work is tracked separately in
-[`librepresenter-optimization-roadmap.md`](librepresenter-optimization-roadmap.md).
+[`hhc-presenter-optimization-roadmap.md`](hhc-presenter-optimization-roadmap.md).
 
 ## Milestones
 

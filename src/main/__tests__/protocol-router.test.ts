@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createLibrePresenterProtocolDispatcher,
-  parseLibrePresenterProtocolUrl
+  createHhcPresenterProtocolDispatcher,
+  parseHhcPresenterProtocolUrl
 } from '../protocol-router'
 
-describe('parseLibrePresenterProtocolUrl', () => {
+describe('parseHhcPresenterProtocolUrl', () => {
   it('accepts only the exact account callback shape', () => {
     expect(
-      parseLibrePresenterProtocolUrl(
-        'librepresenter://auth/account?code=authorization-code&state=expected-state'
+      parseHhcPresenterProtocolUrl(
+        'hhc-presenter://auth/account?code=authorization-code&state=expected-state'
       )
     ).toEqual({
       kind: 'account-auth',
@@ -18,52 +18,53 @@ describe('parseLibrePresenterProtocolUrl', () => {
   })
 
   it.each([
-    'librepresenter://auth/account?code=&state=state',
-    'librepresenter://auth/account?code=%20&state=state',
-    'librepresenter://auth/account?code=code&state=',
-    'librepresenter://auth/account?code=code&state=%20',
-    'librepresenter://auth/account?code=first&code=second&state=state',
-    'librepresenter://auth/account?code=code&state=first&state=second',
-    'librepresenter://auth/account?code=code&state=state&extra=value',
-    'librepresenter://user@auth/account?code=code&state=state',
-    'librepresenter://auth/account?code=code&state=state#fragment',
-    'librepresenter://auth:123/account?code=code&state=state',
-    'librepresenter://other/account?code=code&state=state',
-    'librepresenter://auth/account/?code=code&state=state',
-    'librepresenter://auth/unknown?code=code&state=state',
+    `${['libre', 'presenter'].join('')}://auth/account?code=code&state=state`,
+    'hhc-presenter://auth/account?code=&state=state',
+    'hhc-presenter://auth/account?code=%20&state=state',
+    'hhc-presenter://auth/account?code=code&state=',
+    'hhc-presenter://auth/account?code=code&state=%20',
+    'hhc-presenter://auth/account?code=first&code=second&state=state',
+    'hhc-presenter://auth/account?code=code&state=first&state=second',
+    'hhc-presenter://auth/account?code=code&state=state&extra=value',
+    'hhc-presenter://user@auth/account?code=code&state=state',
+    'hhc-presenter://auth/account?code=code&state=state#fragment',
+    'hhc-presenter://auth:123/account?code=code&state=state',
+    'hhc-presenter://other/account?code=code&state=state',
+    'hhc-presenter://auth/account/?code=code&state=state',
+    'hhc-presenter://auth/unknown?code=code&state=state',
     'https://auth/account?code=code&state=state',
     'not a url'
   ])('rejects malformed or non-exact input: %s', (value) => {
-    expect(parseLibrePresenterProtocolUrl(value)).toEqual({ kind: 'ignore' })
+    expect(parseHhcPresenterProtocolUrl(value)).toEqual({ kind: 'ignore' })
   })
 
   it('preserves the complete OneDrive callback URL and provider parameters', () => {
     const url =
-      'librepresenter://auth/onedrive?code=code&state=state&session_state=session&scope=Files.Read'
+      'hhc-presenter://auth/onedrive?code=code&state=state&session_state=session&scope=Files.Read'
 
-    expect(parseLibrePresenterProtocolUrl(url)).toEqual({ kind: 'onedrive-auth', url })
+    expect(parseHhcPresenterProtocolUrl(url)).toEqual({ kind: 'onedrive-auth', url })
   })
 })
 
-describe('createLibrePresenterProtocolDispatcher', () => {
+describe('createHhcPresenterProtocolDispatcher', () => {
   it('uses one dispatcher for open-url, second-instance argv, and initial argv', () => {
     const onAccountAuth = vi.fn()
     const onOneDriveAuth = vi.fn()
-    const dispatcher = createLibrePresenterProtocolDispatcher({ onAccountAuth, onOneDriveAuth })
+    const dispatcher = createHhcPresenterProtocolDispatcher({ onAccountAuth, onOneDriveAuth })
 
     expect(
-      dispatcher.dispatch('librepresenter://auth/account?code=direct-code&state=direct-state')
+      dispatcher.dispatch('hhc-presenter://auth/account?code=direct-code&state=direct-state')
     ).toBe(true)
     expect(
       dispatcher.dispatchArgv([
         '--flag',
-        'librepresenter://auth/account?code=argv-code&state=argv-state'
+        'hhc-presenter://auth/account?code=argv-code&state=argv-state'
       ])
     ).toBe(true)
     expect(
       dispatcher.dispatchArgv([
         'app',
-        'librepresenter://auth/onedrive?error=access_denied&state=onedrive-state'
+        'hhc-presenter://auth/onedrive?error=access_denied&state=onedrive-state'
       ])
     ).toBe(true)
 
@@ -78,7 +79,7 @@ describe('createLibrePresenterProtocolDispatcher', () => {
       state: 'argv-state'
     })
     expect(onOneDriveAuth).toHaveBeenCalledWith(
-      'librepresenter://auth/onedrive?error=access_denied&state=onedrive-state'
+      'hhc-presenter://auth/onedrive?error=access_denied&state=onedrive-state'
     )
   })
 
@@ -87,9 +88,9 @@ describe('createLibrePresenterProtocolDispatcher', () => {
     const onOneDriveAuth = vi.fn()
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const dispatcher = createLibrePresenterProtocolDispatcher({ onAccountAuth, onOneDriveAuth })
+    const dispatcher = createHhcPresenterProtocolDispatcher({ onAccountAuth, onOneDriveAuth })
 
-    expect(dispatcher.dispatch('librepresenter://auth/unknown?code=secret')).toBe(false)
+    expect(dispatcher.dispatch('hhc-presenter://auth/unknown?code=secret')).toBe(false)
     expect(dispatcher.dispatchArgv(['--flag', 'invalid secret callback'])).toBe(false)
     expect(onAccountAuth).not.toHaveBeenCalled()
     expect(onOneDriveAuth).not.toHaveBeenCalled()

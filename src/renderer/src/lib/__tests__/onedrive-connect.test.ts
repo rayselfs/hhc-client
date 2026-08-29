@@ -1817,9 +1817,9 @@ describe('loginOneDriveAccount', () => {
       value: {
         oneDrive: {
           deleteCredentials: vi.fn(async () => undefined),
-          getAuthRedirectUri: vi.fn(async () => 'librepresenter://auth/onedrive'),
+          getAuthRedirectUri: vi.fn(async () => 'hhc-presenter://auth/onedrive'),
           waitAuthCallback: vi.fn(
-            async () => 'librepresenter://auth/onedrive?code=code-1&state=state-1'
+            async () => 'hhc-presenter://auth/onedrive?code=code-1&state=state-1'
           ),
           completeAuth: vi.fn(async () => ({
             id: 'onedrive:account-1',
@@ -1854,7 +1854,7 @@ describe('loginOneDriveAccount', () => {
     expect(window.api.oneDrive.waitAuthCallback).toHaveBeenCalledWith('state-1')
     expect(window.api.oneDrive.completeAuth).toHaveBeenCalledWith({
       clientId: '11111111-2222-3333-4444-555555555555',
-      redirectUri: 'librepresenter://auth/onedrive',
+      redirectUri: 'hhc-presenter://auth/onedrive',
       code: 'code-1',
       codeVerifier: 'verifier-1'
     })

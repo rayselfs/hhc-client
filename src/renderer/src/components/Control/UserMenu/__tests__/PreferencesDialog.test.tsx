@@ -80,7 +80,7 @@ vi.mock('@renderer/lib/onedrive-web-credentials', () => ({
 }))
 
 vi.mock('@renderer/stores/settings', () => ({
-  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+  HHC_PRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   getEffectiveOneDriveClientId: () => '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   useSettingsStore: vi.fn((selector) => {
     const store = {

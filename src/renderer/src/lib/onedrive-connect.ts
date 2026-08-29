@@ -48,7 +48,7 @@ import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import { dispatchPlannedSyncDownloads } from './sync-transfer-dispatch'
 
 const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
-const ONEDRIVE_WEB_CALLBACK_STORAGE_KEY = 'libre-presenter:onedrive-callback'
+const ONEDRIVE_WEB_CALLBACK_STORAGE_KEY = 'hhc-presenter:onedrive-callback'
 const ONEDRIVE_WEB_CALLBACK_TIMEOUT_MS = 2 * 60_000
 
 function publishOneDriveRootFolder(root: FolderRecord): void {
@@ -515,7 +515,7 @@ function waitForWebOneDriveCallback(authWindow: Window | null): Promise<string |
         typeof data === 'object' &&
         data !== null &&
         'type' in data &&
-        data.type === 'libre-presenter:onedrive-callback' &&
+        data.type === 'hhc-presenter:onedrive-callback' &&
         'url' in data &&
         typeof data.url === 'string'
       ) {
