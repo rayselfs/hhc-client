@@ -341,6 +341,9 @@ test('VLC production matrix', async ({ browserName: _browserName }, testInfo) =>
   })
 
   await test.step('unreadable truncation fails and retry creates a fresh attempt', async () => {
+    const unreadableItemId = itemIds['unreadable-truncated.mkv']
+    const unreadableSource = join(userDataPath, 'native-files', unreadableItemId)
+    const unreadableCache = join(userDataPath, 'video-remux-cache', unreadableItemId)
     await selectGridItem(control, 'broken-cues-readable.mkv')
     await waitForItemState(control, brokenItemId)
     await startCurrentVideo(control)
@@ -351,24 +354,36 @@ test('VLC production matrix', async ({ browserName: _browserName }, testInfo) =>
         async () =>
           (await evidence(control)).failures.filter(
             (failure) =>
-              failure.itemId === itemIds['unreadable-truncated.mkv'] &&
-              failure.code === 'media-open-failed'
+              failure.itemId === unreadableItemId && failure.code === 'matroska-remux-failed'
           ).length,
         { timeout: 20_000 }
       )
       .toBe(1)
+    expect(
+      (await evidence(control)).states.some((state) => state.itemId === unreadableItemId)
+    ).toBe(false)
+    await expect(access(`${unreadableCache}.mkv`)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(access(`${unreadableCache}.json`)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(
+      createHash('sha256')
+        .update(await readFile(unreadableSource))
+        .digest('hex')
+    ).toBe(
+      fixtures.manifest.fixtures.find((fixture) => fixture.file === 'unreadable-truncated.mkv')
+        ?.sha256
+    )
     await control.getByRole('button', { name: /Retry projection|重試投影|重试投影/ }).click()
     await expect
       .poll(
         async () =>
           (await evidence(control)).failures.filter(
             (failure) =>
-              failure.itemId === itemIds['unreadable-truncated.mkv'] &&
-              failure.code === 'media-open-failed'
+              failure.itemId === unreadableItemId && failure.code === 'matroska-remux-failed'
           ).length,
         { timeout: 20_000 }
       )
       .toBe(2)
+    await expect(access(`${unreadableCache}.mkv`)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   await test.step('packaged restart removes only stale remux temps', async () => {

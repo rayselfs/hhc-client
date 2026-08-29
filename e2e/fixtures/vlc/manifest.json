@@ -72,8 +72,8 @@
       ],
       "expectedSeekable": false,
       "expectedPlayback": "failure",
-      "expectedRemux": "matroska-remux",
-      "expectedFailureCode": "media-open-failed",
+      "expectedRemux": "matroska-remux-failed",
+      "expectedFailureCode": "matroska-remux-failed",
       "matroska": {
         "requiredElementIds": ["1a45dfa3", "114d9b74", "1f43b675"]
       }

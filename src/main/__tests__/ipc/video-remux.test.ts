@@ -36,7 +36,7 @@ beforeEach(async () => {
     source: 'bundled'
   })
   mockRunFfmpeg.mockImplementation(async ({ args }: { args: string[] }) => {
-    await fs.writeFile(args.at(-1)!, 'remuxed')
+    if (args.at(-1) !== '-') await fs.writeFile(args.at(-1)!, 'remuxed')
     return { stdout: '', stderr: '' }
   })
 })
@@ -47,19 +47,19 @@ describe('video remux cache', () => {
     const first = await resolveVideoPlaybackPath(sourceId, 'matroska-remux')
     const reused = await resolveVideoPlaybackPath(sourceId, 'matroska-remux')
     expect(reused).toBe(first)
-    expect(mockRunFfmpeg).toHaveBeenCalledOnce()
+    expect(mockRunFfmpeg).toHaveBeenCalledTimes(2)
 
     await writeSource('replacement bytes')
     await resolveVideoPlaybackPath(sourceId, 'matroska-remux')
-    expect(mockRunFfmpeg).toHaveBeenCalledTimes(2)
+    expect(mockRunFfmpeg).toHaveBeenCalledTimes(4)
 
     await fs.rm(join(testRoot, 'video-remux-cache', `${sourceId}.json`))
     await resolveVideoPlaybackPath(sourceId, 'matroska-remux')
-    expect(mockRunFfmpeg).toHaveBeenCalledTimes(3)
+    expect(mockRunFfmpeg).toHaveBeenCalledTimes(6)
 
     await fs.writeFile(first, '')
     await resolveVideoPlaybackPath(sourceId, 'matroska-remux')
-    expect(mockRunFfmpeg).toHaveBeenCalledTimes(4)
+    expect(mockRunFfmpeg).toHaveBeenCalledTimes(8)
     await expect(fs.readFile(getNativeFilePath(sourceId), 'utf8')).resolves.toBe(
       'replacement bytes'
     )
@@ -73,8 +73,8 @@ describe('video remux cache', () => {
     ])
 
     expect(second).toBe(first)
-    expect(mockRunFfmpeg).toHaveBeenCalledOnce()
-    expect(mockRunFfmpeg).toHaveBeenCalledWith({
+    expect(mockRunFfmpeg).toHaveBeenCalledTimes(2)
+    expect(mockRunFfmpeg).toHaveBeenNthCalledWith(1, {
       executable: '/runtime/ffmpeg',
       args: [
         '-hide_banner',
@@ -93,6 +93,48 @@ describe('video remux cache', () => {
       timeoutMs: 30 * 60 * 1000,
       signal: expect.any(AbortSignal)
     })
+    expect(mockRunFfmpeg).toHaveBeenNthCalledWith(2, {
+      executable: '/runtime/ffmpeg',
+      args: [
+        '-hide_banner',
+        '-nostdin',
+        '-v',
+        'error',
+        '-xerror',
+        '-i',
+        expect.stringMatching(/\.tmp\.mkv$/),
+        '-map',
+        '0',
+        '-f',
+        'null',
+        '-'
+      ],
+      timeoutMs: expect.any(Number),
+      signal: expect.any(AbortSignal)
+    })
+  })
+
+  it('rejects and removes a non-empty derivative with no readable packets', async () => {
+    await writeSource('truncated packet bytes')
+    mockRunFfmpeg
+      .mockImplementationOnce(async ({ args }: { args: string[] }) => {
+        await fs.writeFile(args.at(-1)!, 'header only')
+        return { stdout: '', stderr: '' }
+      })
+      .mockRejectedValueOnce(new Error('Error opening input files: End of file'))
+
+    await expect(resolveVideoPlaybackPath(sourceId, 'matroska-remux')).rejects.toThrow(
+      'matroska-remux-failed'
+    )
+    await expect(fs.readFile(getNativeFilePath(sourceId), 'utf8')).resolves.toBe(
+      'truncated packet bytes'
+    )
+    await expect(
+      fs.stat(join(testRoot, 'video-remux-cache', `${sourceId}.mkv`))
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(
+      fs.stat(join(testRoot, 'video-remux-cache', `${sourceId}.json`))
+    ).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('enforces the exact free-space threshold', async () => {
@@ -137,7 +179,7 @@ describe('video remux cache', () => {
     await expect(oldResolve).rejects.toThrow('aborted')
     await mutation
     await expect(newResolve).resolves.toMatch(/\.mkv$/)
-    expect(mockRunFfmpeg).toHaveBeenCalledTimes(2)
+    expect(mockRunFfmpeg).toHaveBeenCalledTimes(3)
   })
 
   it('rejects a derivative when source identity changes before publish', async () => {

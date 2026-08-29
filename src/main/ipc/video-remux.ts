@@ -134,6 +134,7 @@ async function ensureRemux(sourceFileId: string, state: SourceState): Promise<st
   const { output, sidecar } = paths(sourceFileId)
   const token = randomUUID()
   const temporaryOutput = join(cacheDir(), `.${sourceFileId}.${token}.tmp.mkv`)
+  const deadline = Date.now() + REMUX_TIMEOUT_MS
 
   try {
     await runFfmpegProcess({
@@ -155,11 +156,38 @@ async function ensureRemux(sourceFileId: string, state: SourceState): Promise<st
       timeoutMs: REMUX_TIMEOUT_MS,
       signal: controller.signal
     })
-    const [outputStat, currentIdentity] = await Promise.all([
-      fs.stat(temporaryOutput),
-      sourceIdentity(sourceFileId)
-    ])
+    const outputStat = await fs.stat(temporaryOutput)
     if (!outputStat.isFile() || outputStat.size <= 0) throw new Error('matroska-remux-failed')
+    try {
+      await runFfmpegProcess({
+        executable: runtime.path,
+        args: [
+          '-hide_banner',
+          '-nostdin',
+          '-v',
+          'error',
+          '-xerror',
+          '-i',
+          temporaryOutput,
+          '-map',
+          '0',
+          '-f',
+          'null',
+          '-'
+        ],
+        timeoutMs: Math.max(1, deadline - Date.now()),
+        signal: controller.signal
+      })
+    } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.message.includes('timed out'))
+      ) {
+        throw error
+      }
+      throw new Error('matroska-remux-failed')
+    }
+    const currentIdentity = await sourceIdentity(sourceFileId)
     if (
       state.generation !== generation ||
       currentIdentity.fingerprint !== identity.fingerprint ||
