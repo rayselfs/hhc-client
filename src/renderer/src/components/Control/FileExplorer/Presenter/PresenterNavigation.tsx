@@ -2,7 +2,9 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button, ProgressBar } from '@heroui/react'
+import { toast } from '@heroui/react/toast'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import type { MediaProjectionActionResult } from '@renderer/stores/media-projection'
 import { getMediaType } from '@renderer/lib/presentability'
 
 export default function PresenterNavigation(): React.JSX.Element {
@@ -16,6 +18,12 @@ export default function PresenterNavigation(): React.JSX.Element {
   const presentation = useMediaProjectionStore((s) => s.typeStates.presentation)
   const next = useMediaProjectionStore((s) => s.next)
   const prev = useMediaProjectionStore((s) => s.prev)
+
+  const navigate = async (action: () => MediaProjectionActionResult): Promise<void> => {
+    if (!(await action())) {
+      toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
+    }
+  }
 
   const isPresentation = getMediaType(currentItem?.mimeType ?? '') === 'presentation'
   const progressPercent =
@@ -35,7 +43,7 @@ export default function PresenterNavigation(): React.JSX.Element {
           variant="outline"
           isIconOnly
           isDisabled={!canPrev}
-          onPress={() => void prev()}
+          onPress={() => void navigate(prev)}
           className="w-12 h-12 rounded-full shrink-0"
           aria-label={t('presenter.prev')}
         >
@@ -63,7 +71,7 @@ export default function PresenterNavigation(): React.JSX.Element {
           variant="outline"
           isIconOnly
           isDisabled={!canNext}
-          onPress={() => void next()}
+          onPress={() => void navigate(next)}
           className="w-12 h-12 rounded-full shrink-0 size-5"
           aria-label={t('presenter.next')}
         >

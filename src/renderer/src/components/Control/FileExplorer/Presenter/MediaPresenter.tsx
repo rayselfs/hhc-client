@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useTimerRuntimeStore } from '@renderer/stores/timer-runtime'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
@@ -19,12 +20,15 @@ import MediaToolbar from './MediaToolbar'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
+import { toast } from '@heroui/react/toast'
+import type { MediaProjectionActionResult } from '@renderer/stores/media-projection'
 
 interface MediaPresenterProps {
   onExit: () => void
 }
 
 export default function MediaPresenter({ onExit }: MediaPresenterProps): React.JSX.Element {
+  const { t } = useTranslation()
   const { project } = useProjection()
 
   const playlist = useMediaProjectionStore((s) => s.playlist)
@@ -71,6 +75,15 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
     toggleGrid()
   }, [pauseCurrentVideoIfPlaying, toggleGrid])
 
+  const navigate = useCallback(
+    async (action: () => MediaProjectionActionResult): Promise<void> => {
+      if (!(await action())) {
+        toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
+      }
+    },
+    [t]
+  )
+
   useEffect(() => {
     const timerStatus = useTimerRuntimeStore.getState().status
     if (timerStatus === 'running') {
@@ -105,19 +118,22 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
       {
         config: SHORTCUTS.MEDIA.NEXT_SLIDE,
         handler: () => {
-          next()
+          void navigate(next)
         }
       },
-      { config: SHORTCUTS.MEDIA.NEXT_SLIDE_ALT, handler: () => next() },
+      { config: SHORTCUTS.MEDIA.NEXT_SLIDE_ALT, handler: () => void navigate(next) },
       {
         config: SHORTCUTS.MEDIA.PREV_SLIDE,
         handler: () => {
-          prev()
+          void navigate(prev)
         }
       },
-      { config: SHORTCUTS.MEDIA.PREV_SLIDE_ALT, handler: () => prev() },
-      { config: SHORTCUTS.MEDIA.FIRST_SLIDE, handler: () => jumpTo(0) },
-      { config: SHORTCUTS.MEDIA.LAST_SLIDE, handler: () => jumpTo(playlist.length - 1) },
+      { config: SHORTCUTS.MEDIA.PREV_SLIDE_ALT, handler: () => void navigate(prev) },
+      { config: SHORTCUTS.MEDIA.FIRST_SLIDE, handler: () => void navigate(() => jumpTo(0)) },
+      {
+        config: SHORTCUTS.MEDIA.LAST_SLIDE,
+        handler: () => void navigate(() => jumpTo(playlist.length - 1))
+      },
       { config: SHORTCUTS.MEDIA.TOGGLE_GRID, handler: toggleGridWithMediaPause },
       {
         config: SHORTCUTS.MEDIA.TOGGLE_ZOOM,

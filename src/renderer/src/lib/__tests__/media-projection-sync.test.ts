@@ -1214,4 +1214,83 @@ describe('media projection sync', () => {
     })
     expect(mockStartProjection).not.toHaveBeenCalled()
   })
+
+  it('does not start from a finalized document after that editable session is replaced', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const pending = deferred<typeof document>()
+    const closingSession = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: document },
+        draftKind: 'text',
+        save: { status: 'pending' }
+      }))
+    } as unknown as PresentationEditorSession
+    const reopenedSession = {
+      getSnapshot: vi.fn(() => ({ history: { present: document } }))
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(closingSession)
+    registryMocks.finalizeAndFlush.mockReturnValue(pending.promise)
+    useMediaProjectionStore.setState({
+      playlist: [],
+      currentIndex: 0,
+      isPresenting: false,
+      sessionRevision: 11,
+      snapshot: null
+    })
+    renderSync()
+
+    const start = useMediaProjectionStore.getState().startPresentation([editable], 0)
+    await waitFor(() => expect(registryMocks.finalizeAndFlush).toHaveBeenCalledWith(editable.id))
+    registryMocks.get.mockReturnValue(reopenedSession)
+    pending.resolve(document)
+
+    expect(await start).toBe(false)
+    expect(useMediaProjectionStore.getState()).toMatchObject({
+      isPresenting: false,
+      sessionRevision: 11
+    })
+    expect(mockStartProjection).not.toHaveBeenCalled()
+  })
+
+  it('does not project a deferred remote source after an explicit replacement start', async () => {
+    const pending = deferred<{
+      providerConnectionId: string
+      remoteItemId: string
+      rootRemoteFolderId: string
+      source: { kind: 'ticket'; url: string; expiresAt: number; etag: string }
+    }>()
+    setRemotePresentationItem()
+    remoteMocks.prepare.mockReturnValueOnce(pending.promise)
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
+      }
+    })
+    await waitFor(() => expect(remoteMocks.prepare).toHaveBeenCalledOnce())
+
+    const replacement = makeFile('replacement', 'replacement.png')
+    expect(await useMediaProjectionStore.getState().startPresentation([replacement], 0)).toBe(true)
+    mockStartProjection.mockClear()
+    pending.resolve({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      rootRemoteFolderId: 'collection-1',
+      source: {
+        kind: 'ticket',
+        url: 'https://www.alive.org.tw/api/assets/content?ticket=stale',
+        expiresAt: Date.now() + 60_000,
+        etag: 'etag-1'
+      }
+    })
+    await act(async () => {
+      await pending.promise
+    })
+
+    expect(useMediaProjectionStore.getState().currentItem()?.id).toBe(replacement.id)
+    expect(mockStartProjection).not.toHaveBeenCalled()
+  })
 })

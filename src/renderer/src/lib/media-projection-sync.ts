@@ -19,6 +19,8 @@ import {
   isPresentationMimeType
 } from '@renderer/lib/presentation-media'
 import { registerMediaProjectionPreflight } from '@renderer/lib/media-projection-preflight'
+import type { EditablePresentationDocument } from '@renderer/lib/editable-presentation'
+import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 
 function playlistContentChanged(
   prev: { id: string; mimeType: string; name: string }[],
@@ -50,6 +52,12 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   const { project, startProjection, stopProjection, activeOwner } = useProjection()
   const registry = usePresentationSessionRegistry()
   const projectSequenceRef = useRef(0)
+  const finalizedEditableDocumentsRef = useRef(
+    new Map<
+      string,
+      { session: PresentationEditorSession; document: EditablePresentationDocument }
+    >()
+  )
   const didInitializeRef = useRef(false)
   const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const projectCurrentItemRef = useRef<
@@ -78,18 +86,24 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           const session = registry.get(item.id)
           if (!session) continue
           const snapshot = session.getSnapshot()
+          let document = snapshot.history.present
           if (
             !registry.hasPendingEditorWork?.(item.id) &&
             snapshot.draftKind === null &&
             snapshot.save?.status === 'saved'
           ) {
+            finalizedEditableDocumentsRef.current.set(item.id, { session, document })
             continue
           }
           try {
-            if (!(await registry.finalizeAndFlush(item.id))) return false
+            const finalized = await registry.finalizeAndFlush(item.id)
+            if (!finalized) return false
+            if (registry.get(item.id) !== session) return false
+            document = finalized
           } catch {
             return false
           }
+          finalizedEditableDocumentsRef.current.set(item.id, { session, document })
         }
         return true
       }),
@@ -265,14 +279,36 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           return
         }
       }
+      const latest = useMediaProjectionStore.getState()
+      if (
+        sequence !== projectSequenceRef.current ||
+        latest.sessionRevision !== state.sessionRevision ||
+        latest.playlist !== state.playlist ||
+        latest.currentIndex !== state.currentIndex ||
+        latest.currentItem()?.id !== item?.id ||
+        latest.isPresenting !== state.isPresenting
+      ) {
+        return
+      }
+      currentState = latest
       const basePayload = buildFileProjectionPayload(currentState)
       let payload = basePayload
       if (basePayload && item && isEditablePresentationMimeType(item.mimeType)) {
         const session = registry.get(item.id)
         if (session) {
+          const finalized = finalizedEditableDocumentsRef.current.get(item.id)
+          const snapshot = session.getSnapshot()
+          if (
+            finalized &&
+            (finalized.session !== session ||
+              snapshot.history.present !== finalized.document ||
+              snapshot.draftKind != null)
+          ) {
+            return
+          }
           payload = buildEditableSlideProjectionPayload(
             basePayload,
-            session.getSnapshot().history.present,
+            finalized?.document ?? snapshot.history.present,
             usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
           )
         } else {

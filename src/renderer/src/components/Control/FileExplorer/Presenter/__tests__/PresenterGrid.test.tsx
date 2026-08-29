@@ -4,6 +4,10 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import PresenterGrid from '../PresenterGrid'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
+const toastMocks = vi.hoisted(() => ({ danger: vi.fn() }))
+
+vi.mock('@heroui/react/toast', () => ({ toast: toastMocks }))
+
 // Mock out UI dependencies to render cleanly in jsdom
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -106,5 +110,18 @@ describe('PresenterGrid Rendering Optimization', () => {
     const grid = screen.getByTestId('grid-item-0').parentElement
     expect(grid?.className).toContain('lg:grid-cols-6')
     expect(grid?.className).not.toContain('xl:grid-cols-8')
+  })
+
+  it('keeps the grid open when navigation finalization is blocked', async () => {
+    const user = userEvent.setup()
+    const jumpTo = vi.fn(async () => false)
+    useMediaProjectionStore.setState({ jumpTo } as never)
+    render(<PresenterGrid />)
+
+    await user.click(screen.getByTestId('grid-item-4'))
+
+    expect(jumpTo).toHaveBeenCalledWith(4)
+    expect(useMediaProjectionStore.getState().showGrid).toBe(true)
+    expect(toastMocks.danger).toHaveBeenCalled()
   })
 })

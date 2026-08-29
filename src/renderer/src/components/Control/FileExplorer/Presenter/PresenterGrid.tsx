@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@heroui/react'
+import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import type { MediaProjectionActionResult } from '@renderer/stores/media-projection'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -12,8 +14,7 @@ interface GridItemProps {
   index: number
   isFocused: boolean
   thumbnail: string | null
-  jumpTo: (index: number) => void
-  toggleGrid: () => void
+  onSelect: (index: number) => void
   onMouseEnter: (index: number) => void
   buttonRef?: React.Ref<HTMLButtonElement>
 }
@@ -29,8 +30,7 @@ export const GridItem = React.memo(function GridItem({
   index,
   isFocused,
   thumbnail,
-  jumpTo,
-  toggleGrid,
+  onSelect,
   onMouseEnter,
   buttonRef
 }: GridItemProps) {
@@ -51,10 +51,7 @@ export const GridItem = React.memo(function GridItem({
             : 'border-transparent hover:border-accent'
       }`}
       onMouseEnter={() => onMouseEnter(index)}
-      onClick={() => {
-        jumpTo(index)
-        toggleGrid()
-      }}
+      onClick={() => onSelect(index)}
     >
       {thumbnail ? (
         <img src={thumbnail} className="w-full h-full object-cover" alt={item.name} />
@@ -82,6 +79,21 @@ export default function PresenterGrid({ previewCache }: PresenterGridProps): Rea
   const toggleGrid = useMediaProjectionStore((s) => s.toggleGrid)
   const fallbackThumbnails = useThumbnails(playlist)
   const thumbnails = previewCache ?? fallbackThumbnails
+  const failureMessageRef = useRef(
+    t('presentationWorkspace.saveFailed', 'Unable to save presentation')
+  )
+  failureMessageRef.current = t('presentationWorkspace.saveFailed', 'Unable to save presentation')
+
+  const selectItem = useCallback(
+    async (index: number): Promise<void> => {
+      if (!(await (jumpTo(index) as MediaProjectionActionResult))) {
+        toast.danger(failureMessageRef.current)
+        return
+      }
+      toggleGrid()
+    },
+    [jumpTo, toggleGrid]
+  )
 
   const [focusedIndex, setFocusedIndex] = useState(
     () => useMediaProjectionStore.getState().currentIndex
@@ -129,8 +141,7 @@ export default function PresenterGrid({ previewCache }: PresenterGridProps): Rea
       case 'Enter':
       case ' ':
         e.preventDefault()
-        jumpTo(focusedIndex)
-        toggleGrid()
+        void selectItem(focusedIndex)
         break
       case 'Escape':
         e.preventDefault()
@@ -173,8 +184,7 @@ export default function PresenterGrid({ previewCache }: PresenterGridProps): Rea
               index={index}
               isFocused={index === focusedIndex}
               thumbnail={thumbnails[item.id] ?? null}
-              jumpTo={jumpTo}
-              toggleGrid={toggleGrid}
+              onSelect={selectItem}
               onMouseEnter={handleMouseEnter}
               buttonRef={getButtonRefCallbacks[index]}
             />
