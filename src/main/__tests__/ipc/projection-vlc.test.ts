@@ -828,6 +828,8 @@ describe('projection-vlc listener cleanup', () => {
     expect(mockSetPlayerWindowVisible).not.toHaveBeenCalledWith(7, true)
 
     current.emit('paused')
+    expect(current.setVolume).toHaveBeenCalledTimes(3)
+    expect(current.setVolume).toHaveBeenLastCalledWith(70)
     expect(mockSetPlayerWindowVisible).toHaveBeenCalledWith(7, true)
   })
 
@@ -1107,6 +1109,8 @@ describe('projection-vlc listener cleanup', () => {
     expect(current.setTime.mock.invocationCallOrder[0]).toBeLessThan(
       current.play.mock.invocationCallOrder[1]
     )
+    current.emit('playing')
+    expect(current.setVolume).toHaveBeenCalledTimes(3)
   })
 
   it('does not force an MKV demux seek when replay starts at zero', async () => {

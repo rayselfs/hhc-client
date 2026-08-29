@@ -470,6 +470,7 @@ function applyPendingVolume(wm: WindowManager, session: OwnedVlcSession): boolea
 function finishStartup(wm: WindowManager, session: OwnedVlcSession, isPlaying: boolean): void {
   const ownerPlayer = session.player
   if (!ownerPlayer || !ownsSession(wm, session, ownerPlayer)) return
+  if (!applyPendingVolume(wm, session)) return
   session.phase = 'ready'
   session.pending.seekSeconds = undefined
   session.pending.transport = undefined
