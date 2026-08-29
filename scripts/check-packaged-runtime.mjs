@@ -177,7 +177,7 @@ async function checkResourceRoot(resourceRoot, target) {
 
   const appAsar = join(resourceRoot, 'app.asar')
   if (await exists(appAsar)) {
-    const packagedFiles = listPackage(appAsar)
+    const packagedFiles = listPackage(appAsar).map(toPosix)
     const mainSource = extractFile(appAsar, join('out', 'main', 'index.js')).toString('utf8')
     if (!mainSource.includes('tw.org.alive.presenter')) {
       failures.push('Packaged main process must use the HHC Presenter AUMID')
