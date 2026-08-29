@@ -145,6 +145,7 @@ describe('ResponsivePanelGroup', () => {
 
     const overlay = screen.getByRole('dialog', { name: 'Slides' })
     const close = within(overlay).getByRole('button', { name: 'Close Slides' })
+    const internalInspectorSwitch = within(overlay).getByRole('button', { name: 'Format' })
     const stage = container.querySelector('.workspace-stage-slot')
     const inspector = container.querySelector('.workspace-inspector-slot')
     expect(stage).toHaveAttribute('inert')
@@ -154,13 +155,11 @@ describe('ResponsivePanelGroup', () => {
     expect(screen.queryByRole('button', { name: 'Stage action' })).not.toBeInTheDocument()
     await waitFor(() => expect(close).toHaveFocus())
 
-    await user.tab()
-    expect(within(overlay).getByRole('button', { name: 'Slide 1' })).toHaveFocus()
-    await user.tab({ shift: true })
-    expect(close).toHaveFocus()
+    await user.click(internalInspectorSwitch)
+    expect(screen.getByRole('dialog', { name: 'Format' })).toBeInTheDocument()
 
     await user.keyboard('{Escape}')
-    await waitFor(() => expect(trigger).toHaveFocus())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Format' })).toHaveFocus())
     expect(stage).not.toHaveAttribute('inert')
     expect(stage).not.toHaveAttribute('aria-hidden')
     expect(screen.getByRole('button', { name: 'Stage action' })).toBeEnabled()
@@ -180,7 +179,11 @@ describe('ResponsivePanelGroup', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Slides' }))
-    await user.click(screen.getByRole('button', { name: 'Format' }))
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Slides' })).getByRole('button', {
+        name: 'Format'
+      })
+    )
 
     const overlay = screen.getByRole('dialog', { name: 'Format' })
     await waitFor(() =>
@@ -191,7 +194,7 @@ describe('ResponsivePanelGroup', () => {
       'aria-hidden',
       'true'
     )
-    expect(container.querySelector('.workspace-inspector-slot')).not.toHaveAttribute('inert')
+    expect(container.querySelector('.workspace-inspector-slot')).toHaveAttribute('inert')
   })
 
   it('hands focus from a disappearing compact close button to the docked pane', async () => {
@@ -225,7 +228,7 @@ describe('ResponsivePanelGroup', () => {
     expect(container.querySelector('.workspace-stage-slot')).not.toHaveAttribute('inert')
 
     act(() => setViewportWidth(900))
-    await waitFor(() => expect(close).toHaveFocus())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close Format' })).toHaveFocus())
     screen.getByRole('button', { name: 'Apply format' }).focus()
 
     act(() => setViewportWidth(1400))

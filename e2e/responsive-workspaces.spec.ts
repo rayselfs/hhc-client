@@ -816,6 +816,34 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await expect(navigatorSlot).toHaveAttribute('inert', '')
   await expect(navigatorSlot).toHaveAttribute('aria-hidden', 'true')
   await expect(page.getByRole('button', { name: /^(Fit|符合視窗)$/ })).toHaveCount(0)
+  const outsideInteractive = await inspectorOverlay.evaluate((dialog) => {
+    const isVisible = (element: HTMLElement): boolean => {
+      const style = getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        rect.width > 0 &&
+        rect.height > 0
+      )
+    }
+    return Array.from(
+      document.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    )
+      .filter((element) => !dialog.contains(element) && isVisible(element))
+      .map((element) => Boolean(element.closest('[inert], [aria-hidden="true"]')))
+  })
+  expect(outsideInteractive.length).toBeGreaterThan(0)
+  expect(outsideInteractive.every(Boolean)).toBe(true)
+  const designTab = page.locator('#presentation-ribbon-tab-design')
+  const outsideHomeTab = page.locator('#presentation-ribbon-tab-home')
+  const homeBox = await outsideHomeTab.boundingBox()
+  expect(homeBox).not.toBeNull()
+  await page.mouse.click(homeBox!.x + homeBox!.width / 2, homeBox!.y + homeBox!.height / 2)
+  await expect(inspectorOverlay).toBeVisible()
+  await expect(designTab).toHaveAttribute('aria-selected', 'true')
   const inspectorFocusables = inspectorOverlay.locator(
     'button:visible, input:visible, select:visible, textarea:visible, [tabindex]:not([tabindex="-1"]):visible'
   )
@@ -856,7 +884,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await expect(stage).toHaveAttribute('aria-hidden', 'true')
   await expect(inspectorFocusables.last()).toBeFocused()
 
-  await slidesTrigger.click()
+  await inspectorOverlay.getByRole('button', { name: /^(Slides|投影片|幻灯片)$/ }).click()
   const slidesOverlay = page.getByRole('dialog', { name: /^(Slides|投影片|幻灯片)$/ })
   await expect(slidesOverlay).toBeVisible()
   await expect(page.locator('.workspace-inspector-slot')).toHaveCount(0)

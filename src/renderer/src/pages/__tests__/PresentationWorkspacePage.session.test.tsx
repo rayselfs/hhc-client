@@ -1514,6 +1514,43 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(session.getSnapshot().history.past).toHaveLength(initialHistoryLength + 2)
   })
 
+  it('does not change document, history, revision, or save work for min-clamped resize', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({
+      text: 'Minimum frame',
+      x: 100,
+      y: 80,
+      width: 60,
+      height: 24,
+      autoSize: 'fixed',
+      autoWidth: false
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const initial = session.getSnapshot()
+    const textFrame = (await screen.findAllByText('Minimum frame'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    fireEvent.click(textFrame!)
+
+    const leftHandle = screen.getByLabelText('Resize text box left')
+    fireEvent.keyDown(leftHandle, { key: 'ArrowRight' })
+    fireEvent.pointerDown(leftHandle, { clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(leftHandle, { clientX: 24, clientY: 0, pointerId: 1 })
+    fireEvent.pointerUp(leftHandle, { clientX: 24, clientY: 0, pointerId: 1 })
+
+    const after = session.getSnapshot()
+    expect(after.renderedDocument).toBe(initial.renderedDocument)
+    expect(after.history).toBe(initial.history)
+    expect(after.save.scheduledRevision).toBe(initial.save.scheduledRevision)
+    expect(after.draftKind).toBeNull()
+    expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+  })
+
   it('does not select a generated shape while composition blocks the mutation', async () => {
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
     const slideId = sourceDocument.slideOrder[0]

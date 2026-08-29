@@ -5,11 +5,11 @@ import {
   useState,
   type ComponentPropsWithoutRef,
   type CSSProperties,
-  type KeyboardEvent,
   type ReactNode,
   type RefObject
 } from 'react'
 import { Button } from '@heroui/react/button'
+import { Modal } from '@heroui/react/modal'
 import { List, PanelRight, X } from 'lucide-react'
 
 type WorkspaceOverlay = 'navigator' | 'inspector' | null
@@ -103,6 +103,9 @@ export function ResponsivePanelGroup({
   const inspectorTriggerRef = useRef<HTMLButtonElement>(null)
   const navigatorSlotRef = useRef<HTMLDivElement>(null)
   const inspectorSlotRef = useRef<HTMLDivElement>(null)
+  const compactDialogRef = useRef<HTMLDivElement>(null)
+  const compactCloseRef = useRef<HTMLButtonElement>(null)
+  const compactOverlayHadFocusRef = useRef(false)
   const previousCompactOverlayRef = useRef<WorkspaceOverlay>(null)
   const compactNavigator = useMediaQuery('(max-width: 1023px)')
   const compactInspector = useMediaQuery('(max-width: 1279px)')
@@ -131,26 +134,6 @@ export function ResponsivePanelGroup({
     if (compactOverlay === 'navigator') closeNavigator()
     else if (compactOverlay === 'inspector') closeInspector()
   }
-  const trapCompactOverlayFocus = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeCompactOverlay()
-      return
-    }
-    if (event.key !== 'Tab') return
-    const focusable = getFocusableElements(event.currentTarget)
-    if (focusable.length === 0) return
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
   useLayoutEffect(() => {
     const previousCompactOverlay = previousCompactOverlayRef.current
     const previousSlot =
@@ -159,13 +142,11 @@ export function ResponsivePanelGroup({
         : previousCompactOverlay === 'inspector'
           ? inspectorSlotRef.current
           : null
-    const previousClose =
-      previousSlot?.querySelector<HTMLElement>('.workspace-overlay-close') ?? null
     if (
       previousCompactOverlay !== null &&
       compactOverlay === null &&
       overlay === previousCompactOverlay &&
-      document.activeElement === previousClose
+      compactOverlayHadFocusRef.current
     ) {
       const paneControl = previousSlot
         ? getFocusableElements(previousSlot).find(
@@ -177,17 +158,27 @@ export function ResponsivePanelGroup({
           ? (inspectorReturnFocusRef?.current ?? inspectorTriggerRef.current)
           : navigatorTriggerRef.current
       ;(paneControl ?? returnTarget)?.focus()
+      compactOverlayHadFocusRef.current = false
     }
 
-    const slot =
-      compactOverlay === 'navigator'
-        ? navigatorSlotRef.current
-        : compactOverlay === 'inspector'
-          ? inspectorSlotRef.current
-          : null
-    slot?.querySelector<HTMLElement>('.workspace-overlay-close')?.focus()
+    compactCloseRef.current?.focus()
     previousCompactOverlayRef.current = compactOverlay
   }, [compactOverlay, inspectorReturnFocusRef, overlay])
+
+  useLayoutEffect(() => {
+    const dialog = compactDialogRef.current
+    const close = compactCloseRef.current
+    if (!dialog || !close) return
+    const rememberFocus = (): void => {
+      compactOverlayHadFocusRef.current = dialog.contains(document.activeElement)
+    }
+    close.focus()
+    rememberFocus()
+    document.addEventListener('focusin', rememberFocus)
+    return () => {
+      document.removeEventListener('focusin', rememberFocus)
+    }
+  }, [compactOverlay])
 
   return (
     <div
@@ -224,15 +215,11 @@ export function ResponsivePanelGroup({
       <div
         ref={navigatorSlotRef}
         className={`workspace-navigator-slot ${overlay === 'navigator' ? 'workspace-overlay-open' : ''}`}
-        role={compactOverlay === 'navigator' ? 'dialog' : undefined}
-        aria-modal={compactOverlay === 'navigator' ? true : undefined}
-        aria-label={compactOverlay === 'navigator' ? navigatorLabel : undefined}
-        aria-hidden={compactOverlay !== null && compactOverlay !== 'navigator' ? true : undefined}
-        inert={compactOverlay !== null && compactOverlay !== 'navigator'}
-        onKeyDown={compactOverlay === 'navigator' ? trapCompactOverlayFocus : undefined}
+        aria-hidden={compactOverlay !== null ? true : undefined}
+        inert={compactOverlay !== null}
       >
-        {navigator}
-        {overlay === 'navigator' && (
+        {compactOverlay === 'navigator' ? null : navigator}
+        {overlay === 'navigator' && compactOverlay === null && (
           <OverlayClose label={`Close ${navigatorLabel}`} onPress={closeNavigator} />
         )}
       </div>
@@ -249,18 +236,72 @@ export function ResponsivePanelGroup({
           className={`workspace-inspector-slot ${
             overlay === 'inspector' ? 'workspace-overlay-open' : ''
           }`}
-          role={compactOverlay === 'inspector' ? 'dialog' : undefined}
-          aria-modal={compactOverlay === 'inspector' ? true : undefined}
-          aria-label={compactOverlay === 'inspector' ? inspectorLabel : undefined}
-          aria-hidden={compactOverlay !== null && compactOverlay !== 'inspector' ? true : undefined}
-          inert={compactOverlay !== null && compactOverlay !== 'inspector'}
-          onKeyDown={compactOverlay === 'inspector' ? trapCompactOverlayFocus : undefined}
+          aria-hidden={compactOverlay !== null ? true : undefined}
+          inert={compactOverlay !== null}
         >
-          {inspector}
-          {overlay === 'inspector' && (
+          {compactOverlay === 'inspector' ? null : inspector}
+          {overlay === 'inspector' && compactOverlay === null && (
             <OverlayClose label={`Close ${inspectorLabel}`} onPress={closeInspector} />
           )}
         </div>
+      )}
+      {compactOverlay && (
+        <Modal.Backdrop
+          isOpen
+          isDismissable={false}
+          variant="transparent"
+          onOpenChange={(isOpen) => !isOpen && closeCompactOverlay()}
+        >
+          <Modal.Container
+            placement="top"
+            className={`!h-full !w-full !max-w-none !p-0 sm:!w-full sm:!p-0 ${
+              compactOverlay === 'navigator' ? '!items-start' : '!items-end'
+            }`}
+          >
+            <Modal.Dialog
+              aria-label={compactOverlay === 'navigator' ? navigatorLabel : inspectorLabel}
+              className="!my-0 !h-full !min-h-full !max-w-none !rounded-none !bg-background !p-0"
+              style={{
+                width: `min(${
+                  compactOverlay === 'navigator' ? navigatorWidth : inspectorWidth
+                }px, 90vw)`
+              }}
+            >
+              <div ref={compactDialogRef} className="flex min-h-0 flex-1 flex-col">
+                <div className="flex shrink-0 items-center gap-1 p-2 pr-12">
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    onPress={() => setOverlay('navigator')}
+                    aria-pressed={compactOverlay === 'navigator'}
+                  >
+                    <List size={14} />
+                    {navigatorLabel}
+                  </Button>
+                  {inspector && (
+                    <Button
+                      size="sm"
+                      variant="tertiary"
+                      onPress={() => setOverlay('inspector')}
+                      aria-pressed={compactOverlay === 'inspector'}
+                    >
+                      <PanelRight size={14} />
+                      {inspectorLabel}
+                    </Button>
+                  )}
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  {compactOverlay === 'navigator' ? navigator : inspector}
+                </div>
+                <OverlayClose
+                  ref={compactCloseRef}
+                  label={`Close ${compactOverlay === 'navigator' ? navigatorLabel : inspectorLabel}`}
+                  onPress={closeCompactOverlay}
+                />
+              </div>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       )}
     </div>
   )
@@ -289,15 +330,18 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
 }
 
 function OverlayClose({
+  ref,
   label,
   onPress
 }: {
+  ref?: RefObject<HTMLButtonElement | null>
   label: string
   onPress: () => void
 }): React.JSX.Element {
   return (
     <Button
       isIconOnly
+      ref={ref}
       size="sm"
       variant="ghost"
       className="workspace-overlay-close absolute right-2 top-2 z-20"

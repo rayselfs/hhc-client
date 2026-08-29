@@ -61,6 +61,7 @@ interface DragState {
   startX: number
   startY: number
   original: EditablePresentationElement
+  hasPersistedChanges: boolean
 }
 
 interface TextInsertState {
@@ -193,7 +194,8 @@ export default function EditableSlideSurface({
       handle,
       startX: event.clientX,
       startY: event.clientY,
-      original
+      original,
+      hasPersistedChanges: false
     }
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
@@ -233,6 +235,8 @@ export default function EditableSlideSurface({
         height: Math.max(MIN_ELEMENT_SIZE, drag.original.height + dy)
       } as Partial<EditablePresentationElement>
     }
+    drag.hasPersistedChanges = hasElementPatchChanges(drag.original, updates)
+    if (!drag.hasPersistedChanges) return
     if (onTransformPreview) {
       onTransformPreview(drag.elementId, updates)
     } else {
@@ -279,6 +283,10 @@ export default function EditableSlideSurface({
 
     event.preventDefault()
     event.stopPropagation()
+    if (!hasElementPatchChanges(original, updates)) {
+      onTransformCancel?.()
+      return
+    }
     onEditingElementChange?.(null)
     if (onTransformPreview) onTransformPreview(element.id, updates)
     else onUpdateElement?.(slideId, element.id, updates)
@@ -286,12 +294,14 @@ export default function EditableSlideSurface({
   }
 
   const endDrag = (event: React.PointerEvent): void => {
-    if (!dragRef.current) return
+    const drag = dragRef.current
+    if (!drag) return
     dragRef.current = null
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    onTransformCommit?.()
+    if (drag.hasPersistedChanges) onTransformCommit?.()
+    else onTransformCancel?.()
   }
 
   const cancelDrag = (event: React.PointerEvent): void => {
@@ -1028,6 +1038,28 @@ function calculateTextResize(
     width,
     height
   } as Partial<EditablePresentationElement>
+}
+
+function hasElementPatchChanges(
+  element: EditablePresentationElement,
+  updates: Partial<EditablePresentationElement>
+): boolean {
+  return Object.entries(updates).some(([key, value]) => {
+    if (key !== 'crop') {
+      return !Object.is(element[key as keyof EditablePresentationElement], value)
+    }
+    if (element.type !== 'image') return true
+    const current = normalizeImageCrop(element.crop)
+    const next = normalizeImageCrop(
+      value as Extract<EditablePresentationElement, { type: 'image' }>['crop']
+    )
+    return (
+      current.top !== next.top ||
+      current.right !== next.right ||
+      current.bottom !== next.bottom ||
+      current.left !== next.left
+    )
+  })
 }
 
 function isContentAutoSizedText(

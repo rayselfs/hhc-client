@@ -1178,6 +1178,81 @@ describe('EditableSlideSurface', () => {
     expect(onTransformCommit).toHaveBeenCalledTimes(3)
   })
 
+  it('cancels keyboard and pointer resize transactions clamped at the fixed text minimum', () => {
+    const onTransformStart = vi.fn(() => text)
+    const onTransformPreview = vi.fn()
+    const onTransformCommit = vi.fn()
+    const onTransformCancel = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Minimum frame',
+      x: 100,
+      y: 80,
+      width: 60,
+      height: 24,
+      autoSize: 'fixed',
+      autoWidth: false
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+        onTransformCommit={onTransformCommit}
+        onTransformCancel={onTransformCancel}
+      />
+    )
+
+    const leftHandle = screen.getByLabelText('Resize text box left')
+    const keyboardEvent = createEvent.keyDown(leftHandle, { key: 'ArrowRight' })
+    fireEvent(leftHandle, keyboardEvent)
+    fireEvent.pointerDown(leftHandle, { clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(leftHandle, { clientX: 24, clientY: 0, pointerId: 1 })
+    fireEvent.pointerUp(leftHandle, { clientX: 24, clientY: 0, pointerId: 1 })
+
+    expect(keyboardEvent.defaultPrevented).toBe(true)
+    expect(onTransformStart).toHaveBeenCalledTimes(2)
+    expect(onTransformPreview).not.toHaveBeenCalled()
+    expect(onTransformCommit).not.toHaveBeenCalled()
+    expect(onTransformCancel).toHaveBeenCalledTimes(2)
+  })
+
+  it('cancels a generic resize transaction clamped at the minimum size', () => {
+    const onTransformStart = vi.fn(() => shape)
+    const onTransformPreview = vi.fn()
+    const onTransformCommit = vi.fn()
+    const onTransformCancel = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const shape = createShapeElement('rectangle', { width: 20, height: 20 })
+
+    render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, shape)}
+        slideId={slideId}
+        editable
+        selectedElementId={shape.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+        onTransformCommit={onTransformCommit}
+        onTransformCancel={onTransformCancel}
+      />
+    )
+
+    const handle = screen.getByLabelText('Resize element')
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+
+    expect(onTransformPreview).not.toHaveBeenCalled()
+    expect(onTransformCommit).not.toHaveBeenCalled()
+    expect(onTransformCancel).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps content-height keyboard resize horizontal-only', () => {
     const onTransformStart = vi.fn(() => text)
     const onTransformPreview = vi.fn()

@@ -653,10 +653,13 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   })
   await formatBackgroundTrigger.click()
   const inspector = page.locator('.workspace-inspector-slot')
+  const inspectorDialog = page.getByRole('dialog', {
+    name: /Format Background|設定背景格式|设置背景格式/
+  })
   await expect(inspector).toBeVisible()
-  await expect(inspector.locator('.workspace-overlay-close:visible')).toHaveCount(1)
+  await expect(inspectorDialog.locator('.workspace-overlay-close:visible')).toHaveCount(1)
   await expect(inspector.locator('.workspace-inspector-content-close:visible')).toHaveCount(0)
-  await inspector.locator('.workspace-overlay-close').click()
+  await inspectorDialog.locator('.workspace-overlay-close').click()
   await expect(formatBackgroundTrigger).toBeFocused()
 
   await page.setViewportSize({ width: 1440, height: 900 })
