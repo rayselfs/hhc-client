@@ -5,7 +5,7 @@ Use this runbook only with an ACL-only revision of the [pilot manifest](media-sy
 ## 1. Preconditions
 
 - [ ] Fetch all seven repositories. Confirm each server/frontend `origin/main`, merged PR, CI, release workflow, migration, image digest, and rollback anchor agrees with the manifest.
-- [ ] For LibrePresenter, confirm the candidate branch and reviewed commit point to the exact release-code anchor recorded in the manifest. Merge only after all final-head CI and macOS/Windows package gates are green; never tag a local, unpushed, or different commit.
+- [ ] For HHC Presenter, confirm the candidate branch and reviewed commit point to the exact release-code anchor recorded in the manifest. Merge only after all final-head CI and macOS/Windows package gates are green; never tag a local, unpushed, or different commit.
 - [ ] Confirm Account API, Asset API, Gateway, helper, and Admin are Healthy/Running at the manifest revisions; capture the immediately previous revision or static index before each later deployment.
 - [ ] Re-run the read-only negative boundary checks: Account private route is unreachable externally; anonymous Asset reader and invalid ticket are rejected; anonymous Admin management is rejected; www management remains absent.
 - [ ] Check aggregate logs for request-ID coverage and no credential, ticket, or binding-code value markers. Do not export raw log bodies.
@@ -28,7 +28,7 @@ The release workflow generates `SHA256SUMS` from the completed package-job artif
 
 - [ ] Download only the intended artifact and `SHA256SUMS` from the approved official GitHub Release.
 - [ ] Verify the downloaded artifact against the downloaded `SHA256SUMS` with a trusted SHA-256 tool before installation or distribution. If the file is absent or verification fails, stop.
-- [ ] Confirm the package retains the `librepresenter` protocol and passes packaged runtime/VLC projection smoke before distribution.
+- [ ] Confirm the package retains the `hhc-presenter` protocol and passes packaged runtime/VLC projection smoke before distribution.
 - [ ] Present the expected platform warning and checksum result to the pilot operator. Installation or release publication requires the separate tag/release approval checkpoint.
 
 ## 3. Inert deployment order
@@ -40,7 +40,7 @@ For an approved future deployment, complete one healthy boundary before moving o
 3. Gateway reader and management routes.
 4. LINE helper.
 5. Admin Console.
-6. After the scoped-404 compatibility change is reviewed, green, and merged, use only the approved `main` release anchor for LibrePresenter web preview and unsigned GitHub desktop artifacts. Merge alone does not authorize a tag, artifact publication, deployment, or pilot mutation.
+6. After the scoped-404 compatibility change is reviewed, green, and merged, use only the approved `main` release anchor for HHC Presenter web preview and unsigned GitHub desktop artifacts. Merge alone does not authorize a tag, artifact publication, deployment, or pilot mutation.
 
 For every service, record only: commit SHA, CI/release URL, migration identifier, ready revision/static publish timestamp, immutable image digest if applicable, and previous rollback anchor. Schema deployment must not create a role assignment, collection, ACL, or binding.
 

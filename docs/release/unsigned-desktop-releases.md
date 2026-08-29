@@ -1,6 +1,6 @@
 # Unsigned Desktop Releases
 
-LibrePresenter currently publishes unsigned desktop artifacts through GitHub
+HHC Presenter currently publishes unsigned desktop artifacts through GitHub
 Releases. This keeps the release path practical while the project is still
 early and avoids paying platform signing fees before distribution is stable.
 

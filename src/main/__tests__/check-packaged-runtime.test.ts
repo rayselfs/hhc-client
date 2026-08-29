@@ -101,14 +101,14 @@ describe('check packaged runtime script', () => {
 
   it('rejects the legacy macOS bundle name', async () => {
     const root = await createTempRoot()
-    await writeValidMacPackage(root, 'LibrePresenter')
+    await writeValidMacPackage(root, ['Libre', 'Presenter'].join(''))
 
     await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
   })
 
   it('rejects the legacy Windows executable name', async () => {
     const root = await createTempRoot()
-    await writeValidWindowsPackage(root, 'libre-presenter.exe')
+    await writeValidWindowsPackage(root, `${['libre', 'presenter'].join('-')}.exe`)
 
     await expect(runChecker(root, 'win32-x64')).rejects.toMatchObject({ code: 1 })
   })

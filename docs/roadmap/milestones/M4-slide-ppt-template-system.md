@@ -3,7 +3,7 @@
 ## Goal
 
 Treat PPTX as a first-class media item that can be opened, previewed, organized,
-and projected without leaving LibrePresenter. V1 prioritizes projection accuracy,
+and projected without leaving HHC Presenter. V1 prioritizes projection accuracy,
 multi-document operation, and page-level workflows over full PowerPoint element
 editing.
 
@@ -56,7 +56,7 @@ editing.
 ## Future Work
 
 - Full editable deck model for text, image, shape, and layout editing.
-- Native LibrePresenter slide creation.
+- Native HHC Presenter slide creation.
 - PPTX export, only if a real workflow needs it.
 - Presenter notes editing and service cue integration.
 - More detailed render warning UI for unsupported PowerPoint features.

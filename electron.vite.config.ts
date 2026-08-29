@@ -141,9 +141,9 @@ export default defineConfig(({ mode }) => {
           registerType: 'autoUpdate',
           injectRegister: 'auto',
           manifest: {
-            name: 'LibrePresenter',
-            short_name: 'LibrePresenter',
-            description: 'Open-source presentation software for churches and live events',
+            name: 'HHC Presenter',
+            short_name: 'HHC Presenter',
+            description: 'A projection system designed for church services.',
             theme_color: '#000000',
             background_color: '#000000',
             display: 'standalone',

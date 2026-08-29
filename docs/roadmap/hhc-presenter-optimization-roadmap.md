@@ -1,8 +1,8 @@
-# LibrePresenter Reliability, Media, and Presentation Optimization Roadmap
+# HHC Presenter Reliability, Media, and Presentation Optimization Roadmap
 
 ## Purpose
 
-This roadmap follows the implemented M1–M9 product roadmap. It focuses on making LibrePresenter
+This roadmap follows the implemented M1–M9 product roadmap. It focuses on making HHC Presenter
 safe and predictable in a live room before expanding its PowerPoint-like editing surface.
 
 The order is deliberate:
