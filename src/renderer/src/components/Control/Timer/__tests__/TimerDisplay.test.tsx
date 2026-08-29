@@ -8,7 +8,7 @@ vi.mock('react-i18next', () => ({
 describe('TimerDisplay', () => {
   it('renders idle phase correctly', () => {
     const { container } = render(<TimerDisplay phase="idle" mainDisplay="05:00" progress={1} />)
-    expect(screen.getByText('05:00')).toBeInTheDocument()
+    expect(screen.getByText('05:00')).toHaveClass('text-[32cqi]', 'leading-none', 'tabular-nums')
     expect(container.querySelectorAll('circle')).toHaveLength(2)
   })
 

@@ -4,7 +4,7 @@ import StopwatchDisplay from '../StopwatchDisplay'
 describe('StopwatchDisplay', () => {
   it('renders formattedTime correctly', () => {
     render(<StopwatchDisplay formattedTime="01:30" />)
-    expect(screen.getByText('01:30')).toBeInTheDocument()
+    expect(screen.getByText('01:30')).toHaveClass('text-[32cqi]', 'leading-none', 'tabular-nums')
   })
 
   it('renders zero state correctly', () => {

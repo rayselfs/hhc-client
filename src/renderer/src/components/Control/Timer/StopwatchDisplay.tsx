@@ -21,7 +21,10 @@ export default function StopwatchDisplay({
       responsive={responsive}
       className={`flex items-center justify-center @container ${className ?? ''}`}
     >
-      <span className="timer-digits text-[34cqi] tabular-nums" data-testid="stopwatch-display">
+      <span
+        className="timer-digits text-[32cqi] leading-none tabular-nums"
+        data-testid="stopwatch-display"
+      >
         {formattedTime}
       </span>
     </TimerRing>
