@@ -45,7 +45,7 @@ export default function TimerDisplay({
       type="button"
       className={[
         'timer-digits bg-transparent border-0 p-0 focus:outline-none',
-        'text-[34cqi]',
+        'text-[32cqi] leading-none tabular-nums',
         isWarning && !warningColor ? 'text-danger' : '',
         canEditTime ? 'hover:opacity-80 cursor-pointer' : 'pointer-events-none',
         digitClassName

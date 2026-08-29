@@ -20,6 +20,68 @@ function createCanvas(width: number, height: number): OffscreenCanvas {
   return new OffscreenCanvas(Math.max(1, Math.ceil(width)), Math.max(1, Math.ceil(height)))
 }
 
+class OffscreenCanvasFactory {
+  create(
+    width: number,
+    height: number
+  ): {
+    canvas: OffscreenCanvas
+    context: OffscreenCanvasRenderingContext2D
+  } {
+    const canvas = createCanvas(width, height)
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Offscreen canvas context is unavailable')
+    return { canvas, context }
+  }
+
+  reset(entry: { canvas: OffscreenCanvas }, width: number, height: number): void {
+    entry.canvas.width = Math.max(1, Math.ceil(width))
+    entry.canvas.height = Math.max(1, Math.ceil(height))
+  }
+
+  destroy(entry: {
+    canvas: OffscreenCanvas | null
+    context: OffscreenCanvasRenderingContext2D | null
+  }): void {
+    if (entry.canvas) entry.canvas.width = entry.canvas.height = 0
+    entry.canvas = null
+    entry.context = null
+  }
+}
+
+class WorkerFilterFactory {
+  addFilter(): string {
+    return 'none'
+  }
+  addHCMFilter(): string {
+    return 'none'
+  }
+  addAlphaFilter(): string {
+    return 'none'
+  }
+  addLuminosityFilter(): string {
+    return 'none'
+  }
+  addKnockoutFilter(): string {
+    return 'none'
+  }
+  addHighlightHCMFilter(): string {
+    return 'none'
+  }
+  addSelectionHCMFilter(): string {
+    return 'none'
+  }
+  addSelectionFilter(): string {
+    return 'none'
+  }
+  createSelectionStyle(): null {
+    return null
+  }
+  destroy(): void {
+    return undefined
+  }
+}
+
 async function renderImage(id: string, file: File): Promise<Blob[]> {
   if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') {
     throw new BackgroundRenderingUnavailableError('Image rendering APIs are unavailable')
@@ -46,7 +108,13 @@ async function renderPdf(id: string, file: File, allPages: boolean): Promise<Blo
   }
   if (file.size > MAX_PDF_SIZE) return []
   const pdfjs = await loadPdfjsLib()
-  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise
+  const pdf = await pdfjs.getDocument({
+    data: await file.arrayBuffer(),
+    CanvasFactory: OffscreenCanvasFactory,
+    FilterFactory: WorkerFilterFactory,
+    disableFontFace: true,
+    useSystemFonts: false
+  }).promise
 
   try {
     const blobs: Blob[] = []
