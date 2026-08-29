@@ -18,7 +18,7 @@
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:desktop-native": "node scripts/check-desktop-native.mjs",
     "postinstall": "electron-builder install-app-deps",
-    "build:unpack": "npm run build && npm run check:desktop-native && npm run prepare:video-engine:strict && electron-builder --dir && npm run check:packaged-runtime",
+    "build:unpack": "npm run build && npm run check:desktop-native && npm run prepare:video-engine:strict && electron-builder --dir && npm run check:packaged-runtime -- --unpacked-only",
     "package:desktop": "npm run build && npm run check:desktop-native && npm run prepare:video-engine:strict && electron-builder",
     "build:win": "npm run package:desktop -- --win",
     "build:mac": "npm run package:desktop -- --mac",

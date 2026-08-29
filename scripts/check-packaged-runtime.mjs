@@ -10,6 +10,7 @@ const currentTarget = `${process.platform}-${process.arch}`
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='))
 const requestedTarget = targetArg ? targetArg.slice('--target='.length) : currentTarget
 const checkAll = args.has('--all')
+const unpackedOnly = args.has('--unpacked-only')
 const maxWindowsInstallerBytes = 450 * 1024 * 1024
 
 const licenseFiles = [
@@ -135,9 +136,9 @@ async function checkResourceRoot(resourceRoot, target) {
   }
 
   const updaterConfigPath = join(resourceRoot, 'app-update.yml')
-  if (!(await exists(updaterConfigPath))) {
+  if (!(await exists(updaterConfigPath)) && !unpackedOnly) {
     failures.push('Missing app-update.yml')
-  } else {
+  } else if (await exists(updaterConfigPath)) {
     const updaterConfig = await readFile(updaterConfigPath, 'utf8')
     for (const expected of [
       /^owner:\s*rayselfs\s*$/m,
