@@ -18,6 +18,7 @@ import {
   isPresentationMimeType
 } from '@renderer/lib/presentation-media'
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
+import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
 
 type FileProjectionProps = {
   generation?: number
@@ -97,6 +98,7 @@ export default function FileProjection({
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [pdfState, setPdfState] = useState<PdfState | null>(null)
+  const [pdfPreviewUrls, setPdfPreviewUrls] = useState<string[]>([])
   const [pdfContainerWidth, setPdfContainerWidth] = useState(0)
   const [isEnded, setIsEnded] = useState(false)
   const [displayName, setDisplayName] = useState(fileName ?? '')
@@ -235,6 +237,18 @@ export default function FileProjection({
     })
   }, [])
 
+  const loadPdfPreviews = useCallback(
+    async (blobId: string, itemId: string, loadSequence: number): Promise<void> => {
+      const urls = await getPdfPageThumbs(blobId)
+      if (loadSequenceRef.current !== loadSequence || currentItemIdRef.current !== itemId) {
+        urls.forEach((url) => URL.revokeObjectURL(url))
+        return
+      }
+      setPdfPreviewUrls(urls)
+    },
+    []
+  )
+
   const sendVideoPlaybackState = useCallback(
     (next?: { isPlaying?: boolean; isEnded?: boolean }): void => {
       const video = mediaRef.current
@@ -303,8 +317,12 @@ export default function FileProjection({
       setZoom(replay?.zoom ?? 1)
       setPan(replay ? { ...replay.pan } : { x: 0, y: 0 })
       setPdfState(null)
+      setPdfPreviewUrls([])
       setIsEnded(replay?.isEnded ?? false)
       setMimeType(fileMimeType)
+      if (fileMimeType === 'application/pdf') {
+        void loadPdfPreviews(blobId, itemId, loadSequence)
+      }
       if (options.playbackMode === 'vlc-embedded') {
         return
       }
@@ -336,7 +354,14 @@ export default function FileProjection({
         setObjectUrl(source.url)
       }
     },
-    [disposePdf, loadPdf]
+    [disposePdf, loadPdf, loadPdfPreviews]
+  )
+
+  useEffect(
+    () => () => {
+      pdfPreviewUrls.forEach((url) => URL.revokeObjectURL(url))
+    },
+    [pdfPreviewUrls]
   )
 
   const pdfPageCount = pdfState?.document.numPages ?? 0
@@ -424,14 +449,19 @@ export default function FileProjection({
             task?.cancel()
             return previous
           }
-          const pages = [...previous.pages]
           const pageSizes = [...previous.pageSizes]
-          pages[pageNumber - 1] = canvas
           pageSizes[pageNumber - 1] = { width: canvas.width, height: canvas.height }
-          return { ...previous, pages, pageSizes }
+          return { ...previous, pageSizes }
         })
 
         await task.promise
+        if (pdfDocumentRef.current !== document || !pdfWindowRef.current.has(pageNumber)) return
+        setPdfState((previous) => {
+          if (!previous || previous.document !== document) return previous
+          const pages = [...previous.pages]
+          pages[pageNumber - 1] = canvas
+          return { ...previous, pages }
+        })
       } catch (error) {
         const errorName = (error as { name?: string })?.name
         if (
@@ -682,6 +712,8 @@ export default function FileProjection({
                   key={pageNumber}
                   canvas={pdfState.pages[pageNumber - 1]}
                   size={pdfState.pageSizes[pageNumber - 1]}
+                  previewUrl={pdfPreviewUrls[pageNumber - 1]}
+                  pageNumber={pageNumber}
                   continuous
                 />
               )
@@ -709,8 +741,28 @@ export default function FileProjection({
           <PdfCanvas
             canvas={pdfState.pages[pdfWindowCenter - 1]}
             size={pdfState.pageSizes[pdfWindowCenter - 1]}
+            previewUrl={pdfPreviewUrls[pdfWindowCenter - 1]}
+            pageNumber={pdfWindowCenter}
           />
         </div>
+      </div>
+    )
+  }
+
+  if (mimeType === 'application/pdf' && pdfPreviewUrls.length > 0) {
+    const replayPage =
+      replayStateRef.current?.itemId === currentItemIdRef.current
+        ? replayStateRef.current.pdfPage
+        : 1
+    const pageNumber = Math.min(pdfPreviewUrls.length, Math.max(1, Math.floor(replayPage)))
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
+        <img
+          data-pdf-preview={pageNumber}
+          src={pdfPreviewUrls[pageNumber - 1]}
+          alt={displayName}
+          className="h-full w-full object-contain"
+        />
       </div>
     )
   }
@@ -982,10 +1034,14 @@ function VlcProjectionSurface({
 function PdfCanvas({
   canvas,
   size,
+  previewUrl,
+  pageNumber,
   continuous = false
 }: {
   canvas: HTMLCanvasElement | undefined
   size?: { width: number; height: number }
+  previewUrl?: string
+  pageNumber: number
   continuous?: boolean
 }): React.JSX.Element | null {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -1007,7 +1063,7 @@ function PdfCanvas({
     }
   }, [canvas, continuous])
 
-  if (!canvas) return null
+  if (!canvas && !previewUrl) return null
   return (
     <div
       ref={containerRef}
@@ -1017,6 +1073,15 @@ function PdfCanvas({
           ? { maxWidth: size.width, aspectRatio: `${size.width} / ${size.height}` }
           : undefined
       }
-    />
+    >
+      {!canvas && previewUrl && (
+        <img
+          data-pdf-preview={pageNumber}
+          src={previewUrl}
+          alt=""
+          className="h-full w-full object-contain"
+        />
+      )}
+    </div>
   )
 }

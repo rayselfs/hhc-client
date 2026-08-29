@@ -5,13 +5,29 @@ const {
   mockDeleteThumbnail,
   mockDeletePdfPageThumbs,
   mockDeleteDerivedAssets,
-  mockDeleteNativeFile
+  mockDeleteNativeFile,
+  mockCancelAndWait,
+  mockWithCancellationFence
 } = vi.hoisted(() => ({
   envState: { isElectron: false },
   mockDeleteThumbnail: vi.fn(),
   mockDeletePdfPageThumbs: vi.fn(),
   mockDeleteDerivedAssets: vi.fn(),
-  mockDeleteNativeFile: vi.fn()
+  mockDeleteNativeFile: vi.fn(),
+  mockCancelAndWait: vi.fn(
+    async (
+      _predicate: (job: { type: string; itemId?: string; sourceBlobId?: string }) => boolean
+    ) => 0
+  ),
+  mockWithCancellationFence: vi.fn(
+    async <T>(
+      predicate: (job: { type: string; itemId?: string; sourceBlobId?: string }) => boolean,
+      operation: () => Promise<T>
+    ) => {
+      await mockCancelAndWait(predicate)
+      return operation()
+    }
+  )
 }))
 
 vi.mock('@renderer/lib/env', () => ({
@@ -26,6 +42,13 @@ vi.mock('@renderer/lib/thumbnail-db', () => ({
 vi.mock('@renderer/lib/media-work-db', () => ({
   deleteDerivedAssetsForSource: mockDeleteDerivedAssets,
   listMediaJobs: vi.fn(async () => [])
+}))
+
+vi.mock('@renderer/lib/media-job-queue', () => ({
+  mediaJobQueue: {
+    cancelAndWait: mockCancelAndWait,
+    withCancellationFence: mockWithCancellationFence
+  }
 }))
 
 import {
@@ -63,10 +86,20 @@ beforeEach(async () => {
 })
 
 describe('file resource cleanup', () => {
-  it('keeps requested missing item IDs in the poster cancellation closure', async () => {
+  it('does not cancel unknown shared sources for already-missing item IDs', async () => {
     await expect(
       listFileResourceCleanupItemIds({ itemIds: ['already-removed-item'] })
     ).resolves.toEqual(['already-removed-item'])
+
+    await cleanupFileResources({ itemIds: ['already-removed-item'] })
+    const predicate = mockCancelAndWait.mock.calls[0][0]
+    expect(
+      predicate({
+        type: 'pdf-pages',
+        itemId: 'already-removed-item',
+        sourceBlobId: 'shared-source'
+      })
+    ).toBe(false)
   })
 
   it('recursively deletes unloaded descendants and their resources from the database', async () => {
@@ -120,6 +153,46 @@ describe('file resource cleanup', () => {
     expect(mockDeletePdfPageThumbs).toHaveBeenCalledWith(originalBlobId)
   })
 
+  it('waits for derived-asset jobs before permanently deleting their source', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', {
+      id: 'pdf-item',
+      parentId: 'file-root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'slides.pdf',
+      url: `blob:${originalBlobId}`,
+      size: 1,
+      mimeType: 'application/pdf'
+    })
+    await db.put('file-blobs', {
+      id: originalBlobId,
+      blob: new Blob(['pdf']),
+      refCount: 1
+    })
+
+    await cleanupFileResources({ itemIds: ['pdf-item'] })
+
+    expect(mockCancelAndWait).toHaveBeenCalledOnce()
+    const predicate = mockCancelAndWait.mock.calls[0][0]
+    expect(
+      predicate({ type: 'cover-thumbnail', itemId: 'pdf-item', sourceBlobId: originalBlobId })
+    ).toBe(true)
+    expect(predicate({ type: 'pdf-pages', itemId: 'pdf-item', sourceBlobId: originalBlobId })).toBe(
+      true
+    )
+    expect(predicate({ type: 'video-poster', sourceBlobId: originalBlobId })).toBe(true)
+    expect(predicate({ type: 'pdf-pages', itemId: 'other-item', sourceBlobId: 'other' })).toBe(
+      false
+    )
+    expect(predicate({ type: 'sync-download', itemId: 'pdf-item' })).toBe(false)
+    expect(mockCancelAndWait.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDeleteDerivedAssets.mock.invocationCallOrder[0]
+    )
+  })
+
   it('preserves shared blobs until the final copied item is removed', async () => {
     const db = await openFileExplorerDB()
     for (const id of ['original-item', 'copy-item']) {
@@ -143,6 +216,14 @@ describe('file resource cleanup', () => {
     })
 
     await cleanupFileResources({ itemIds: ['original-item'] })
+    const sharedBlobPredicate = mockCancelAndWait.mock.calls[0][0]
+    expect(
+      sharedBlobPredicate({
+        type: 'pdf-pages',
+        itemId: 'original-item',
+        sourceBlobId: originalBlobId
+      })
+    ).toBe(false)
     await expect(db.get('file-blobs', originalBlobId)).resolves.toMatchObject({ refCount: 1 })
     expect(mockDeleteDerivedAssets).not.toHaveBeenCalled()
     expect(mockDeletePdfPageThumbs).not.toHaveBeenCalled()
@@ -152,6 +233,40 @@ describe('file resource cleanup', () => {
     await expect(db.get('file-blobs', originalBlobId)).resolves.toBeUndefined()
     expect(mockDeleteDerivedAssets).toHaveBeenCalledWith(originalBlobId)
     expect(mockDeletePdfPageThumbs).toHaveBeenCalledWith(originalBlobId)
+  })
+
+  it('serializes concurrent deletes so the final shared reference is fenced', async () => {
+    const db = await openFileExplorerDB()
+    for (const id of ['first-copy', 'second-copy']) {
+      await db.put('folder-items', {
+        id,
+        parentId: 'file-root',
+        type: 'file',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        name: `${id}.pdf`,
+        url: `blob:${originalBlobId}`,
+        size: 1,
+        mimeType: 'application/pdf'
+      })
+    }
+    await db.put('file-blobs', {
+      id: originalBlobId,
+      blob: new Blob(['pdf']),
+      refCount: 2
+    })
+
+    await Promise.all([
+      cleanupFileResources({ itemIds: ['first-copy'] }),
+      cleanupFileResources({ itemIds: ['second-copy'] })
+    ])
+
+    const predicates = mockCancelAndWait.mock.calls.map(([predicate]) => predicate)
+    expect(
+      predicates.some((predicate) => predicate({ type: 'pdf-pages', sourceBlobId: originalBlobId }))
+    ).toBe(true)
+    await expect(db.get('file-blobs', originalBlobId)).resolves.toBeUndefined()
   })
 
   it('defers final source and derived-asset cleanup while projection holds a lock', async () => {

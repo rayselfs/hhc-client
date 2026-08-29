@@ -3,6 +3,8 @@ import { getBlobId } from './blob-identity'
 import { openFileExplorerDB, type ResourceCleanupJournalRecord } from './file-explorer-db'
 import { deferMediaResourceCleanup, isMediaResourceLocked } from './media-resource-locks'
 import { createResourceCleanupRecord, retryResourceCleanup } from './resource-cleanup-journal'
+import { mediaJobQueue } from './media-job-queue'
+import type { MediaJobRecord, MediaJobType } from './media-work-db'
 
 export interface CleanupResult {
   folderIds: string[]
@@ -87,7 +89,45 @@ async function finalizeDeferredBlobCleanup(blobId: string): Promise<void> {
   await retryResourceCleanup(cleanupRecord.id)
 }
 
-export async function cleanupFileResources(request: CleanupRequest): Promise<CleanupResult> {
+let cleanupTail: Promise<void> = Promise.resolve()
+
+export function cleanupFileResources(request: CleanupRequest): Promise<CleanupResult> {
+  const cleanup = cleanupTail.then(() => cleanupFileResourcesSerial(request))
+  cleanupTail = cleanup.then(
+    () => undefined,
+    () => undefined
+  )
+  return cleanup
+}
+
+async function cleanupFileResourcesSerial(request: CleanupRequest): Promise<CleanupResult> {
+  const targetItemIds = new Set(await listFileResourceCleanupItemIds(request))
+  const lookupDb = await openFileExplorerDB()
+  const removedReferencesByBlob = new Map<string, number>()
+  for (const itemId of targetItemIds) {
+    const item = await lookupDb.get('folder-items', itemId)
+    if (!item) continue
+    if (!isFileItem(item)) continue
+    const blobId = getBlobId(item)
+    removedReferencesByBlob.set(blobId, (removedReferencesByBlob.get(blobId) ?? 0) + 1)
+  }
+  const deletedBlobIds = new Set<string>()
+  for (const [blobId, removedReferences] of removedReferencesByBlob) {
+    const blob = await lookupDb.get('file-blobs', blobId)
+    if (!blob || (blob.refCount ?? 1) <= removedReferences) deletedBlobIds.add(blobId)
+  }
+  const derivedJobTypes = new Set<MediaJobType>(['cover-thumbnail', 'pdf-pages', 'video-poster'])
+  const matchesDeletedSource = (job: MediaJobRecord): boolean =>
+    derivedJobTypes.has(job.type) &&
+    job.sourceBlobId !== undefined &&
+    deletedBlobIds.has(job.sourceBlobId)
+
+  return mediaJobQueue.withCancellationFence(matchesDeletedSource, () =>
+    cleanupFileResourcesAfterJobFence(request)
+  )
+}
+
+async function cleanupFileResourcesAfterJobFence(request: CleanupRequest): Promise<CleanupResult> {
   const db = await openFileExplorerDB()
   const tx = db.transaction(
     ['folder-records', 'folder-items', 'file-blobs', 'resource-cleanup-journal'],

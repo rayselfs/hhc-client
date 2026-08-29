@@ -88,6 +88,75 @@ describe('MediaJobQueue', () => {
     expect(maxActive).toBe(1)
   })
 
+  it('runs queued cover thumbnails before low-priority PDF page prewarming', async () => {
+    const queue = new MediaJobQueue()
+    const order: string[] = []
+    const releases: Array<() => void> = []
+    const executor = (label: string) => async (): Promise<void> => {
+      order.push(label)
+      await new Promise<void>((resolve) => releases.push(resolve))
+    }
+    queue.registerExecutor('cover-thumbnail', executor('cover'))
+    queue.registerExecutor('pdf-pages', executor('pdf'))
+
+    const firstCover = await queue.enqueue({ type: 'cover-thumbnail' })
+    const secondCover = await queue.enqueue({ type: 'cover-thumbnail' })
+    const pdf = await queue.enqueue({ type: 'pdf-pages', priority: -1 })
+    await waitForJob(firstCover.id, 'running')
+
+    expect(order).toEqual(['cover'])
+    releases.shift()?.()
+    await waitForJob(secondCover.id, 'running')
+    expect(order).toEqual(['cover', 'cover'])
+    releases.shift()?.()
+    await waitForJob(pdf.id, 'running')
+    expect(order).toEqual(['cover', 'cover', 'pdf'])
+    releases.shift()?.()
+  })
+
+  it('rejects late enqueues while cleanup holds a cancellation fence', async () => {
+    const queue = new MediaJobQueue()
+    let releaseCleanup = (): void => undefined
+    let cleanupStarted = false
+    const cleanup = queue.withCancellationFence(
+      (job) => job.sourceBlobId === 'deleted-blob',
+      () => {
+        cleanupStarted = true
+        return new Promise<void>((resolve) => (releaseCleanup = resolve))
+      }
+    )
+
+    await vi.waitFor(() => expect(cleanupStarted).toBe(true))
+    await expect(
+      queue.enqueue({ type: 'pdf-pages', sourceBlobId: 'deleted-blob' })
+    ).rejects.toThrow('Media job target is being deleted')
+
+    releaseCleanup()
+    await cleanup
+  })
+
+  it('does not retry fenced work during cleanup', async () => {
+    const queue = new MediaJobQueue()
+    const job = await queue.enqueue({ type: 'pdf-pages', sourceBlobId: 'deleted-blob' })
+    await putMediaJob({ ...job, status: 'failed' })
+    let releaseCleanup = (): void => undefined
+    let cleanupStarted = false
+    const cleanup = queue.withCancellationFence(
+      (candidate) => candidate.sourceBlobId === 'deleted-blob',
+      () => {
+        cleanupStarted = true
+        return new Promise<void>((resolve) => (releaseCleanup = resolve))
+      }
+    )
+    await vi.waitFor(() => expect(cleanupStarted).toBe(true))
+
+    await queue.retry(job.id)
+
+    await expect(getMediaJob(job.id)).resolves.toMatchObject({ status: 'cancelled' })
+    releaseCleanup()
+    await cleanup
+  })
+
   it('recovers stale running jobs after restart', async () => {
     const now = Date.now()
     await putMediaJob({

@@ -11,14 +11,16 @@ const {
   mockProjectionHandlers,
   mockProjectionSend,
   mockProjectionSetGeneration,
-  mockProjectionVlcStop
+  mockProjectionVlcStop,
+  mockGetPdfPageThumbs
 } = vi.hoisted(() => ({
   mockGetFileSource: vi.fn(),
   mockLoadPdfjsLib: vi.fn(),
   mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
   mockProjectionSend: vi.fn(),
   mockProjectionSetGeneration: vi.fn(),
-  mockProjectionVlcStop: vi.fn()
+  mockProjectionVlcStop: vi.fn(),
+  mockGetPdfPageThumbs: vi.fn()
 }))
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
@@ -28,6 +30,11 @@ vi.mock('@renderer/lib/file-explorer-db', () => ({
 
 vi.mock('@renderer/lib/pdfjs-loader', () => ({
   loadPdfjsLib: mockLoadPdfjsLib
+}))
+
+vi.mock('@renderer/lib/thumbnail-db', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@renderer/lib/thumbnail-db')>()),
+  getPdfPageThumbs: mockGetPdfPageThumbs
 }))
 
 vi.mock('@renderer/lib/projection-adapter', () => ({
@@ -78,8 +85,10 @@ function mockPdf(
     loadingTask: { destroy: ReturnType<typeof vi.fn> }
   }
   renderCancels: Map<number, ReturnType<typeof vi.fn>>
+  renderResolves: Map<number, () => void>
 } {
   const renderCancels = new Map<number, ReturnType<typeof vi.fn>>()
+  const renderResolves = new Map<number, () => void>()
   const pdf = {
     numPages: pageCount,
     getPage: vi.fn(async (pageNumber: number) => ({
@@ -88,7 +97,8 @@ function mockPdf(
         canvas.dataset.pdfPage = String(pageNumber)
         let rejectRender: ((error: Error) => void) | undefined
         const promise = pendingRenders
-          ? new Promise<void>((_resolve, reject) => {
+          ? new Promise<void>((resolve, reject) => {
+              renderResolves.set(pageNumber, resolve)
               rejectRender = reject
             })
           : Promise.resolve()
@@ -106,7 +116,7 @@ function mockPdf(
   mockLoadPdfjsLib.mockResolvedValue({
     getDocument: vi.fn(() => ({ promise: Promise.resolve(pdf) }))
   })
-  return { pdf, renderCancels }
+  return { pdf, renderCancels, renderResolves }
 }
 
 describe('FileProjection copied media identity', () => {
@@ -137,6 +147,7 @@ describe('FileProjection copied media identity', () => {
       }
     })
     mockProjectionVlcStop.mockResolvedValue(undefined)
+    mockGetPdfPageThumbs.mockResolvedValue([])
     HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
     HTMLMediaElement.prototype.pause = vi.fn()
     resizeObserverCallback = undefined
@@ -796,6 +807,45 @@ describe('FileProjection copied media identity', () => {
     })
     expect(pdf.getPage).toHaveBeenCalledTimes(1)
     expect(pdf.getPage).toHaveBeenCalledWith(50)
+  })
+
+  it('shows the cached PDF page while the full-resolution document is loading', async () => {
+    const { pdf, renderResolves } = mockPdf(1, true)
+    let resolvePdf: ((value: typeof pdf) => void) | undefined
+    const pdfPromise = new Promise<typeof pdf>((resolve) => {
+      resolvePdf = resolve
+    })
+    mockLoadPdfjsLib.mockResolvedValue({
+      getDocument: vi.fn(() => ({ promise: pdfPromise }))
+    })
+    mockGetPdfPageThumbs.mockResolvedValue(['blob:cached-pdf-page'])
+
+    const { container } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+      />
+    )
+
+    const preview = await waitFor(() => {
+      const image = container.querySelector<HTMLImageElement>('[data-pdf-preview="1"]')
+      expect(image).not.toBeNull()
+      return image!
+    })
+    expect(preview.src).toBe('blob:cached-pdf-page')
+
+    await act(async () => resolvePdf?.(pdf))
+    await waitFor(() => expect(renderResolves.has(1)).toBe(true))
+    expect(container.querySelector('[data-pdf-preview="1"]')).not.toBeNull()
+    expect(container.querySelector('canvas[data-pdf-page="1"]')).toBeNull()
+
+    await act(async () => renderResolves.get(1)?.())
+    await waitFor(() => {
+      expect(container.querySelector('canvas[data-pdf-page="1"]')).not.toBeNull()
+    })
+    expect(container.querySelector('[data-pdf-preview="1"]')).toBeNull()
   })
 
   it('keeps only pages 48-52 mounted when continuous mode scrolls to page 50', async () => {

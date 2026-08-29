@@ -37,7 +37,10 @@ const DEFAULT_CONCURRENCY: Record<MediaJobType, number> = {
 }
 
 const TERMINAL_STATUSES = new Set<MediaJobRecord['status']>(['completed', 'cancelled'])
+const SERIAL_THUMBNAIL_TYPES = new Set<MediaJobType>(['cover-thumbnail', 'pdf-pages'])
 export const MEDIA_JOB_HISTORY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+
+type MediaJobSelector = (job: MediaJobRecord) => boolean
 
 interface ActiveJob {
   controller: AbortController
@@ -49,6 +52,8 @@ export class MediaJobQueue {
   private readonly executors = new Map<MediaJobType, MediaJobExecutor>()
   private readonly active = new Map<string, ActiveJob>()
   private readonly pendingEnqueues = new Map<string, Promise<MediaJobRecord>>()
+  private readonly cancellationFences = new Set<MediaJobSelector>()
+  private mutationTail: Promise<void> = Promise.resolve()
   private pumping = false
 
   constructor(private readonly concurrency = DEFAULT_CONCURRENCY) {}
@@ -62,13 +67,18 @@ export class MediaJobQueue {
   }
 
   async recoverStaleJobs(now = Date.now(), staleAfterMs = 5 * 60 * 1000): Promise<number> {
-    const jobs = await listMediaJobs()
-    let recovered = 0
-    for (const job of jobs) {
-      if (job.status !== 'running' || now - job.updatedAt < staleAfterMs) continue
-      await putMediaJob({ ...job, status: 'queued', updatedAt: now })
-      recovered++
-    }
+    const recovered = await this.withMutationLock(async () => {
+      const jobs = await listMediaJobs()
+      let count = 0
+      for (const job of jobs) {
+        if (job.status !== 'running' || now - job.updatedAt < staleAfterMs || this.isFenced(job)) {
+          continue
+        }
+        await putMediaJob({ ...job, status: 'queued', updatedAt: now })
+        count++
+      }
+      return count
+    })
     if (recovered > 0) void this.pump()
     return recovered
   }
@@ -101,6 +111,16 @@ export class MediaJobQueue {
     dedupeKey?: string
     priority?: number
   }): Promise<MediaJobRecord> {
+    return this.withMutationLock(() => this.enqueueUnderLock(input))
+  }
+
+  private async enqueueUnderLock(input: {
+    type: MediaJobType
+    sourceBlobId?: string
+    itemId?: string
+    dedupeKey?: string
+    priority?: number
+  }): Promise<MediaJobRecord> {
     if (input.dedupeKey) {
       const existing = await findMediaJobByDedupeKey(input.dedupeKey)
       if (existing && !TERMINAL_STATUSES.has(existing.status)) {
@@ -122,28 +142,34 @@ export class MediaJobQueue {
       createdAt: now,
       updatedAt: now
     }
+    this.assertNotFenced(job)
     await putMediaJob(job)
     void this.pump()
     return job
   }
 
   async setPriority(id: string, priority: number): Promise<void> {
-    const job = await getMediaJob(id)
-    if (!job || job.status !== 'queued') return
-    await putMediaJob({ ...job, priority, updatedAt: Date.now() })
+    await this.withMutationLock(async () => {
+      const job = await getMediaJob(id)
+      if (!job || job.status !== 'queued' || this.isFenced(job)) return
+      await putMediaJob({ ...job, priority, updatedAt: Date.now() })
+    })
     void this.pump()
   }
 
   async retry(id: string): Promise<void> {
-    const job = await getMediaJob(id)
-    if (!job || !['failed', 'blocked', 'paused'].includes(job.status)) return
-    await putMediaJob({
-      ...job,
-      status: 'queued',
-      blockedReason: undefined,
-      errorCode: undefined,
-      progress: 0,
-      updatedAt: Date.now()
+    await this.withMutationLock(async () => {
+      const job = await getMediaJob(id)
+      if (!job || !['failed', 'blocked', 'paused'].includes(job.status) || this.isFenced(job))
+        return
+      await putMediaJob({
+        ...job,
+        status: 'queued',
+        blockedReason: undefined,
+        errorCode: undefined,
+        progress: 0,
+        updatedAt: Date.now()
+      })
     })
     void this.pump()
   }
@@ -162,7 +188,7 @@ export class MediaJobQueue {
     this.active.get(id)?.controller.abort()
   }
 
-  async cancelAndWait(predicate: (job: MediaJobRecord) => boolean): Promise<number> {
+  async cancelAndWait(predicate: MediaJobSelector): Promise<number> {
     const jobs = (await listMediaJobs()).filter(predicate)
     await Promise.all(jobs.map((job) => this.cancel(job.id)))
     await Promise.allSettled(
@@ -172,6 +198,47 @@ export class MediaJobQueue {
       })
     )
     return jobs.length
+  }
+
+  async withCancellationFence<T>(
+    predicate: MediaJobSelector,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    await this.withMutationLock(async () => {
+      this.cancellationFences.add(predicate)
+    })
+    try {
+      await this.cancelAndWait(predicate)
+      return await operation()
+    } finally {
+      await this.withMutationLock(async () => {
+        this.cancellationFences.delete(predicate)
+      })
+    }
+  }
+
+  private assertNotFenced(job: MediaJobRecord): void {
+    if (this.isFenced(job)) {
+      throw new Error('Media job target is being deleted')
+    }
+  }
+
+  private isFenced(job: MediaJobRecord): boolean {
+    return [...this.cancellationFences].some((predicate) => predicate(job))
+  }
+
+  private async withMutationLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.mutationTail
+    let release = (): void => undefined
+    this.mutationTail = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    try {
+      return await operation()
+    } finally {
+      release()
+    }
   }
 
   async removeExpiredHistory(
@@ -195,6 +262,12 @@ export class MediaJobQueue {
         .sort((a, b) => b.priority - a.priority || a.createdAt - b.createdAt)
 
       for (const job of jobs) {
+        if (
+          SERIAL_THUMBNAIL_TYPES.has(job.type) &&
+          [...this.active.values()].some((active) => SERIAL_THUMBNAIL_TYPES.has(active.type))
+        ) {
+          continue
+        }
         const activeForType = [...this.active.values()].filter(
           (active) => active.type === job.type
         ).length
