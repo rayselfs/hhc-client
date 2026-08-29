@@ -25,6 +25,10 @@ export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
   }
 
   const pdfjsLib = await import('pdfjs-dist')
+  if (typeof document === 'undefined') {
+    const { WorkerMessageHandler } = await import('pdfjs-dist/build/pdf.worker.mjs')
+    Object.assign(globalThis, { pdfjsWorker: { WorkerMessageHandler } })
+  }
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
   return pdfjsLib
 }

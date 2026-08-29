@@ -15,6 +15,7 @@ export function TimerEngineProvider({
   const [adapter, setAdapter] = useState<TimerAdapter | null>(null)
 
   const timerStatus = useTimerStore((s) => s.status)
+  const timerMode = useTimerStore((s) => s.mode)
   const totalDuration = useTimerStore((s) => s.totalDuration)
   const swStatus = useStopwatchStore((s) => s.status)
 
@@ -46,6 +47,10 @@ export function TimerEngineProvider({
       setAdapter(null)
     }
   }, [])
+
+  useEffect(() => {
+    adapterRef.current?.syncMode(timerMode)
+  }, [timerMode])
 
   useEffect(() => {
     const prev = prevTimerStatus.current

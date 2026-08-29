@@ -12,6 +12,7 @@ vi.mock('@renderer/lib/env')
 
 const mockAdapter = {
   sendCommand: vi.fn(),
+  syncMode: vi.fn(),
   onTick: vi.fn(),
   onFinished: vi.fn(),
   onStopwatchTick: vi.fn(),
@@ -109,6 +110,24 @@ describe('TimerEngineContext', () => {
       )
       expect(mockAdapter.onStopwatchTick).toHaveBeenCalledOnce()
       expect(typeof mockAdapter.onStopwatchTick.mock.calls[0][0]).toBe('function')
+    })
+  })
+
+  describe('Timer mode synchronization', () => {
+    it('syncs the initial mode and later mode changes', async () => {
+      render(
+        <TimerEngineProvider>
+          <TestChild />
+        </TimerEngineProvider>
+      )
+
+      expect(mockAdapter.syncMode).toHaveBeenCalledWith('timer')
+
+      await act(async () => {
+        useTimerStore.getState().setMode('stopwatch')
+      })
+
+      expect(mockAdapter.syncMode).toHaveBeenLastCalledWith('stopwatch')
     })
   })
 

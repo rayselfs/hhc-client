@@ -5,12 +5,14 @@ const {
   mockEnsureSourceMediaMetadata,
   mockEnqueueVideoPosterJob,
   mockGenerateThumbnail,
-  mockSaveThumbnail
+  mockSaveThumbnail,
+  mockSaveThumbnailBlob
 } = vi.hoisted(() => ({
   mockEnsureSourceMediaMetadata: vi.fn(),
   mockEnqueueVideoPosterJob: vi.fn(),
   mockGenerateThumbnail: vi.fn(),
-  mockSaveThumbnail: vi.fn()
+  mockSaveThumbnail: vi.fn(),
+  mockSaveThumbnailBlob: vi.fn()
 }))
 
 vi.mock('../env', () => ({
@@ -31,7 +33,8 @@ vi.mock('../thumbnail-generator', () => ({
 }))
 
 vi.mock('../thumbnail-db', () => ({
-  saveThumbnail: mockSaveThumbnail
+  saveThumbnail: mockSaveThumbnail,
+  saveThumbnailBlob: mockSaveThumbnailBlob
 }))
 
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
@@ -90,6 +93,7 @@ describe('refreshImportedMediaAssets', () => {
     mockEnqueueVideoPosterJob.mockResolvedValue(undefined)
     mockGenerateThumbnail.mockResolvedValue('data:image/jpeg;base64,thumb')
     mockSaveThumbnail.mockResolvedValue(undefined)
+    mockSaveThumbnailBlob.mockResolvedValue(undefined)
   })
 
   it('generates thumbnails from Web IndexedDB blobs without nativeFs', async () => {
@@ -119,6 +123,17 @@ describe('refreshImportedMediaAssets', () => {
     expect(mockGenerateThumbnail).toHaveBeenCalledWith(expect.any(File), 'image/png')
     expect(mockSaveThumbnail).toHaveBeenCalledWith('image-1', 'data:image/jpeg;base64,thumb')
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-source')
+  })
+
+  it('persists Worker-generated thumbnail blobs without data URL conversion', async () => {
+    const [image] = await createImageItems(1)
+    const thumbnail = new Blob(['jpeg'], { type: 'image/jpeg' })
+    mockGenerateThumbnail.mockResolvedValueOnce(thumbnail)
+
+    await refreshImportedMediaAssets([image])
+
+    expect(mockSaveThumbnailBlob).toHaveBeenCalledWith(image.id, thumbnail)
+    expect(mockSaveThumbnail).not.toHaveBeenCalled()
   })
 
   it('does not commit a thumbnail or ready event after authorization changes during generation', async () => {

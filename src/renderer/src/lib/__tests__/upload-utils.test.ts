@@ -18,7 +18,6 @@ vi.mock('@renderer/stores/file-explorer', () => ({
 
 vi.mock('@renderer/lib/thumbnail-generator', () => ({
   generateThumbnail: vi.fn().mockResolvedValue(null),
-  generateAllPdfPageThumbnails: vi.fn().mockResolvedValue([]),
   yieldToMain: vi.fn().mockResolvedValue(undefined)
 }))
 
@@ -30,6 +29,10 @@ vi.mock('@renderer/lib/thumbnail-db', () => ({
 
 vi.mock('@renderer/lib/env', () => ({
   isWeb: vi.fn()
+}))
+
+vi.mock('@renderer/lib/media-metadata', () => ({
+  ensureSourceMediaMetadata: vi.fn().mockResolvedValue(null)
 }))
 
 vi.mock('@renderer/lib/media-job-queue', () => ({
@@ -48,6 +51,7 @@ import { isWeb } from '@renderer/lib/env'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
+import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { ensurePdfPageJob } from '../pdf-page-jobs'
 import i18n from '@renderer/i18n'
 
@@ -74,10 +78,9 @@ function expectFolderYieldOrder(addFolder: { mock: { invocationCallOrder: number
   const yieldCalls = vi.mocked(yieldToMain).mock.invocationCallOrder
 
   expect(addFolderCalls).toHaveLength(3)
-  expect(yieldCalls).toHaveLength(3)
   for (let index = 0; index < 3; index++) {
-    expect(addFolderCalls[index]).toBeLessThan(yieldCalls[index])
-    if (index < 2) expect(yieldCalls[index]).toBeLessThan(addFolderCalls[index + 1])
+    const nextAdd = addFolderCalls[index + 1] ?? Number.POSITIVE_INFINITY
+    expect(yieldCalls.some((order) => order > addFolderCalls[index] && order < nextAdd)).toBe(true)
   }
 }
 
@@ -263,7 +266,7 @@ describe('folder upload yielding', () => {
     await uploadFolderFiles(files, 'root', addFolder)
 
     expect(addFolder).toHaveBeenCalledTimes(3)
-    expect(yieldToMain).toHaveBeenCalledTimes(3)
+    expect(vi.mocked(yieldToMain).mock.calls.length).toBeGreaterThanOrEqual(3)
     expectFolderYieldOrder(addFolder)
   })
 
@@ -310,7 +313,7 @@ describe('folder upload yielding', () => {
     await uploadFromDataTransfer(items, 'root')
 
     expect(addFolder).toHaveBeenCalledTimes(3)
-    expect(yieldToMain).toHaveBeenCalledTimes(3)
+    expect(vi.mocked(yieldToMain).mock.calls.length).toBeGreaterThanOrEqual(3)
     expectFolderYieldOrder(addFolder)
   })
 })
@@ -345,17 +348,15 @@ describe('uploadFiles classification', () => {
     expect(addFileItemToStore).not.toHaveBeenCalled()
   })
 
-  it('enqueues PDF page rendering with canonical identities', async () => {
+  it('does not enqueue PDF pages or metadata during upload', async () => {
     const file = makeFile('slides.PDF', 100, '')
 
     await uploadFiles([file], 'parent-1')
 
-    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
-      type: 'pdf-pages',
-      sourceBlobId: 'mock-id',
-      itemId: 'mock-id',
-      dedupeKey: 'pdf-pages:mock-id'
-    })
+    expect(ensureSourceMediaMetadata).not.toHaveBeenCalled()
+    expect(mediaJobQueue.enqueue).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'pdf-pages' })
+    )
   })
 
   it('accepts Electron desktop-video candidates and enqueues one poster job', async () => {
@@ -364,12 +365,14 @@ describe('uploadFiles classification', () => {
     await expect(uploadFiles([file], 'parent-1')).resolves.toBe(1)
 
     expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', 'video/x-matroska')
-    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
-      type: 'video-poster',
-      sourceBlobId: 'mock-id',
-      itemId: 'mock-id',
-      dedupeKey: 'video-poster:mock-id'
-    })
+    await vi.waitFor(() =>
+      expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+        type: 'video-poster',
+        sourceBlobId: 'mock-id',
+        itemId: 'mock-id',
+        dedupeKey: 'video-poster:mock-id'
+      })
+    )
   })
 
   it('uses poster jobs for Electron-native videos instead of browser thumbnails', async () => {
@@ -379,12 +382,14 @@ describe('uploadFiles classification', () => {
 
     expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', 'video/mp4')
     expect(generateThumbnail).not.toHaveBeenCalled()
-    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
-      type: 'video-poster',
-      sourceBlobId: 'mock-id',
-      itemId: 'mock-id',
-      dedupeKey: 'video-poster:mock-id'
-    })
+    await vi.waitFor(() =>
+      expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+        type: 'video-poster',
+        sourceBlobId: 'mock-id',
+        itemId: 'mock-id',
+        dedupeKey: 'video-poster:mock-id'
+      })
+    )
   })
 
   it('queues Electron image thumbnails instead of blocking folder upload', async () => {
@@ -438,6 +443,52 @@ describe('uploadFiles web video thumbnails', () => {
 })
 
 describe('uploadFiles concurrency', () => {
+  it('resolves after persistence without waiting for Electron enrichment', async () => {
+    vi.mocked(isWeb).mockReturnValue(false)
+    vi.mocked(mediaJobQueue.enqueue).mockReturnValue(new Promise(() => undefined))
+
+    const result = await Promise.race([
+      uploadFiles([makeFile('photo.png', 100)], 'parent-1'),
+      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 0))
+    ])
+
+    expect(result).toBe(1)
+  })
+
+  it('yields after each persisted Electron file', async () => {
+    vi.mocked(isWeb).mockReturnValue(false)
+
+    await uploadFiles([makeFile('photo.png', 100)], 'parent-1')
+
+    expect(yieldToMain).toHaveBeenCalled()
+    expect(vi.mocked(addFileItemToStore).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(yieldToMain).mock.invocationCallOrder[0]
+    )
+  })
+
+  it('time-slices candidate classification before persistence exceeds its budget', async () => {
+    vi.mocked(isWeb).mockReturnValue(false)
+    vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValueOnce(9).mockReturnValue(9)
+
+    await uploadFiles([makeFile('a.png', 100), makeFile('b.png', 100)], 'parent-1')
+
+    expect(vi.mocked(yieldToMain).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(addFileItemToStore).mock.invocationCallOrder[0]
+    )
+  })
+
+  it('keeps a 1000-file import time-sliced', async () => {
+    vi.mocked(isWeb).mockReturnValue(false)
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now++)
+    const files = Array.from({ length: 1000 }, (_, index) => makeFile(`${index}.png`, 100))
+
+    await expect(uploadFiles(files, 'parent-1')).resolves.toBe(1000)
+
+    expect(addFileItemToStore).toHaveBeenCalledTimes(1000)
+    expect(yieldToMain).toHaveBeenCalled()
+  })
+
   it('limits shared upload work to 3 files', async () => {
     vi.mocked(isWeb).mockReturnValue(false)
     let active = 0

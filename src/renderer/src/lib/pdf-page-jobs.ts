@@ -1,7 +1,10 @@
 import { getFileBlob, getFileSource, openFileExplorerDB } from './file-explorer-db'
-import { mediaJobQueue } from './media-job-queue'
-import { generateAllPdfPageThumbnails } from './thumbnail-generator'
-import { getPdfPageThumbs, savePdfPageThumbs } from './thumbnail-db'
+import { MediaJobBlockedError, mediaJobQueue } from './media-job-queue'
+import { getPdfPageThumbs, savePdfPageThumbBlobs } from './thumbnail-db'
+import {
+  BackgroundRenderingUnavailableError,
+  renderPdfPageThumbnails
+} from './thumbnail-worker-client'
 
 const pendingFiles = new Map<string, File>()
 
@@ -33,8 +36,16 @@ mediaJobQueue.registerExecutor('pdf-pages', async (job, { signal }) => {
     const cachedThumbs = await getPdfPageThumbs(job.sourceBlobId)
     cachedThumbs.forEach((url) => URL.revokeObjectURL(url))
     if (cachedThumbs.length > 0) return
-    const dataUrls = await generateAllPdfPageThumbnails(file, { signal, throwOnError: true })
-    if (dataUrls.length > 0) await savePdfPageThumbs(job.sourceBlobId, dataUrls)
+    let blobs: Blob[]
+    try {
+      blobs = await renderPdfPageThumbnails(file, signal)
+    } catch (error) {
+      if (error instanceof BackgroundRenderingUnavailableError) {
+        throw new MediaJobBlockedError('configuration', error.message)
+      }
+      throw error
+    }
+    if (blobs.length > 0) await savePdfPageThumbBlobs(job.sourceBlobId, blobs)
   } finally {
     pendingFiles.delete(job.sourceBlobId)
   }

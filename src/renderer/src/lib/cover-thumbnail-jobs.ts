@@ -1,7 +1,11 @@
 import { getFileBlob, getFileSource, openFileExplorerDB } from './file-explorer-db'
-import { mediaJobQueue } from './media-job-queue'
+import { MediaJobBlockedError, mediaJobQueue } from './media-job-queue'
 import { generateThumbnail } from './thumbnail-generator'
-import { saveThumbnail } from './thumbnail-db'
+import { saveThumbnail, saveThumbnailBlob } from './thumbnail-db'
+import {
+  BackgroundRenderingUnavailableError,
+  renderCoverThumbnail
+} from './thumbnail-worker-client'
 
 const pendingFiles = new Map<string, { file: File; mimeType: string }>()
 
@@ -24,14 +28,35 @@ async function loadJobFile(sourceBlobId: string, itemId: string): Promise<File |
   }
 }
 
-mediaJobQueue.registerExecutor('cover-thumbnail', async (job) => {
+mediaJobQueue.registerExecutor('cover-thumbnail', async (job, { signal }) => {
   if (!job.sourceBlobId || !job.itemId) throw new Error('Cover thumbnail job is missing source')
   try {
     const pending = pendingFiles.get(job.sourceBlobId)
     const file = pending?.file ?? (await loadJobFile(job.sourceBlobId, job.itemId))
     if (!file) throw new Error('Cover thumbnail source is unavailable')
-    const dataUrl = await generateThumbnail(file, pending?.mimeType ?? file.type)
-    if (dataUrl) await saveThumbnail(job.sourceBlobId, dataUrl)
+    const mimeType = pending?.mimeType ?? file.type
+    let dataUrl: string | null = null
+    if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+      let blob: Blob | null
+      try {
+        blob = await renderCoverThumbnail(file, mimeType, signal)
+      } catch (error) {
+        if (error instanceof BackgroundRenderingUnavailableError) {
+          throw new MediaJobBlockedError('configuration', error.message)
+        }
+        throw error
+      }
+      if (blob) {
+        await saveThumbnailBlob(job.sourceBlobId, blob)
+        dataUrl = URL.createObjectURL(blob)
+      }
+    } else {
+      const thumbnail = await generateThumbnail(file, mimeType)
+      if (typeof thumbnail === 'string') {
+        dataUrl = thumbnail
+        await saveThumbnail(job.sourceBlobId, thumbnail)
+      }
+    }
     window.dispatchEvent(
       new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: job.itemId, dataUrl } })
     )

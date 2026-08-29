@@ -139,7 +139,10 @@ async function getLegacyThumbnail(itemId: string): Promise<ThumbnailRecord | und
 }
 
 export async function saveThumbnail(sourceBlobId: string, dataUrl: string): Promise<void> {
-  const blob = dataUrlToBlob(dataUrl)
+  await saveThumbnailBlob(sourceBlobId, dataUrlToBlob(dataUrl))
+}
+
+export async function saveThumbnailBlob(sourceBlobId: string, blob: Blob): Promise<void> {
   await putDerivedAsset({
     sourceBlobId,
     kind: 'cover-thumbnail',

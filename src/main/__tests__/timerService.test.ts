@@ -234,6 +234,23 @@ describe('TimerService', () => {
       const settings = (service as unknown as { settings: { mode: string } }).settings
       expect(settings.mode).toBe('stopwatch')
     })
+
+    it('broadcasts advancing stopwatch ticks after switching mode', () => {
+      const now = vi.spyOn(performance, 'now').mockReturnValue(0)
+      mainWindow = makeMockWindow()
+      service.handleCommand({ type: 'setMode', mode: 'stopwatch' })
+      service.handleCommand({ type: 'startStopwatch' })
+      mainWindow.webContents.send.mockClear()
+
+      now.mockReturnValue(200)
+      vi.advanceTimersByTime(200)
+
+      expect(mainWindow.webContents.send).toHaveBeenLastCalledWith(
+        'timer-tick',
+        expect.objectContaining({ mode: 'stopwatch', stopwatchElapsedMs: 200 })
+      )
+      now.mockRestore()
+    })
   })
 
   describe('setReminder command', () => {
