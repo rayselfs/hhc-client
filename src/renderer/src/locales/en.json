@@ -1,4 +1,8 @@
 {
+  "app": {
+    "name": "HHC Presenter",
+    "description": "A projection system designed for church services."
+  },
   "nav": {
     "timer": "TIMER",
     "bible": "BIBLE",
@@ -10,7 +14,7 @@
     "trash": "TRASH"
   },
   "welcome": {
-    "title": "Welcome to LibrePresenter",
+    "title": "Welcome to HHC Presenter",
     "subtitle": "Let's set up your preferences",
     "language": "Language",
     "timezone": "Timezone",
@@ -562,7 +566,7 @@
       "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled.",
       "unlink": "Disconnect",
       "unlinkTitle": "Disconnect {{name}}?",
-      "unlinkDescription": "This removes the sync source from LibrePresenter and clears local synced cache. Original local or cloud files are not changed.",
+      "unlinkDescription": "This removes the sync source from HHC Presenter and clears local synced cache. Original local or cloud files are not changed.",
       "unlinked": "Sync folder disconnected.",
       "unlinkFailed": "Failed to disconnect sync folder."
     },
@@ -765,12 +769,12 @@
   "about": {
     "title": "About",
     "description": "Projection software.",
-    "tagline": "Open-source presentation software for churches and live events.",
+    "tagline": "A projection system designed for church services.",
     "version": "Version",
     "license": "License",
     "openSourceLicenses": "Open Source Licenses",
     "viewLicenses": "View licenses",
-    "licensesIntro": "Licenses for LibrePresenter and bundled video components.",
+    "licensesIntro": "Licenses for HHC Presenter and bundled video components.",
     "source": "Source",
     "back": "Back"
   },
@@ -833,7 +837,7 @@
       },
       "oneDrive": {
         "title": "OneDrive",
-        "description": "OneDrive folders are read-only sources. LibrePresenter never uploads, renames, moves, or deletes remote files.",
+        "description": "OneDrive folders are read-only sources. HHC Presenter never uploads, renames, moves, or deletes remote files.",
         "connectedAccount": "Connected Account",
         "noConnectedAccount": "No OneDrive account connected.",
         "connect": "Sign in",
@@ -844,7 +848,7 @@
         "connectFailed": "Failed to connect OneDrive.",
         "disconnect": "Logout",
         "disconnectTitle": "Logout from OneDrive?",
-        "disconnectDescription": "This removes the OneDrive source from LibrePresenter and clears locally cached synced files. Remote files are not changed.",
+        "disconnectDescription": "This removes the OneDrive source from HHC Presenter and clears locally cached synced files. Remote files are not changed.",
         "disconnected": "Logged out of OneDrive.",
         "disconnectFailed": "Failed to logout from OneDrive."
       },

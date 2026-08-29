@@ -37,6 +37,17 @@ describe('i18n configuration', () => {
 })
 
 describe('translations', () => {
+  it('translates the product identity across all locales', () => {
+    expect(i18n.t('app.name', { lng: 'en' })).toBe('HHC Presenter')
+    expect(i18n.t('app.name', { lng: 'zh-TW' })).toBe('HHC 投影系統')
+    expect(i18n.t('app.name', { lng: 'zh-CN' })).toBe('HHC 投影系统')
+    expect(i18n.t('app.description', { lng: 'en' })).toBe(
+      'A projection system designed for church services.'
+    )
+    expect(i18n.t('app.description', { lng: 'zh-TW' })).toBe('專為教會聚會設計的投影系統。')
+    expect(i18n.t('app.description', { lng: 'zh-CN' })).toBe('专为教会聚会设计的投影系统。')
+  })
+
   it('translates nav keys correctly across all locales', () => {
     expect(i18n.t('nav.timer', { lng: 'en' })).toBe('TIMER')
     expect(i18n.t('nav.timer', { lng: 'zh-TW' })).toBe('計時器')

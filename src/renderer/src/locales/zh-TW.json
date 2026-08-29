@@ -1,4 +1,8 @@
 {
+  "app": {
+    "name": "HHC 投影系統",
+    "description": "專為教會聚會設計的投影系統。"
+  },
   "nav": {
     "timer": "計時器",
     "bible": "聖經",
@@ -10,7 +14,7 @@
     "trash": "垃圾桶"
   },
   "welcome": {
-    "title": "歡迎使用 LibrePresenter",
+    "title": "歡迎使用 HHC 投影系統",
     "subtitle": "讓我們設定您的偏好",
     "language": "語言",
     "timezone": "時區",
@@ -562,7 +566,7 @@
       "unsupportedFiles": "有 {{count}} 個檔案格式不支援，已保留但禁用。",
       "unlink": "取消連結",
       "unlinkTitle": "取消連結 {{name}}？",
-      "unlinkDescription": "這會從 LibrePresenter 移除同步來源並清除本機同步快取，不會變更原始本機或雲端檔案。",
+      "unlinkDescription": "這會從 HHC 投影系統移除同步來源並清除本機同步快取，不會變更原始本機或雲端檔案。",
       "unlinked": "已取消同步資料夾連結。",
       "unlinkFailed": "無法取消同步資料夾連結。"
     },
@@ -765,12 +769,12 @@
   "about": {
     "title": "關於",
     "description": "投影軟體。",
-    "tagline": "為教會與現場活動打造的開源投影軟體。",
+    "tagline": "專為教會聚會設計的投影系統。",
     "version": "版本",
     "license": "授權",
     "openSourceLicenses": "開源授權",
     "viewLicenses": "查看授權",
-    "licensesIntro": "LibrePresenter 與內建影片元件使用的授權。",
+    "licensesIntro": "HHC 投影系統與內建影片元件使用的授權。",
     "source": "來源",
     "back": "返回"
   },
@@ -833,7 +837,7 @@
       },
       "oneDrive": {
         "title": "OneDrive",
-        "description": "OneDrive 資料夾是唯讀來源。LibrePresenter 不會上傳、重新命名、移動或刪除遠端檔案。",
+        "description": "OneDrive 資料夾是唯讀來源。HHC 投影系統不會上傳、重新命名、移動或刪除遠端檔案。",
         "connectedAccount": "已連結帳號",
         "noConnectedAccount": "尚未連結 OneDrive 帳號。",
         "connect": "登入",
@@ -844,7 +848,7 @@
         "connectFailed": "無法連接 OneDrive。",
         "disconnect": "登出",
         "disconnectTitle": "登出 OneDrive？",
-        "disconnectDescription": "這會從 LibrePresenter 移除 OneDrive 來源並清除本機同步快取，不會變更遠端檔案。",
+        "disconnectDescription": "這會從 HHC 投影系統移除 OneDrive 來源並清除本機同步快取，不會變更遠端檔案。",
         "disconnected": "已登出 OneDrive。",
         "disconnectFailed": "無法登出 OneDrive。"
       },
