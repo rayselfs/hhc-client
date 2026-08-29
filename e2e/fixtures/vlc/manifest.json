@@ -4,13 +4,15 @@
     "encoder": "FFmpeg 8.1.2 macOS arm64",
     "videoSource": "testsrc2=size=320x180:rate=15",
     "videoCodec": "h264",
+    "audioSource": "sine=frequency=440:sample_rate=48000",
+    "audioCodec": "aac",
     "durationSeconds": 8
   },
   "fixtures": [
     {
       "file": "healthy.mp4",
-      "sha256": "321854c0ac85c424fc90de22c51fdb95607ac5095204eef3aa3ff978a89820ae",
-      "size": 125987,
+      "sha256": "41e1f072f2f3012c1995eaa94ff3597ae2f7318bbe1659ac76db485af5fb279d",
+      "size": 193828,
       "container": "mp4",
       "codec": "h264",
       "readable": true,
@@ -22,8 +24,8 @@
     },
     {
       "file": "healthy.mkv",
-      "sha256": "a162cc7f22dece6199786b6366a550b62c8893e6c91f48912cfe6f7ecfe1ef03",
-      "size": 125367,
+      "sha256": "7423baca9ebf2c46670ff20bc2afefee35bc3a19f860d2b866c43b7a7d6f09ec",
+      "size": 192607,
       "container": "matroska",
       "codec": "h264",
       "readable": true,
@@ -38,26 +40,26 @@
     },
     {
       "file": "broken-cues-readable.mkv",
-      "sha256": "acd604861a0ff5bf4399200e2b81e56e9a0421454a91f88b00f8274cfbb406c9",
-      "size": 125339,
+      "sha256": "ff2d825e7784d462e4f422994a2c3930c9dceeb040198916be0014b4338631b8",
+      "size": 192579,
       "container": "matroska",
       "codec": "h264",
       "readable": true,
       "durationSeconds": { "min": 7.9, "max": 8.1 },
-      "allowedDiagnostics": ["File ended prematurely at pos\\. 125339"],
+      "allowedDiagnostics": ["File ended prematurely at pos\\. 192579"],
       "expectedSeekable": true,
       "expectedPlayback": "vlc-embedded",
       "expectedRemux": "matroska-remux",
       "matroska": {
         "requiredElementIds": ["1a45dfa3", "114d9b74", "1f43b675"],
         "seekHeadCuesReferenceOffset": 112,
-        "missingCuesOffset": 125339,
+        "missingCuesOffset": 192579,
         "minimumClusterCount": 2
       }
     },
     {
       "file": "unreadable-truncated.mkv",
-      "sha256": "e1b1d62fa37e997a94f632b9e51131fbf1e615c9b6907edea5756b1883e3b3ee",
+      "sha256": "890116f621ef337b03366544bf36651fc16f833d95b1aff43965864089948f60",
       "size": 4000,
       "container": "matroska",
       "codec": "h264",
