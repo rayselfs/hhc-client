@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { getBlobId } from '@renderer/lib/blob-identity'
+import type { EditablePresentationDocument } from '@renderer/lib/editable-presentation'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -9,13 +10,27 @@ export type CloseDecision = 'keep-editing' | 'retry' | 'discard'
 export interface PresentationSessionRegistry {
   open(item: FileItemRecord): Promise<PresentationEditorSession>
   get(itemId: string): PresentationEditorSession | undefined
+  finalizeAndFlush(itemId: string): Promise<EditablePresentationDocument | null>
   activate(itemId: string): Promise<boolean>
   close(itemId: string, decision?: CloseDecision): Promise<boolean>
   flushAll(): Promise<void>
   discardAll(): Promise<void>
+  undo?(itemId: string): boolean
+  redo?(itemId: string): boolean
+  hasLiveEditor?(itemId: string): boolean
+  hasPendingEditorWork?(itemId: string): boolean
+  hasComposingEditor?(itemId: string): boolean
+  notifyEditorLifecycle?(itemId: string): void
   hasUnsafeWork(): boolean
   getUnsafeItemIds(): string[]
   subscribe(listener: () => void): () => void
+  registerEditorFinalizer?(
+    itemId: string,
+    finalize: () => boolean,
+    hasUnsafeWork?: () => boolean,
+    hasLiveEditor?: () => boolean,
+    hasComposing?: () => boolean
+  ): () => void
 }
 
 const PresentationSessionRegistryContext = createContext<PresentationSessionRegistry | null>(null)
@@ -33,6 +48,17 @@ export function PresentationSessionRegistryProvider({
   const sessionsRef = useRef(new Map<string, PresentationEditorSession>())
   const openingRef = useRef(new Map<string, Promise<PresentationEditorSession>>())
   const sessionUnsubscribersRef = useRef(new Map<string, () => void>())
+  const editorFinalizersRef = useRef(
+    new Map<
+      string,
+      {
+        finalize: () => boolean
+        hasUnsafeWork: () => boolean
+        hasLiveEditor: () => boolean
+        hasComposing: () => boolean
+      }
+    >()
+  )
   const listenersRef = useRef(new Set<() => void>())
 
   const registry = useMemo<PresentationSessionRegistry>(() => {
@@ -100,18 +126,43 @@ export function PresentationSessionRegistryProvider({
 
     const getUnsafeItemIds = (): string[] =>
       [...sessionsRef.current.entries()]
-        .filter(([, session]) => isSessionUnsafe(session))
+        .filter(
+          ([itemId, session]) =>
+            isSessionUnsafe(session) || editorFinalizersRef.current.get(itemId)?.hasUnsafeWork()
+        )
         .map(([itemId]) => itemId)
+
+    const finalizeEditor = (itemId: string): boolean =>
+      editorFinalizersRef.current.get(itemId)?.finalize() ?? true
+
+    const moveHistory = (itemId: string, direction: 'undo' | 'redo'): boolean => {
+      const session = sessionsRef.current.get(itemId)
+      if (!session || !finalizeEditor(itemId)) return false
+      session[direction]()
+      return true
+    }
+
+    const finalizeAndFlush = async (
+      itemId: string
+    ): Promise<EditablePresentationDocument | null> => {
+      const session = sessionsRef.current.get(itemId)
+      if (!session || !finalizeEditor(itemId)) return null
+      if (session.getSnapshot().draftKind !== null) session.commitDraft()
+      if (isSessionUnsafe(session)) await session.flush()
+      return session.getSnapshot().history.present
+    }
 
     return {
       open,
       get: (itemId) => sessionsRef.current.get(itemId),
+      finalizeAndFlush,
       activate: async (itemId) => {
         const workspace = usePresentationWorkspaceStore.getState()
         const previousItemId = workspace.activeItemId
         if (previousItemId === itemId) return true
         const previousSession = previousItemId ? sessionsRef.current.get(previousItemId) : undefined
         if (previousSession) {
+          if (!finalizeEditor(previousItemId!)) return false
           try {
             await previousSession.flush()
           } catch {
@@ -125,6 +176,7 @@ export function PresentationSessionRegistryProvider({
         if (decision === 'keep-editing') return false
         const session = sessionsRef.current.get(itemId)
         if (session) {
+          if (!finalizeEditor(itemId)) return false
           if (decision === 'discard') {
             await session.discard()
           } else {
@@ -138,24 +190,60 @@ export function PresentationSessionRegistryProvider({
           sessionUnsubscribersRef.current.delete(itemId)
           session.dispose()
           sessionsRef.current.delete(itemId)
+          editorFinalizersRef.current.delete(itemId)
         }
         usePresentationWorkspaceStore.getState().closeDocument(itemId)
         notify()
         return true
       },
       flushAll: async () => {
+        for (const itemId of editorFinalizersRef.current.keys()) {
+          if (!finalizeEditor(itemId)) throw new Error('Text composition is still active')
+        }
         const unsafeSessions = [...sessionsRef.current.values()].filter(isSessionUnsafe)
         await Promise.all(unsafeSessions.map((session) => session.flush()))
       },
       discardAll: async () => {
+        for (const itemId of editorFinalizersRef.current.keys()) {
+          if (!finalizeEditor(itemId)) throw new Error('Text composition is still active')
+        }
         const unsafeSessions = [...sessionsRef.current.values()].filter(isSessionUnsafe)
         await Promise.all(unsafeSessions.map((session) => session.discard()))
       },
+      undo: (itemId) => moveHistory(itemId, 'undo'),
+      redo: (itemId) => moveHistory(itemId, 'redo'),
+      hasLiveEditor: (itemId) => editorFinalizersRef.current.get(itemId)?.hasLiveEditor() ?? false,
+      hasPendingEditorWork: (itemId) =>
+        editorFinalizersRef.current.get(itemId)?.hasUnsafeWork() ?? false,
+      hasComposingEditor: (itemId) =>
+        editorFinalizersRef.current.get(itemId)?.hasComposing() ?? false,
+      notifyEditorLifecycle: () => notify(),
       hasUnsafeWork: () => getUnsafeItemIds().length > 0,
       getUnsafeItemIds,
       subscribe: (listener) => {
         listenersRef.current.add(listener)
         return () => listenersRef.current.delete(listener)
+      },
+      registerEditorFinalizer: (
+        itemId,
+        finalize,
+        hasUnsafeWork = () => false,
+        hasLiveEditor = () => false,
+        hasComposing = () => false
+      ) => {
+        editorFinalizersRef.current.set(itemId, {
+          finalize,
+          hasUnsafeWork,
+          hasLiveEditor,
+          hasComposing
+        })
+        notify()
+        return () => {
+          if (editorFinalizersRef.current.get(itemId)?.finalize === finalize) {
+            editorFinalizersRef.current.delete(itemId)
+            notify()
+          }
+        }
       }
     }
   }, [])
@@ -166,6 +254,7 @@ export function PresentationSessionRegistryProvider({
       for (const session of sessionsRef.current.values()) session.dispose()
       sessionUnsubscribersRef.current.clear()
       sessionsRef.current.clear()
+      editorFinalizersRef.current.clear()
       openingRef.current.clear()
       listenersRef.current.clear()
     },

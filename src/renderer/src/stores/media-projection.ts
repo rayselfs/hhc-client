@@ -1,9 +1,15 @@
 import { create } from 'zustand'
 import type { StoreApi } from 'zustand'
 import type { FileItemRecord } from '@shared/types/folder'
+import { getBlobId } from '@renderer/lib/blob-identity'
 import { getMediaType, type MediaType, type MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { lockMediaResources } from '@renderer/lib/media-resource-locks'
+import {
+  prepareMediaProjection,
+  type MediaProjectionPreflightResult
+} from '@renderer/lib/media-projection-preflight'
+import { isEditablePresentationMimeType } from '@renderer/lib/presentation-media'
 import {
   analyzePresentationReadiness,
   createPresentationSnapshot,
@@ -16,6 +22,19 @@ import { ensureSyncItemAvailableForPresentation } from '@renderer/lib/cloud-prov
 interface StartPresentationWithReadinessOptions {
   prioritizeStartItem?: boolean
   presentationState?: MediaTypeStateMap['presentation']
+}
+
+export type MediaProjectionActionOutcome = {
+  status: 'success' | 'blocked' | 'superseded' | 'noop'
+}
+
+export type MediaProjectionActionResult = boolean | Promise<MediaProjectionActionOutcome>
+
+export async function resolveMediaProjectionAction(
+  result: MediaProjectionActionResult
+): Promise<MediaProjectionActionOutcome> {
+  const resolved = await result
+  return typeof resolved === 'boolean' ? { status: resolved ? 'success' : 'noop' } : resolved
 }
 
 export interface MediaProjectionStore {
@@ -38,13 +57,13 @@ export interface MediaProjectionStore {
   canPrev: () => boolean
   progress: () => string
 
-  startPresentation: (files: FileItemRecord[], startIndex: number) => void
+  startPresentation: (files: FileItemRecord[], startIndex: number) => MediaProjectionActionResult
   exit: () => void
   endLiveSession: () => void
   markProjectionClosed: () => void
-  next: () => void
-  prev: () => void
-  jumpTo: (index: number) => void
+  next: () => MediaProjectionActionResult
+  prev: () => MediaProjectionActionResult
+  jumpTo: (index: number) => MediaProjectionActionResult
   toggleGrid: () => void
   getTypeState: <K extends MediaType>(type: K) => MediaTypeStateMap[K] | undefined
   setTypeState: <K extends MediaType>(type: K, value: MediaTypeStateMap[K]) => void
@@ -78,6 +97,16 @@ const initialState = {
 }
 
 let releaseProjectionLocks: (() => void) | null = null
+let projectionActionGeneration = 0
+
+function beginProjectionAction(): number {
+  projectionActionGeneration += 1
+  return projectionActionGeneration
+}
+
+function isCurrentProjectionAction(generation: number): boolean {
+  return generation === projectionActionGeneration
+}
 
 function clearLiveSession(set: StoreApi<MediaProjectionStore>['setState']): void {
   releaseProjectionLocks?.()
@@ -100,6 +129,101 @@ function getCurrentPresentationState(
   const item = state.playlist[state.currentIndex]
   if (!item || getMediaType(item.mimeType) !== 'presentation') return null
   return state.typeStates.presentation ?? { slideIndex: 0 }
+}
+
+type ProjectionPreflightValue = boolean | MediaProjectionPreflightResult
+
+function isReadyPreflight(value: ProjectionPreflightValue): boolean {
+  return value === true || (typeof value !== 'boolean' && value.status === 'ready')
+}
+
+function validatesPreflight(value: ProjectionPreflightValue): boolean {
+  if (typeof value === 'boolean' || value.status !== 'ready') return true
+  try {
+    return value.validate?.() !== false
+  } catch {
+    return false
+  }
+}
+
+function commitAfterPreflight(
+  generation: number,
+  result:
+    | boolean
+    | MediaProjectionPreflightResult
+    | Promise<boolean | MediaProjectionPreflightResult>,
+  commit: () => void,
+  isCurrent = (): boolean => true
+): MediaProjectionActionResult {
+  const canCommit = (): boolean => isCurrentProjectionAction(generation) && isCurrent()
+  if (!(result instanceof Promise)) {
+    if (!isReadyPreflight(result) || !canCommit() || !validatesPreflight(result)) return false
+    commit()
+    return true
+  }
+  return result.then(
+    (ready) => {
+      if (!isReadyPreflight(ready)) return { status: 'blocked' }
+      if (!canCommit() || !validatesPreflight(ready)) return { status: 'superseded' }
+      commit()
+      return { status: 'success' }
+    },
+    () => ({ status: 'blocked' })
+  )
+}
+
+function editablePreflightItems(
+  ...items: Array<FileItemRecord | null | undefined>
+): FileItemRecord[] {
+  return items.filter(
+    (item, index, values): item is FileItemRecord =>
+      item !== null &&
+      item !== undefined &&
+      isEditablePresentationMimeType(item.mimeType) &&
+      values.indexOf(item) === index
+  )
+}
+
+function prepareEditableProjection(
+  ...items: Array<FileItemRecord | null | undefined>
+): boolean | MediaProjectionPreflightResult | Promise<boolean | MediaProjectionPreflightResult> {
+  const editableItems = editablePreflightItems(...items)
+  return editableItems.length > 0 ? prepareMediaProjection(editableItems) : true
+}
+
+function isSameNavigationState(
+  state: MediaProjectionStore,
+  get: StoreApi<MediaProjectionStore>['getState']
+): boolean {
+  const current = get()
+  return (
+    current.playlist === state.playlist &&
+    current.currentIndex === state.currentIndex &&
+    current.isPresenting === state.isPresenting &&
+    current.isEnded === state.isEnded &&
+    current.sessionRevision === state.sessionRevision &&
+    current.typeStates.presentation === state.typeStates.presentation
+  )
+}
+
+function blockedReadinessReport(
+  item: FileItemRecord | undefined,
+  reason: 'presentation-finalization-blocked' | 'presentation-projection-superseded'
+): PresentationReadinessReport {
+  return {
+    summary: { ready: 0, preparing: 0, unsupported: 0, missing: 0, failed: 1 },
+    items: item
+      ? [
+          {
+            itemId: item.id,
+            blobId: getBlobId(item),
+            status: 'failed',
+            reason,
+            support: null
+          }
+        ]
+      : []
+  }
 }
 
 export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get) => ({
@@ -145,17 +269,20 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   startPresentation: (files: FileItemRecord[], startIndex: number) => {
-    releaseProjectionLocks?.()
-    const snapshot = createPresentationSnapshot(files)
-    releaseProjectionLocks = lockMediaResources(getPresentationSnapshotResourceIds(snapshot))
-    set({
-      playlist: files,
-      currentIndex: startIndex,
-      isPresenting: true,
-      sessionRevision: get().sessionRevision + 1,
-      lastReadinessReport: null,
-      snapshot,
-      typeStates: initialTypeStates
+    const generation = beginProjectionAction()
+    return commitAfterPreflight(generation, prepareEditableProjection(files[startIndex]), () => {
+      releaseProjectionLocks?.()
+      const snapshot = createPresentationSnapshot(files)
+      releaseProjectionLocks = lockMediaResources(getPresentationSnapshotResourceIds(snapshot))
+      set({
+        playlist: files,
+        currentIndex: startIndex,
+        isPresenting: true,
+        sessionRevision: get().sessionRevision + 1,
+        lastReadinessReport: null,
+        snapshot,
+        typeStates: initialTypeStates
+      })
     })
   },
 
@@ -164,8 +291,12 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
     startIndex: number,
     options: StartPresentationWithReadinessOptions = {}
   ): Promise<PresentationReadinessReport> => {
-    let report = await analyzePresentationReadiness(files)
+    const generation = beginProjectionAction()
     const requestedItem = files[startIndex]
+    let report = await analyzePresentationReadiness(files)
+    if (!isCurrentProjectionAction(generation)) {
+      return blockedReadinessReport(requestedItem, 'presentation-projection-superseded')
+    }
     if (options.prioritizeStartItem && requestedItem) {
       const requestedReadiness = report.items.find((item) => item.itemId === requestedItem.id)
       if (
@@ -174,6 +305,9 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
         (await ensureSyncItemAvailableForPresentation(requestedItem))
       ) {
         report = await analyzePresentationReadiness(files)
+        if (!isCurrentProjectionAction(generation)) {
+          return blockedReadinessReport(requestedItem, 'presentation-projection-superseded')
+        }
       }
     }
 
@@ -185,10 +319,16 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       ? readyFiles.findIndex((file) => file.id === requestedItem.id)
       : -1
     if (options.prioritizeStartItem && requestedItem && requestedReadyIndex === -1) {
+      if (!isCurrentProjectionAction(generation)) {
+        return blockedReadinessReport(requestedItem, 'presentation-projection-superseded')
+      }
       set({ lastReadinessReport: report })
       return report
     }
     if (readyFiles.length === 0) {
+      if (!isCurrentProjectionAction(generation)) {
+        return blockedReadinessReport(requestedItem, 'presentation-projection-superseded')
+      }
       set({ lastReadinessReport: report })
       return report
     }
@@ -202,6 +342,14 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
         : fallbackReadyIndex >= 0
           ? fallbackReadyIndex
           : readyFiles.length - 1
+
+    const preflight = await prepareEditableProjection(readyFiles[resolvedIndex])
+    if (!isReadyPreflight(preflight)) {
+      return blockedReadinessReport(readyFiles[resolvedIndex], 'presentation-finalization-blocked')
+    }
+    if (!isCurrentProjectionAction(generation) || !validatesPreflight(preflight)) {
+      return blockedReadinessReport(readyFiles[resolvedIndex], 'presentation-projection-superseded')
+    }
 
     releaseProjectionLocks?.()
     const snapshot = createPresentationSnapshot(readyFiles, report.items)
@@ -225,90 +373,150 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   exit: () => {
+    beginProjectionAction()
     clearLiveSession(set)
   },
 
   endLiveSession: () => {
+    beginProjectionAction()
     clearLiveSession(set)
   },
 
   markProjectionClosed: () => {
+    beginProjectionAction()
     clearLiveSession(set)
   },
 
   next: () => {
+    const generation = beginProjectionAction()
     const s = get()
-    if (s.isEnded) return
+    if (s.isEnded) return false
     const presentation = getCurrentPresentationState(s)
     if (
       presentation &&
       presentation.slideCount !== undefined &&
       presentation.slideIndex < presentation.slideCount - 1
     ) {
-      set({
-        typeStates: {
-          ...s.typeStates,
-          presentation: {
-            ...presentation,
-            slideIndex: presentation.slideIndex + 1
-          }
-        }
-      })
-      return
+      return commitAfterPreflight(
+        generation,
+        prepareEditableProjection(s.currentItem()),
+        () => {
+          const current = get()
+          const currentPresentation = getCurrentPresentationState(current)
+          if (!currentPresentation) return
+          set({
+            typeStates: {
+              ...current.typeStates,
+              presentation: {
+                ...currentPresentation,
+                slideIndex: currentPresentation.slideIndex + 1
+              }
+            }
+          })
+        },
+        () => isSameNavigationState(s, get)
+      )
     }
     if (s.currentIndex >= s.playlist.length - 1) {
-      set({ isEnded: true })
-      return
+      return commitAfterPreflight(
+        generation,
+        prepareEditableProjection(s.currentItem()),
+        () => {
+          set({ isEnded: true })
+        },
+        () => isSameNavigationState(s, get)
+      )
     }
-    set({
-      currentIndex: s.currentIndex + 1,
-      zoomLevel: 1,
-      pan: { x: 0, y: 0 },
-      typeStates: withoutTransientMediaRuntimeState(s.typeStates)
-    })
+    return commitAfterPreflight(
+      generation,
+      prepareEditableProjection(s.currentItem(), s.nextItem()),
+      () => {
+        const current = get()
+        set({
+          currentIndex: current.currentIndex + 1,
+          zoomLevel: 1,
+          pan: { x: 0, y: 0 },
+          typeStates: withoutTransientMediaRuntimeState(current.typeStates)
+        })
+      },
+      () => isSameNavigationState(s, get)
+    )
   },
 
   prev: () => {
+    const generation = beginProjectionAction()
     const s = get()
     if (s.isEnded) {
-      set({ isEnded: false })
-      return
+      return commitAfterPreflight(
+        generation,
+        prepareEditableProjection(s.currentItem()),
+        () => {
+          set({ isEnded: false })
+        },
+        () => isSameNavigationState(s, get)
+      )
     }
     const presentation = getCurrentPresentationState(s)
     if (presentation && presentation.slideIndex > 0) {
-      set({
-        typeStates: {
-          ...s.typeStates,
-          presentation: {
-            ...presentation,
-            slideIndex: presentation.slideIndex - 1
-          }
-        }
-      })
-      return
+      return commitAfterPreflight(
+        generation,
+        prepareEditableProjection(s.currentItem()),
+        () => {
+          const current = get()
+          const currentPresentation = getCurrentPresentationState(current)
+          if (!currentPresentation) return
+          set({
+            typeStates: {
+              ...current.typeStates,
+              presentation: {
+                ...currentPresentation,
+                slideIndex: currentPresentation.slideIndex - 1
+              }
+            }
+          })
+        },
+        () => isSameNavigationState(s, get)
+      )
     }
-    if (s.currentIndex <= 0) return
-    set({
-      currentIndex: s.currentIndex - 1,
-      zoomLevel: 1,
-      pan: { x: 0, y: 0 },
-      typeStates: withoutTransientMediaRuntimeState(s.typeStates)
-    })
+    if (s.currentIndex <= 0) return false
+    return commitAfterPreflight(
+      generation,
+      prepareEditableProjection(s.currentItem(), s.prevItem()),
+      () => {
+        const current = get()
+        set({
+          currentIndex: current.currentIndex - 1,
+          zoomLevel: 1,
+          pan: { x: 0, y: 0 },
+          typeStates: withoutTransientMediaRuntimeState(current.typeStates)
+        })
+      },
+      () => isSameNavigationState(s, get)
+    )
   },
 
   jumpTo: (index: number) => {
-    const { playlist } = get()
-    const clamped = Math.max(0, Math.min(index, playlist.length - 1))
-    set((state) => ({
-      currentIndex: clamped,
-      isEnded: false,
-      zoomLevel: 1,
-      pan: { x: 0, y: 0 },
-      typeStates:
-        clamped === state.currentIndex
-          ? state.typeStates
-          : withoutTransientMediaRuntimeState(state.typeStates)
-    }))
+    const generation = beginProjectionAction()
+    const s = get()
+    const clamped = Math.max(0, Math.min(index, s.playlist.length - 1))
+    return commitAfterPreflight(
+      generation,
+      prepareEditableProjection(s.currentItem(), s.playlist[clamped]),
+      () => {
+        const current = get()
+        set({
+          currentIndex: clamped,
+          isEnded: false,
+          zoomLevel: 1,
+          pan: { x: 0, y: 0 },
+          typeStates:
+            clamped === current.currentIndex
+              ? current.typeStates
+              : withoutTransientMediaRuntimeState(current.typeStates)
+        })
+      },
+      () => isSameNavigationState(s, get)
+    )
   },
 
   toggleGrid: () => {

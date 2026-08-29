@@ -184,11 +184,78 @@ describe('PresentationSessionRegistryContext', () => {
     )
     await registry!.open(firstItem)
     await registry!.open(secondItem)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(firstItem.id, finalize)
 
     await expect(registry!.activate(secondItem.id)).resolves.toBe(true)
 
+    expect(finalize).toHaveBeenCalledTimes(1)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(firstSession.flush).mock.invocationCallOrder[0]
+    )
     expect(firstSession.flush).toHaveBeenCalledTimes(1)
     expect(usePresentationWorkspaceStore.getState().activeItemId).toBe(secondItem.id)
+  })
+
+  it('treats pending live editor DOM as unsafe before a session draft exists', async () => {
+    const item = makeEditableItem('deck-1')
+    const session = createFakeSession(makeDocument('Sunday', item.id))
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: session.getSnapshot().renderedDocument,
+      revision: 0
+    })
+    mocks.createPresentationEditorSession.mockReturnValue(session)
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <RegistryProbe onRegistry={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await registry!.open(item)
+    let pending = true
+    registry!.registerEditorFinalizer!(
+      item.id,
+      () => true,
+      () => pending
+    )
+
+    expect(registry!.hasUnsafeWork()).toBe(true)
+    expect(registry!.getUnsafeItemIds()).toEqual([item.id])
+    pending = false
+    expect(registry!.hasUnsafeWork()).toBe(false)
+  })
+
+  it('finalizes a live editor before preparing its current document for projection', async () => {
+    const item = makeEditableItem('deck-1')
+    const document = makeDocument('Sunday', item.id)
+    const session = createFakeSession(document, 'dirty')
+    session.getSnapshot().draftKind = 'text'
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+    mocks.createPresentationEditorSession.mockReturnValue(session)
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <RegistryProbe onRegistry={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await registry!.open(item)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(item.id, finalize)
+    const finalizeAndFlush = (
+      registry! as PresentationSessionRegistry & {
+        finalizeAndFlush?: (itemId: string) => Promise<EditablePresentationDocument | null>
+      }
+    ).finalizeAndFlush
+
+    expect(finalizeAndFlush).toBeTypeOf('function')
+    if (!finalizeAndFlush) return
+    await expect(finalizeAndFlush(item.id)).resolves.toBe(document)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.commitDraft).mock.invocationCallOrder[0]
+    )
+    expect(vi.mocked(session.commitDraft).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.flush).mock.invocationCallOrder[0]
+    )
   })
 
   it('keeps the previous tab active when its flush fails', async () => {
@@ -267,9 +334,15 @@ describe('PresentationSessionRegistryContext', () => {
       </PresentationSessionRegistryProvider>
     )
     await registry!.open(item)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(item.id, finalize)
 
     await expect(registry!.close(item.id)).resolves.toBe(true)
 
+    expect(finalize).toHaveBeenCalledTimes(1)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.flush).mock.invocationCallOrder[0]
+    )
     expect(session.flush).toHaveBeenCalledTimes(1)
     expect(session.dispose).toHaveBeenCalledTimes(1)
     expect(registry!.get(item.id)).toBeUndefined()
@@ -292,9 +365,15 @@ describe('PresentationSessionRegistryContext', () => {
       </PresentationSessionRegistryProvider>
     )
     await registry!.open(item)
+    const finalize = vi.fn(() => true)
+    registry!.registerEditorFinalizer!(item.id, finalize)
 
     await expect(registry!.close(item.id, 'discard')).resolves.toBe(true)
 
+    expect(finalize).toHaveBeenCalledTimes(1)
+    expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.discard).mock.invocationCallOrder[0]
+    )
     expect(session.discard).toHaveBeenCalledTimes(1)
     expect(session.flush).not.toHaveBeenCalled()
     expect(session.dispose).toHaveBeenCalledTimes(1)

@@ -5,7 +5,6 @@ import {
   type EditablePresentationDocument
 } from '@renderer/lib/editable-presentation'
 import { getMediaType, type MediaTypeStateMap } from '@renderer/lib/presentability'
-import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import type { PresentationSnapshot } from '@renderer/lib/presentation-readiness'
 import { isEditablePresentationMimeType } from '@renderer/lib/presentation-media'
 import type { ProjectionPayload } from '@shared/projection-messages'
@@ -57,20 +56,6 @@ export function buildEditableSlideProjectionPayload(
     presentation: { slideIndex, slideCount: document.slideOrder.length },
     editablePresentation
   }
-}
-
-export async function buildEditableProjectionPayloadForSession(
-  base: ProjectionPayload<'file:show'>,
-  session: PresentationEditorSession,
-  activeSlideId: string
-): Promise<ProjectionPayload<'file:show'>> {
-  session.commitDraft()
-  await session.flush()
-  return buildEditableSlideProjectionPayload(
-    base,
-    session.getSnapshot().history.present,
-    activeSlideId
-  )
 }
 
 export function buildFileProjectionPayload({

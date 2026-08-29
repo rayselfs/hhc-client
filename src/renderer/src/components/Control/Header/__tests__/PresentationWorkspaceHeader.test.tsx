@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   stopProjectionSession: vi.fn(),
   toastDanger: vi.fn(),
   isProjectionOpen: false,
+  ensureProjectionOpen: vi.fn(() => Promise.resolve()),
   stopProjection: vi.fn()
 }))
 
@@ -56,6 +57,7 @@ vi.mock('react-router-dom', async () => {
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     isProjectionOpen: mocks.isProjectionOpen,
+    ensureProjectionOpen: mocks.ensureProjectionOpen,
     stopProjection: mocks.stopProjection
   })
 }))
@@ -181,6 +183,22 @@ function createRegistry(session: PresentationEditorSession): PresentationSession
     close: vi.fn().mockResolvedValue(true),
     flushAll: vi.fn().mockResolvedValue(undefined),
     discardAll: vi.fn().mockResolvedValue(undefined),
+    finalizeAndFlush: vi.fn(async () => {
+      session.commitDraft()
+      await session.flush()
+      return session.getSnapshot().history.present
+    }),
+    undo: vi.fn(() => {
+      session.undo()
+      return true
+    }),
+    redo: vi.fn(() => {
+      session.redo()
+      return true
+    }),
+    hasLiveEditor: vi.fn(() => false),
+    hasPendingEditorWork: vi.fn(() => false),
+    hasComposingEditor: vi.fn(() => false),
     hasUnsafeWork: vi.fn(() => false),
     getUnsafeItemIds: vi.fn(() => []),
     subscribe: vi.fn(() => () => undefined)
@@ -241,10 +259,9 @@ describe('PresentationWorkspaceHeader', () => {
 
   it('runs session Undo and Redo with truthful disabled states', async () => {
     const user = userEvent.setup()
-    usePresentationWorkspaceStore.getState().updateEditorMetadata(item.id, {
-      canUndo: true,
-      canRedo: true
-    })
+    const snapshot = session.getSnapshot()
+    snapshot.history.past.push(snapshot.history.present)
+    snapshot.history.future.push(snapshot.history.present)
     renderHeader()
 
     await user.click(screen.getByRole('button', { name: 'Undo' }))
@@ -252,6 +269,38 @@ describe('PresentationWorkspaceHeader', () => {
 
     expect(session.undo).toHaveBeenCalledTimes(1)
     expect(session.redo).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Undo and Redo disabled without an active session even when metadata is stale', () => {
+    mocks.registry = { ...mocks.registry!, get: vi.fn(() => undefined) }
+    usePresentationWorkspaceStore.getState().updateEditorMetadata(item.id, {
+      canUndo: true,
+      canRedo: true
+    })
+    renderHeader()
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled()
+  })
+
+  it('disables Redo for pending input and both history commands during composition', () => {
+    const snapshot = session.getSnapshot()
+    snapshot.history.future.push(snapshot.history.present)
+    vi.mocked(mocks.registry!.hasPendingEditorWork!).mockReturnValue(true)
+    const view = renderHeader()
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled()
+
+    view.unmount()
+    mocks.registry = {
+      ...mocks.registry!,
+      hasComposingEditor: vi.fn(() => true)
+    }
+    renderHeader()
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled()
   })
 
   it('shows save failure and retries the active session', async () => {
@@ -439,10 +488,9 @@ describe('PresentationWorkspaceHeader', () => {
   })
 
   it('keeps native text Undo while presentation shortcuts target the session', () => {
-    usePresentationWorkspaceStore.getState().updateEditorMetadata(item.id, {
-      canUndo: true,
-      canRedo: true
-    })
+    const snapshot = session.getSnapshot()
+    snapshot.history.past.push(snapshot.history.present)
+    snapshot.history.future.push(snapshot.history.present)
     renderHeader()
 
     fireEvent.keyDown(document, { code: 'KeyZ', key: 'z', ctrlKey: true })

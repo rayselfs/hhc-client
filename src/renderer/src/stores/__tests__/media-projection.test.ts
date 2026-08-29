@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { registerMediaProjectionPreflight } from '@renderer/lib/media-projection-preflight'
 import {
   isMediaResourceLocked,
   resetMediaResourceLocksForTests
@@ -33,6 +34,16 @@ function makeFile(id: string, name: string, mimeType = 'image/png'): FileItemRec
     url: `https://example.com/${id}`,
     createdAt: Date.now(),
     expiresAt: null
+  }
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  return {
+    promise: new Promise<T>((done) => {
+      resolve = done
+    }),
+    resolve
   }
 }
 
@@ -90,6 +101,125 @@ describe('startPresentation', () => {
 
     useMediaProjectionStore.getState().startPresentation(files, 1)
     expect(useMediaProjectionStore.getState().sessionRevision).toBe(2)
+  })
+
+  it('does not let an older editable start commit after a newer start or exit', async () => {
+    const editable = makeFile(
+      'editable',
+      'editable.lpdeck',
+      'application/vnd.librepresenter.presentation+json'
+    )
+    const pending = deferred<boolean>()
+    const unregister = registerMediaProjectionPreflight(() => pending.promise)
+
+    const staleStart = useMediaProjectionStore.getState().startPresentation([editable], 0)
+    expect(staleStart).toBeInstanceOf(Promise)
+
+    expect(useMediaProjectionStore.getState().startPresentation([files[1]], 0)).toBe(true)
+    pending.resolve(true)
+    expect(await staleStart).toEqual({ status: 'superseded' })
+    expect(useMediaProjectionStore.getState().currentItem()?.id).toBe('b')
+
+    const pendingExit = deferred<boolean>()
+    unregister()
+    const unregisterExit = registerMediaProjectionPreflight(() => pendingExit.promise)
+    const staleExitStart = useMediaProjectionStore.getState().startPresentation([editable], 0)
+    useMediaProjectionStore.getState().exit()
+    pendingExit.resolve(true)
+    expect(await staleExitStart).toEqual({ status: 'superseded' })
+    expect(useMediaProjectionStore.getState().isPresenting).toBe(false)
+    unregisterExit()
+  })
+
+  it('keeps only the newest pending navigation result', async () => {
+    const editableFiles = ['one', 'two', 'three'].map((id) =>
+      makeFile(id, `${id}.lpdeck`, 'application/vnd.librepresenter.presentation+json')
+    )
+    const first = deferred<boolean>()
+    const second = deferred<boolean>()
+    let calls = 0
+    const restore = registerMediaProjectionPreflight(() => {
+      calls += 1
+      return calls === 1 ? first.promise : second.promise
+    })
+    useMediaProjectionStore.setState({
+      playlist: editableFiles,
+      currentIndex: 0,
+      isPresenting: true,
+      sessionRevision: 4
+    })
+
+    const next = useMediaProjectionStore.getState().next()
+    const jump = useMediaProjectionStore.getState().jumpTo(2)
+    second.resolve(true)
+    expect(await jump).toEqual({ status: 'success' })
+    first.resolve(true)
+    expect(await next).toEqual({ status: 'superseded' })
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(2)
+    restore()
+  })
+
+  it('does not overwrite presentation runtime state published during a pending navigation', async () => {
+    const presentation = makeFile(
+      'deck',
+      'deck.pptx',
+      'application/vnd.librepresenter.presentation+json'
+    )
+    const pending = deferred<boolean>()
+    const unregister = registerMediaProjectionPreflight(() => pending.promise)
+    useMediaProjectionStore.setState({
+      playlist: [presentation],
+      currentIndex: 0,
+      isPresenting: true,
+      isEnded: false,
+      typeStates: { presentation: { slideIndex: 0, slideCount: 5 } }
+    })
+
+    const next = useMediaProjectionStore.getState().next()
+    useMediaProjectionStore.getState().setTypeState('presentation', {
+      slideIndex: 3,
+      slideCount: 5
+    })
+    pending.resolve(true)
+
+    expect(await next).toEqual({ status: 'superseded' })
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toEqual({
+      slideIndex: 3,
+      slideCount: 5
+    })
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
+
+    expect(await useMediaProjectionStore.getState().next()).toEqual({ status: 'success' })
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toEqual({
+      slideIndex: 4,
+      slideCount: 5
+    })
+    unregister()
+  })
+
+  it('does not revive a closed editable item after it reopens', async () => {
+    const editable = makeFile(
+      'editable',
+      'editable.lpdeck',
+      'application/vnd.librepresenter.presentation+json'
+    )
+    const first = deferred<boolean>()
+    const second = deferred<boolean>()
+    let calls = 0
+    const unregister = registerMediaProjectionPreflight(() => {
+      calls += 1
+      return calls === 1 ? first.promise : second.promise
+    })
+
+    const staleStart = useMediaProjectionStore.getState().startPresentation([editable], 0)
+    useMediaProjectionStore.getState().exit()
+    const reopenedStart = useMediaProjectionStore.getState().startPresentation([editable], 0)
+    second.resolve(true)
+    expect(await reopenedStart).toEqual({ status: 'success' })
+    first.resolve(true)
+    expect(await staleStart).toEqual({ status: 'superseded' })
+    expect(useMediaProjectionStore.getState().currentItem()?.id).toBe(editable.id)
+    unregister()
   })
 })
 

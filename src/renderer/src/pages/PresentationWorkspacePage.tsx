@@ -1,4 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -15,7 +23,9 @@ import {
   AlignVerticalSpaceAround,
   Baseline,
   Bold,
+  BringToFront,
   ChevronDown,
+  ClipboardPaste,
   Crop,
   Eraser,
   FileText,
@@ -26,6 +36,7 @@ import {
   Plus,
   RectangleHorizontal,
   RefreshCw,
+  SendToBack,
   StickyNote,
   Type,
   Underline,
@@ -38,6 +49,7 @@ import { AlertDialog } from '@heroui/react/alert-dialog'
 import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
 import {
   InspectorPanel,
@@ -51,12 +63,14 @@ import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 import {
   addElementToSlide,
   applySlideBackgroundToAllSlides,
+  CONTENT_HEIGHT_TEXT_PADDING_Y,
   createImageElement,
   createLineElement,
   createShapeElement,
   createTextElement,
   convertPptxToEditablePresentation,
   DEFAULT_GRADIENT_BACKGROUND,
+  duplicateElementInSlide,
   duplicateEditableSlides,
   getSlideBackgroundPrimaryColor,
   INSERTED_TEXT_CLICK_SIZE,
@@ -82,6 +96,7 @@ import {
 } from '@renderer/lib/editable-presentation'
 import type { HhcLineCloudAuth } from '@renderer/lib/cloud-provider'
 import { prepareHhcLinePresentationSource } from '@renderer/lib/hhc-line-connect'
+import { isMac } from '@renderer/lib/env'
 import {
   alignElements,
   distributeElements,
@@ -95,12 +110,14 @@ import {
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import {
   mergeFontFamilies,
-  queryLocalFontFamilies,
+  queryLocalFontFamiliesOnce,
   supportsLocalFontAccess
 } from '@renderer/lib/local-fonts'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
+import { calculateFitZoomPercent } from '@renderer/lib/presentation-viewport'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
 import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
@@ -114,8 +131,9 @@ import { isFileItem, type FileItemRecord } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
-type RibbonTab = 'home' | 'insert' | 'design' | 'picture' | 'text'
+type RibbonTab = 'home' | 'insert' | 'design' | 'picture'
 type PresentationElementType = EditablePresentationElement['type']
+type ZoomMode = 'fit' | 'custom'
 
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
 const FONT_SIZES = [
@@ -123,13 +141,17 @@ const FONT_SIZES = [
 ]
 const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
 const BASE_RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
+const PRESENTATION_CANVAS_WIDTH = 1024
+const PRESENTATION_VIEWPORT_PADDING = 64
 const NATIVE_CONTROL_CLASS =
-  'presentation-native-control rounded-lg border border-divider bg-content2 px-3 text-sm text-foreground outline-none'
+  'presentation-native-control h-7 rounded-md border border-divider bg-content2 px-2 text-sm text-foreground outline-none'
 const RANGE_CLASS = 'presentation-range w-full'
 const RIBBON_ICON_BUTTON_CLASS =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-transparent px-2 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
+  'inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-transparent px-1.5 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
 const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
   'border-primary bg-primary text-white shadow-inner hover:border-primary hover:bg-primary/90 hover:text-white'
+const RIBBON_COMMAND_BUTTON_CLASS =
+  'inline-flex h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs text-default-500 transition-colors hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 disabled:cursor-not-allowed disabled:opacity-30'
 
 function RibbonGroup({
   label,
@@ -145,10 +167,9 @@ function RibbonGroup({
       role="group"
       aria-label={label}
       data-testid="presentation-ribbon-group"
-      className={`flex h-full shrink-0 flex-col border-r border-divider px-3 pb-1 pt-2 last:border-r-0 ${className}`}
+      className={`flex h-full shrink-0 flex-col border-r border-divider px-2 py-1 last:border-r-0 ${className}`}
     >
       <div className="min-h-0 flex-1">{children}</div>
-      <p className="mt-1 text-center text-[10px] leading-3 text-default-400">{label}</p>
     </section>
   )
 }
@@ -578,6 +599,7 @@ function EditableSessionDocumentView({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const { showMenu } = useContextMenu()
+  const registry = usePresentationSessionRegistry()
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
   const setActiveSlideId = usePresentationWorkspaceStore((state) => state.setActiveSlideId)
   const storedActiveSlideId = usePresentationWorkspaceStore((state) =>
@@ -599,7 +621,19 @@ function EditableSessionDocumentView({
       : Math.min(lastActiveSlideIndex, Math.max(0, document.slideOrder.length - 1))
   const activeSlideId = document.slideOrder[activeSlideIndex] ?? null
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const canvasViewportRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
+  const textEditorFinalizerRef = useRef<
+    ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean }) | null
+  >(null)
+  const pendingZoomAnchorRef = useRef<{
+    clientX: number
+    clientY: number
+    logicalX: number
+    logicalY: number
+    nextZoom: number
+  } | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(() => new Set())
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
@@ -614,11 +648,13 @@ function EditableSessionDocumentView({
   const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
   const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([])
   const [isLoadingLocalFonts, setIsLoadingLocalFonts] = useState(false)
+  const hasRequestedLocalFontsRef = useRef(false)
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
+  const [zoomMode, setZoomMode] = useState<ZoomMode>('fit')
   const [zoomPercent, setZoomPercent] = useState(100)
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [isNotesOpen, setIsNotesOpen] = useState(false)
-  const [notesDraftBySlideId, setNotesDraftBySlideId] = useState<Record<string, string>>({})
   const [cropElementId, setCropElementId] = useState<string | null>(null)
   const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
   const formatBackgroundTriggerRef = useRef<HTMLButtonElement>(null)
@@ -626,6 +662,34 @@ function EditableSessionDocumentView({
     vertical?: number
     horizontal?: number
   }>({})
+
+  const finalizeTextEditor = useCallback(
+    (): boolean => textEditorFinalizerRef.current?.() ?? true,
+    []
+  )
+  const setTextEditorFinalizer = useCallback(
+    (
+      finalize:
+        | ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean })
+        | null
+    ): void => {
+      textEditorFinalizerRef.current = finalize
+      registry.notifyEditorLifecycle?.(deck.itemId)
+    },
+    [deck.itemId, registry]
+  )
+
+  useEffect(
+    () =>
+      registry.registerEditorFinalizer?.(
+        deck.itemId,
+        finalizeTextEditor,
+        () => textEditorFinalizerRef.current?.hasUnsafeWork?.() ?? false,
+        () => textEditorFinalizerRef.current !== null,
+        () => textEditorFinalizerRef.current?.isComposing?.() ?? false
+      ),
+    [deck.itemId, finalizeTextEditor, registry]
+  )
   const pressedRibbonTimeoutRef = useRef<number | null>(null)
   const projectionPlaylist = useMediaProjectionStore((state) => state.playlist)
   const projectionIndex = useMediaProjectionStore((state) => state.currentIndex)
@@ -653,6 +717,42 @@ function EditableSessionDocumentView({
   )
 
   useEffect(() => {
+    const viewport = canvasViewportRef.current
+    if (!viewport) return
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return
+      setViewportSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (zoomMode !== 'fit' || viewportSize.width <= 0 || viewportSize.height <= 0) return
+    setZoomPercent(
+      calculateFitZoomPercent(
+        viewportSize.width,
+        viewportSize.height,
+        PRESENTATION_CANVAS_WIDTH,
+        (PRESENTATION_CANVAS_WIDTH * document.height) / document.width,
+        PRESENTATION_VIEWPORT_PADDING
+      )
+    )
+  }, [document.height, document.width, viewportSize, zoomMode])
+
+  useLayoutEffect(() => {
+    const pending = pendingZoomAnchorRef.current
+    const viewport = canvasViewportRef.current
+    const canvas = canvasRef.current
+    if (!pending || !viewport || !canvas || pending.nextZoom !== zoomPercent) return
+    const rect = canvas.getBoundingClientRect()
+    const scale = zoomPercent / 100
+    viewport.scrollLeft += rect.left + pending.logicalX * scale - pending.clientX
+    viewport.scrollTop += rect.top + pending.logicalY * scale - pending.clientY
+    pendingZoomAnchorRef.current = null
+  }, [zoomPercent])
+
+  useEffect(() => {
     setSlideCount(deck.itemId, document.slideOrder.length)
     if (activeSlideId !== storedActiveSlideId) {
       setActiveSlideId(deck.itemId, activeSlideId)
@@ -667,12 +767,15 @@ function EditableSessionDocumentView({
     storedActiveSlideId
   ])
 
-  const activateSlide = (slideId: string | null): void => {
+  const activateSlide = (slideId: string | null): boolean => {
+    if (!finalizeTextEditor()) return false
+    commitNotes()
     if (slideId) {
       const index = document.slideOrder.indexOf(slideId)
       if (index >= 0) setLastActiveSlideIndex(index)
     }
     setActiveSlideId(deck.itemId, slideId)
+    return true
   }
 
   const activeSlide = activeSlideId ? document.slides[activeSlideId] : null
@@ -685,9 +788,14 @@ function EditableSessionDocumentView({
       ? (projectedPresentationState?.slideIndex ?? 0)
       : -1
 
-  const notesDraft = activeSlideId
-    ? (notesDraftBySlideId[activeSlideId] ?? activeSlide?.notes ?? '')
-    : ''
+  const notesDraft = activeSlide?.notes ?? ''
+
+  useEffect(
+    () => () => {
+      if (session.getSnapshot().draftKind === 'notes') session.commitDraft()
+    },
+    [session]
+  )
 
   useEffect(() => {
     onSelectedElementTypeChange(selectedElement?.type ?? null)
@@ -704,18 +812,73 @@ function EditableSessionDocumentView({
     if (session.getSnapshot().draftKind === 'text') session.commitDraft()
   }
 
-  const commitDocument = (nextDocument: EditablePresentationDocument): void => {
+  const finalizeDocumentMutation = (): EditablePresentationDocument | null => {
+    if (!finalizeTextEditor()) return null
     clearTextCommitTimer()
-    session.commit(nextDocument)
+    return session.getSnapshot().renderedDocument
   }
+
+  const commitDocument = (
+    update: (currentDocument: EditablePresentationDocument) => EditablePresentationDocument
+  ): boolean => {
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return false
+    session.commit(update(currentDocument))
+    return true
+  }
+
+  function commitNotes(): void {
+    if (session.getSnapshot().draftKind === 'notes') session.commitDraft()
+  }
+
+  const setCustomZoom = (nextZoom: number): void => {
+    setZoomMode('custom')
+    setZoomPercent(Math.max(25, Math.min(200, nextZoom)))
+  }
+
+  useEffect(() => {
+    const viewport = canvasViewportRef.current
+    if (!viewport) return
+    const handleWheel = (event: WheelEvent): void => {
+      if (!(event.ctrlKey || (isMac() && event.metaKey))) return
+      event.preventDefault()
+      if (event.deltaY === 0) return
+      const nextZoom = Math.max(25, Math.min(200, zoomPercent + (event.deltaY < 0 ? 5 : -5)))
+      setZoomMode('custom')
+      if (nextZoom === zoomPercent) return
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const scale = zoomPercent / 100
+      pendingZoomAnchorRef.current = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        logicalX: (event.clientX - rect.left) / scale,
+        logicalY: (event.clientY - rect.top) / scale,
+        nextZoom
+      }
+      setZoomPercent(nextZoom)
+    }
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    return () => viewport.removeEventListener('wheel', handleWheel)
+  }, [zoomPercent])
 
   const previewTextElement = (
     slideId: string,
     elementId: string,
     updates: Partial<EditablePresentationElement>
   ): void => {
-    if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
     const preview = session.getSnapshot().renderedDocument
+    const current = preview.slides[slideId]?.elements[elementId]
+    if (
+      current &&
+      Object.entries(updates).every(
+        ([key, value]) => current[key as keyof typeof current] === value
+      )
+    ) {
+      return
+    }
+    if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
     session.previewDraft(updateElementInSlide(preview, slideId, elementId, updates))
     clearTextCommitTimer()
     textCommitTimerRef.current = window.setTimeout(() => {
@@ -726,7 +889,9 @@ function EditableSessionDocumentView({
 
   const updateSelectedElement = (updates: Partial<EditablePresentationElement>): void => {
     if (!document || !activeSlideId || !selectedElementId) return
-    commitDocument(updateElementInSlide(document, activeSlideId, selectedElementId, updates))
+    commitDocument((current) =>
+      updateElementInSlide(current, activeSlideId, selectedElementId, updates)
+    )
   }
 
   const selectElement = (
@@ -762,16 +927,15 @@ function EditableSessionDocumentView({
   const addShape = (shape: 'rectangle' | 'ellipse'): void => {
     if (!activeSlideId) return
     const element = createShapeElement(shape)
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    if (!commitDocument((current) => addElementToSlide(current, activeSlideId, element))) return
     setSelectedElementId(element.id)
-    setSelectedElementIds(new Set([element.id]))
     setSelectedElementIds(new Set([element.id]))
   }
 
   const addLine = (): void => {
     if (!activeSlideId) return
     const element = createLineElement()
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    if (!commitDocument((current) => addElementToSlide(current, activeSlideId, element))) return
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
   }
@@ -780,49 +944,54 @@ function EditableSessionDocumentView({
     if (!activeSlideId) return
     const ids = [...selectedElementIds]
     if (ids.length < 2) return
-    commitDocument(alignElements(document, activeSlideId, ids, alignment))
+    commitDocument((current) => alignElements(current, activeSlideId, ids, alignment))
   }
 
   const applyElementDistribution = (distribution: ElementDistribution): void => {
     if (!activeSlideId) return
     const ids = [...selectedElementIds]
     if (ids.length < 3) return
-    commitDocument(distributeElements(document, activeSlideId, ids, distribution))
+    commitDocument((current) => distributeElements(current, activeSlideId, ids, distribution))
   }
 
   const moveSelectedSlides = (targetIndex: number): void => {
     const ids = draggingSlideIds.length > 0 ? draggingSlideIds : getSelectedSlideIds()
-    const nextDocument = reorderSelectedSlides(document, ids, targetIndex)
-    if (nextDocument === document) return
-    commitDocument(nextDocument)
+    commitDocument((current) => reorderSelectedSlides(current, ids, targetIndex))
     setDraggingSlideIds([])
     setInsertionIndex(null)
   }
 
   const setActiveSlideBackground = (background: EditableSlideBackground): void => {
     if (!document || !activeSlideId) return
-    commitDocument(updateSlideBackground(document, activeSlideId, background))
+    commitDocument((current) => updateSlideBackground(current, activeSlideId, background))
   }
 
   const applyActiveBackgroundToAllSlides = (): void => {
     if (!document || !activeSlide) return
-    commitDocument(applySlideBackgroundToAllSlides(document, activeSlide.background))
+    commitDocument((current) =>
+      applySlideBackgroundToAllSlides(
+        current,
+        current.slides[activeSlideId]?.background ?? activeSlide.background
+      )
+    )
   }
 
   const resetActiveSlideBackground = (): void => {
     if (!document || !activeSlideId) return
-    commitDocument(resetSlideBackground(document, activeSlideId))
+    commitDocument((current) => resetSlideBackground(current, activeSlideId))
   }
 
   const addTextElement = (frame?: EditableTextInsertFrame): void => {
     if (!document || !activeSlideId) return
     const autoSize = frame?.autoSize ?? 'content'
+    const autoWidth = frame?.autoWidth ?? true
     const nextFrame = frame ?? {
       x: 260,
       y: 220,
       width: INSERTED_TEXT_CLICK_SIZE.width,
       height: INSERTED_TEXT_CLICK_SIZE.height,
-      autoSize
+      autoSize,
+      autoWidth
     }
     const width =
       autoSize === 'content'
@@ -832,19 +1001,27 @@ function EditableSessionDocumentView({
       autoSize === 'content'
         ? nextFrame.height
         : Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.height, nextFrame.height)
-    const fontSize = presentationPointsToCanvasPx(INSERTED_TEXT_FONT_SIZE_POINTS, document.width)
-    const textHeight = Math.max(height, Math.ceil(fontSize * 1.15))
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const fontSize = presentationPointsToCanvasPx(
+      INSERTED_TEXT_FONT_SIZE_POINTS,
+      currentDocument.width
+    )
+    const textHeight = Math.max(
+      height,
+      Math.ceil(fontSize * 1.15) + CONTENT_HEIGHT_TEXT_PADDING_Y * 2
+    )
     const element = createTextElement({
-      x: Math.max(0, Math.min(document.width - width, nextFrame.x)),
-      y: Math.max(0, Math.min(document.height - textHeight, nextFrame.y)),
+      x: Math.max(0, Math.min(currentDocument.width - width, nextFrame.x)),
+      y: Math.max(0, Math.min(currentDocument.height - textHeight, nextFrame.y)),
       width,
       height: textHeight,
-      autoWidth: autoSize === 'content',
+      autoWidth: nextFrame.autoWidth,
       autoSize,
       fontSize,
       text: ''
     })
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    session.commit(addElementToSlide(currentDocument, activeSlideId, element))
     setSelectedElementId(element.id)
     setEditingElementId(element.id)
     setIsTextInsertMode(false)
@@ -852,8 +1029,10 @@ function EditableSessionDocumentView({
 
   const addSlide = (): void => {
     if (!document) return
-    const result = insertBlankEditableSlide(document, document.slideOrder.length)
-    commitDocument(result.document)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const result = insertBlankEditableSlide(currentDocument, currentDocument.slideOrder.length)
+    session.commit(result.document)
     activateSlide(result.slideId)
     setSelectedSlideIds(new Set([result.slideId]))
     setSelectedElementId(null)
@@ -862,8 +1041,10 @@ function EditableSessionDocumentView({
 
   const addSlideAfter = (index: number): void => {
     if (!document) return
-    const result = insertBlankEditableSlide(document, index + 1)
-    commitDocument(result.document)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const result = insertBlankEditableSlide(currentDocument, index + 1)
+    session.commit(result.document)
     activateSlide(result.slideId)
     setSelectedSlideIds(new Set([result.slideId]))
     setSelectionAnchorIndex(index + 1)
@@ -875,6 +1056,7 @@ function EditableSessionDocumentView({
   const selectSlide = (index: number, event: React.MouseEvent | React.KeyboardEvent): void => {
     const slideId = document.slideOrder[index]
     if (!slideId) return
+    if (!finalizeTextEditor()) return
     commitTextDraft()
 
     if (event.shiftKey) {
@@ -939,10 +1121,13 @@ function EditableSessionDocumentView({
 
   const pasteSlide = (): void => {
     if (copiedSlideIds.length === 0 || !document) return
-    const targetIndex = insertionIndex ?? activeSlideIndex + 1
-    const result = duplicateEditableSlides(document, copiedSlideIds, targetIndex)
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const targetIndex =
+      insertionIndex ?? currentDocument.slideOrder.indexOf(activeSlideId ?? '') + 1
+    const result = duplicateEditableSlides(currentDocument, copiedSlideIds, targetIndex)
     if (result.slideIds.length === 0) return
-    commitDocument(result.document)
+    session.commit(result.document)
     setSelectedSlideIds(new Set(result.slideIds))
     activateSlide(result.slideIds[0])
     setInsertionIndex(null)
@@ -959,12 +1144,17 @@ function EditableSessionDocumentView({
 
   const deleteSlide = (): void => {
     if (!document || document.slideOrder.length <= 1) return
-    const removingIds = getSelectedSlideIds()
+    if (!finalizeTextEditor()) return
+    const currentDocument = session.getSnapshot().renderedDocument
+    const removingIds = currentDocument.slideOrder.filter((slideId) =>
+      selectedSlideIds.has(slideId)
+    )
+    if (removingIds.length === 0 && activeSlideId) removingIds.push(activeSlideId)
     if (removingIds.length === 0) return
-    const nextDocument = removeEditableSlides(document, removingIds)
+    const nextDocument = removeEditableSlides(currentDocument, removingIds)
     const nextIndex = Math.min(activeSlideIndex, Math.max(0, nextDocument.slideOrder.length - 1))
     const nextSlideId = nextDocument.slideOrder[nextIndex]
-    commitDocument(nextDocument)
+    session.commit(nextDocument)
     activateSlide(nextSlideId ?? null)
     setSelectedSlideIds(nextSlideId ? new Set([nextSlideId]) : new Set())
     setSelectedElementId(null)
@@ -973,13 +1163,13 @@ function EditableSessionDocumentView({
   }
 
   const deleteElement = (): void => {
-    if (editingElementId) return
     if (!document || !activeSlideId || selectedElementIds.size === 0) return
+    if (!finalizeTextEditor()) return
     const nextDocument = [...selectedElementIds].reduce(
       (current, elementId) => removeElementFromSlide(current, activeSlideId, elementId),
-      document
+      session.getSnapshot().renderedDocument
     )
-    commitDocument(nextDocument)
+    session.commit(nextDocument)
     setSelectedElementId(null)
     setSelectedElementIds(new Set())
   }
@@ -992,9 +1182,20 @@ function EditableSessionDocumentView({
       x: copiedElement.x + 24,
       y: copiedElement.y + 24
     } as EditablePresentationElement
-    commitDocument(addElementToSlide(document, activeSlideId, element))
+    if (!commitDocument((current) => addElementToSlide(current, activeSlideId, element))) return
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
+  }
+
+  const duplicateSelectedElement = (): void => {
+    if (!activeSlideId || !selectedElementId) return
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument) return
+    const result = duplicateElementInSlide(currentDocument, activeSlideId, selectedElementId)
+    if (result.document === currentDocument) return
+    session.commit(result.document)
+    setSelectedElementId(result.elementId)
+    setSelectedElementIds(new Set([result.elementId]))
   }
 
   const reorderElement = (
@@ -1002,7 +1203,7 @@ function EditableSessionDocumentView({
     action: 'bring-forward' | 'bring-to-front' | 'send-backward' | 'send-to-back'
   ): void => {
     if (!document || !activeSlideId) return
-    commitDocument(reorderElementInSlide(document, activeSlideId, elementId, action))
+    commitDocument((current) => reorderElementInSlide(current, activeSlideId, elementId, action))
   }
 
   const showElementContextMenu = (
@@ -1041,12 +1242,16 @@ function EditableSessionDocumentView({
 
   const addImage = async (file: File): Promise<void> => {
     if (!document || !activeSlideId) return
+    const targetSlideId = activeSlideId
     const { dataUrl, width, height } = await readImageFile(file)
+    if (registry.get(deck.itemId) !== session) return
+    const currentDocument = finalizeDocumentMutation()
+    if (!currentDocument || !currentDocument.slides[targetSlideId]) return
     const assetId = crypto.randomUUID()
     const nextDocument: EditablePresentationDocument = {
-      ...document,
+      ...currentDocument,
       assets: {
-        ...document.assets,
+        ...currentDocument.assets,
         [assetId]: {
           id: assetId,
           name: file.name,
@@ -1057,12 +1262,12 @@ function EditableSessionDocumentView({
     }
     const element = createImageElement({
       assetId,
-      slideWidth: document.width,
-      slideHeight: document.height,
+      slideWidth: currentDocument.width,
+      slideHeight: currentDocument.height,
       sourceWidth: width,
       sourceHeight: height
     })
-    commitDocument(addElementToSlide(nextDocument, activeSlideId, element))
+    session.commit(addElementToSlide(nextDocument, targetSlideId, element))
     setSelectedElementId(element.id)
     setSelectedElementIds(new Set([element.id]))
     setIsTextInsertMode(false)
@@ -1089,7 +1294,7 @@ function EditableSessionDocumentView({
   const loadLocalFonts = async (): Promise<void> => {
     setIsLoadingLocalFonts(true)
     try {
-      setLocalFontFamilies(await queryLocalFontFamilies())
+      setLocalFontFamilies(await queryLocalFontFamiliesOnce())
     } catch {
       toast.warning(
         t(
@@ -1100,6 +1305,12 @@ function EditableSessionDocumentView({
     } finally {
       setIsLoadingLocalFonts(false)
     }
+  }
+
+  const loadLocalFontsOnFirstGesture = (): void => {
+    if (hasRequestedLocalFontsRef.current) return
+    hasRequestedLocalFontsRef.current = true
+    void loadLocalFonts()
   }
 
   const updateSelectedImageElement = (
@@ -1135,25 +1346,32 @@ function EditableSessionDocumentView({
     )
   }
 
+  const showShapeMenu = (event: React.MouseEvent): void => {
+    showMenu(
+      [
+        {
+          id: 'insert-rectangle',
+          label: t('presentationWorkspace.rectangle', 'Rectangle'),
+          onAction: () => addShape('rectangle')
+        },
+        {
+          id: 'insert-ellipse',
+          label: t('presentationWorkspace.ellipse', 'Ellipse'),
+          onAction: () => addShape('ellipse')
+        },
+        {
+          id: 'insert-line',
+          label: t('presentationWorkspace.line', 'Line'),
+          onAction: addLine
+        }
+      ],
+      event
+    )
+  }
+
   const collapseSlideSelectionToActive = (): void => {
     if (!activeSlideId || selectedSlideIds.size <= 1) return
     setSelectedSlideIds(new Set([activeSlideId]))
-  }
-
-  const updateSelectedNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
-    const next = Number(value)
-    if (!Number.isFinite(next)) return
-    updateSelectedElement({
-      [key]: next,
-      ...(selectedElement?.type === 'text' && (key === 'width' || key === 'height')
-        ? { autoWidth: false, autoSize: 'fixed' as const }
-        : {})
-    } as Partial<EditablePresentationElement>)
-  }
-
-  const commitNotes = (): void => {
-    if (!activeSlideId || notesDraft === activeSlide?.notes) return
-    commitDocument(updateSlideNotes(document, activeSlideId, notesDraft))
   }
 
   const flashRibbonAction = (actionId: string): void => {
@@ -1191,9 +1409,9 @@ function EditableSessionDocumentView({
         >
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.adjust', 'Adjust')}
-            className="w-[660px]"
+            className="w-[600px]"
           >
-            <div className="grid h-full grid-cols-[240px_120px_140px_140px] items-center gap-2">
+            <div className="grid h-full grid-cols-[220px_100px_110px_110px] items-center gap-2">
               <ControlSlider
                 label={t('presentationWorkspace.transparency', 'Transparency')}
                 value={
@@ -1207,7 +1425,7 @@ function EditableSessionDocumentView({
               <label className="flex items-center gap-2 text-default-500">
                 <span>{t('presentationWorkspace.borderColor', 'Border')}</span>
                 <input
-                  className="h-9 w-12 rounded bg-transparent"
+                  className="h-7 w-10 rounded-md bg-transparent"
                   type="color"
                   disabled={!selectedImageElement}
                   value={selectedImageElement?.borderColor ?? '#ffffff'}
@@ -1219,7 +1437,7 @@ function EditableSessionDocumentView({
               <label className="flex items-center gap-2 text-default-500">
                 <span>{t('presentationWorkspace.borderWidth', 'Width')}</span>
                 <select
-                  className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                  className={`w-16 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                   disabled={!selectedImageElement}
                   value={selectedImageElement?.borderWidth ?? 0}
                   onChange={(event) =>
@@ -1236,7 +1454,7 @@ function EditableSessionDocumentView({
               <label className="flex items-center gap-2 text-default-500">
                 <span>{t('presentationWorkspace.shadow', 'Shadow')}</span>
                 <select
-                  className={`h-9 w-28 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                  className={`w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                   disabled={!selectedImageElement}
                   value={selectedImageElement?.shadow ?? 'none'}
                   onChange={(event) =>
@@ -1256,7 +1474,7 @@ function EditableSessionDocumentView({
           </RibbonGroup>
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
-            className="w-48"
+            className="w-40"
           >
             <div className="grid h-full grid-rows-2 gap-1">
               <Button
@@ -1283,7 +1501,7 @@ function EditableSessionDocumentView({
           </RibbonGroup>
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.size', 'Size')}
-            className="w-28"
+            className="w-24"
           >
             <div className="flex h-full items-center justify-center">
               <Button
@@ -1313,9 +1531,9 @@ function EditableSessionDocumentView({
         >
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
-            className="w-[460px]"
+            className="w-[400px]"
           >
-            <div className="flex h-full items-center gap-1 [&>button]:h-16 [&>button]:min-w-20 [&>button]:flex-col [&>button]:gap-1">
+            <div className="flex h-full items-center gap-1 [&>button]:h-14 [&>button]:min-w-16 [&>button]:flex-col [&>button]:gap-1">
               <Button
                 size="sm"
                 variant={isTextInsertMode ? 'primary' : 'tertiary'}
@@ -1410,17 +1628,42 @@ function EditableSessionDocumentView({
         data-ribbon-surface
         className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
       >
+        <RibbonGroup label={t('presentationWorkspace.clipboard', 'Clipboard')} className="w-16">
+          <div className="flex h-full items-center justify-center">
+            <button
+              type="button"
+              className={RIBBON_COMMAND_BUTTON_CLASS}
+              disabled={!copiedElement && copiedSlideIds.length === 0}
+              onClick={() => (copiedElement ? pasteElement() : pasteSlide())}
+            >
+              <ClipboardPaste size={18} />
+              {t('presentationWorkspace.pasteElement', 'Paste')}
+            </button>
+          </div>
+        </RibbonGroup>
+
+        <RibbonGroup label={t('presentationWorkspace.slides', 'Slides')} className="w-20">
+          <div className="flex h-full items-center justify-center">
+            <button type="button" className={RIBBON_COMMAND_BUTTON_CLASS} onClick={addSlide}>
+              <Plus size={18} />
+              {t('presentationWorkspace.newSlide', 'New Slide')}
+            </button>
+          </div>
+        </RibbonGroup>
+
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.font', 'Font')}
-          className="w-[440px]"
+          className="w-[376px]"
         >
           <div className="grid h-full grid-rows-2 gap-1">
             <div className="flex items-center gap-1">
               <select
                 aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
-                className={`h-9 min-w-44 flex-1 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                className={`min-w-32 flex-1 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
+                onPointerDown={loadLocalFontsOnFirstGesture}
+                onFocus={loadLocalFontsOnFirstGesture}
                 onChange={(event) =>
                   updateSelectedTextElement({
                     fontFamily: event.currentTarget.value
@@ -1445,7 +1688,8 @@ function EditableSessionDocumentView({
                 </button>
               )}
               <select
-                className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                aria-label={t('presentationWorkspace.fontSize', 'Font size')}
+                className={`w-14 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={
                   selectedTextElement && document
@@ -1569,7 +1813,7 @@ function EditableSessionDocumentView({
 
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.paragraph', 'Paragraph')}
-          className="w-44"
+          className="w-28"
         >
           <div className="grid h-full grid-rows-2 gap-1">
             <div className="flex items-center gap-1">
@@ -1612,26 +1856,38 @@ function EditableSessionDocumentView({
         </RibbonGroup>
 
         <RibbonGroup
-          label={t('presentationWorkspace.ribbonGroups.position', 'Position')}
-          className="w-48"
+          label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
+          className="w-44"
         >
-          <div className="grid h-full grid-cols-2 grid-rows-2 gap-1">
-            {(['x', 'y', 'width', 'height'] as const).map((key) => (
-              <label
-                key={key}
-                className="flex items-center gap-1 text-xs uppercase text-default-400"
-              >
-                <span className="w-3">{key === 'width' ? 'w' : key === 'height' ? 'h' : key}</span>
-                <input
-                  className={`h-8 min-w-0 flex-1 px-2 ${NATIVE_CONTROL_CLASS}`}
-                  type="number"
-                  disabled={!selectedElement}
-                  value={selectedElement ? Math.round(selectedElement[key]) : 0}
-                  onChange={(event) => updateSelectedNumber(key, event.currentTarget.value)}
-                  aria-label={key}
-                />
-              </label>
-            ))}
+          <div className="flex h-full items-center gap-1">
+            <button
+              type="button"
+              className={RIBBON_COMMAND_BUTTON_CLASS}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              <ImagePlus size={18} />
+              {t('presentationWorkspace.picture', 'Picture')}
+            </button>
+            <button
+              type="button"
+              className={RIBBON_COMMAND_BUTTON_CLASS}
+              onClick={showShapeMenu}
+              aria-haspopup="menu"
+            >
+              <RectangleHorizontal size={18} />
+              {t('presentationWorkspace.shapes', 'Shapes')}
+            </button>
+            <button
+              type="button"
+              className={`${RIBBON_COMMAND_BUTTON_CLASS} ${
+                isTextInsertMode ? RIBBON_ICON_BUTTON_ACTIVE_CLASS : ''
+              }`}
+              aria-pressed={isTextInsertMode}
+              onClick={() => setIsTextInsertMode((enabled) => !enabled)}
+            >
+              <Type size={18} />
+              {t('presentationWorkspace.textBox', 'Text Box')}
+            </button>
           </div>
         </RibbonGroup>
 
@@ -1639,7 +1895,25 @@ function EditableSessionDocumentView({
           label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
           className="w-44"
         >
-          <div data-ribbon-no-wrap className="grid h-full grid-cols-4 grid-rows-2 gap-1">
+          <div data-ribbon-no-wrap className="grid h-full grid-cols-5 grid-rows-2 gap-1">
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={!selectedElement}
+              onClick={() => selectedElement && reorderElement(selectedElement.id, 'bring-forward')}
+              aria-label={t('presentationWorkspace.bringForward', 'Bring Forward')}
+            >
+              <BringToFront size={17} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={!selectedElement}
+              onClick={() => selectedElement && reorderElement(selectedElement.id, 'send-backward')}
+              aria-label={t('presentationWorkspace.sendBackward', 'Send Backward')}
+            >
+              <SendToBack size={17} />
+            </button>
             {(
               [
                 ['left', AlignHorizontalJustifyStart, 'Align objects left'],
@@ -1684,22 +1958,159 @@ function EditableSessionDocumentView({
     )
   }
 
+  useKeyboardShortcuts(
+    [
+      {
+        id: 'presentation-new-slide',
+        config: SHORTCUTS.PRESENTATION.NEW_SLIDE,
+        description: t('presentationWorkspace.newSlide', 'New Slide'),
+        handler: addSlide
+      },
+      {
+        id: 'presentation-duplicate-object',
+        config: SHORTCUTS.PRESENTATION.DUPLICATE,
+        description: t('presentationWorkspace.duplicateElement', 'Duplicate object'),
+        handler: duplicateSelectedElement
+      },
+      {
+        id: 'presentation-zoom-in',
+        config: SHORTCUTS.PRESENTATION.ZOOM_IN,
+        description: t('presentationWorkspace.zoomIn', 'Zoom in'),
+        handler: () => setCustomZoom(zoomPercent + 25)
+      },
+      {
+        id: 'presentation-zoom-in-alt',
+        config: SHORTCUTS.PRESENTATION.ZOOM_IN_ALT,
+        description: t('presentationWorkspace.zoomIn', 'Zoom in'),
+        handler: () => setCustomZoom(zoomPercent + 25)
+      },
+      {
+        id: 'presentation-zoom-out',
+        config: SHORTCUTS.PRESENTATION.ZOOM_OUT,
+        description: t('presentationWorkspace.zoomOut', 'Zoom out'),
+        handler: () => setCustomZoom(zoomPercent - 25)
+      },
+      {
+        id: 'presentation-zoom-fit',
+        config: SHORTCUTS.PRESENTATION.ZOOM_FIT,
+        description: t('presentationWorkspace.fit', 'Fit'),
+        handler: () => setZoomMode('fit')
+      },
+      {
+        id: 'presentation-bold',
+        config: SHORTCUTS.PRESENTATION.BOLD,
+        description: t('presentationWorkspace.bold', 'Bold'),
+        handler: () => {
+          if (!editingElementId && selectedTextElement) {
+            updateSelectedTextElement({ bold: !selectedTextElement.bold })
+          }
+        }
+      },
+      {
+        id: 'presentation-italic',
+        config: SHORTCUTS.PRESENTATION.ITALIC,
+        description: t('presentationWorkspace.italic', 'Italic'),
+        handler: () => {
+          if (!editingElementId && selectedTextElement) {
+            updateSelectedTextElement({ italic: !selectedTextElement.italic })
+          }
+        }
+      },
+      {
+        id: 'presentation-underline',
+        config: SHORTCUTS.PRESENTATION.UNDERLINE,
+        description: t('presentationWorkspace.underline', 'Underline'),
+        handler: () => {
+          if (!editingElementId && selectedTextElement) {
+            updateSelectedTextElement({ underline: !selectedTextElement.underline })
+          }
+        }
+      }
+    ],
+    { sectionKey: 'presentation' }
+  )
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      const target = event.target as HTMLElement | null
-      if (event.key === 'Escape' && session.getSnapshot().draftKind !== null) {
-        event.preventDefault()
-        clearTextCommitTimer()
-        session.cancelDraft()
-        setEditingElementId(null)
+      if (event.defaultPrevented) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('[role="menu"], [role="dialog"]')) return
+      const isFormControl = Boolean(target?.closest('input, select, textarea'))
+      if (isFormControl) return
+      const isActionControl = Boolean(
+        target?.closest('button, a[href], [role="button"], [role="link"], [role="tab"]')
+      )
+      const isTabDelete =
+        Boolean(target?.closest('[role="tab"]')) &&
+        (event.key === 'Delete' || event.key === 'Backspace')
+      if (isActionControl && !isTabDelete) return
+      const isContentEditable =
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.getAttribute('contenteditable') === 'true')
+      if (isContentEditable && event.key !== 'Escape') return
+
+      if (event.key === 'Escape') {
+        if (event.isComposing || event.keyCode === 229) return
+        if (editingElementId) {
+          event.preventDefault()
+          if (!finalizeTextEditor()) return
+          commitTextDraft()
+          return
+        }
+        if (session.getSnapshot().draftKind !== null) {
+          event.preventDefault()
+          session.cancelDraft()
+          return
+        }
+        if (selectedElementIds.size > 0) {
+          event.preventDefault()
+          selectElement(null)
+          return
+        }
+        if (isTextInsertMode) {
+          event.preventDefault()
+          setIsTextInsertMode(false)
+        }
         return
       }
-      const isEditingText =
-        target?.isContentEditable ||
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'SELECT' ||
-        target?.tagName === 'TEXTAREA'
-      if (isEditingText) return
+
+      if (event.key === 'PageUp' || event.key === 'PageDown') {
+        event.preventDefault()
+        const nextIndex = Math.max(
+          0,
+          Math.min(
+            document.slideOrder.length - 1,
+            activeSlideIndex + (event.key === 'PageUp' ? -1 : 1)
+          )
+        )
+        const nextSlideId = document.slideOrder[nextIndex]
+        if (nextSlideId && nextSlideId !== activeSlideId) {
+          if (!finalizeTextEditor()) return
+          commitTextDraft()
+          activateSlide(nextSlideId)
+          setSelectedSlideIds(new Set([nextSlideId]))
+          setSelectionAnchorIndex(nextIndex)
+          setSelectedElementId(null)
+          setSelectedElementIds(new Set())
+          setEditingElementId(null)
+          setIsTextInsertMode(false)
+          setInsertionIndex(null)
+        }
+        return
+      }
+
+      if (
+        event.key === 'Enter' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        selectedTextElement &&
+        !selectedTextElement.locked
+      ) {
+        event.preventDefault()
+        setEditingElementId(selectedTextElement.id)
+        return
+      }
 
       const command = event.metaKey || event.ctrlKey
       const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
@@ -1712,7 +2123,9 @@ function EditableSessionDocumentView({
         const amount = event.shiftKey ? 10 : 1
         const dx = event.key === 'ArrowLeft' ? -amount : event.key === 'ArrowRight' ? amount : 0
         const dy = event.key === 'ArrowUp' ? -amount : event.key === 'ArrowDown' ? amount : 0
-        commitDocument(nudgeElements(document, activeSlideId, [...selectedElementIds], dx, dy))
+        commitDocument((current) =>
+          nudgeElements(current, activeSlideId, [...selectedElementIds], dx, dy)
+        )
         return
       }
       if (isSlideSidebar && command && event.key.toLowerCase() === 'a') {
@@ -1765,7 +2178,7 @@ function EditableSessionDocumentView({
     )
   }
 
-  const ribbonHeightClass = 'h-28'
+  const ribbonHeightClass = 'h-24'
 
   return (
     <>
@@ -1793,6 +2206,11 @@ function EditableSessionDocumentView({
           }}
         />
         <div
+          id="presentation-ribbon-panel"
+          role="tabpanel"
+          aria-labelledby={`presentation-ribbon-tab-${activeRibbon}`}
+          aria-hidden={!isRibbonOpen}
+          inert={!isRibbonOpen}
           data-testid="presentation-ribbon-frame"
           className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
             isRibbonOpen ? `${ribbonHeightClass} opacity-100` : 'h-0 opacity-0'
@@ -1875,8 +2293,7 @@ function EditableSessionDocumentView({
                             const ids = selectedSlideIds.has(slideId)
                               ? getSelectedSlideIds()
                               : [slideId]
-                            const nextDocument = reorderSelectedSlides(document, ids, target)
-                            if (nextDocument !== document) commitDocument(nextDocument)
+                            commitDocument((current) => reorderSelectedSlides(current, ids, target))
                             return
                           }
                           if (event.key === 'Enter') {
@@ -1959,128 +2376,166 @@ function EditableSessionDocumentView({
           }
           stage={
             <StageViewport className="presentation-stage relative flex min-h-0 flex-col bg-[#111217]">
-              <div className="flex flex-1 items-center justify-center overflow-auto p-8">
-                <div
-                  className="relative max-w-none shrink-0 transition-[width] duration-150"
-                  style={{ width: `${Math.max(320, 1024 * (zoomPercent / 100))}px` }}
-                >
-                  <EditableSlideSurface
-                    document={document}
-                    slideId={activeSlideId}
-                    editable
-                    showBorder
-                    selectedElementId={selectedElementId}
-                    selectedElementIds={selectedElementIds}
-                    editingElementId={editingElementId}
-                    cropElementId={cropElementId}
-                    isTextInsertMode={isTextInsertMode}
-                    onSelectElement={selectElement}
-                    onMarqueeSelect={(bounds, additive) => {
-                      if (!activeSlide) return
-                      const matches = selectElementsInBounds(activeSlide, bounds)
-                      setSelectedElementIds((current) => {
-                        const next = additive ? new Set(current) : new Set<string>()
-                        matches.forEach((elementId) => next.add(elementId))
-                        setSelectedElementId(
-                          matches.at(-1) ?? (additive ? selectedElementId : null)
-                        )
-                        return next
-                      })
-                    }}
-                    onEditingElementChange={(elementId) => {
-                      if (elementId === null) commitTextDraft()
-                      setEditingElementId(elementId)
-                    }}
-                    onInsertText={addTextElement}
-                    onElementContextMenu={showElementContextMenu}
-                    onTransformStart={() => session.beginDraft('pointer')}
-                    onTransformPreview={(elementId, updates) => {
-                      const snapshot = session.getSnapshot()
-                      const preview = snapshot.renderedDocument
-                      const base = snapshot.history.present
-                      const current = base.slides[activeSlideId]?.elements[elementId]
-                      let nextUpdates = updates
-                      if (current && (updates.x !== undefined || updates.y !== undefined)) {
-                        const snapped = snapElementPosition(
-                          { ...current, ...updates },
-                          { width: preview.width, height: preview.height },
-                          8
-                        )
-                        nextUpdates = { ...updates, x: snapped.x, y: snapped.y }
-                        setSnapGuides({
-                          vertical: snapped.verticalGuide,
-                          horizontal: snapped.horizontalGuide
-                        })
-                      }
-                      if (
-                        current &&
-                        selectedElementIds.size > 1 &&
-                        updates.width === undefined &&
-                        updates.height === undefined &&
-                        (nextUpdates.x !== undefined || nextUpdates.y !== undefined)
-                      ) {
-                        session.previewDraft(
-                          nudgeElements(
-                            base,
-                            activeSlideId,
-                            [...selectedElementIds],
-                            (nextUpdates.x ?? current.x) - current.x,
-                            (nextUpdates.y ?? current.y) - current.y
+              <div
+                ref={canvasViewportRef}
+                data-testid="presentation-canvas-viewport"
+                className="min-h-0 flex-1 overflow-auto"
+              >
+                <div className="flex h-max min-h-full w-max min-w-full p-8">
+                  <div
+                    ref={canvasRef}
+                    data-testid="presentation-canvas"
+                    className="relative m-auto max-w-none shrink-0"
+                    style={{ width: `${PRESENTATION_CANVAS_WIDTH * (zoomPercent / 100)}px` }}
+                  >
+                    <EditableSlideSurface
+                      document={document}
+                      slideId={activeSlideId}
+                      editable
+                      showBorder
+                      selectedElementId={selectedElementId}
+                      selectedElementIds={selectedElementIds}
+                      editingElementId={editingElementId}
+                      cropElementId={cropElementId}
+                      isTextInsertMode={isTextInsertMode}
+                      onSelectElement={selectElement}
+                      onMarqueeSelect={(bounds, additive) => {
+                        if (!activeSlide) return
+                        const matches = selectElementsInBounds(activeSlide, bounds)
+                        setSelectedElementIds((current) => {
+                          const next = additive ? new Set(current) : new Set<string>()
+                          matches.forEach((elementId) => next.add(elementId))
+                          setSelectedElementId(
+                            matches.at(-1) ?? (additive ? selectedElementId : null)
                           )
+                          return next
+                        })
+                      }}
+                      onEditingElementChange={(elementId) => {
+                        if (elementId === null) commitTextDraft()
+                        setEditingElementId(elementId)
+                      }}
+                      onTextEditFinalizerChange={setTextEditorFinalizer}
+                      onInsertText={addTextElement}
+                      onElementContextMenu={showElementContextMenu}
+                      onTransformStart={(elementId) => {
+                        const current =
+                          session.getSnapshot().renderedDocument.slides[activeSlideId]?.elements[
+                            elementId
+                          ]
+                        if (!current) return undefined
+                        session.beginDraft('pointer')
+                        return current
+                      }}
+                      onTransformPreview={(elementId, updates) => {
+                        const snapshot = session.getSnapshot()
+                        const base = snapshot.history.present
+                        const current = base.slides[activeSlideId]?.elements[elementId]
+                        let nextUpdates = updates
+                        if (current && (updates.x !== undefined || updates.y !== undefined)) {
+                          const snapped = snapElementPosition(
+                            { ...current, ...updates },
+                            { width: base.width, height: base.height },
+                            8
+                          )
+                          nextUpdates = { ...updates, x: snapped.x, y: snapped.y }
+                          setSnapGuides({
+                            vertical: snapped.verticalGuide,
+                            horizontal: snapped.horizontalGuide
+                          })
+                        }
+                        if (
+                          current &&
+                          selectedElementIds.size > 1 &&
+                          updates.width === undefined &&
+                          updates.height === undefined &&
+                          (nextUpdates.x !== undefined || nextUpdates.y !== undefined)
+                        ) {
+                          return session.previewDraft(
+                            nudgeElements(
+                              base,
+                              activeSlideId,
+                              [...selectedElementIds],
+                              (nextUpdates.x ?? current.x) - current.x,
+                              (nextUpdates.y ?? current.y) - current.y
+                            )
+                          )
+                        }
+                        return session.previewDraft(
+                          updateElementInSlide(base, activeSlideId, elementId, nextUpdates)
                         )
-                        return
-                      }
-                      session.previewDraft(
-                        updateElementInSlide(preview, activeSlideId, elementId, nextUpdates)
-                      )
-                    }}
-                    onTransformCommit={() => {
-                      setSnapGuides({})
-                      session.commitDraft()
-                    }}
-                    onTransformCancel={() => {
-                      setSnapGuides({})
-                      session.cancelDraft()
-                    }}
-                    onUpdateElement={previewTextElement}
-                  />
-                  {snapGuides.vertical !== undefined && (
-                    <span
-                      className="pointer-events-none absolute inset-y-0 w-px bg-primary"
-                      style={{ left: `${(snapGuides.vertical / document.width) * 100}%` }}
+                      }}
+                      onTransformCommit={() => {
+                        setSnapGuides({})
+                        session.commitDraft()
+                      }}
+                      onTransformCancel={() => {
+                        setSnapGuides({})
+                        session.cancelDraft()
+                      }}
+                      onUpdateElement={previewTextElement}
                     />
-                  )}
-                  {snapGuides.horizontal !== undefined && (
-                    <span
-                      className="pointer-events-none absolute inset-x-0 h-px bg-primary"
-                      style={{ top: `${(snapGuides.horizontal / document.height) * 100}%` }}
-                    />
-                  )}
+                    {snapGuides.vertical !== undefined && (
+                      <span
+                        className="pointer-events-none absolute inset-y-0 w-px bg-primary"
+                        style={{ left: `${(snapGuides.vertical / document.width) * 100}%` }}
+                      />
+                    )}
+                    {snapGuides.horizontal !== undefined && (
+                      <span
+                        className="pointer-events-none absolute inset-x-0 h-px bg-primary"
+                        style={{ top: `${(snapGuides.horizontal / document.height) * 100}%` }}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
               {isNotesOpen && (
-                <label className="border-t border-divider bg-content1/95 px-4 py-2 text-xs text-default-500">
-                  <span className="sr-only">{t('presentationWorkspace.notes', 'Notes')}</span>
-                  <textarea
-                    className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
-                    value={notesDraft}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value
-                      setNotesDraftBySlideId((current) => ({
-                        ...current,
-                        [activeSlideId]: value
-                      }))
-                    }}
-                    onBlur={commitNotes}
-                    aria-label={t('presentationWorkspace.notes', 'Notes')}
-                    placeholder={t(
-                      'presentationWorkspace.notesPlaceholder',
-                      'Add speaker notes for this slide'
-                    )}
-                  />
-                </label>
+                <section
+                  id="presentation-notes-region"
+                  aria-label={t('presentationWorkspace.notes', 'Notes')}
+                  className="border-t border-divider bg-content1/95 px-4 py-2 text-xs text-default-500"
+                >
+                  <label>
+                    <span className="sr-only">{t('presentationWorkspace.notes', 'Notes')}</span>
+                    <textarea
+                      className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
+                      value={notesDraft}
+                      onChange={(event) => {
+                        if (!activeSlideId) return
+                        const snapshot = session.getSnapshot()
+                        const nextNotes = event.currentTarget.value
+                        const storedNotes =
+                          snapshot.history.present.slides[activeSlideId]?.notes ?? ''
+                        if (nextNotes === storedNotes) {
+                          if (snapshot.draftKind === 'notes') session.cancelDraft()
+                          return
+                        }
+                        if (snapshot.draftKind !== 'notes') {
+                          session.beginDraft('notes')
+                        }
+                        session.previewDraft(
+                          updateSlideNotes(
+                            session.getSnapshot().renderedDocument,
+                            activeSlideId,
+                            nextNotes
+                          )
+                        )
+                      }}
+                      onBlur={() => commitNotes()}
+                      aria-label={t('presentationWorkspace.notes', 'Notes')}
+                      placeholder={t(
+                        'presentationWorkspace.notesPlaceholder',
+                        'Add speaker notes for this slide'
+                      )}
+                    />
+                  </label>
+                </section>
               )}
-              <div className="flex h-8 items-center gap-3 border-t border-divider bg-content1 px-3 text-xs text-default-500">
+              <div
+                data-testid="presentation-status-bar"
+                className="flex h-8 items-center gap-3 border-t border-divider bg-content1 px-3 text-xs text-default-500"
+              >
                 <span>
                   {t('presentationWorkspace.slide', 'Slide')} {activeSlideIndex + 1} /{' '}
                   {document.slideOrder.length}
@@ -2103,6 +2558,8 @@ function EditableSessionDocumentView({
                     setIsNotesOpen((open) => !open)
                   }}
                   aria-label={t('presentationWorkspace.toggleNotes', 'Toggle Notes')}
+                  aria-controls="presentation-notes-region"
+                  aria-expanded={isNotesOpen}
                 >
                   <StickyNote size={14} />
                   <span className="hidden lg:inline">
@@ -2114,7 +2571,7 @@ function EditableSessionDocumentView({
                     isIconOnly
                     size="sm"
                     variant="ghost"
-                    onPress={() => setZoomPercent((value) => Math.max(25, value - 25))}
+                    onPress={() => setCustomZoom(zoomPercent - 25)}
                     aria-label={t('presentationWorkspace.zoomOut', 'Zoom out')}
                   >
                     <ZoomOut size={14} />
@@ -2124,24 +2581,32 @@ function EditableSessionDocumentView({
                     type="range"
                     min={25}
                     max={200}
-                    step={5}
+                    step={1}
                     value={zoomPercent}
-                    onChange={(event) => setZoomPercent(Number(event.currentTarget.value))}
+                    onChange={(event) => setCustomZoom(Number(event.currentTarget.value))}
                     aria-label={t('presentationWorkspace.zoom', 'Zoom')}
                   />
                   <button
                     type="button"
                     className="w-11 rounded px-1 text-right tabular-nums hover:bg-content2"
-                    onClick={() => setZoomPercent(100)}
+                    onClick={() => setCustomZoom(100)}
                     aria-label={t('presentationWorkspace.resetZoom', 'Reset zoom')}
                   >
                     {zoomPercent}%
                   </button>
                   <Button
+                    size="sm"
+                    variant={zoomMode === 'fit' ? 'primary' : 'ghost'}
+                    onPress={() => setZoomMode('fit')}
+                    aria-pressed={zoomMode === 'fit'}
+                  >
+                    {t('presentationWorkspace.fit', 'Fit')}
+                  </Button>
+                  <Button
                     isIconOnly
                     size="sm"
                     variant="ghost"
-                    onPress={() => setZoomPercent((value) => Math.min(200, value + 25))}
+                    onPress={() => setCustomZoom(zoomPercent + 25)}
                     aria-label={t('presentationWorkspace.zoomIn', 'Zoom in')}
                   >
                     <ZoomIn size={14} />
@@ -2626,16 +3091,22 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     setBackgroundPanel({ itemId: activeItemId, isOpen: false })
   }
   const ribbonTabs = useMemo<RibbonTab[]>(
-    () =>
-      selectedElementType === 'image'
-        ? [...BASE_RIBBON_TABS, 'picture']
-        : selectedElementType === 'text'
-          ? [...BASE_RIBBON_TABS, 'text']
-          : BASE_RIBBON_TABS,
+    () => (selectedElementType === 'image' ? [...BASE_RIBBON_TABS, 'picture'] : BASE_RIBBON_TABS),
     [selectedElementType]
   )
   const effectiveActiveRibbon = ribbonTabs.includes(activeRibbon) ? activeRibbon : 'home'
   const activeRibbonIndex = Math.max(0, ribbonTabs.indexOf(effectiveActiveRibbon))
+
+  const handleSelectedElementTypeChange = useCallback((type: PresentationElementType | null) => {
+    if (type !== 'image') {
+      const pictureTab = globalThis.document.getElementById('presentation-ribbon-tab-picture')
+      if (globalThis.document.activeElement === pictureTab) {
+        globalThis.document.getElementById('presentation-ribbon-tab-home')?.focus()
+      }
+      setActiveRibbon((current) => (current === 'picture' ? 'home' : current))
+    }
+    setSelectedElementType(type)
+  }, [])
 
   useEffect(() => {
     if (!itemId) return
@@ -2664,31 +3135,72 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     setIsRibbonOpen(true)
   }
 
+  const handleRibbonTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    tabIndex: number
+  ): void => {
+    let nextIndex: number | null = null
+    if (event.key === 'ArrowLeft') {
+      nextIndex = (tabIndex - 1 + ribbonTabs.length) % ribbonTabs.length
+    } else if (event.key === 'ArrowRight') {
+      nextIndex = (tabIndex + 1) % ribbonTabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = ribbonTabs.length - 1
+    }
+    if (nextIndex === null) return
+
+    event.preventDefault()
+    const nextTab = ribbonTabs[nextIndex]
+    if (!nextTab) return
+    if (activeRibbon === 'design' && nextTab !== 'design') {
+      setBackgroundPanel((panel) => ({ ...panel, isOpen: false }))
+    }
+    setActiveRibbon(nextTab)
+    setIsRibbonOpen(true)
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLElement>('[role="tab"]')
+      [nextIndex]?.focus()
+  }
+
   const getRibbonTabLabel = (tab: RibbonTab): string => {
     const fallbacks: Record<RibbonTab, string> = {
       home: '常用',
       insert: '插入',
       design: '設計',
-      picture: '圖片格式',
-      text: '文字格式'
+      picture: '圖片格式'
     }
-    return t(`presentationWorkspace.${tab}`, fallbacks[tab])
+    return t(
+      tab === 'picture' ? 'presentationWorkspace.pictureFormat' : `presentationWorkspace.${tab}`,
+      fallbacks[tab]
+    )
   }
 
   return (
     <WorkspaceShell className="w-0 min-w-full bg-background text-foreground">
-      <div className="relative flex h-10 shrink-0 items-end overflow-x-auto bg-background px-2 sm:px-4">
-        {ribbonTabs.map((tab) => (
+      <div
+        role="tablist"
+        aria-label={t('presentationWorkspace.title')}
+        className="relative flex h-10 shrink-0 items-end overflow-x-auto bg-background px-2 sm:px-4"
+      >
+        {ribbonTabs.map((tab, tabIndex) => (
           <button
             key={tab}
+            id={`presentation-ribbon-tab-${tab}`}
             type="button"
+            role="tab"
             aria-selected={effectiveActiveRibbon === tab}
+            aria-controls="presentation-ribbon-panel"
+            aria-expanded={effectiveActiveRibbon === tab ? isRibbonOpen : undefined}
+            tabIndex={effectiveActiveRibbon === tab ? 0 : -1}
             className={`h-9 w-16 rounded-t-lg text-sm transition-colors ${
               effectiveActiveRibbon === tab
                 ? 'bg-content1 text-foreground'
                 : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
             }`}
             onClick={() => handleRibbonTabClick(tab)}
+            onKeyDown={(event) => handleRibbonTabKeyDown(event, tabIndex)}
           >
             {getRibbonTabLabel(tab)}
           </button>
@@ -2709,7 +3221,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
             onBackgroundPanelOpenChange={(isOpen) =>
               setBackgroundPanel({ itemId: activeDocument.itemId, isOpen })
             }
-            onSelectedElementTypeChange={setSelectedElementType}
+            onSelectedElementTypeChange={handleSelectedElementTypeChange}
           />
         ) : (
           <PptxDocumentView deck={activeDocument} />

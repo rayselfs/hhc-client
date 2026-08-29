@@ -48,7 +48,8 @@ export interface EditableTextInsertFrame {
   y: number
   width: number
   height: number
-  autoSize?: EditableTextAutoSize
+  autoSize: EditableTextAutoSize
+  autoWidth: boolean
 }
 
 export interface EditableImageInsertInput {
@@ -169,9 +170,20 @@ const DEFAULT_FONT_FAMILY = 'Inter Variable'
 export const DEFAULT_SLIDE_BACKGROUND_COLOR = '#ffffff'
 const DEFAULT_FOREGROUND_COLOR = '#111827'
 export type EditableTextAutoSize = 'content' | 'fixed'
+
+export function hasContentHeight(
+  element: Pick<EditableTextElement, 'autoSize' | 'autoWidth'>
+): boolean {
+  return (
+    element.autoSize === 'content' || (element.autoSize === undefined && element.autoWidth === true)
+  )
+}
+
 export const INSERTED_TEXT_FONT_SIZE_POINTS = 18
 export const INSERTED_TEXT_CLICK_SIZE = { width: 24, height: 32 } as const
 export const INSERTED_TEXT_DRAG_MIN_SIZE = { width: 80, height: 40 } as const
+export const CONTENT_HEIGHT_TEXT_PADDING_X = 8
+export const CONTENT_HEIGHT_TEXT_PADDING_Y = 4
 export const INSERTED_IMAGE_MAX_SLIDE_RATIO = 0.6
 const EMU_PER_INCH = 914400
 const CSS_PX_PER_INCH = 96
@@ -503,6 +515,7 @@ export function updateElementInSlide(
   const slide = document.slides[slideId]
   const element = slide?.elements[elementId]
   if (!slide || !element) return document
+  if (!hasElementPatchChanges(element, updates)) return document
   return {
     ...document,
     slides: {
@@ -517,6 +530,26 @@ export function updateElementInSlide(
     },
     updatedAt: Date.now()
   }
+}
+
+function hasElementPatchChanges(
+  element: EditablePresentationElement,
+  updates: Partial<EditablePresentationElement>
+): boolean {
+  return Object.entries(updates).some(([key, value]) => {
+    if (key !== 'crop') return !Object.is(element[key as keyof EditablePresentationElement], value)
+    if (element.type !== 'image') return true
+    const current = normalizeImageCrop(element.crop)
+    const next = normalizeImageCrop(
+      value as Extract<EditablePresentationElement, { type: 'image' }>['crop']
+    )
+    return (
+      current.top !== next.top ||
+      current.right !== next.right ||
+      current.bottom !== next.bottom ||
+      current.left !== next.left
+    )
+  })
 }
 
 export function reorderElementInSlide(

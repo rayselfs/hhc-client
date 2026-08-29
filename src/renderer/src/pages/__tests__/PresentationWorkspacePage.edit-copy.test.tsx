@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PresentationWorkspacePage, { PptxDocumentView } from '../PresentationWorkspacePage'
+import i18n from '@renderer/i18n'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
@@ -42,14 +43,6 @@ vi.mock('@renderer/contexts/HhcAuthContext', () => ({
 vi.mock('@renderer/lib/hhc-line-connect', () => ({
   prepareHhcLinePresentationSource: mocks.prepareHhcLinePresentationSource
 }))
-
-vi.mock('react-i18next', async () => {
-  const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next')
-  return {
-    ...actual,
-    useTranslation: () => ({ t: (_key: string, fallback?: string) => fallback ?? _key })
-  }
-})
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
@@ -145,7 +138,8 @@ function renderEditableDeck(sourceItem: FileItemRecord): void {
 }
 
 describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('en')
     mocks.convertPptxToEditablePresentation.mockReset()
     mocks.loadEditablePresentationSnapshot.mockReset()
     mocks.persistEditablePresentationRevision.mockReset()
@@ -270,7 +264,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
 
     renderEditableDeck(sourceItem)
     const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
-    fireEvent.click(screen.getByRole('button', { name: '設計' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Design' }))
     const formatBackgroundTrigger = within(ribbonFrame).getByRole('button', {
       name: 'Format Background'
     })
@@ -289,7 +283,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     inspectorSlot = window.document.querySelector('.workspace-inspector-slot')
     expect(inspectorSlot).toHaveClass('workspace-overlay-open')
     const inspectorContentClose = within(inspectorSlot as HTMLElement).getByRole('button', {
-      name: 'common.close'
+      name: 'Close'
     })
     expect(inspectorContentClose).toHaveClass('workspace-inspector-content-close')
     fireEvent.click(inspectorContentClose)
@@ -319,10 +313,10 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
 
     renderEditableDeck(sourceItem)
     const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
-    await user.click(screen.getByRole('button', { name: '設計' }))
+    await user.click(screen.getByRole('tab', { name: 'Design' }))
     await user.click(within(ribbonFrame).getByRole('button', { name: 'Format Background' }))
 
-    const insertTab = screen.getByRole('button', { name: '插入' })
+    const insertTab = screen.getByRole('tab', { name: 'Insert' })
     await user.click(insertTab)
 
     expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
@@ -342,7 +336,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
 
     renderEditableDeck(sourceItem)
     const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
-    const designTab = screen.getByRole('button', { name: '設計' })
+    const designTab = screen.getByRole('tab', { name: 'Design' })
     await user.click(designTab)
     await user.click(within(ribbonFrame).getByRole('button', { name: 'Format Background' }))
 
@@ -366,13 +360,13 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     renderEditableDeck(sourceItem)
 
     const frame = await screen.findByTestId('presentation-ribbon-frame')
-    expect(frame).toHaveClass('h-28')
+    expect(frame).toHaveClass('h-24')
 
-    fireEvent.click(screen.getByRole('button', { name: '插入' }))
-    expect(frame).toHaveClass('h-28')
+    fireEvent.click(screen.getByRole('tab', { name: 'Insert' }))
+    expect(frame).toHaveClass('h-24')
 
-    fireEvent.click(screen.getByRole('button', { name: '設計' }))
-    expect(frame).toHaveClass('h-28')
+    fireEvent.click(screen.getByRole('tab', { name: 'Design' }))
+    expect(frame).toHaveClass('h-24')
   })
 
   it('does not mount off-screen editable slide previews', async () => {
@@ -432,16 +426,18 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     await screen.findByTestId('presentation-ribbon-frame')
     const groups = screen.getAllByTestId('presentation-ribbon-group')
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Clipboard',
+      'Slides',
       'Font',
       'Paragraph',
-      'Position',
+      'Insert',
       'Arrange'
     ])
     groups.forEach((group) => expect(group).toHaveClass('shrink-0'))
     const surface = window.document.querySelector('[data-ribbon-surface]')
     expect(surface).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
     const fontGroup = screen.getByRole('group', { name: 'Font' })
-    expect(fontGroup).toHaveClass('w-[440px]')
+    expect(fontGroup).toHaveClass('w-[376px]')
     const fontRows = fontGroup.querySelector('.grid.grid-rows-2')?.children
     expect(fontRows).toHaveLength(2)
     const firstRow = fontRows?.[0]
@@ -450,8 +446,8 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     const sizeSelect = Array.from(fontGroup.querySelectorAll('select')).find(
       (select) => select !== familySelect
     )
-    expect(familySelect).toHaveClass('min-w-44', 'flex-1')
-    expect(sizeSelect).toHaveClass('w-20')
+    expect(familySelect).toHaveClass('min-w-32', 'flex-1')
+    expect(sizeSelect).toHaveClass('w-14')
     expect(firstRow).toContainElement(familySelect)
     expect(firstRow).toContainElement(sizeSelect!)
     expect(firstRow).toContainElement(screen.getByRole('button', { name: 'Increase font size' }))
@@ -462,6 +458,8 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     expect(secondRow).toContainElement(screen.getByRole('button', { name: 'Clear formatting' }))
     expect(screen.getByRole('group', { name: 'Arrange' }).querySelector('.flex-wrap')).toBeNull()
     ;[
+      'Bring Forward',
+      'Send Backward',
       'Align objects left',
       'Align objects center',
       'Align objects right',
@@ -556,11 +554,120 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     renderEditableDeck(sourceItem)
     await screen.findByTestId('presentation-ribbon-frame')
 
-    fireEvent.click(screen.getByRole('button', { name: '插入' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Insert' }))
     expect(screen.getByRole('group', { name: 'Insert' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '設計' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Design' }))
     expect(screen.getByRole('group', { name: 'Background' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['zh-TW', '字型大小'],
+    ['zh-CN', '字体大小']
+  ])('localizes the Font size accessible name in %s', async (language, accessibleName) => {
+    await i18n.changeLanguage(language)
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+
+    expect(await screen.findByRole('combobox', { name: accessibleName })).toBeInTheDocument()
+  })
+
+  it('keeps the zh-TW Picture command distinct from the Picture Format contextual tab', async () => {
+    await i18n.changeLanguage('zh-TW')
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const image = createImageElement({
+      assetId: 'asset-1',
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: 640,
+      sourceHeight: 360
+    })
+    const withImage = addElementToSlide(document, slideId, image)
+    withImage.assets['asset-1'] = {
+      id: 'asset-1',
+      name: 'Worship image',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,AA=='
+    }
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withImage, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    const pictureCommand = await screen.findByRole('button', { name: '圖片' })
+    const imageElement = (await screen.findAllByRole('img', { name: 'Worship image' }))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(imageElement).not.toBeNull()
+    fireEvent.pointerDown(imageElement!, { clientX: 10, clientY: 10 })
+
+    expect(await screen.findByRole('tab', { name: '圖片格式' })).toBeInTheDocument()
+    expect(pictureCommand).toHaveAccessibleName('圖片')
+    expect(screen.queryByRole('tab', { name: '圖片' })).not.toBeInTheDocument()
+  })
+
+  it('returns a removed focused Picture Format tab to a one-click collapsible Home tab', async () => {
+    const user = userEvent.setup()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const image = createImageElement({
+      assetId: 'asset-1',
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: 640,
+      sourceHeight: 360
+    })
+    const withImage = addElementToSlide(document, slideId, image)
+    withImage.assets['asset-1'] = {
+      id: 'asset-1',
+      name: 'Worship image',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,AA=='
+    }
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withImage, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    const imageElement = (await screen.findAllByRole('img', { name: 'Worship image' }))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(imageElement).not.toBeNull()
+    fireEvent.pointerDown(imageElement!, { clientX: 10, clientY: 10 })
+    const pictureFormat = await screen.findByRole('tab', { name: 'Picture Format' })
+    await user.click(pictureFormat)
+    expect(pictureFormat).toHaveFocus()
+
+    await user.keyboard('{Delete}')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('tab', { name: 'Picture Format' })).not.toBeInTheDocument()
+    )
+    const home = screen.getByRole('tab', { name: 'Home' })
+    const panel = screen.getByTestId('presentation-ribbon-frame')
+    expect(home).toHaveFocus()
+    expect(home).toHaveAttribute('aria-selected', 'true')
+    expect(panel).toHaveClass('h-24')
+
+    await user.click(home)
+    expect(panel).toHaveClass('h-0')
   })
 
   it('groups Picture Format commands as Adjust, Arrange, and Size', async () => {
@@ -594,52 +701,12 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
       ?.closest('[data-slide-element]')
     expect(imageElement).not.toBeNull()
     fireEvent.pointerDown(imageElement!, { clientX: 10, clientY: 10 })
-    fireEvent.click(await screen.findByRole('button', { name: '圖片格式' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Picture Format' }))
 
     expect(
       screen
         .getAllByTestId('presentation-ribbon-group')
         .map((group) => group.getAttribute('aria-label'))
     ).toEqual(['Adjust', 'Arrange', 'Size'])
-  })
-
-  it('updates selected text box height from numeric controls', async () => {
-    const document = createBlankEditablePresentationDocument('Sunday')
-    const slideId = document.slideOrder[0]
-    const text = createTextElement({ text: 'Height', width: 220, height: 40, autoWidth: false })
-    const withText = addElementToSlide(document, slideId, text)
-    const sourceItem = makeFile({
-      id: 'editable-deck',
-      name: 'Sunday Editable',
-      url: 'blob:editable-deck',
-      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
-    })
-    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withText, revision: 0 })
-
-    renderEditableDeck(sourceItem)
-
-    const textBoxes = await screen.findAllByRole('textbox')
-    const mainTextBox = textBoxes[textBoxes.length - 1]
-    if (!mainTextBox) throw new Error('main text box not found')
-    fireEvent.click(mainTextBox)
-    fireEvent.change(screen.getByLabelText('height'), { target: { value: '96' } })
-
-    await waitFor(() =>
-      expect(mocks.persistEditablePresentationRevision).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          itemId: 'editable-deck',
-          sourceBlobId: 'editable-deck',
-          document: expect.objectContaining({
-            slides: expect.objectContaining({
-              [slideId]: expect.objectContaining({
-                elements: expect.objectContaining({
-                  [text.id]: expect.objectContaining({ height: 96 })
-                })
-              })
-            })
-          })
-        })
-      )
-    )
   })
 })

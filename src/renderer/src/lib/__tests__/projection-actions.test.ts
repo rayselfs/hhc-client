@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS, DEFAULT_STATE, useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { startTimerProjection } from '../projection-actions'
+import type { FileItemRecord } from '@shared/types/folder'
+import { startMediaProjection, startTimerProjection } from '../projection-actions'
 
 describe('projection actions', () => {
   beforeEach(() => {
@@ -79,5 +80,46 @@ describe('projection actions', () => {
         ]
       ])
     )
+  })
+
+  it('reserves the browser projection window before media readiness settles', async () => {
+    const item: FileItemRecord = {
+      id: 'video-1',
+      name: 'Welcome.mp4',
+      mimeType: 'video/mp4',
+      type: 'file',
+      sortIndex: 0,
+      parentId: 'root',
+      size: 1,
+      url: 'blob:video-1',
+      createdAt: 1,
+      expiresAt: null
+    }
+    let resolveReadiness!: (value: {
+      summary: {
+        ready: number
+        preparing: number
+        unsupported: number
+        missing: number
+        failed: number
+      }
+      items: []
+    }) => void
+    const readiness = new Promise<Parameters<typeof resolveReadiness>[0]>((resolve) => {
+      resolveReadiness = resolve
+    })
+    const ensureProjectionOpen = vi.fn(() => Promise.resolve())
+
+    const result = startMediaProjection([item], 0, {
+      ensureProjectionOpen,
+      startMediaPresentation: () => readiness
+    })
+
+    expect(ensureProjectionOpen).toHaveBeenCalledOnce()
+    resolveReadiness({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: []
+    })
+    await result
   })
 })

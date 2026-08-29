@@ -12,7 +12,25 @@ export const SHORTCUTS = {
       code: 'KeyY',
       metaOrCtrl: true,
       mac: { code: 'KeyZ', meta: true, shift: true }
-    }
+    },
+    NEW_SLIDE: {
+      code: 'KeyM',
+      ctrl: true,
+      mac: { code: 'KeyN', ctrl: false, meta: true, shift: true }
+    },
+    DUPLICATE: { code: 'KeyD', ctrl: true, mac: { ctrl: false, meta: true } },
+    ZOOM_IN: {
+      code: 'Equal',
+      ctrl: true,
+      shift: true,
+      mac: { ctrl: false, meta: true }
+    },
+    ZOOM_IN_ALT: { code: 'Equal', ctrl: true, mac: { ctrl: false, meta: true } },
+    ZOOM_OUT: { code: 'Minus', ctrl: true, mac: { ctrl: false, meta: true } },
+    ZOOM_FIT: { code: 'KeyO', ctrl: true, alt: true, mac: { ctrl: false, meta: true } },
+    BOLD: { code: 'KeyB', ctrl: true, mac: { ctrl: false, meta: true } },
+    ITALIC: { code: 'KeyI', ctrl: true, mac: { ctrl: false, meta: true } },
+    UNDERLINE: { code: 'KeyU', ctrl: true, mac: { ctrl: false, meta: true } }
   },
   BIBLE: {
     PREV_VERSE: { code: 'ArrowUp' },

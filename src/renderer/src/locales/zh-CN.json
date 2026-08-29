@@ -587,6 +587,8 @@
     "home": "常用",
     "insert": "插入",
     "design": "设计",
+    "fit": "适合窗口",
+    "clipboard": "剪贴板",
     "ribbonGroups": {
       "font": "字体",
       "paragraph": "段落",
@@ -598,6 +600,7 @@
       "size": "大小"
     },
     "fontFamily": "字体",
+    "fontSize": "字体大小",
     "loadLocalFonts": "加载本机字体",
     "localFontsLoadFailed": "无法加载本机字体，请确认已允许字体访问权限。",
     "present": "投影",
@@ -605,6 +608,10 @@
     "untitledName": "未命名演示文稿",
     "text": "文字",
     "image": "图片",
+    "picture": "图片",
+    "pictureFormat": "图片格式",
+    "shapes": "形状",
+    "textBox": "文本框",
     "moveSlideUp": "上移",
     "moveSlideDown": "下移",
     "copyElement": "复制对象",

@@ -18,6 +18,7 @@ const {
   mockStopProjection,
   mockClaimProjection,
   mockPauseTimer,
+  mockToastDanger,
   storeState
 } = vi.hoisted(() => {
   const videoItem: FileItemRecord = {
@@ -46,6 +47,7 @@ const {
     mockStopProjection: vi.fn(),
     mockClaimProjection: vi.fn(),
     mockPauseTimer: vi.fn(),
+    mockToastDanger: vi.fn(),
     storeState: {
       playlist: [videoItem],
       showGrid: false,
@@ -93,6 +95,10 @@ vi.mock('@renderer/stores/timer-runtime', () => ({
 }))
 
 vi.mock('@renderer/stores/media-projection', () => ({
+  resolveMediaProjectionAction: async (result: unknown) => {
+    const resolved = await result
+    return typeof resolved === 'boolean' ? { status: resolved ? 'success' : 'noop' } : resolved
+  },
   useMediaProjectionStore: Object.assign(
     vi.fn((selector: (state: typeof storeState) => unknown) => selector(storeState)),
     {
@@ -107,6 +113,8 @@ vi.mock('@renderer/stores/media-projection', () => ({
     }
   )
 }))
+
+vi.mock('@heroui/react/toast', () => ({ toast: { danger: mockToastDanger } }))
 
 vi.mock('@renderer/lib/media-projection-sync', () => ({
   useMediaProjectionSync: vi.fn()
@@ -169,6 +177,8 @@ beforeEach(() => {
   storeState.zoomLevel = 1
   storeState.currentItem = () => storeState.currentFile
   storeState.typeStates.video = { hasStarted: false, isPlaying: false, isEnded: false }
+  mockNext.mockReturnValue(true)
+  mockPrev.mockReturnValue(true)
 })
 
 describe('MediaPresenter video keyboard behavior', () => {
@@ -196,6 +206,17 @@ describe('MediaPresenter video keyboard behavior', () => {
 
     expect(mockNext).toHaveBeenCalledOnce()
     expect(mockPrev).toHaveBeenCalledOnce()
+  })
+
+  it('does not show a save failure toast when keyboard navigation is superseded', async () => {
+    mockNext.mockResolvedValueOnce({ status: 'superseded' })
+    render(<MediaPresenter onExit={mockExit} />)
+
+    findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mockToastDanger).not.toHaveBeenCalled()
   })
 
   it('uses item navigation for single left and right even while video is playing', () => {

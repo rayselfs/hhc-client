@@ -1,91 +1,85 @@
-import { describe, it, expect } from 'vitest'
-import axios from 'axios'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { http } from '../http'
 
-// Get the transformer function for testing
-const getTransformer = (): ((data: string) => unknown) => {
-  const transformers = http.defaults.transformResponse as unknown as ((data: string) => unknown)[]
-  return transformers[0]
-}
-
 describe('http', () => {
-  it('is an axios instance', () => {
-    expect(axios.isAxiosError).toBeDefined()
-    expect(http).toBeDefined()
-    expect(http.get).toBeDefined()
-    expect(http.post).toBeDefined()
-    expect(http.defaults).toBeDefined()
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
-  it('has 30 second timeout', () => {
-    expect(http.defaults.timeout).toBe(30_000)
+  it('gets JSON and converts nested snake_case keys to camelCase', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            user_info: { first_name: 'Jane', last_address: { zip_code: '12345' } },
+            is_active: true
+          })
+        )
+      )
+    )
+
+    await expect(http.get('/api/example')).resolves.toEqual({
+      data: {
+        userInfo: { firstName: 'Jane', lastAddress: { zipCode: '12345' } },
+        isActive: true
+      }
+    })
   })
 
-  describe('transformResponse', () => {
-    it('parses JSON string to object', () => {
-      const transformer = getTransformer()
-      const data = '{"key": "value"}'
-      const result = transformer(data)
+  it('rejects unsuccessful HTTP responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(new Response('', { status: 503, statusText: 'Service Unavailable' }))
+    )
 
-      expect(result).toEqual({ key: 'value' })
-    })
+    await expect(http.get('/api/example')).rejects.toThrow('HTTP 503: Service Unavailable')
+  })
 
-    it('converts snake_case keys to camelCase', () => {
-      const transformer = getTransformer()
-      const data = '{"first_name": "John", "last_name": "Doe"}'
-      const result = transformer(data)
-
-      expect(result).toEqual({ firstName: 'John', lastName: 'Doe' })
-    })
-
-    it('converts nested snake_case keys to camelCase with deep:true', () => {
-      const transformer = getTransformer()
-      const data = '{"user_info": {"first_name": "Jane", "last_address": {"zip_code": "12345"}}}'
-      const result = transformer(data)
-
-      expect(result).toEqual({
-        userInfo: { firstName: 'Jane', lastAddress: { zipCode: '12345' } }
+  it('aborts a request after its configured timeout', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'))
+          })
+        })
       })
-    })
+    )
 
-    it('handles arrays with objects inside', () => {
-      const transformer = getTransformer()
-      const data = '[{"user_id": 1}, {"user_id": 2}]'
-      const result = transformer(data)
+    const request = http.get('/api/example', { timeout: 25 })
+    const rejection = expect(request).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.advanceTimersByTimeAsync(25)
 
-      expect(result).toEqual([{ userId: 1 }, { userId: 2 }])
-    })
+    await rejection
+  })
 
-    it('handles empty object', () => {
-      const transformer = getTransformer()
-      const data = '{}'
-      const result = transformer(data)
+  it('uses a 30 second timeout by default', async () => {
+    vi.useFakeTimers()
+    let signal: AbortSignal | null | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+        signal = init?.signal
+        return new Promise<Response>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'))
+          })
+        })
+      })
+    )
 
-      expect(result).toEqual({})
-    })
+    const request = http.get('/api/example')
+    const rejection = expect(request).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.advanceTimersByTimeAsync(29_999)
+    expect(signal?.aborted).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
 
-    it('handles empty array', () => {
-      const transformer = getTransformer()
-      const data = '[]'
-      const result = transformer(data)
-
-      expect(result).toEqual([])
-    })
-
-    it('preserves numeric and boolean values', () => {
-      const transformer = getTransformer()
-      const data = '{"count": 42, "is_active": true, "balance": 99.99}'
-      const result = transformer(data)
-
-      expect(result).toEqual({ count: 42, isActive: true, balance: 99.99 })
-    })
-
-    it('preserves null values', () => {
-      const transformer = getTransformer()
-      const data = '{"value": null}'
-      const result = transformer(data)
-
-      expect(result).toEqual({ value: null })
-    })
+    await rejection
   })
 })

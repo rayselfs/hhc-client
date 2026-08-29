@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   EditablePresentationDocument,
   EditablePresentationElement,
@@ -6,8 +6,11 @@ import type {
   EditableTextInsertFrame
 } from '@renderer/lib/editable-presentation'
 import {
+  CONTENT_HEIGHT_TEXT_PADDING_X,
+  CONTENT_HEIGHT_TEXT_PADDING_Y,
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
+  hasContentHeight,
   getSlideBackgroundCss,
   getSlideBackgroundPrimaryColor
 } from '@renderer/lib/editable-presentation'
@@ -32,10 +35,14 @@ interface EditableSlideSurfaceProps {
     additive: boolean
   ) => void
   onEditingElementChange?: (elementId: string | null) => void
+  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
-  onTransformStart?: () => void
-  onTransformPreview?: (elementId: string, updates: Partial<EditablePresentationElement>) => void
+  onTransformStart?: (elementId: string) => EditablePresentationElement | undefined
+  onTransformPreview?: (
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => boolean | void
   onTransformCommit?: () => void
   onTransformCancel?: () => void
   onUpdateElement?: (
@@ -45,6 +52,11 @@ interface EditableSlideSurfaceProps {
   ) => void
 }
 
+type TextEditFinalizer = (() => boolean) & {
+  hasUnsafeWork?: () => boolean
+  isComposing?: () => boolean
+}
+
 interface DragState {
   elementId: string
   mode: 'move' | 'resize' | 'crop'
@@ -52,6 +64,7 @@ interface DragState {
   startX: number
   startY: number
   original: EditablePresentationElement
+  hasPersistedChanges: boolean
 }
 
 interface TextInsertState {
@@ -77,9 +90,15 @@ const TEXT_AUTO_MIN_WIDTH = INSERTED_TEXT_CLICK_SIZE.width
 const TEXT_FRAME_HIT_AREA = 6
 const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
+const RESIZE_HIT_TARGET_SIZE = 25
+const RESIZE_INDICATOR_HIT_SIZE = 4
+const TEXT_HANDLE_SIZE = 12
+const IMAGE_HANDLE_SIZE = 16
+const GENERIC_HANDLE_SIZE = 20
 
 const IMAGE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-const TEXT_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const CONTENT_TEXT_HANDLES: ResizeHandle[] = ['nw', 'w', 'sw', 'ne', 'e', 'se']
+const FIXED_TEXT_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
 export default function EditableSlideSurface({
   document,
@@ -95,6 +114,7 @@ export default function EditableSlideSurface({
   onSelectElement,
   onMarqueeSelect,
   onEditingElementChange,
+  onTextEditFinalizerChange,
   onInsertText,
   onElementContextMenu,
   onTransformStart,
@@ -108,9 +128,20 @@ export default function EditableSlideSurface({
   const dragRef = useRef<DragState | null>(null)
   const textInsertRef = useRef<TextInsertState | null>(null)
   const marqueeRef = useRef<MarqueeState | null>(null)
+  const textEditFinalizerRef = useRef<(() => boolean) | null>(null)
   const scaleRef = useRef({ x: 1, y: 1 })
   const [surfaceScale, setSurfaceScale] = useState(1)
   const [marquee, setMarquee] = useState<MarqueeState | null>(null)
+
+  const setTextEditFinalizer = useCallback(
+    (finalize: (() => boolean) | null): void => {
+      textEditFinalizerRef.current = finalize
+      onTextEditFinalizerChange?.(finalize)
+    },
+    [onTextEditFinalizerChange]
+  )
+
+  const finalizeTextEdit = (): boolean => textEditFinalizerRef.current?.() ?? true
 
   const orderedElements = useMemo(() => {
     if (!slide) return []
@@ -124,7 +155,7 @@ export default function EditableSlideSurface({
     if (!surface) return
     const updateScale = (): void => {
       const rect = surface.getBoundingClientRect()
-      if (rect.width > 0) setSurfaceScale(rect.width / document.width)
+      setSurfaceScale(normalizeSurfaceScale(rect.width / document.width))
     }
     updateScale()
     if (!('ResizeObserver' in window)) return
@@ -146,6 +177,7 @@ export default function EditableSlideSurface({
     handle?: ResizeHandle
   ): void => {
     if (!editable || element.locked) return
+    if (!finalizeTextEdit()) return
     event.preventDefault()
     event.stopPropagation()
     const rect = surfaceRef.current?.getBoundingClientRect()
@@ -155,17 +187,19 @@ export default function EditableSlideSurface({
         y: document.height / rect.height
       }
     }
+    onEditingElementChange?.(null)
+    onSelectElement?.(element.id, event)
+    const original = onTransformStart ? onTransformStart(element.id) : element
+    if (!original) return
     dragRef.current = {
       elementId: element.id,
       mode,
       handle,
       startX: event.clientX,
       startY: event.clientY,
-      original: element
+      original,
+      hasPersistedChanges: false
     }
-    onEditingElementChange?.(null)
-    onSelectElement?.(element.id, event)
-    onTransformStart?.()
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
@@ -189,7 +223,7 @@ export default function EditableSlideSurface({
       updates = {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false,
-        autoSize: 'fixed'
+        autoSize: hasContentHeight(drag.original) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'image' && drag.handle) {
       updates = calculateImageResize(
@@ -204,20 +238,79 @@ export default function EditableSlideSurface({
         height: Math.max(MIN_ELEMENT_SIZE, drag.original.height + dy)
       } as Partial<EditablePresentationElement>
     }
+    const rawHasPersistedChanges = hasElementPatchChanges(drag.original, updates)
     if (onTransformPreview) {
-      onTransformPreview(drag.elementId, updates)
-    } else {
+      drag.hasPersistedChanges =
+        onTransformPreview(drag.elementId, updates) ?? rawHasPersistedChanges
+    } else if (rawHasPersistedChanges) {
+      drag.hasPersistedChanges = true
       onUpdateElement?.(slideId, drag.elementId, updates)
+    } else {
+      drag.hasPersistedChanges = false
     }
   }
 
+  const resizeWithKeyboard = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    element: EditablePresentationElement,
+    handle: ResizeHandle,
+    mode: 'resize' | 'crop'
+  ): void => {
+    const horizontalOnly = element.type === 'text' && hasContentHeight(element)
+    const delta = getKeyboardResizeDelta(event, handle, horizontalOnly)
+    if (!delta || !finalizeTextEdit()) return
+    const original = onTransformStart ? onTransformStart(element.id) : element
+    if (!original) return
+
+    let updates: Partial<EditablePresentationElement>
+    if (mode === 'crop' && original.type === 'image') {
+      updates = {
+        crop: calculateImageCrop(original.crop, handle, delta.dx, delta.dy, original)
+      } as Partial<EditablePresentationElement>
+    } else if (original.type === 'text') {
+      updates = {
+        ...calculateTextResize(original, handle, delta.dx, delta.dy),
+        autoWidth: false,
+        autoSize: hasContentHeight(original) ? 'content' : 'fixed'
+      } as Partial<EditablePresentationElement>
+    } else if (original.type === 'image') {
+      updates = calculateImageResize(
+        original,
+        handle,
+        delta.dx,
+        delta.dy
+      ) as Partial<EditablePresentationElement>
+    } else {
+      updates = {
+        width: Math.max(MIN_ELEMENT_SIZE, original.width + delta.dx),
+        height: Math.max(MIN_ELEMENT_SIZE, original.height + delta.dy)
+      } as Partial<EditablePresentationElement>
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    onEditingElementChange?.(null)
+    const rawHasPersistedChanges = hasElementPatchChanges(original, updates)
+    const hasPersistedChanges = onTransformPreview
+      ? (onTransformPreview(element.id, updates) ?? rawHasPersistedChanges)
+      : rawHasPersistedChanges
+    if (!hasPersistedChanges) {
+      onTransformCancel?.()
+      return
+    }
+    if (!onTransformPreview) onUpdateElement?.(slideId, element.id, updates)
+    onTransformCommit?.()
+  }
+
   const endDrag = (event: React.PointerEvent): void => {
-    if (!dragRef.current) return
+    const drag = dragRef.current
+    if (!drag) return
     dragRef.current = null
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    onTransformCommit?.()
+    if (drag.hasPersistedChanges) onTransformCommit?.()
+    else onTransformCancel?.()
   }
 
   const cancelDrag = (event: React.PointerEvent): void => {
@@ -279,7 +372,8 @@ export default function EditableSlideSurface({
         y: Math.max(0, Math.min(document.height - INSERTED_TEXT_CLICK_SIZE.height, insert.startY)),
         width: INSERTED_TEXT_CLICK_SIZE.width,
         height: INSERTED_TEXT_CLICK_SIZE.height,
-        autoSize: 'content'
+        autoSize: 'content',
+        autoWidth: true
       })
       return
     }
@@ -293,7 +387,8 @@ export default function EditableSlideSurface({
       y: Math.max(0, Math.min(document.height - height, y)),
       width,
       height,
-      autoSize: 'fixed'
+      autoSize: 'content',
+      autoWidth: false
     })
   }
 
@@ -355,7 +450,8 @@ export default function EditableSlideSurface({
       y: Math.max(0, Math.min(document.height - INSERTED_TEXT_CLICK_SIZE.height, point.y)),
       width: INSERTED_TEXT_CLICK_SIZE.width,
       height: INSERTED_TEXT_CLICK_SIZE.height,
-      autoSize: 'content'
+      autoSize: 'content',
+      autoWidth: true
     })
   }
 
@@ -363,7 +459,7 @@ export default function EditableSlideSurface({
     <div
       data-slide-surface
       ref={surfaceRef}
-      className={`relative aspect-video w-full overflow-hidden bg-black ${
+      className={`relative aspect-video w-full overflow-visible bg-black ${
         isTextInsertMode ? 'cursor-crosshair' : ''
       } ${className ?? ''}`}
       style={{
@@ -374,6 +470,7 @@ export default function EditableSlideSurface({
       onPointerDown={(event) => {
         if (!editable) return
         if (startTextInsert(event)) return
+        if (!finalizeTextEdit()) return
         onEditingElementChange?.(null)
         if (!(event.metaKey || event.ctrlKey)) onSelectElement?.(null, event)
         startMarquee(event)
@@ -393,7 +490,59 @@ export default function EditableSlideSurface({
       onDoubleClick={insertTextAtPointer}
     >
       <div
-        className="absolute left-0 top-0"
+        data-slide-content
+        className="absolute inset-0 overflow-hidden"
+        style={{ borderRadius: 'inherit' }}
+      >
+        <div
+          className="absolute left-0 top-0"
+          style={{
+            width: document.width,
+            height: document.height,
+            transform: `scale(${surfaceScale})`,
+            transformOrigin: 'top left'
+          }}
+        >
+          {orderedElements.map((element) => (
+            <SlideElement
+              key={element.id}
+              document={document}
+              slide={slide}
+              element={element}
+              editable={editable}
+              editing={element.id === editingElementId}
+              onSelect={(event) => onSelectElement?.(element.id, event)}
+              onPointerDown={(event) => startDrag(event, element, 'move')}
+              onPointerMove={updateDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={cancelDrag}
+              onContextMenu={(event) => onElementContextMenu?.(event, element)}
+              onUpdateElement={onUpdateElement}
+              onStartTextEdit={() => {
+                onSelectElement?.(element.id)
+                onEditingElementChange?.(element.id)
+              }}
+              onFinishTextEdit={() => onEditingElementChange?.(null)}
+              onTextEditFinalizerChange={setTextEditFinalizer}
+            />
+          ))}
+          {marquee && (
+            <div
+              data-testid="element-marquee"
+              className="pointer-events-none absolute border border-primary bg-primary/15"
+              style={{
+                left: Math.min(marquee.startX, marquee.currentX),
+                top: Math.min(marquee.startY, marquee.currentY),
+                width: Math.abs(marquee.currentX - marquee.startX),
+                height: Math.abs(marquee.currentY - marquee.startY)
+              }}
+            />
+          )}
+        </div>
+      </div>
+      <div
+        data-selection-layer
+        className="pointer-events-none absolute left-0 top-0 overflow-visible"
         style={{
           width: document.width,
           height: document.height,
@@ -401,47 +550,30 @@ export default function EditableSlideSurface({
           transformOrigin: 'top left'
         }}
       >
-        {orderedElements.map((element) => (
-          <SlideElement
-            key={element.id}
-            document={document}
-            slide={slide}
-            element={element}
-            editable={editable}
-            editing={element.id === editingElementId}
-            cropMode={element.id === cropElementId}
-            selected={
-              element.id === selectedElementId || Boolean(selectedElementIds?.has(element.id))
-            }
-            primarySelected={element.id === selectedElementId}
-            onSelect={(event) => onSelectElement?.(element.id, event)}
-            onPointerDown={(event) => startDrag(event, element, 'move')}
-            onPointerMove={updateDrag}
-            onPointerUp={endDrag}
-            onPointerCancel={cancelDrag}
-            onContextMenu={(event) => onElementContextMenu?.(event, element)}
-            onUpdateElement={onUpdateElement}
-            onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
-            onCropPointerDown={(event, handle) => startDrag(event, element, 'crop', handle)}
-            onStartTextEdit={() => {
-              onSelectElement?.(element.id)
-              onEditingElementChange?.(element.id)
-            }}
-            onFinishTextEdit={() => onEditingElementChange?.(null)}
-          />
-        ))}
-        {marquee && (
-          <div
-            data-testid="element-marquee"
-            className="pointer-events-none absolute border border-primary bg-primary/15"
-            style={{
-              left: Math.min(marquee.startX, marquee.currentX),
-              top: Math.min(marquee.startY, marquee.currentY),
-              width: Math.abs(marquee.currentX - marquee.startX),
-              height: Math.abs(marquee.currentY - marquee.startY)
-            }}
-          />
-        )}
+        {orderedElements.map((element) => {
+          const selected =
+            element.id === selectedElementId || Boolean(selectedElementIds?.has(element.id))
+          if (!selected) return null
+          return (
+            <SelectionChrome
+              key={`selection-${element.id}`}
+              element={element}
+              cropMode={element.id === cropElementId}
+              surfaceScale={surfaceScale}
+              showHandles={editable && element.id === selectedElementId && !element.locked}
+              onMovePointerDown={(event) => startDrag(event, element, 'move')}
+              onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
+              onCropPointerDown={(event, handle) => startDrag(event, element, 'crop', handle)}
+              onResizeKeyDown={(event, handle) =>
+                resizeWithKeyboard(event, element, handle, 'resize')
+              }
+              onCropKeyDown={(event, handle) => resizeWithKeyboard(event, element, handle, 'crop')}
+              onPointerMove={updateDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={cancelDrag}
+            />
+          )
+        })}
       </div>
     </div>
   )
@@ -463,9 +595,6 @@ function SlideElement({
   element,
   editable,
   editing,
-  cropMode,
-  selected,
-  primarySelected,
   onSelect,
   onPointerDown,
   onPointerMove,
@@ -473,19 +602,15 @@ function SlideElement({
   onPointerCancel,
   onContextMenu,
   onUpdateElement,
-  onResizePointerDown,
-  onCropPointerDown,
   onStartTextEdit,
-  onFinishTextEdit
+  onFinishTextEdit,
+  onTextEditFinalizerChange
 }: {
   document: EditablePresentationDocument
   slide: EditablePresentationSlide
   element: EditablePresentationElement
   editable: boolean
   editing: boolean
-  cropMode: boolean
-  selected: boolean
-  primarySelected: boolean
   onSelect: (event: React.MouseEvent) => void
   onPointerDown: (event: React.PointerEvent) => void
   onPointerMove: (event: React.PointerEvent) => void
@@ -497,10 +622,9 @@ function SlideElement({
     elementId: string,
     updates: Partial<EditablePresentationElement>
   ) => void
-  onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
-  onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onStartTextEdit: () => void
   onFinishTextEdit: () => void
+  onTextEditFinalizerChange: (finalize: TextEditFinalizer | null) => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
     left: element.x,
@@ -514,9 +638,7 @@ function SlideElement({
   return (
     <div
       data-slide-element
-      className={`absolute ${editable ? 'cursor-move' : ''} ${
-        selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''
-      }`}
+      className={`absolute ${editable ? 'cursor-move' : ''}`}
       style={commonStyle}
       onPointerDown={(event) => {
         if (editing) return
@@ -539,17 +661,71 @@ function SlideElement({
         editing,
         onUpdateElement,
         onStartTextEdit,
-        onFinishTextEdit
+        onFinishTextEdit,
+        onTextEditFinalizerChange
       )}
-      {editable && primarySelected && !element.locked && (
+    </div>
+  )
+}
+
+function SelectionChrome({
+  element,
+  cropMode,
+  surfaceScale,
+  showHandles,
+  onMovePointerDown,
+  onResizePointerDown,
+  onCropPointerDown,
+  onResizeKeyDown,
+  onCropKeyDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel
+}: {
+  element: EditablePresentationElement
+  cropMode: boolean
+  surfaceScale: number
+  showHandles: boolean
+  onMovePointerDown: (event: React.PointerEvent) => void
+  onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
+  onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
+  onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
+  onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
+  onPointerMove: (event: React.PointerEvent) => void
+  onPointerUp: (event: React.PointerEvent) => void
+  onPointerCancel: (event: React.PointerEvent) => void
+}): React.JSX.Element {
+  return (
+    <div
+      data-selection-chrome
+      className="pointer-events-none absolute outline-solid outline-primary"
+      style={{
+        left: element.x,
+        top: element.y,
+        width: element.width,
+        height: element.height,
+        transform: `rotate(${element.rotation}deg)`,
+        outlineWidth: 1.5 / surfaceScale,
+        outlineOffset: `${2 / surfaceScale}px`
+      }}
+      onPointerDownCapture={(event) => {
+        const handle = getNearestResizeHandle(event)
+        if (!handle) return
+        if (cropMode && element.type === 'image') onCropPointerDown(event, handle)
+        else onResizePointerDown(event, handle)
+      }}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    >
+      {showHandles && (
         <ElementHandles
           element={element}
           cropMode={cropMode}
-          onResizePointerDown={onResizePointerDown}
-          onCropPointerDown={onCropPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
+          surfaceScale={surfaceScale}
+          onMovePointerDown={onMovePointerDown}
+          onResizeKeyDown={onResizeKeyDown}
+          onCropKeyDown={onCropKeyDown}
         />
       )}
     </div>
@@ -559,40 +735,96 @@ function SlideElement({
 function ElementHandles({
   element,
   cropMode,
-  onResizePointerDown,
-  onCropPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel
+  surfaceScale,
+  onMovePointerDown,
+  onResizeKeyDown,
+  onCropKeyDown
 }: {
   element: EditablePresentationElement
   cropMode: boolean
-  onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
-  onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
-  onPointerMove: (event: React.PointerEvent) => void
-  onPointerUp: (event: React.PointerEvent) => void
-  onPointerCancel: (event: React.PointerEvent) => void
+  surfaceScale: number
+  onMovePointerDown: (event: React.PointerEvent) => void
+  onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
+  onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
 }): React.JSX.Element {
   if (element.type === 'text') {
+    const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
+    const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
+    const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+    const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
+    const handleSize = TEXT_HANDLE_SIZE / surfaceScale
+    const borderWidth = 1.5 / surfaceScale
     return (
       <>
-        {TEXT_HANDLES.map((handle) => (
+        {(['top', 'right', 'bottom', 'left'] as const).map((edge) => (
+          <div
+            key={`move-text-${edge}`}
+            data-text-frame-edge={edge}
+            data-testid={`text-frame-edge-${edge}`}
+            className="pointer-events-auto absolute cursor-move"
+            style={{
+              zIndex: 10,
+              touchAction: 'none',
+              ...(edge === 'top' || edge === 'bottom'
+                ? {
+                    left: 0,
+                    width: '100%',
+                    height: edgeSize,
+                    [edge]: -edgeSize
+                  }
+                : {
+                    top: 0,
+                    width: edgeSize,
+                    height: '100%',
+                    [edge]: -edgeSize
+                  })
+            }}
+            onPointerDown={onMovePointerDown}
+          />
+        ))}
+        {handles.map((handle) => (
           <button
             key={`resize-text-${handle}`}
             type="button"
-            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute size-4 rounded-[2px] border-2 border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]`}
+            data-resize-handle={handle}
+            className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-[2px]`}
             aria-label={`Resize text box ${handleToLabel(handle)}`}
-            onPointerDown={(event) => onResizePointerDown(event, handle)}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerCancel}
-          />
+            style={{
+              ...getTextHandlePositionStyle(handle, hitTargetSize),
+              zIndex: 20,
+              width: hitTargetSize,
+              height: hitTargetSize,
+              touchAction: 'none'
+            }}
+            onKeyDown={(event) => onResizeKeyDown(event, handle)}
+          >
+            <span
+              data-resize-handle-indicator
+              aria-hidden="true"
+              className="pointer-events-auto absolute"
+              style={{
+                ...getHandleIndicatorPositionStyle(handle, indicatorHitSize),
+                width: indicatorHitSize,
+                height: indicatorHitSize
+              }}
+            >
+              <span
+                data-resize-handle-visual
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
+                style={{ width: handleSize, height: handleSize, borderWidth }}
+              />
+            </span>
+          </button>
         ))}
       </>
     )
   }
 
   if (element.type === 'image') {
+    const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+    const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
+    const handleSize = IMAGE_HANDLE_SIZE / surfaceScale
+    const borderWidth = 1 / surfaceScale
     return (
       <>
         {cropMode && (
@@ -602,32 +834,80 @@ function ElementHandles({
           <button
             key={`${cropMode ? 'crop' : 'resize'}-${handle}`}
             type="button"
-            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute size-4 rounded-full border border-white ${
-              cropMode ? 'bg-warning' : 'bg-primary'
-            }`}
+            data-resize-handle={handle}
+            className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-full`}
             aria-label={`${cropMode ? 'Crop' : 'Resize'} image ${handleToLabel(handle)}`}
-            onPointerDown={(event) =>
-              cropMode ? onCropPointerDown(event, handle) : onResizePointerDown(event, handle)
+            style={{
+              ...getTextHandlePositionStyle(handle, hitTargetSize),
+              zIndex: 20,
+              width: hitTargetSize,
+              height: hitTargetSize,
+              touchAction: 'none'
+            }}
+            onKeyDown={(event) =>
+              cropMode ? onCropKeyDown(event, handle) : onResizeKeyDown(event, handle)
             }
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerCancel}
-          />
+          >
+            <span
+              data-resize-handle-indicator
+              aria-hidden="true"
+              className="pointer-events-auto absolute"
+              style={{
+                ...getHandleIndicatorPositionStyle(handle, indicatorHitSize),
+                width: indicatorHitSize,
+                height: indicatorHitSize
+              }}
+            >
+              <span
+                data-resize-handle-visual
+                className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white ${
+                  cropMode ? 'bg-warning' : 'bg-primary'
+                }`}
+                style={{ width: handleSize, height: handleSize, borderWidth }}
+              />
+            </span>
+          </button>
         ))}
       </>
     )
   }
 
+  const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
+  const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
+  const handleSize = GENERIC_HANDLE_SIZE / surfaceScale
+  const borderWidth = 1 / surfaceScale
   return (
     <button
       type="button"
-      className="absolute -bottom-2 -right-2 size-5 cursor-nwse-resize rounded-full border border-white bg-primary"
+      data-resize-handle="se"
+      className="pointer-events-auto absolute flex cursor-nwse-resize items-center justify-center rounded-full"
       aria-label="Resize element"
-      onPointerDown={(event) => onResizePointerDown(event, 'se')}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-    />
+      style={{
+        ...getTextHandlePositionStyle('se', hitTargetSize),
+        zIndex: 20,
+        width: hitTargetSize,
+        height: hitTargetSize,
+        touchAction: 'none'
+      }}
+      onKeyDown={(event) => onResizeKeyDown(event, 'se')}
+    >
+      <span
+        data-resize-handle-indicator
+        aria-hidden="true"
+        className="pointer-events-auto absolute"
+        style={{
+          ...getHandleIndicatorPositionStyle('se', indicatorHitSize),
+          width: indicatorHitSize,
+          height: indicatorHitSize
+        }}
+      >
+        <span
+          data-resize-handle-visual
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary"
+          style={{ width: handleSize, height: handleSize, borderWidth }}
+        />
+      </span>
+    </button>
   )
 }
 
@@ -643,7 +923,8 @@ function renderElementContent(
     updates: Partial<EditablePresentationElement>
   ) => void,
   onStartTextEdit?: () => void,
-  onFinishTextEdit?: () => void
+  onFinishTextEdit?: () => void,
+  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
 ): React.ReactNode {
   if (element.type === 'text') {
     return (
@@ -655,6 +936,7 @@ function renderElementContent(
         onUpdateElement={onUpdateElement}
         onStartTextEdit={onStartTextEdit}
         onFinishTextEdit={onFinishTextEdit}
+        onTextEditFinalizerChange={onTextEditFinalizerChange}
       />
     )
   }
@@ -747,10 +1029,16 @@ function calculateTextResize(
 ): Partial<EditablePresentationElement> {
   const hasWest = handle.includes('w')
   const hasEast = handle.includes('e')
+  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
+  if (hasContentHeight(element)) {
+    return {
+      x: hasWest ? element.x + (element.width - width) : element.x,
+      width
+    } as Partial<EditablePresentationElement>
+  }
+
   const hasNorth = handle.includes('n')
   const hasSouth = handle.includes('s')
-
-  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
   const height = Math.max(TEXT_MIN_HEIGHT, element.height + (hasSouth ? dy : hasNorth ? -dy : 0))
 
   return {
@@ -761,10 +1049,32 @@ function calculateTextResize(
   } as Partial<EditablePresentationElement>
 }
 
+function hasElementPatchChanges(
+  element: EditablePresentationElement,
+  updates: Partial<EditablePresentationElement>
+): boolean {
+  return Object.entries(updates).some(([key, value]) => {
+    if (key !== 'crop') {
+      return !Object.is(element[key as keyof EditablePresentationElement], value)
+    }
+    if (element.type !== 'image') return true
+    const current = normalizeImageCrop(element.crop)
+    const next = normalizeImageCrop(
+      value as Extract<EditablePresentationElement, { type: 'image' }>['crop']
+    )
+    return (
+      current.top !== next.top ||
+      current.right !== next.right ||
+      current.bottom !== next.bottom ||
+      current.left !== next.left
+    )
+  })
+}
+
 function isContentAutoSizedText(
   element: Extract<EditablePresentationElement, { type: 'text' }>
 ): boolean {
-  return element.autoSize === 'content' || element.autoWidth === true
+  return hasContentHeight(element)
 }
 
 function measureAutoSizedTextElement(
@@ -790,7 +1100,10 @@ function measureAutoSizedTextElement(
   })
   window.document.body.appendChild(measure)
 
-  const width = Math.max(TEXT_AUTO_MIN_WIDTH, Math.ceil(measure.scrollWidth))
+  const width =
+    element.autoWidth === true
+      ? Math.max(TEXT_AUTO_MIN_WIDTH, Math.ceil(measure.scrollWidth))
+      : element.width
   measure.style.width = `${width}px`
   measure.style.whiteSpace = 'pre-wrap'
   measure.style.overflowWrap = 'break-word'
@@ -801,8 +1114,10 @@ function measureAutoSizedTextElement(
   measure.remove()
 
   const updates: Partial<EditablePresentationElement> = {}
-  if (Math.abs(width - element.width) >= 1) updates.width = width
-  if (Math.abs(height - element.height) >= 1) updates.height = height
+  if (element.autoWidth === true && Math.abs(width - element.width) >= 1) updates.width = width
+  if (hasContentHeight(element) && Math.abs(height - element.height) >= 1) {
+    updates.height = height
+  }
   return updates
 }
 
@@ -825,21 +1140,6 @@ function createCaretRangeFromPoint(x: number, y: number, content: HTMLElement): 
   return range && content.contains(range.startContainer) ? range : null
 }
 
-function isTextFramePointer(
-  event: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>
-): boolean {
-  const rect = event.currentTarget.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0) return false
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
-  return (
-    x <= TEXT_FRAME_HIT_AREA ||
-    y <= TEXT_FRAME_HIT_AREA ||
-    rect.width - x <= TEXT_FRAME_HIT_AREA ||
-    rect.height - y <= TEXT_FRAME_HIT_AREA
-  )
-}
-
 function TextElementContent({
   element,
   slideId,
@@ -847,7 +1147,8 @@ function TextElementContent({
   editing,
   onUpdateElement,
   onStartTextEdit,
-  onFinishTextEdit
+  onFinishTextEdit,
+  onTextEditFinalizerChange
 }: {
   element: Extract<EditablePresentationElement, { type: 'text' }>
   slideId: string
@@ -860,17 +1161,36 @@ function TextElementContent({
   ) => void
   onStartTextEdit?: () => void
   onFinishTextEdit?: () => void
+  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
   const isComposingRef = useRef(false)
+  const editingRef = useRef(editing)
+  const finalizeTextEditRef = useRef<() => boolean>(() => true)
   const initializedEditingElementRef = useRef<string | null>(null)
   const blurFrameRef = useRef<number | null>(null)
+  const textFrameRef = useRef<number | null>(null)
+  const pendingBlurTextRef = useRef<string | null>(null)
+  const hasPendingTextRef = useRef(false)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
+  const registeredFinalizerRef = useRef<TextEditFinalizer | null>(null)
+  const contentHeight = hasContentHeight(element)
+
+  const notifyTextEditLifecycle = useCallback((): void => {
+    onTextEditFinalizerChange?.(registeredFinalizerRef.current)
+  }, [onTextEditFinalizerChange])
+
+  const settlePendingText = (): void => {
+    if (isComposingRef.current || !hasPendingTextRef.current) return
+    scheduleTextCommit()
+  }
 
   const cancelPendingBlur = (): void => {
     if (blurFrameRef.current == null) return
     window.cancelAnimationFrame(blurFrameRef.current)
     blurFrameRef.current = null
+    pendingBlurTextRef.current = null
+    settlePendingText()
   }
 
   const commitText = (text: string): void => {
@@ -881,6 +1201,42 @@ function TextElementContent({
         ? measureAutoSizedTextElement(contentRef.current, element, text)
         : {})
     } as Partial<EditablePresentationElement>)
+    hasPendingTextRef.current = false
+    notifyTextEditLifecycle()
+  }
+
+  const cancelPendingTextCommit = (): void => {
+    if (textFrameRef.current == null) return
+    window.cancelAnimationFrame(textFrameRef.current)
+    textFrameRef.current = null
+  }
+
+  const scheduleTextCommit = (): void => {
+    cancelPendingTextCommit()
+    textFrameRef.current = window.requestAnimationFrame(() => {
+      textFrameRef.current = null
+      if (isComposingRef.current) return
+      const content = contentRef.current
+      if (content) commitText(content.textContent ?? '')
+    })
+  }
+
+  const scheduleBlurCommit = (): void => {
+    if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+    blurFrameRef.current = window.requestAnimationFrame(() => {
+      blurFrameRef.current = null
+      const content = contentRef.current
+      if (!editingRef.current || !content) return
+      if (window.document.activeElement === content) {
+        pendingBlurTextRef.current = null
+        settlePendingText()
+        return
+      }
+      if (isComposingRef.current) return
+      pendingBlurTextRef.current = null
+      commitText(content.textContent ?? '')
+      onFinishTextEdit?.()
+    })
   }
 
   const focusEditableContent = (
@@ -901,6 +1257,44 @@ function TextElementContent({
   }
 
   useLayoutEffect(() => {
+    editingRef.current = editing
+  }, [editing])
+
+  useLayoutEffect(() => {
+    finalizeTextEditRef.current = (): boolean => {
+      if (!editingRef.current) return true
+      if (isComposingRef.current) return false
+      const content = contentRef.current
+      if (!content) {
+        hasPendingTextRef.current = false
+        return true
+      }
+      cancelPendingBlur()
+      cancelPendingTextCommit()
+      registeredFinalizerRef.current = null
+      notifyTextEditLifecycle()
+      commitText(content.textContent ?? '')
+      onFinishTextEdit?.()
+      return true
+    }
+  })
+
+  useLayoutEffect(() => {
+    if (!editing) return
+    const finalize: TextEditFinalizer = () => finalizeTextEditRef.current()
+    finalize.hasUnsafeWork = () => hasPendingTextRef.current
+    finalize.isComposing = () => isComposingRef.current
+    registeredFinalizerRef.current = finalize
+    notifyTextEditLifecycle()
+    return () => {
+      if (registeredFinalizerRef.current === finalize) {
+        registeredFinalizerRef.current = null
+        notifyTextEditLifecycle()
+      }
+    }
+  }, [editing, notifyTextEditLifecycle])
+
+  useLayoutEffect(() => {
     if (!editing || element.locked) return
     const content = contentRef.current
     if (!content) return
@@ -912,21 +1306,16 @@ function TextElementContent({
   }, [editing, element.id, element.locked, element.text])
 
   useLayoutEffect(() => {
-    if (!editing || element.locked) return
-    const content = contentRef.current
-    if (!content) return
-    if (window.document.activeElement === content) return
-    focusEditableContent(content)
-  }, [editing, element.height, element.locked, element.width])
-
-  useLayoutEffect(() => {
     if (editing) return
     initializedEditingElementRef.current = null
+    cancelPendingTextCommit()
+    hasPendingTextRef.current = false
   }, [editing])
 
   useEffect(() => {
     return () => {
       if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+      if (textFrameRef.current != null) window.cancelAnimationFrame(textFrameRef.current)
     }
   }, [])
 
@@ -948,25 +1337,40 @@ function TextElementContent({
         fontStyle: element.italic ? 'italic' : 'normal',
         textDecoration: element.underline ? 'underline' : 'none',
         textAlign: element.align,
-        lineHeight: element.lineHeight
+        lineHeight: element.lineHeight,
+        boxSizing: contentHeight ? 'border-box' : undefined,
+        padding: contentHeight
+          ? `${CONTENT_HEIGHT_TEXT_PADDING_Y}px ${CONTENT_HEIGHT_TEXT_PADDING_X}px`
+          : undefined,
+        width: editing && element.autoWidth === true ? 'max-content' : undefined,
+        minWidth: editing && element.autoWidth === true ? '100%' : undefined,
+        height: editing && element.autoWidth === true ? 'auto' : undefined,
+        whiteSpace: editing && element.autoWidth === true ? 'pre' : 'pre-wrap',
+        overflowWrap: editing && element.autoWidth === true ? 'normal' : 'break-word'
       }}
-      onInput={(event) => {
+      onInput={() => {
         if (!editing) return
+        hasPendingTextRef.current = true
+        notifyTextEditLifecycle()
         if (isComposingRef.current) return
-        commitText(event.currentTarget.textContent ?? '')
+        scheduleTextCommit()
       }}
       onCompositionStart={() => {
         isComposingRef.current = true
+        hasPendingTextRef.current = true
+        notifyTextEditLifecycle()
+        cancelPendingTextCommit()
       }}
-      onCompositionEnd={(event) => {
+      onCompositionEnd={() => {
         isComposingRef.current = false
+        notifyTextEditLifecycle()
         if (!editing) return
-        commitText(event.currentTarget.textContent ?? '')
+        if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
+        else scheduleTextCommit()
       }}
       onPointerDown={(event) => {
         if (!editable) return
         cancelPendingBlur()
-        if (isTextFramePointer(event)) return
         event.stopPropagation()
         if (!editing && !element.locked) {
           pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
@@ -974,9 +1378,9 @@ function TextElementContent({
         }
       }}
       onClick={(event) => {
-        if (!editable || element.locked) return
-        if (isTextFramePointer(event)) return
+        if (!editable) return
         event.stopPropagation()
+        if (element.locked) return
         cancelPendingBlur()
         if (!editing) {
           pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
@@ -984,15 +1388,11 @@ function TextElementContent({
         }
       }}
       onBlur={(event) => {
-        const target = event.currentTarget
-        if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
-        blurFrameRef.current = window.requestAnimationFrame(() => {
-          blurFrameRef.current = null
-          if (window.document.activeElement === target) return
-          isComposingRef.current = false
-          commitText(target.textContent ?? '')
-          onFinishTextEdit?.()
-        })
+        cancelPendingTextCommit()
+        hasPendingTextRef.current = true
+        notifyTextEditLifecycle()
+        pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
+        scheduleBlurCommit()
       }}
     >
       {editing
@@ -1115,18 +1515,131 @@ function getImageShadow(
   return undefined
 }
 
-function getHandlePositionClass(handle: ResizeHandle): string {
+function getTextHandlePositionStyle(handle: ResizeHandle, handleSize: number): React.CSSProperties {
+  const offset = -handleSize
   const vertical = handle.includes('n')
-    ? '-top-2'
+    ? { top: offset }
     : handle.includes('s')
-      ? '-bottom-2'
-      : 'top-1/2 -translate-y-1/2'
+      ? { bottom: offset }
+      : { top: '50%' }
   const horizontal = handle.includes('w')
-    ? '-left-2'
+    ? { left: offset }
     : handle.includes('e')
-      ? '-right-2'
-      : 'left-1/2 -translate-x-1/2'
-  return `${vertical} ${horizontal}`
+      ? { right: offset }
+      : { left: '50%' }
+  const transform = [
+    !handle.includes('n') && !handle.includes('s') ? 'translateY(-50%)' : '',
+    !handle.includes('w') && !handle.includes('e') ? 'translateX(-50%)' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+  return { ...vertical, ...horizontal, transform: transform || undefined }
+}
+
+function getHandleIndicatorPositionStyle(
+  handle: ResizeHandle,
+  indicatorSize: number
+): React.CSSProperties {
+  const offset = -indicatorSize / 2
+  const vertical = handle.includes('n')
+    ? { bottom: offset }
+    : handle.includes('s')
+      ? { top: offset }
+      : { top: '50%' }
+  const horizontal = handle.includes('w')
+    ? { right: offset }
+    : handle.includes('e')
+      ? { left: offset }
+      : { left: '50%' }
+  const transform = [
+    !handle.includes('n') && !handle.includes('s') ? 'translateY(-50%)' : '',
+    !handle.includes('w') && !handle.includes('e') ? 'translateX(-50%)' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+  return { ...vertical, ...horizontal, transform: transform || undefined }
+}
+
+function getNearestResizeHandle(event: React.PointerEvent<HTMLDivElement>): ResizeHandle | null {
+  const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-resize-handle]')
+  if (!target || !event.currentTarget.contains(target)) return null
+
+  const candidates = IMAGE_HANDLES.map((handle) =>
+    event.currentTarget.querySelector<HTMLElement>(`[data-resize-handle="${handle}"]`)
+  ).filter((candidate): candidate is HTMLElement => candidate !== null)
+  if (
+    candidates.every((candidate) => {
+      const rect = getResizeHandleIndicatorRect(candidate)
+      return rect.width === 0 && rect.height === 0
+    })
+  ) {
+    const handle = target.dataset.resizeHandle
+    return IMAGE_HANDLES.includes(handle as ResizeHandle) ? (handle as ResizeHandle) : null
+  }
+  const first = candidates[0]
+  if (!first) return null
+  let nearest = first
+  let nearestDistance = distanceToCenter(
+    getResizeHandleIndicatorRect(first),
+    event.clientX,
+    event.clientY
+  )
+  candidates.slice(1).forEach((candidate) => {
+    const distance = distanceToCenter(
+      getResizeHandleIndicatorRect(candidate),
+      event.clientX,
+      event.clientY
+    )
+    if (distance < nearestDistance) {
+      nearest = candidate
+      nearestDistance = distance
+    }
+  })
+  const handle = nearest.dataset.resizeHandle
+  return IMAGE_HANDLES.includes(handle as ResizeHandle) ? (handle as ResizeHandle) : null
+}
+
+function getResizeHandleIndicatorRect(handle: HTMLElement): DOMRect {
+  return (
+    handle.querySelector<HTMLElement>('[data-resize-handle-indicator]') ?? handle
+  ).getBoundingClientRect()
+}
+
+function distanceToCenter(rect: DOMRect, x: number, y: number): number {
+  return (rect.left + rect.width / 2 - x) ** 2 + (rect.top + rect.height / 2 - y) ** 2
+}
+
+function normalizeSurfaceScale(scale: number): number {
+  return Number.isFinite(scale) && scale > 0 ? scale : 1
+}
+
+function getKeyboardResizeDelta(
+  event: React.KeyboardEvent<HTMLButtonElement>,
+  handle: ResizeHandle,
+  horizontalOnly: boolean
+): { dx: number; dy: number } | null {
+  const step = event.shiftKey ? 10 : 1
+  if (event.key === 'ArrowLeft' && (handle.includes('w') || handle.includes('e'))) {
+    return { dx: -step, dy: 0 }
+  }
+  if (event.key === 'ArrowRight' && (handle.includes('w') || handle.includes('e'))) {
+    return { dx: step, dy: 0 }
+  }
+  if (
+    !horizontalOnly &&
+    event.key === 'ArrowUp' &&
+    (handle.includes('n') || handle.includes('s'))
+  ) {
+    return { dx: 0, dy: -step }
+  }
+  if (
+    !horizontalOnly &&
+    event.key === 'ArrowDown' &&
+    (handle.includes('n') || handle.includes('s'))
+  ) {
+    return { dx: 0, dy: step }
+  }
+  return null
 }
 
 function getHandleCursorClass(handle: ResizeHandle): string {

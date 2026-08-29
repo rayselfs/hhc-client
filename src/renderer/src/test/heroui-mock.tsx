@@ -86,9 +86,24 @@ const ModalMock = Object.assign(
     Root: ({ state, children }: { state?: { isOpen: boolean }; children: React.ReactNode }) =>
       state?.isOpen ? <div>{children}</div> : null,
     Trigger: () => null,
-    Backdrop: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Backdrop: ({
+      children,
+      isOpen = true,
+      onOpenChange
+    }: {
+      children: React.ReactNode
+      isOpen?: boolean
+      onOpenChange?: (isOpen: boolean) => void
+    }) =>
+      isOpen ? (
+        <div onKeyDown={(event) => event.key === 'Escape' && onOpenChange?.(false)}>{children}</div>
+      ) : null,
     Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Dialog: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => (
+      <div role="dialog" {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+        {children}
+      </div>
+    ),
     Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Heading: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Icon: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

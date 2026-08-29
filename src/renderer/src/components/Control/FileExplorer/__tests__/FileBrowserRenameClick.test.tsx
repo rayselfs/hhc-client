@@ -91,6 +91,10 @@ vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
   useConfirm: () => vi.fn()
 }))
 
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: () => ({ ensureProjectionOpen: vi.fn(() => Promise.resolve()) })
+}))
+
 const mockStartPresentation = vi.fn()
 const mockStartPresentationWithReadiness = vi.fn().mockResolvedValue({
   summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },

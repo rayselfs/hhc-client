@@ -81,6 +81,8 @@ describe('UserMenu', () => {
     const { container } = renderUserMenu()
     expect(screen.getByText('Guest')).toBeInTheDocument()
     expect(container.querySelector('[data-slot="avatar"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-slot="avatar-fallback"]')).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Account menu for Guest' })).toHaveLength(1)
     expect(container.querySelector('button button')).not.toBeInTheDocument()
   })

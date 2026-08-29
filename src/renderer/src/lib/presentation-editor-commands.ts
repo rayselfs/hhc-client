@@ -78,6 +78,7 @@ export function nudgeElements(
   const bounds = getCollectiveBounds(elements)
   const boundedDx = Math.max(-bounds.x, Math.min(document.width - (bounds.x + bounds.width), dx))
   const boundedDy = Math.max(-bounds.y, Math.min(document.height - (bounds.y + bounds.height), dy))
+  if (boundedDx === 0 && boundedDy === 0) return document
   return patchElements(document, slideId, elementIds, (element) => ({
     ...element,
     x: element.x + boundedDx,
