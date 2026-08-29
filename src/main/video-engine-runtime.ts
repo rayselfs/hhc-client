@@ -60,7 +60,7 @@ export function resolveVlcRuntime(
   return { status: 'missing', message: 'VLC runtime not found' }
 }
 
-export function resolveFfmpegPosterRuntime(): VideoEngineRuntimeInfo {
+export function resolveFfmpegRuntime(): VideoEngineRuntimeInfo {
   const executable = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
   const bundled = bundledPath('ffmpeg', platformDir(), executable)
   if (canExecute(bundled)) return { status: 'ready', path: bundled, source: 'bundled' }
@@ -74,3 +74,5 @@ export function resolveFfmpegPosterRuntime(): VideoEngineRuntimeInfo {
     source: 'system'
   }
 }
+
+export const resolveFfmpegPosterRuntime = resolveFfmpegRuntime
