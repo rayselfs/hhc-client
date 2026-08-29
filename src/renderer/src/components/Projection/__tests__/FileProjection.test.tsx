@@ -344,6 +344,52 @@ describe('FileProjection copied media identity', () => {
     })
   })
 
+  it('starts and controls the new VLC owner while the old owner stop is pending', async () => {
+    let resolveOldStop: (() => void) | undefined
+    const { rerender } = render(
+      <FileProjection
+        fileName="old.mkv"
+        initialItemId="old-id"
+        initialBlobId="old-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+      />
+    )
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalledOnce())
+    mockProjectionVlcStop.mockImplementation((request: { force?: boolean }) =>
+      request.force
+        ? new Promise<void>((resolve) => {
+            resolveOldStop = resolve
+          })
+        : Promise.resolve()
+    )
+    vi.mocked(window.api.projectionVlc.start).mockClear()
+    vi.mocked(window.api.projectionVlc.control).mockClear()
+
+    rerender(
+      <FileProjection
+        fileName="new.mkv"
+        initialItemId="new-id"
+        initialBlobId="new-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+        controlEvent={{ id: 1, data: { action: 'play', itemId: 'new-id' } }}
+      />
+    )
+
+    await waitFor(() =>
+      expect(window.api.projectionVlc.start).toHaveBeenCalledWith(
+        expect.objectContaining({ itemId: 'new-id', sourceFileId: 'new-blob' })
+      )
+    )
+    expect(window.api.projectionVlc.control).toHaveBeenCalledWith({
+      action: 'play',
+      itemId: 'new-id'
+    })
+    expect(mockProjectionVlcStop).not.toHaveBeenCalledWith({ force: true })
+    resolveOldStop?.()
+  })
+
   it('restarts embedded VLC exactly once for a same-generation replay revision', async () => {
     const props = {
       generation: 4,

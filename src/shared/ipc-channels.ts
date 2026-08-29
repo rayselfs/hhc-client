@@ -85,7 +85,6 @@ export interface ProjectionVlcFailure {
 
 export interface ProjectionVlcInfo {
   status: ProjectionVlcStatus
-  vlcDir?: string
   message?: string
 }
 
