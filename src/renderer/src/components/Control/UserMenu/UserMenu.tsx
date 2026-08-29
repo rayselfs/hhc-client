@@ -50,7 +50,9 @@ export default function UserMenu({
   const availableVersion = useUpdateStore(selectAvailableVersion)
   const downloadPercent = useUpdateStore((state) => state.downloadPercent)
   const isMacPlatform = isMac()
+  const canCheckForUpdates = ['idle', 'not-available', 'error'].includes(updateStatus)
   const canUseUpdateAction =
+    canCheckForUpdates ||
     (isMacPlatform && updateStatus === 'available') ||
     (!isMacPlatform && updateStatus === 'downloaded')
   const { status, session, signInStatus, signIn, cancelSignIn, signOut } = useHhcAuth()
@@ -70,6 +72,16 @@ export default function UserMenu({
   }
 
   const handleUpdateAction = async (): Promise<void> => {
+    if (canCheckForUpdates) {
+      useUpdateStore.getState().check()
+      const result = await window.api.update.checkForUpdates()
+      if (result.updateAvailable && result.version) {
+        useUpdateStore.getState().setAvailable(result.version)
+      } else {
+        useUpdateStore.getState().setNotAvailable()
+      }
+      return
+    }
     if (isMacPlatform && updateStatus === 'available') {
       useUpdateStore.getState().setDownloading()
       await window.api.update.downloadMacInstaller()
@@ -88,6 +100,9 @@ export default function UserMenu({
   }
 
   const updateLabel = (): string => {
+    if (updateStatus === 'idle' || updateStatus === 'not-available') {
+      return t('userMenu.checkForUpdates')
+    }
     if (updateStatus === 'available') {
       return t(isMacPlatform ? 'userMenu.downloadUpdate' : 'userMenu.updateAvailable', {
         version: availableVersion

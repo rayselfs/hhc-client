@@ -2,6 +2,7 @@ import { app, ipcMain, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import type { IpcMainToRendererMap } from '../shared/ipc-channels'
 import { downloadMacUpdate } from './macUpdateDownloader'
+import { isMainWindow } from './ipc/validate'
 import { WindowManager } from './windowManager'
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000
@@ -73,7 +74,8 @@ export function registerUpdateService(wm: WindowManager): void {
     sendStatus({ status: 'error', error: error.message })
   })
 
-  ipcMain.handle('update:check', async () => {
+  ipcMain.handle('update:check', async (event) => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized update access')
     const result = await checkForUpdates()
     if (!result?.updateInfo) return { updateAvailable: false }
 
@@ -83,35 +85,39 @@ export function registerUpdateService(wm: WindowManager): void {
     }
   })
 
-  ipcMain.handle('update:install-downloaded', () => {
+  ipcMain.handle('update:install-downloaded', (event) => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized update access')
     if (process.platform !== 'win32') {
       throw new Error('Downloaded updater installation is only available on Windows')
     }
     autoUpdater.quitAndInstall()
   })
 
-  ipcMain.handle('update:download-mac-installer', async () => {
+  ipcMain.handle('update:download-mac-installer', async (event) => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized update access')
     if (process.platform !== 'darwin') {
       throw new Error('Manual DMG download is only available on macOS')
     }
     if (!availableVersion) throw new Error('No macOS update is available')
+    if (downloading) throw new Error('A macOS update download is already in progress')
 
     const mainWindow = wm.getMainWindow()
     if (!mainWindow) throw new Error('Main window is not available')
+    const version = availableVersion
 
     try {
       downloading = true
       const dmgPath = await downloadMacUpdate(
         mainWindow,
-        availableVersion,
-        (percent) => sendStatus({ status: 'downloading', version: availableVersion, percent }),
-        () => sendStatus({ status: 'verifying', version: availableVersion })
+        version,
+        (percent) => sendStatus({ status: 'downloading', version, percent }),
+        () => sendStatus({ status: 'verifying', version })
       )
       const openError = await shell.openPath(dmgPath)
       if (openError) throw new Error(openError)
 
       downloading = false
-      sendStatus({ status: 'installer-opened', version: availableVersion })
+      sendStatus({ status: 'installer-opened', version })
     } catch (error) {
       downloading = false
       const message = error instanceof Error ? error.message : String(error)

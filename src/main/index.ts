@@ -95,7 +95,7 @@ if (!gotSingleInstanceLock) {
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     await clearStaleNativeMediaLeasesOnStartup()
-    electronApp.setAppUserModelId('org.hhc-presenter.app')
+    electronApp.setAppUserModelId('tw.org.alive.presenter')
     registerAppProtocol()
 
     app.on('browser-window-created', (_, window) => {

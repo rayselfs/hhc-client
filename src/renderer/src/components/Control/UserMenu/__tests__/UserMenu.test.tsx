@@ -30,6 +30,7 @@ const auth = vi.hoisted(() => ({
 }))
 const toastDanger = vi.hoisted(() => vi.fn())
 const updateApi = vi.hoisted(() => ({
+  checkForUpdates: vi.fn(async () => ({ updateAvailable: false })),
   installDownloaded: vi.fn(async () => undefined),
   downloadMacInstaller: vi.fn(async () => undefined)
 }))
@@ -84,6 +85,7 @@ beforeEach(async () => {
   useUpdateStore.getState().reset()
   updateApi.installDownloaded.mockClear()
   updateApi.downloadMacInstaller.mockClear()
+  updateApi.checkForUpdates.mockClear()
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: { update: updateApi }
@@ -125,6 +127,16 @@ describe('UserMenu', () => {
     renderUserMenu()
 
     expect(screen.getByText(label)).toBeInTheDocument()
+  })
+
+  it('manually checks for updates from an idle Electron session', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    renderUserMenu()
+
+    fireEvent.click(screen.getByText('Check for Updates').closest('[role="menuitem"]')!)
+
+    await waitFor(() => expect(updateApi.checkForUpdates).toHaveBeenCalledOnce())
+    expect(useUpdateStore.getState().status).toBe('not-available')
   })
 
   it('asks before installing a downloaded Windows update', async () => {

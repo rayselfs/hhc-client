@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
     }),
     openPath: vi.fn(() => Promise.resolve('')),
     downloadMacUpdate: vi.fn(() => Promise.resolve('/tmp/hhc-presenter-2.4.1.dmg')),
+    isMainWindow: vi.fn(() => true),
     sendToMain: vi.fn(),
     getMainWindow: vi.fn(() => ({ id: 'main-window' }))
   }
@@ -34,6 +35,7 @@ vi.mock('electron', () => ({
   shell: { openPath: mocks.openPath }
 }))
 vi.mock('../macUpdateDownloader', () => ({ downloadMacUpdate: mocks.downloadMacUpdate }))
+vi.mock('../ipc/validate', () => ({ isMainWindow: mocks.isMainWindow }))
 
 import type { WindowManager } from '../windowManager'
 import { registerUpdateService } from '../updateService'
@@ -55,6 +57,8 @@ describe('registerUpdateService', () => {
     mocks.updaterHandlers.clear()
     mocks.ipcHandlers.clear()
     mocks.autoUpdater.checkForUpdates.mockResolvedValue(null)
+    mocks.downloadMacUpdate.mockResolvedValue('/tmp/hhc-presenter-2.4.1.dmg')
+    mocks.isMainWindow.mockReturnValue(true)
     mocks.autoUpdater.autoDownload = false
     mocks.autoUpdater.autoInstallOnAppQuit = true
   })
@@ -154,6 +158,36 @@ describe('registerUpdateService', () => {
     await expect(mocks.ipcHandlers.get('update:download-mac-installer')?.()).rejects.toThrow(
       'macOS'
     )
+  })
+
+  it('rejects updater IPC from outside the main window', async () => {
+    register('darwin')
+    mocks.isMainWindow.mockReturnValue(false)
+
+    await expect(mocks.ipcHandlers.get('update:check')?.({})).rejects.toThrow('Unauthorized')
+    await expect(mocks.ipcHandlers.get('update:download-mac-installer')?.({})).rejects.toThrow(
+      'Unauthorized'
+    )
+    expect(() => mocks.ipcHandlers.get('update:install-downloaded')?.({})).toThrow('Unauthorized')
+  })
+
+  it('rejects a second macOS download while one is active', async () => {
+    let finishDownload: (() => void) | undefined
+    mocks.downloadMacUpdate.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishDownload = () => resolve('/tmp/hhc-presenter-2.4.1.dmg')
+        })
+    )
+    register('darwin')
+    mocks.updaterHandlers.get('update-available')?.({ version: '2.4.1' })
+    const handler = mocks.ipcHandlers.get('update:download-mac-installer')
+
+    const firstDownload = handler?.({})
+    await expect(handler?.({})).rejects.toThrow('already in progress')
+
+    finishDownload?.()
+    await firstDownload
   })
 
   it('publishes the rounded updater download percentage', () => {

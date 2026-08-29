@@ -29,12 +29,26 @@ async function writeRendererAsar(
   const asarSource = join(resourcesRoot, 'asar-source')
   await writeFileIn(asarSource, 'out/renderer/assets/pdf-worker.js')
   await writeFile(join(asarSource, 'out/renderer/assets/pdf-worker.js'), workerSource)
+  await writeFileIn(asarSource, 'out/main/index.js')
+  await writeFile(
+    join(asarSource, 'out/main/index.js'),
+    "setAppUserModelId('tw.org.alive.presenter'); setAsDefaultProtocolClient('hhc-presenter')"
+  )
   await createPackage(asarSource, join(resourcesRoot, 'app.asar'))
   await rm(asarSource, { recursive: true })
 }
 
 async function writeValidMacPackage(root: string, appName = 'HHC Presenter'): Promise<string> {
   const resourcesRoot = join(root, `dist/mac-arm64/${appName}.app/Contents/Resources`)
+  await writeFileIn(resourcesRoot, 'app-update.yml')
+  await writeFile(
+    join(resourcesRoot, 'app-update.yml'),
+    'owner: rayselfs\nrepo: hhc-presenter\nprovider: github\nupdaterCacheDirName: hhc-presenter-updater\n'
+  )
+  await writeFile(
+    join(resourcesRoot, '../Info.plist'),
+    '<key>CFBundleIdentifier</key><string>tw.org.alive.presenter</string><string>hhc-presenter</string>'
+  )
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.GPL-2.0')
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.LGPL-2.1')
   await writeFileIn(resourcesRoot, 'licenses/ffmpeg/LICENSE.LGPL-2.1')
@@ -54,6 +68,11 @@ async function writeValidWindowsPackage(
   executableName = 'hhc-presenter.exe'
 ): Promise<string> {
   const resourcesRoot = join(root, 'dist/win-unpacked/resources')
+  await writeFileIn(resourcesRoot, 'app-update.yml')
+  await writeFile(
+    join(resourcesRoot, 'app-update.yml'),
+    'owner: rayselfs\nrepo: hhc-presenter\nprovider: github\nupdaterCacheDirName: hhc-presenter-updater\n'
+  )
   await writeFileIn(root, `dist/win-unpacked/${executableName}`)
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.GPL-2.0')
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.LGPL-2.1')
@@ -111,6 +130,18 @@ describe('check packaged runtime script', () => {
     await writeValidWindowsPackage(root, `${['libre', 'presenter'].join('-')}.exe`)
 
     await expect(runChecker(root, 'win32-x64')).rejects.toMatchObject({ code: 1 })
+  })
+
+  it('rejects legacy updater metadata', async () => {
+    const root = await createTempRoot()
+    const resourcesRoot = await writeValidMacPackage(root)
+    const legacySlug = ['libre', 'presenter'].join('-')
+    await writeFile(
+      join(resourcesRoot, 'app-update.yml'),
+      `owner: rayselfs\nrepo: ${legacySlug}\nprovider: github\nupdaterCacheDirName: ${legacySlug}-updater\n`
+    )
+
+    await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
   })
 
   it('rejects packaged apps missing the electron-vlc-player binding', async () => {
