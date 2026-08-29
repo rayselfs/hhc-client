@@ -2429,14 +2429,13 @@ function EditableSessionDocumentView({
                       }}
                       onTransformPreview={(elementId, updates) => {
                         const snapshot = session.getSnapshot()
-                        const preview = snapshot.renderedDocument
                         const base = snapshot.history.present
                         const current = base.slides[activeSlideId]?.elements[elementId]
                         let nextUpdates = updates
                         if (current && (updates.x !== undefined || updates.y !== undefined)) {
                           const snapped = snapElementPosition(
                             { ...current, ...updates },
-                            { width: preview.width, height: preview.height },
+                            { width: base.width, height: base.height },
                             8
                           )
                           nextUpdates = { ...updates, x: snapped.x, y: snapped.y }
@@ -2452,7 +2451,7 @@ function EditableSessionDocumentView({
                           updates.height === undefined &&
                           (nextUpdates.x !== undefined || nextUpdates.y !== undefined)
                         ) {
-                          session.previewDraft(
+                          return session.previewDraft(
                             nudgeElements(
                               base,
                               activeSlideId,
@@ -2461,10 +2460,9 @@ function EditableSessionDocumentView({
                               (nextUpdates.y ?? current.y) - current.y
                             )
                           )
-                          return
                         }
-                        session.previewDraft(
-                          updateElementInSlide(preview, activeSlideId, elementId, nextUpdates)
+                        return session.previewDraft(
+                          updateElementInSlide(base, activeSlideId, elementId, nextUpdates)
                         )
                       }}
                       onTransformCommit={() => {

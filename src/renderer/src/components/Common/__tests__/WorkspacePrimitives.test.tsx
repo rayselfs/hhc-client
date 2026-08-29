@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   InspectorPanel,
@@ -235,7 +236,106 @@ describe('ResponsivePanelGroup', () => {
 
     expect(screen.getByRole('button', { name: 'Apply format' })).toHaveFocus()
   })
+
+  it('keeps inspector state and DOM identity while moving between modal and dock', async () => {
+    const setViewportWidth = mockCompactViewport()
+    const user = userEvent.setup()
+    render(
+      <ResponsivePanelGroup
+        navigatorLabel="Slides"
+        inspectorLabel="Format"
+        navigator={<NavigatorRail>Slide navigator</NavigatorRail>}
+        stage={<StageViewport>Editing stage</StageViewport>}
+        inspector={<StatefulInspector />}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Format' }))
+    const inspector = screen.getByTestId('stateful-inspector')
+    await user.click(screen.getByRole('button', { name: 'Gradient stop 2' }))
+    expect(screen.getByRole('button', { name: 'Gradient stop 2' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+
+    act(() => setViewportWidth(1400))
+    expect(screen.getByTestId('stateful-inspector')).toBe(inspector)
+    expect(screen.getByRole('button', { name: 'Gradient stop 2' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getAllByTestId('stateful-inspector')).toHaveLength(1)
+
+    act(() => setViewportWidth(900))
+    expect(screen.getByTestId('stateful-inspector')).toBe(inspector)
+    expect(screen.getByRole('button', { name: 'Gradient stop 2' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
+  it('keeps navigator selection, scroll, and DOM identity across modal reparenting', async () => {
+    const setViewportWidth = mockCompactViewport()
+    const user = userEvent.setup()
+    render(
+      <ResponsivePanelGroup
+        navigatorLabel="Slides"
+        navigator={<StatefulNavigator />}
+        stage={<StageViewport>Editing stage</StageViewport>}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Slides' }))
+    const navigator = screen.getByTestId('stateful-navigator')
+    navigator.scrollTop = 72
+    await user.click(screen.getByRole('button', { name: 'Slide 2' }))
+
+    act(() => setViewportWidth(1400))
+    expect(screen.getByTestId('stateful-navigator')).toBe(navigator)
+    expect(navigator.scrollTop).toBe(72)
+    expect(screen.getByRole('button', { name: 'Slide 2' })).toHaveAttribute('aria-current', 'true')
+    expect(screen.getAllByTestId('stateful-navigator')).toHaveLength(1)
+
+    act(() => setViewportWidth(900))
+    expect(screen.getByTestId('stateful-navigator')).toBe(navigator)
+    expect(navigator.scrollTop).toBe(72)
+    expect(screen.getByRole('button', { name: 'Slide 2' })).toHaveAttribute('aria-current', 'true')
+  })
 })
+
+function StatefulInspector(): React.JSX.Element {
+  const [selectedStop, setSelectedStop] = useState(0)
+  return (
+    <InspectorPanel data-testid="stateful-inspector">
+      {[0, 1].map((index) => (
+        <button
+          key={index}
+          type="button"
+          aria-label={`Gradient stop ${index + 1}`}
+          aria-pressed={selectedStop === index}
+          onClick={() => setSelectedStop(index)}
+        />
+      ))}
+    </InspectorPanel>
+  )
+}
+
+function StatefulNavigator(): React.JSX.Element {
+  const [selectedSlide, setSelectedSlide] = useState(0)
+  return (
+    <NavigatorRail data-testid="stateful-navigator" className="overflow-auto">
+      {[0, 1].map((index) => (
+        <button
+          key={index}
+          type="button"
+          aria-label={`Slide ${index + 1}`}
+          aria-current={selectedSlide === index ? 'true' : undefined}
+          onClick={() => setSelectedSlide(index)}
+        />
+      ))}
+    </NavigatorRail>
+  )
+}
 
 function mockCompactViewport(initialWidth = 900): (width: number) => void {
   let width = initialWidth

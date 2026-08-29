@@ -1180,7 +1180,7 @@ describe('EditableSlideSurface', () => {
 
   it('cancels keyboard and pointer resize transactions clamped at the fixed text minimum', () => {
     const onTransformStart = vi.fn(() => text)
-    const onTransformPreview = vi.fn()
+    const onTransformPreview = vi.fn(() => false)
     const onTransformCommit = vi.fn()
     const onTransformCancel = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -1218,14 +1218,14 @@ describe('EditableSlideSurface', () => {
 
     expect(keyboardEvent.defaultPrevented).toBe(true)
     expect(onTransformStart).toHaveBeenCalledTimes(2)
-    expect(onTransformPreview).not.toHaveBeenCalled()
+    expect(onTransformPreview).toHaveBeenCalledTimes(2)
     expect(onTransformCommit).not.toHaveBeenCalled()
     expect(onTransformCancel).toHaveBeenCalledTimes(2)
   })
 
   it('cancels a generic resize transaction clamped at the minimum size', () => {
     const onTransformStart = vi.fn(() => shape)
-    const onTransformPreview = vi.fn()
+    const onTransformPreview = vi.fn(() => false)
     const onTransformCommit = vi.fn()
     const onTransformCancel = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -1248,7 +1248,7 @@ describe('EditableSlideSurface', () => {
     const handle = screen.getByLabelText('Resize element')
     fireEvent.keyDown(handle, { key: 'ArrowLeft' })
 
-    expect(onTransformPreview).not.toHaveBeenCalled()
+    expect(onTransformPreview).toHaveBeenCalledTimes(1)
     expect(onTransformCommit).not.toHaveBeenCalled()
     expect(onTransformCancel).toHaveBeenCalledTimes(1)
   })

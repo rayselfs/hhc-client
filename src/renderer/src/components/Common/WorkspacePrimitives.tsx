@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -8,6 +9,7 @@ import {
   type ReactNode,
   type RefObject
 } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@heroui/react/button'
 import { Modal } from '@heroui/react/modal'
 import { List, PanelRight, X } from 'lucide-react'
@@ -99,6 +101,8 @@ export function ResponsivePanelGroup({
   className?: string
 }): React.JSX.Element {
   const [uncontrolledOverlay, setUncontrolledOverlay] = useState<WorkspaceOverlay>(null)
+  const [navigatorHost] = useState(createPaneHost)
+  const [inspectorHost] = useState(createPaneHost)
   const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
   const inspectorTriggerRef = useRef<HTMLButtonElement>(null)
   const navigatorSlotRef = useRef<HTMLDivElement>(null)
@@ -114,6 +118,26 @@ export function ResponsivePanelGroup({
     (overlay === 'navigator' && compactNavigator) || (overlay === 'inspector' && compactInspector)
       ? overlay
       : null
+  const attachNavigatorDock = useCallback(
+    (target: HTMLDivElement | null): void => {
+      if (target && compactOverlay !== 'navigator') target.append(navigatorHost)
+    },
+    [compactOverlay, navigatorHost]
+  )
+  const attachInspectorDock = useCallback(
+    (target: HTMLDivElement | null): void => {
+      if (target && compactOverlay !== 'inspector') target.append(inspectorHost)
+    },
+    [compactOverlay, inspectorHost]
+  )
+  const attachCompactPane = useCallback(
+    (target: HTMLDivElement | null): void => {
+      if (!target) return
+      if (compactOverlay === 'navigator') target.append(navigatorHost)
+      else if (compactOverlay === 'inspector') target.append(inspectorHost)
+    },
+    [compactOverlay, inspectorHost, navigatorHost]
+  )
   const setOverlay = (nextOverlay: WorkspaceOverlay): void => {
     if (controlledOverlay === undefined) setUncontrolledOverlay(nextOverlay)
     onOverlayChange?.(nextOverlay)
@@ -218,7 +242,7 @@ export function ResponsivePanelGroup({
         aria-hidden={compactOverlay !== null ? true : undefined}
         inert={compactOverlay !== null}
       >
-        {compactOverlay === 'navigator' ? null : navigator}
+        <div ref={attachNavigatorDock} className="contents" />
         {overlay === 'navigator' && compactOverlay === null && (
           <OverlayClose label={`Close ${navigatorLabel}`} onPress={closeNavigator} />
         )}
@@ -239,7 +263,7 @@ export function ResponsivePanelGroup({
           aria-hidden={compactOverlay !== null ? true : undefined}
           inert={compactOverlay !== null}
         >
-          {compactOverlay === 'inspector' ? null : inspector}
+          <div ref={attachInspectorDock} className="contents" />
           {overlay === 'inspector' && compactOverlay === null && (
             <OverlayClose label={`Close ${inspectorLabel}`} onPress={closeInspector} />
           )}
@@ -290,9 +314,7 @@ export function ResponsivePanelGroup({
                     </Button>
                   )}
                 </div>
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  {compactOverlay === 'navigator' ? navigator : inspector}
-                </div>
+                <div ref={attachCompactPane} className="min-h-0 flex-1 overflow-hidden" />
                 <OverlayClose
                   ref={compactCloseRef}
                   label={`Close ${compactOverlay === 'navigator' ? navigatorLabel : inspectorLabel}`}
@@ -303,8 +325,16 @@ export function ResponsivePanelGroup({
           </Modal.Container>
         </Modal.Backdrop>
       )}
+      {createPortal(navigator, navigatorHost, 'workspace-navigator')}
+      {inspector ? createPortal(inspector, inspectorHost, 'workspace-inspector') : null}
     </div>
   )
+}
+
+function createPaneHost(): HTMLDivElement {
+  const host = document.createElement('div')
+  host.className = 'contents'
+  return host
 }
 
 function useMediaQuery(query: string): boolean {

@@ -27,7 +27,7 @@ export interface PresentationEditorSession {
   undo(): void
   redo(): void
   beginDraft(kind: PresentationDraftKind): void
-  previewDraft(next: EditablePresentationDocument): void
+  previewDraft(next: EditablePresentationDocument): boolean
   commitDraft(): void
   cancelDraft(): void
   rename(nextName: string, catalogName: string): void
@@ -223,6 +223,7 @@ export function createPresentationEditorSession(options: {
       if (!draft) throw new Error('Presentation draft has not started')
       draft = { ...draft, preview: next }
       emit()
+      return next !== history.present
     },
     commitDraft,
     cancelDraft,

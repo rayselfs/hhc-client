@@ -1072,6 +1072,7 @@ test.describe('touch presentation editing', () => {
     await page.goto('/#/files')
     await page.getByLabel(/New|新增/).click()
     await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
+    await expect(page).toHaveURL(/#\/presentations\//)
     await installResizeFixture(page)
 
     const elements = page.locator('.presentation-stage [data-slide-content] [data-slide-element]')

@@ -39,7 +39,10 @@ interface EditableSlideSurfaceProps {
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
   onTransformStart?: (elementId: string) => EditablePresentationElement | undefined
-  onTransformPreview?: (elementId: string, updates: Partial<EditablePresentationElement>) => void
+  onTransformPreview?: (
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => boolean | void
   onTransformCommit?: () => void
   onTransformCancel?: () => void
   onUpdateElement?: (
@@ -235,12 +238,15 @@ export default function EditableSlideSurface({
         height: Math.max(MIN_ELEMENT_SIZE, drag.original.height + dy)
       } as Partial<EditablePresentationElement>
     }
-    drag.hasPersistedChanges = hasElementPatchChanges(drag.original, updates)
-    if (!drag.hasPersistedChanges) return
+    const rawHasPersistedChanges = hasElementPatchChanges(drag.original, updates)
     if (onTransformPreview) {
-      onTransformPreview(drag.elementId, updates)
-    } else {
+      drag.hasPersistedChanges =
+        onTransformPreview(drag.elementId, updates) ?? rawHasPersistedChanges
+    } else if (rawHasPersistedChanges) {
+      drag.hasPersistedChanges = true
       onUpdateElement?.(slideId, drag.elementId, updates)
+    } else {
+      drag.hasPersistedChanges = false
     }
   }
 
@@ -283,13 +289,16 @@ export default function EditableSlideSurface({
 
     event.preventDefault()
     event.stopPropagation()
-    if (!hasElementPatchChanges(original, updates)) {
+    onEditingElementChange?.(null)
+    const rawHasPersistedChanges = hasElementPatchChanges(original, updates)
+    const hasPersistedChanges = onTransformPreview
+      ? (onTransformPreview(element.id, updates) ?? rawHasPersistedChanges)
+      : rawHasPersistedChanges
+    if (!hasPersistedChanges) {
       onTransformCancel?.()
       return
     }
-    onEditingElementChange?.(null)
-    if (onTransformPreview) onTransformPreview(element.id, updates)
-    else onUpdateElement?.(slideId, element.id, updates)
+    if (!onTransformPreview) onUpdateElement?.(slideId, element.id, updates)
     onTransformCommit?.()
   }
 

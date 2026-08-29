@@ -515,6 +515,7 @@ export function updateElementInSlide(
   const slide = document.slides[slideId]
   const element = slide?.elements[elementId]
   if (!slide || !element) return document
+  if (!hasElementPatchChanges(element, updates)) return document
   return {
     ...document,
     slides: {
@@ -529,6 +530,26 @@ export function updateElementInSlide(
     },
     updatedAt: Date.now()
   }
+}
+
+function hasElementPatchChanges(
+  element: EditablePresentationElement,
+  updates: Partial<EditablePresentationElement>
+): boolean {
+  return Object.entries(updates).some(([key, value]) => {
+    if (key !== 'crop') return !Object.is(element[key as keyof EditablePresentationElement], value)
+    if (element.type !== 'image') return true
+    const current = normalizeImageCrop(element.crop)
+    const next = normalizeImageCrop(
+      value as Extract<EditablePresentationElement, { type: 'image' }>['crop']
+    )
+    return (
+      current.top !== next.top ||
+      current.right !== next.right ||
+      current.bottom !== next.bottom ||
+      current.left !== next.left
+    )
+  })
 }
 
 export function reorderElementInSlide(

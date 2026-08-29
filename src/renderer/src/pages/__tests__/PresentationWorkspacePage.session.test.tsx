@@ -1551,6 +1551,129 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
   })
 
+  it('does not commit a pointer move whose finalized position snaps to its original', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({
+      text: 'Snapped origin',
+      x: 0,
+      y: 100,
+      width: 120,
+      height: 40,
+      autoWidth: false
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const initial = session.getSnapshot()
+    const frame = (await screen.findAllByText('Snapped origin'))
+      .at(-1)
+      ?.closest<HTMLElement>('[data-slide-element]')
+    if (!frame) throw new Error('presentation text frame not found')
+
+    fireEvent.pointerDown(frame, { clientX: 10, clientY: 10, pointerId: 1 })
+    fireEvent.pointerMove(frame, { clientX: 14, clientY: 10, pointerId: 1 })
+
+    expect(session.getSnapshot().renderedDocument).toBe(initial.renderedDocument)
+    expect(frame).toHaveStyle({ left: '0px' })
+
+    fireEvent.pointerUp(frame, { clientX: 14, clientY: 10, pointerId: 1 })
+    const after = session.getSnapshot()
+    expect(after.renderedDocument).toBe(initial.renderedDocument)
+    expect(after.history).toBe(initial.history)
+    expect(after.save.scheduledRevision).toBe(initial.save.scheduledRevision)
+    expect(after.draftKind).toBeNull()
+    expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+  })
+
+  it('restores the live base geometry when a pointer move returns exactly to its origin', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const text = createTextElement({
+      text: 'Return to origin',
+      x: 100,
+      y: 100,
+      width: 120,
+      height: 40,
+      autoWidth: false
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(sourceDocument, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const initial = session.getSnapshot()
+    const frame = (await screen.findAllByText('Return to origin'))
+      .at(-1)
+      ?.closest<HTMLElement>('[data-slide-element]')
+    if (!frame) throw new Error('presentation text frame not found')
+
+    fireEvent.pointerDown(frame, { clientX: 10, clientY: 10, pointerId: 1 })
+    fireEvent.pointerMove(frame, { clientX: 30, clientY: 10, pointerId: 1 })
+    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
+      x: 120,
+      y: 100
+    })
+
+    const movedFrame = (await screen.findAllByText('Return to origin'))
+      .at(-1)
+      ?.closest<HTMLElement>('[data-slide-element]')
+    if (!movedFrame) throw new Error('moved presentation text frame not found')
+    fireEvent.pointerMove(movedFrame, { clientX: 10, clientY: 10, pointerId: 1 })
+
+    expect(session.getSnapshot().renderedDocument).toBe(initial.renderedDocument)
+    expect(movedFrame).toHaveStyle({ left: '100px', top: '100px' })
+
+    fireEvent.pointerUp(movedFrame, { clientX: 10, clientY: 10, pointerId: 1 })
+    const after = session.getSnapshot()
+    expect(after.history).toBe(initial.history)
+    expect(after.save.scheduledRevision).toBe(initial.save.scheduledRevision)
+    expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+  })
+
+  it('does not commit a selected group move whose finalized delta snaps to zero', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument('Sunday')
+    const slideId = sourceDocument.slideOrder[0]
+    const first = createTextElement({ text: 'Group first', x: 0, y: 100, width: 120, height: 40 })
+    const second = createTextElement({
+      text: 'Group second',
+      x: 200,
+      y: 100,
+      width: 120,
+      height: 40
+    })
+    const withFirst = addElementToSlide(sourceDocument, slideId, first)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(withFirst, slideId, second),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const firstFrame = (await screen.findAllByText('Group first'))
+      .at(-1)
+      ?.closest<HTMLElement>('[data-slide-element]')
+    const secondFrame = (await screen.findAllByText('Group second'))
+      .at(-1)
+      ?.closest<HTMLElement>('[data-slide-element]')
+    if (!firstFrame || !secondFrame) throw new Error('presentation group frames not found')
+    fireEvent.click(firstFrame)
+    fireEvent.click(secondFrame, { ctrlKey: true })
+    const initial = session.getSnapshot()
+
+    act(() => {
+      fireEvent.pointerDown(firstFrame, { clientX: 10, clientY: 10, pointerId: 1 })
+      fireEvent.pointerMove(firstFrame, { clientX: 14, clientY: 10, pointerId: 1 })
+    })
+    fireEvent.pointerUp(firstFrame, { clientX: 14, clientY: 10, pointerId: 1 })
+
+    const after = session.getSnapshot()
+    expect(after.renderedDocument).toBe(initial.renderedDocument)
+    expect(after.history).toBe(initial.history)
+    expect(after.save.scheduledRevision).toBe(initial.save.scheduledRevision)
+    expect(mocks.persistEditablePresentationRevision).not.toHaveBeenCalled()
+  })
+
   it('does not select a generated shape while composition blocks the mutation', async () => {
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
     const slideId = sourceDocument.slideOrder[0]
