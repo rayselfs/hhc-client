@@ -10,7 +10,7 @@ import { rendererManualChunk } from './scripts/renderer-manual-chunk'
 import { OAUTH_CALLBACK_PWA_DENYLIST } from './scripts/pwa-navigation-denylist'
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
-const DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
+const DEFAULT_ONEDRIVE_CLIENT_ID = '2aeb121a-c658-4766-ad71-d31625db10bd'
 const DEFAULT_BIBLE_API_HOST = 'https://www.alive.org.tw'
 const DEFAULT_BIBLE_API_V1_PREFIX = '/api/bible/v1'
 const DEFAULT_BIBLE_API_V2_PREFIX = '/api/bible/v2'
