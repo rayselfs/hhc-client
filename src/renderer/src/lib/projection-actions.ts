@@ -8,6 +8,7 @@ import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import { getDisplayValues, useTimerStore } from '@renderer/stores/timer'
 import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
+import { isWeb } from '@renderer/lib/env'
 import type { FileItemRecord } from '@shared/types/folder'
 
 export type ProjectionHeaderDisabledReason =
@@ -41,6 +42,7 @@ interface CloseProjectionSessionDeps {
 }
 
 interface StartMediaProjectionDeps {
+  ensureProjectionOpen?: () => Promise<unknown>
   startMediaPresentation?: (
     items: FileItemRecord[],
     startIndex: number,
@@ -67,6 +69,7 @@ interface PresentMediaItemInput {
 interface StartProjectionForRouteInput {
   pathname: string
   startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<unknown>
+  ensureProjectionOpen?: () => Promise<unknown>
   biblePayloads: ContentMessageTuple[] | null
   presentableItems: FileItemRecord[]
   startMediaPresentation: (
@@ -169,6 +172,9 @@ export async function startMediaProjection(
     presentationState?: MediaTypeStateMap['presentation']
   }
 ): Promise<PresentationReadinessReport> {
+  if (isWeb() && deps.ensureProjectionOpen) {
+    void deps.ensureProjectionOpen().catch(() => undefined)
+  }
   const startMediaPresentation =
     deps.startMediaPresentation ?? useMediaProjectionStore.getState().startPresentationWithReadiness
   const report = await startMediaPresentation(items, startIndex, options)
@@ -208,6 +214,7 @@ export async function presentMediaItem({
 export async function startProjectionForRoute({
   pathname,
   startProjection,
+  ensureProjectionOpen,
   biblePayloads,
   presentableItems,
   startMediaPresentation,
@@ -226,6 +233,7 @@ export async function startProjectionForRoute({
 
   if (isFilesRoute(pathname) && presentableItems.length > 0) {
     const report = await startMediaProjection(presentableItems, 0, {
+      ensureProjectionOpen,
       startMediaPresentation,
       onNoProjectableFiles
     })

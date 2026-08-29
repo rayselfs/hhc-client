@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   stopProjectionSession: vi.fn(),
   toastDanger: vi.fn(),
   isProjectionOpen: false,
+  ensureProjectionOpen: vi.fn(() => Promise.resolve()),
   stopProjection: vi.fn()
 }))
 
@@ -56,6 +57,7 @@ vi.mock('react-router-dom', async () => {
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     isProjectionOpen: mocks.isProjectionOpen,
+    ensureProjectionOpen: mocks.ensureProjectionOpen,
     stopProjection: mocks.stopProjection
   })
 }))

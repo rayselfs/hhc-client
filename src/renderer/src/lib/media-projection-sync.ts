@@ -86,6 +86,8 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   useEffect(
     () =>
       registerMediaProjectionPreflight(async (items) => {
+        const nextOwnership = new Map(editableOwnershipRef.current)
+        nextOwnership.clear()
         const ownedDocuments: Array<{
           itemId: string
           session: PresentationEditorSession
@@ -96,7 +98,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           if (!isEditablePresentationMimeType(item.mimeType)) continue
           const session = registry.get(item.id)
           if (!session) {
-            editableOwnershipRef.current.set(item.id, { kind: 'none' })
+            nextOwnership.set(item.id, { kind: 'none' })
             ownedWithoutSession.push(item.id)
             continue
           }
@@ -107,7 +109,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
             snapshot.draftKind === null &&
             snapshot.save?.status === 'saved'
           ) {
-            editableOwnershipRef.current.set(item.id, { kind: 'session', session, document })
+            nextOwnership.set(item.id, { kind: 'session', session, document })
             ownedDocuments.push({ itemId: item.id, session, document })
             continue
           }
@@ -121,20 +123,24 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           } catch {
             return false
           }
-          editableOwnershipRef.current.set(item.id, { kind: 'session', session, document })
+          nextOwnership.set(item.id, { kind: 'session', session, document })
           ownedDocuments.push({ itemId: item.id, session, document })
         }
         return {
           status: 'ready' as const,
-          validate: () =>
-            ownedDocuments.every(({ itemId, session, document }) => {
-              const snapshot = session.getSnapshot()
-              return (
-                registry.get(itemId) === session &&
-                snapshot.history.present === document &&
-                snapshot.draftKind == null
-              )
-            }) && ownedWithoutSession.every((itemId) => registry.get(itemId) === undefined)
+          validate: () => {
+            const valid =
+              ownedDocuments.every(({ itemId, session, document }) => {
+                const snapshot = session.getSnapshot()
+                return (
+                  registry.get(itemId) === session &&
+                  snapshot.history.present === document &&
+                  snapshot.draftKind == null
+                )
+              }) && ownedWithoutSession.every((itemId) => registry.get(itemId) === undefined)
+            if (valid) editableOwnershipRef.current = nextOwnership
+            return valid
+          }
         }
       }),
     [registry]
@@ -411,10 +417,14 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   }, [activeOwner, clearRemoteSource, projectCurrentItem])
 
   useEffect(() => {
-    if (!useMediaProjectionStore.getState().isPresenting) clearRemoteSource()
+    if (!useMediaProjectionStore.getState().isPresenting) {
+      editableOwnershipRef.current.clear()
+      clearRemoteSource()
+    }
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (prev.isPresenting && !state.isPresenting) {
         projectSequenceRef.current += 1
+        editableOwnershipRef.current.clear()
         clearRemoteSource()
       }
     })
@@ -453,6 +463,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   useEffect(
     () => () => {
       projectSequenceRef.current += 1
+      editableOwnershipRef.current.clear()
       clearRemoteSource()
     },
     [clearRemoteSource]

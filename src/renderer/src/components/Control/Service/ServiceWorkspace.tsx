@@ -53,7 +53,7 @@ function projectionResultMessage(
 
 export default function ServiceWorkspace(): React.JSX.Element {
   const { t } = useTranslation()
-  const { startProjection } = useProjection()
+  const { ensureProjectionOpen, startProjection } = useProjection()
   const cues = useServicePlaylistStore((state) => state.cues)
   const currentCueId = useServicePlaylistStore((state) => state.currentCueId)
   const selectedCueId = useServicePlaylistStore((state) => state.selectedCueId)
@@ -111,7 +111,7 @@ export default function ServiceWorkspace(): React.JSX.Element {
     setProjectingCueId(cue.id)
     setProjectionMessage(null)
     try {
-      const result = await projectServiceCue(cue, { startProjection })
+      const result = await projectServiceCue(cue, { ensureProjectionOpen, startProjection })
       setProjectionMessage(projectionResultMessage(result, t))
     } finally {
       setProjectingCueId(null)

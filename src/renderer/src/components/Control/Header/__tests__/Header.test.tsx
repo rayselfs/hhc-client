@@ -66,6 +66,9 @@ function baseProjectionContext(): MockProjectionContext {
       failure: null
     },
     claimProjection: vi.fn<MockProjectionContext['claimProjection']>(),
+    ensureProjectionOpen: vi.fn<MockProjectionContext['ensureProjectionOpen']>(() =>
+      Promise.resolve({ ok: true, generation: 1 })
+    ),
     startProjection: vi.fn<MockProjectionContext['startProjection']>(() =>
       Promise.resolve({ ok: true, generation: 1 })
     ),

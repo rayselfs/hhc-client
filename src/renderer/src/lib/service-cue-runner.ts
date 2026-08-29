@@ -26,6 +26,7 @@ export interface ServiceCueProjectionResult {
 }
 
 interface ProjectServiceCueDependencies {
+  ensureProjectionOpen?: () => Promise<unknown>
   startProjection: (
     owner: ProjectionOwner,
     payloads?: ContentMessageTuple[] | undefined
@@ -61,7 +62,7 @@ async function projectMediaCue(
   const report = await startMediaProjection(
     [item],
     0,
-    { startMediaPresentation },
+    { ensureProjectionOpen: deps.ensureProjectionOpen, startMediaPresentation },
     { prioritizeStartItem: true }
   )
   const itemReadiness = report.items.find((entry) => entry.itemId === item.id)

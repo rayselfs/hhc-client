@@ -9,7 +9,12 @@ import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   showMenu: vi.fn(),
+  ensureProjectionOpen: vi.fn(() => Promise.resolve()),
   startMediaProjection: vi.fn()
+}))
+
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: () => ({ ensureProjectionOpen: mocks.ensureProjectionOpen })
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -121,6 +126,7 @@ describe.each(['file', 'folder'] as const)('useFileContextMenu %s Project action
   beforeEach(() => {
     mocks.navigate.mockReset()
     mocks.showMenu.mockReset()
+    mocks.ensureProjectionOpen.mockClear()
     mocks.startMediaProjection.mockReset()
     fileMenuItem = image
     useFileExplorerStore.setState({

@@ -3,6 +3,7 @@ import { toast } from '@heroui/react/toast'
 import { Play, Star, StarOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { createFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
 import type { UseFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
@@ -31,7 +32,8 @@ function project(
   items: Parameters<typeof getProjectionPlaylist>[0],
   requestedItem: FileItemRecord | undefined,
   t: (key: string) => string,
-  navigate: (path: string) => void
+  navigate: (path: string) => void,
+  ensureProjectionOpen: ReturnType<typeof useProjection>['ensureProjectionOpen']
 ): void {
   const playlist = getProjectionPlaylist(items, requestedItem)
   if (playlist.length === 0) return
@@ -48,7 +50,10 @@ function project(
         startMediaProjection(
           files,
           index,
-          { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+          {
+            ensureProjectionOpen,
+            onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+          },
           options
         ),
       navigate
@@ -57,6 +62,7 @@ function project(
   }
 
   void startMediaProjection(playlist, startIndex, {
+    ensureProjectionOpen,
     onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
   })
     .then((report) => {
@@ -68,7 +74,8 @@ function project(
 function getItemProjectActions(
   item: FolderItem,
   t: (key: string) => string,
-  navigate: (path: string) => void
+  navigate: (path: string) => void,
+  ensureProjectionOpen: ReturnType<typeof useProjection>['ensureProjectionOpen']
 ): ContextMenuEntry[] {
   if (!isFileItem(item) || !isPresentable(item.mimeType)) return []
 
@@ -81,7 +88,7 @@ function getItemProjectActions(
       onAction: () => {
         const { currentFolderId, getItems } = useFileExplorerStore.getState()
         const items = getItems(currentFolderId)
-        project(items, item, t, navigate)
+        project(items, item, t, navigate, ensureProjectionOpen)
       }
     }
   ]
@@ -90,7 +97,8 @@ function getItemProjectActions(
 function getFolderProjectActions(
   folder: FolderRecord,
   t: (key: string) => string,
-  navigate: (path: string) => void
+  navigate: (path: string) => void,
+  ensureProjectionOpen: ReturnType<typeof useProjection>['ensureProjectionOpen']
 ): ContextMenuEntry[] {
   const { toggleFavorite, getItems } = useFileExplorerStore.getState()
   const items = getItems(folder.id)
@@ -103,7 +111,7 @@ function getFolderProjectActions(
       id: 'project',
       label: t('fileExplorer.contextMenu.project'),
       icon: React.createElement(Play, { size: 14 }),
-      onAction: () => project(items, undefined, t, navigate)
+      onAction: () => project(items, undefined, t, navigate, ensureProjectionOpen)
     })
   }
 
@@ -124,6 +132,7 @@ function getFolderProjectActions(
 export function useFileContextMenu(): UseFolderContextMenu {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { ensureProjectionOpen } = useProjection()
   const menu = useBaseFileContextMenu()
   const translate = (key: string): string => t(key as never) as string
 
@@ -133,7 +142,7 @@ export function useFileContextMenu(): UseFolderContextMenu {
       menu.showItemMenu({
         ...options,
         extraActions: [
-          ...getItemProjectActions(options.item, translate, navigate),
+          ...getItemProjectActions(options.item, translate, navigate, ensureProjectionOpen),
           ...(options.extraActions ?? [])
         ]
       })
@@ -142,7 +151,7 @@ export function useFileContextMenu(): UseFolderContextMenu {
       menu.showFolderMenu({
         ...options,
         extraActions: [
-          ...getFolderProjectActions(options.folder, translate, navigate),
+          ...getFolderProjectActions(options.folder, translate, navigate, ensureProjectionOpen),
           ...(options.extraActions ?? [])
         ]
       })

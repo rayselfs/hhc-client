@@ -12,6 +12,7 @@ import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { isWeb } from '@renderer/lib/env'
 import {
   getPresentationWorkspacePath,
   isEditablePresentationMimeType,
@@ -26,7 +27,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { isProjectionOpen, stopProjection } = useProjection()
+  const { isProjectionOpen, ensureProjectionOpen, stopProjection } = useProjection()
   const registry = usePresentationSessionRegistry()
   const requestCloseDecision = usePresentationCloseDecision()
   const runPresentationSafeAction = usePresentationSafeAction()
@@ -143,6 +144,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
 
   const presentActiveDocument = async (from: 'beginning' | 'current'): Promise<void> => {
     if (!activeDocument) return
+    if (isWeb()) void ensureProjectionOpen().catch(() => undefined)
 
     const db = await openFileExplorerDB()
     const item = await db.get('folder-items', activeDocument.itemId)

@@ -43,7 +43,8 @@ export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
-  const { isProjectionOpen, startProjection, stopProjection } = useProjection()
+  const { isProjectionOpen, ensureProjectionOpen, startProjection, stopProjection } =
+    useProjection()
   const mode = useTimerStore((s) => s.mode)
 
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
@@ -121,6 +122,7 @@ export default function Header(): React.JSX.Element {
     const started = await startProjectionForRoute({
       pathname: location.pathname,
       startProjection,
+      ensureProjectionOpen,
       biblePayloads,
       presentableItems,
       startMediaPresentation: (items, startIndex) =>
@@ -130,6 +132,7 @@ export default function Header(): React.JSX.Element {
     if (started && isFilesRoute(location.pathname)) navigate('/media')
   }, [
     biblePayloads,
+    ensureProjectionOpen,
     isProjectionOpen,
     location.pathname,
     presentableItems,

@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { useItemSelection } from '@renderer/hooks/useItemSelection'
 import { useOsFileDrop } from '@renderer/hooks/useOsFileDrop'
@@ -374,6 +375,7 @@ export function FileBrowser({
   onRenameItemRequestHandled,
   isCurrentFolderReadOnly = false
 }: FileBrowserProps): React.JSX.Element {
+  const { ensureProjectionOpen } = useProjection()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const confirm = useConfirm()
@@ -791,7 +793,10 @@ export function FileBrowser({
             startMediaProjection(
               items,
               startIndex,
-              { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+              {
+                ensureProjectionOpen,
+                onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+              },
               options
             ),
           navigate
@@ -806,6 +811,7 @@ export function FileBrowser({
       navigateToFolder,
       openPresentationDocument,
       navigate,
+      ensureProjectionOpen,
       t
     ]
   )
@@ -1021,7 +1027,10 @@ export function FileBrowser({
           void startMediaProjection(
             playlist,
             startIndex,
-            { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+            {
+              ensureProjectionOpen,
+              onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+            },
             { prioritizeStartItem: true }
           )
             .then((report) => {
@@ -1179,7 +1188,8 @@ export function FileBrowser({
         void presentMediaItem({
           item: result.item,
           playlist: [result.item],
-          start: startMediaProjection,
+          start: (items, startIndex, _, options) =>
+            startMediaProjection(items, startIndex, { ensureProjectionOpen }, options),
           navigate: (path) => {
             navigate(path)
             setSearchQuery('')

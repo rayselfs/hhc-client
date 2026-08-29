@@ -79,6 +79,7 @@ describe('projectServiceCue', () => {
 
   it('starts media presentation for media cues', async () => {
     const startProjection = vi.fn(() => Promise.resolve())
+    const ensureProjectionOpen = vi.fn(() => Promise.resolve())
     const file = makeFile('file-1')
     const startMediaPresentation = vi.fn(() =>
       Promise.resolve({
@@ -109,6 +110,7 @@ describe('projectServiceCue', () => {
     await expect(
       projectServiceCue(cue, {
         startProjection,
+        ensureProjectionOpen,
         getFileItem: () => file,
         startMediaPresentation
       })
@@ -117,6 +119,7 @@ describe('projectServiceCue', () => {
       prioritizeStartItem: true
     })
     expect(startProjection).not.toHaveBeenCalled()
+    expect(ensureProjectionOpen).toHaveBeenCalledOnce()
   })
 
   it('reports an editable finalization block without claiming a media cue projected', async () => {

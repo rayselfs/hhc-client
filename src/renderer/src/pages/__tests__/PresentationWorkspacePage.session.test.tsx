@@ -162,7 +162,11 @@ vi.mock('@renderer/contexts/PresentationCloseDecisionContext', () => ({
 }))
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
-  useProjection: () => ({ isProjectionOpen: false, stopProjection: vi.fn() })
+  useProjection: () => ({
+    isProjectionOpen: false,
+    ensureProjectionOpen: vi.fn(() => Promise.resolve()),
+    stopProjection: vi.fn()
+  })
 }))
 
 vi.mock('@renderer/lib/projection-actions', () => ({

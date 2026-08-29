@@ -1292,6 +1292,79 @@ describe('media projection sync', () => {
     rendered.unmount()
   })
 
+  it('does not republish editable ownership after an in-flight start is ended', async () => {
+    const closingDocument = createBlankEditablePresentationDocument('Closing')
+    const reopenedBase = createBlankEditablePresentationDocument('Reopened')
+    const reopenedDocument = addElementToSlide(
+      reopenedBase,
+      reopenedBase.slideOrder[0],
+      createTextElement({ text: 'Reopened session' })
+    )
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const pending = deferred<typeof closingDocument>()
+    const closingSession = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: closingDocument },
+        draftKind: 'text',
+        save: { status: 'pending' }
+      }))
+    } as unknown as PresentationEditorSession
+    const reopenedSession = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: reopenedDocument },
+        draftKind: null,
+        save: { status: 'saved' }
+      }))
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(closingSession)
+    registryMocks.finalizeAndFlush.mockReturnValue(pending.promise)
+    useMediaProjectionStore.setState({ playlist: [], isPresenting: false, snapshot: null })
+    renderSync()
+
+    const start = useMediaProjectionStore.getState().startPresentation([editable], 0)
+    await waitFor(() => expect(registryMocks.finalizeAndFlush).toHaveBeenCalledWith(editable.id))
+    act(() => useMediaProjectionStore.getState().endLiveSession())
+    pending.resolve(closingDocument)
+    expect(await start).toEqual({ status: 'superseded' })
+    registryMocks.get.mockReturnValue(reopenedSession)
+
+    mockStartProjection.mockClear()
+    act(() => {
+      useMediaProjectionStore.setState({
+        playlist: [editable],
+        currentIndex: 0,
+        isPresenting: true,
+        sessionRevision: 2,
+        snapshot: {
+          id: 'resumed',
+          createdAt: 2,
+          entries: [
+            {
+              index: 0,
+              itemId: editable.id,
+              blobId: editable.id,
+              name: editable.name,
+              mimeType: editable.mimeType,
+              sourceUrl: editable.url
+            }
+          ]
+        }
+      })
+    })
+
+    await waitFor(() => expect(mockStartProjection).toHaveBeenCalledOnce())
+    expect(mockStartProjection.mock.calls[0]?.[1][0]?.[1]).toMatchObject({
+      editablePresentation: expect.objectContaining({
+        slide: expect.objectContaining({
+          elements: expect.objectContaining({
+            [reopenedDocument.slides[reopenedDocument.slideOrder[0]].elementOrder[0]]:
+              expect.objectContaining({ text: 'Reopened session' })
+          })
+        })
+      })
+    })
+  })
+
   it('revalidates a clean editable session at the store commit boundary', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const replacementDocument = createBlankEditablePresentationDocument('Replacement')
@@ -1334,6 +1407,86 @@ describe('media projection sync', () => {
       status: 'success'
     })
     await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
+  })
+
+  it('releases editable ownership when a media session ends', async () => {
+    const firstDocument = createBlankEditablePresentationDocument('First')
+    const secondBase = createBlankEditablePresentationDocument('Second')
+    const secondDocument = addElementToSlide(
+      secondBase,
+      secondBase.slideOrder[0],
+      createTextElement({ text: 'Current session' })
+    )
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const firstSession = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: firstDocument },
+        draftKind: null,
+        save: { status: 'saved' }
+      }))
+    } as unknown as PresentationEditorSession
+    const secondSession = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: secondDocument },
+        draftKind: null,
+        save: { status: 'saved' }
+      }))
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(firstSession)
+    useMediaProjectionStore.setState({ playlist: [], isPresenting: false, snapshot: null })
+    renderSync()
+
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'success'
+    })
+    await waitFor(() => expect(mockStartProjection).toHaveBeenCalledOnce())
+
+    act(() => useMediaProjectionStore.getState().endLiveSession())
+    registryMocks.get.mockReturnValue(secondSession)
+    mockStartProjection.mockClear()
+    act(() => {
+      useMediaProjectionStore.setState({
+        playlist: [editable],
+        currentIndex: 0,
+        isPresenting: true,
+        sessionRevision: 2,
+        snapshot: {
+          id: 'resumed',
+          createdAt: 2,
+          entries: [
+            {
+              index: 0,
+              itemId: editable.id,
+              blobId: editable.id,
+              name: editable.name,
+              mimeType: editable.mimeType,
+              sourceUrl: editable.url
+            }
+          ]
+        }
+      })
+    })
+
+    await waitFor(() => expect(mockStartProjection).toHaveBeenCalledOnce())
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'media',
+      [
+        [
+          'file:show',
+          expect.objectContaining({
+            editablePresentation: expect.objectContaining({
+              slide: expect.objectContaining({
+                elements: expect.objectContaining({
+                  [secondDocument.slides[secondDocument.slideOrder[0]].elementOrder[0]]:
+                    expect.objectContaining({ type: 'text', text: 'Current session' })
+                })
+              })
+            })
+          })
+        ]
+      ],
+      { bringToFront: true }
+    )
   })
 
   it('does not project a deferred remote source after an explicit replacement start', async () => {

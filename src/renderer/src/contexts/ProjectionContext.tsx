@@ -50,6 +50,7 @@ interface ProjectionContextValue {
   vlcFailure: ProjectionVlcFailure | null
   sessionSummary: ProjectionSessionSummary
   claimProjection: (owner: ProjectionOwner, options?: { unblank?: boolean }) => void
+  ensureProjectionOpen: () => Promise<ProjectionOperationResult>
   startProjection: (
     owner: ProjectionOwner,
     payloads?: ProjectionContentMessageTuple[],
@@ -525,6 +526,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       vlcFailure,
       sessionSummary,
       claimProjection,
+      ensureProjectionOpen: openProjection,
       startProjection,
       stopProjection,
       retryProjection,
@@ -544,6 +546,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       vlcFailure,
       sessionSummary,
       claimProjection,
+      openProjection,
       startProjection,
       stopProjection,
       retryProjection,

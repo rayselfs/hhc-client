@@ -13,7 +13,12 @@ import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
+  ensureProjectionOpen: vi.fn(() => Promise.resolve()),
   startMediaProjection: vi.fn()
+}))
+
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: () => ({ ensureProjectionOpen: mocks.ensureProjectionOpen })
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -102,6 +107,7 @@ async function renderWithItems(items: readonly FileItemRecord[]): Promise<void> 
 describe('FileBrowser presentation open behavior', () => {
   beforeEach(() => {
     mocks.navigate.mockClear()
+    mocks.ensureProjectionOpen.mockClear()
     mocks.startMediaProjection.mockClear()
     act(() => {
       usePresentationWorkspaceStore.setState({
@@ -343,7 +349,7 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.startMediaProjection).toHaveBeenCalledWith(
       [item],
       0,
-      {},
+      { ensureProjectionOpen: mocks.ensureProjectionOpen },
       {
         prioritizeStartItem: true
       }
