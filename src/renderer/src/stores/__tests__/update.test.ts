@@ -19,4 +19,20 @@ describe('useUpdateStore', () => {
       downloadPercent: null
     })
   })
+
+  it('tracks macOS verification and opened installer states', () => {
+    useUpdateStore.getState().setAvailable('2.4.1')
+    useUpdateStore.getState().setVerifying()
+    expect(useUpdateStore.getState()).toMatchObject({
+      status: 'verifying',
+      availableVersion: '2.4.1',
+      downloadPercent: null
+    })
+
+    useUpdateStore.getState().setInstallerOpened()
+    expect(useUpdateStore.getState()).toMatchObject({
+      status: 'installer-opened',
+      availableVersion: '2.4.1'
+    })
+  })
 })

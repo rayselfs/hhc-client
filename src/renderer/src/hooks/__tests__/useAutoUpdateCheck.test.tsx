@@ -36,4 +36,12 @@ describe('useAutoUpdateCheck', () => {
       downloadPercent: 42
     })
   })
+
+  it.each(['verifying', 'installer-opened'] as const)('stores the %s status from IPC', (status) => {
+    renderHook(() => useAutoUpdateCheck())
+
+    act(() => mocks.statusHandler?.({ status }))
+
+    expect(useUpdateStore.getState().status).toBe(status)
+  })
 })

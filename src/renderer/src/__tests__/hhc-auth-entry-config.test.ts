@@ -154,6 +154,7 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(checksumStep).toContain('release-artifacts')
     expect(checksumStep).toContain('sha256sum')
     expect(checksumStep).toContain('SHA256SUMS')
+    expect(checksumStep).toContain("-printf '%f\\0'")
     expect(checksumStep).toContain('test -s')
     expect(release).toContain('needs: [quality-gates, prepare, package]')
     expect(release.indexOf('- name: Download desktop artifacts')).toBeLessThan(

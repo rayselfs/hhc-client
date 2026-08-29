@@ -117,7 +117,8 @@ interface AppAPI {
 
 interface UpdateAPI {
   checkForUpdates: () => Promise<{ updateAvailable: boolean; version?: string }>
-  downloadAndInstall: () => Promise<void>
+  installDownloaded: () => Promise<void>
+  downloadMacInstaller: () => Promise<void>
   onStatusChanged: (
     callback: (...data: IpcMainToRendererMap['update:status-changed']) => void
   ) => () => void

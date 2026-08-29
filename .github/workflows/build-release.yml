@@ -225,7 +225,9 @@ jobs:
         working-directory: release-artifacts
         shell: bash
         run: |
-          mapfile -d '' artifacts < <(find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z)
+          mapfile -d '' artifacts < <(
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' | sort -z
+          )
           if (( ${#artifacts[@]} == 0 )); then
             echo 'No release artifacts found'
             exit 1

@@ -13,7 +13,9 @@ export interface UpdateActions {
   setAvailable(version: string): void
   setNotAvailable(): void
   setDownloading(percent?: number): void
+  setVerifying(): void
   setDownloaded(): void
+  setInstallerOpened(): void
   setError(message: string): void
   reset(): void
 }
@@ -42,8 +44,16 @@ export const useUpdateStore = create<UpdateStore>()((set) => ({
     set({ status: 'downloading', downloadPercent: percent ?? null })
   },
 
+  setVerifying: () => {
+    set({ status: 'verifying', downloadPercent: null })
+  },
+
   setDownloaded: () => {
     set({ status: 'downloaded', downloadPercent: null })
+  },
+
+  setInstallerOpened: () => {
+    set({ status: 'installer-opened', downloadPercent: null })
   },
 
   setError: (message: string) => {

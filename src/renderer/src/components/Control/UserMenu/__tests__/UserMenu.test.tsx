@@ -8,7 +8,7 @@ import { PresentationSessionRegistryProvider } from '@renderer/contexts/Presenta
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import UserMenu from '../UserMenu'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
-import { isElectron } from '@renderer/lib/env'
+import { isElectron, isMac } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
 
 const auth = vi.hoisted(() => ({
@@ -29,6 +29,10 @@ const auth = vi.hoisted(() => ({
   }
 }))
 const toastDanger = vi.hoisted(() => vi.fn())
+const updateApi = vi.hoisted(() => ({
+  installDownloaded: vi.fn(async () => undefined),
+  downloadMacInstaller: vi.fn(async () => undefined)
+}))
 
 vi.mock('@renderer/contexts/HhcAuthContext', () => ({
   useHhcAuth: () => auth.value
@@ -39,7 +43,10 @@ vi.mock('@heroui/react/toast', async (importOriginal) => {
   return { ...actual, toast: { ...actual.toast, danger: toastDanger } }
 })
 
-vi.mock('@renderer/lib/env', () => ({ isElectron: vi.fn(() => false) }))
+vi.mock('@renderer/lib/env', () => ({
+  isElectron: vi.fn(() => false),
+  isMac: vi.fn(() => false)
+}))
 
 function renderUserMenu(
   props: { isExpanded?: boolean; onOpenPreferences?: () => void } = {}
@@ -73,7 +80,14 @@ beforeEach(async () => {
   auth.value.getAccessToken = vi.fn(async () => null)
   toastDanger.mockClear()
   vi.mocked(isElectron).mockReturnValue(false)
+  vi.mocked(isMac).mockReturnValue(false)
   useUpdateStore.getState().reset()
+  updateApi.installDownloaded.mockClear()
+  updateApi.downloadMacInstaller.mockClear()
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: { update: updateApi }
+  })
 })
 
 describe('UserMenu', () => {
@@ -111,6 +125,50 @@ describe('UserMenu', () => {
     renderUserMenu()
 
     expect(screen.getByText(label)).toBeInTheDocument()
+  })
+
+  it('asks before installing a downloaded Windows update', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    useUpdateStore.setState({ status: 'downloaded', availableVersion: '2.4.1' })
+    renderUserMenu()
+
+    fireEvent.click(screen.getByText('Install update').closest('[role="menuitem"]')!)
+    expect(await screen.findByText('Install update now?')).toBeInTheDocument()
+    expect(updateApi.installDownloaded).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Install now' }))
+    await waitFor(() => expect(updateApi.installDownloaded).toHaveBeenCalledOnce())
+  })
+
+  it('starts the dedicated macOS download from an available update', () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    vi.mocked(isMac).mockReturnValue(true)
+    useUpdateStore.setState({ status: 'available', availableVersion: '2.4.1' })
+    renderUserMenu()
+
+    fireEvent.click(screen.getByText('Download update 2.4.1').closest('[role="menuitem"]')!)
+
+    expect(updateApi.downloadMacInstaller).toHaveBeenCalledOnce()
+    expect(updateApi.installDownloaded).not.toHaveBeenCalled()
+  })
+
+  it('shows macOS verification as a disabled status', () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    vi.mocked(isMac).mockReturnValue(true)
+    useUpdateStore.setState({ status: 'verifying' })
+    renderUserMenu()
+
+    const item = screen.getByText('Verifying download...').closest('[role="menuitem"]')
+    expect(item).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('opens macOS installation guidance after the verified DMG opens', () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    vi.mocked(isMac).mockReturnValue(true)
+    useUpdateStore.setState({ status: 'installer-opened', availableVersion: '2.4.1' })
+    renderUserMenu()
+
+    expect(screen.getByText('Install HHC Presenter')).toBeInTheDocument()
   })
 
   it('enables Login for an anonymous session', () => {

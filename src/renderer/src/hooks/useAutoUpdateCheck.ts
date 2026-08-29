@@ -21,7 +21,9 @@ export function useAutoUpdateCheck(): void {
         toast.success(t('toast.updateAvailable', { version: data.version }))
       } else if (data.status === 'not-available') store.setNotAvailable()
       else if (data.status === 'downloading') store.setDownloading(data.percent)
+      else if (data.status === 'verifying') store.setVerifying()
       else if (data.status === 'downloaded') store.setDownloaded()
+      else if (data.status === 'installer-opened') store.setInstallerOpened()
       else if (data.status === 'error') store.setError(data.error ?? 'Unknown error')
     })
 

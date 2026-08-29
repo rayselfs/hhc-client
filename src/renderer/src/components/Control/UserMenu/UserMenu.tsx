@@ -18,15 +18,12 @@ import {
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
+import MacUpdateInstallDialog from '@renderer/components/Control/UserMenu/MacUpdateInstallDialog'
 import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
-import { isElectron } from '@renderer/lib/env'
+import { isElectron, isMac } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
-import {
-  selectIsUpdateAvailable,
-  selectUpdateStatus,
-  selectAvailableVersion
-} from '@renderer/stores/selectors/update'
+import { selectUpdateStatus, selectAvailableVersion } from '@renderer/stores/selectors/update'
 
 interface UserMenuProps {
   isExpanded: boolean
@@ -50,9 +47,12 @@ export default function UserMenu({
   const confirm = useConfirm()
   const runPresentationSafeAction = usePresentationSafeAction()
   const updateStatus = useUpdateStore(selectUpdateStatus)
-  const isUpdateAvailable = useUpdateStore(selectIsUpdateAvailable)
   const availableVersion = useUpdateStore(selectAvailableVersion)
   const downloadPercent = useUpdateStore((state) => state.downloadPercent)
+  const isMacPlatform = isMac()
+  const canUseUpdateAction =
+    (isMacPlatform && updateStatus === 'available') ||
+    (!isMacPlatform && updateStatus === 'downloaded')
   const { status, session, signInStatus, signIn, cancelSignIn, signOut } = useHhcAuth()
   const accountLabel =
     status === 'authenticated' && session ? session.displayName : t('userMenu.guest')
@@ -67,6 +67,43 @@ export default function UserMenu({
     })
     if (!confirmed) return
     await runPresentationSafeAction(() => window.close())
+  }
+
+  const handleUpdateAction = async (): Promise<void> => {
+    if (isMacPlatform && updateStatus === 'available') {
+      useUpdateStore.getState().setDownloading()
+      await window.api.update.downloadMacInstaller()
+      return
+    }
+    if (isMacPlatform || updateStatus !== 'downloaded') return
+
+    const confirmed = await confirm({
+      status: 'info',
+      title: t('userMenu.installUpdateTitle'),
+      description: t('userMenu.installUpdateConfirm'),
+      confirmLabel: t('userMenu.installNow'),
+      cancelLabel: t('common.cancel')
+    })
+    if (confirmed) await window.api.update.installDownloaded()
+  }
+
+  const updateLabel = (): string => {
+    if (updateStatus === 'available') {
+      return t(isMacPlatform ? 'userMenu.downloadUpdate' : 'userMenu.updateAvailable', {
+        version: availableVersion
+      })
+    }
+    if (updateStatus === 'checking') return t('userMenu.checking')
+    if (updateStatus === 'downloading') {
+      return downloadPercent === null
+        ? t('userMenu.downloadingUpdate')
+        : t('userMenu.downloadingUpdateProgress', { percent: downloadPercent })
+    }
+    if (updateStatus === 'verifying') return t('userMenu.verifyingUpdate')
+    if (updateStatus === 'downloaded') return t('userMenu.installUpdate')
+    if (updateStatus === 'installer-opened') return t('userMenu.installerOpened')
+    if (updateStatus === 'error') return t('userMenu.updateFailed')
+    return t('userMenu.upToDate')
   }
 
   return (
@@ -105,9 +142,12 @@ export default function UserMenu({
               if (key === 'closeApp') handleCloseApp()
               if (key === 'keyboardShortcuts') setShortcutsOpen(true)
               if (key === 'about') setAboutOpen(true)
-              if (key === 'checkForUpdates' && isUpdateAvailable) {
-                useUpdateStore.getState().setDownloading()
-                window.api.update.downloadAndInstall().catch(console.error)
+              if (key === 'checkForUpdates' && canUseUpdateAction) {
+                void handleUpdateAction().catch((error: unknown) => {
+                  useUpdateStore
+                    .getState()
+                    .setError(error instanceof Error ? error.message : 'Unknown error')
+                })
               }
             }}
           >
@@ -196,19 +236,11 @@ export default function UserMenu({
             {isElectron() && (
               <Dropdown.Item
                 id="checkForUpdates"
-                isDisabled={!isUpdateAvailable}
+                isDisabled={!canUseUpdateAction}
                 className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
               >
                 <RefreshCw className="size-4" />
-                {updateStatus === 'available'
-                  ? t('userMenu.updateAvailable', { version: availableVersion })
-                  : updateStatus === 'checking'
-                    ? t('userMenu.checking')
-                    : updateStatus === 'downloading'
-                      ? downloadPercent === null
-                        ? t('userMenu.downloadingUpdate')
-                        : t('userMenu.downloadingUpdateProgress', { percent: downloadPercent })
-                      : t('userMenu.upToDate')}
+                {updateLabel()}
               </Dropdown.Item>
             )}
             <Dropdown.Item
@@ -225,6 +257,14 @@ export default function UserMenu({
         <KeyboardShortcutsDialog isOpen={isShortcutsOpen} onOpenChange={setShortcutsOpen} />
       )}
       {isAboutOpen && <AboutDialog isOpen={isAboutOpen} onOpenChange={setAboutOpen} />}
+      {isMacPlatform && updateStatus === 'installer-opened' && (
+        <MacUpdateInstallDialog
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) useUpdateStore.getState().reset()
+          }}
+        />
+      )}
     </>
   )
 }
