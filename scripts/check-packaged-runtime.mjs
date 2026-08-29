@@ -116,10 +116,22 @@ async function hasAnyFile(dir, files) {
 async function checkResourceRoot(resourceRoot, target) {
   const failures = []
   const checks = targetChecks[target]
+  const normalizedRoot = toPosix(resourceRoot)
 
   if (!checks) {
     failures.push(`Unsupported package target: ${target}`)
     return failures
+  }
+
+  if (
+    target.startsWith('darwin-') &&
+    !normalizedRoot.endsWith('/HHC Presenter.app/Contents/Resources')
+  ) {
+    failures.push('macOS bundle must be named HHC Presenter.app')
+  }
+
+  if (target === 'win32-x64' && !(await exists(join(resourceRoot, '..', 'hhc-presenter.exe')))) {
+    failures.push('Windows executable must be named hhc-presenter.exe')
   }
 
   for (const file of licenseFiles) {

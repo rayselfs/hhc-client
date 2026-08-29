@@ -84,11 +84,11 @@ jobs:
           - os: macos-15
             target: --mac
             artifact: macos
-            smoke_executable: dist/mac-arm64/LibrePresenter.app/Contents/MacOS/LibrePresenter
+            smoke_executable: dist/mac-arm64/HHC Presenter.app/Contents/MacOS/HHC Presenter
           - os: windows-2025
             target: --win
             artifact: windows
-            smoke_executable: dist/win-unpacked/libre-presenter.exe
+            smoke_executable: dist/win-unpacked/hhc-presenter.exe
 
     steps:
       - name: Checkout code
@@ -195,7 +195,7 @@ jobs:
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v6.0.0
         with:
-          name: libre-presenter-${{ matrix.artifact }}-${{ needs.prepare.outputs.version }}
+          name: hhc-presenter-${{ matrix.artifact }}-${{ needs.prepare.outputs.version }}
           path: |
             dist/*.dmg
             dist/*.exe

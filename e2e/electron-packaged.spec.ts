@@ -43,7 +43,7 @@ test('launches packaged control and projection windows with recovery lifecycle',
 
   const control = await test.step('open control window', async () => {
     const window = await electronApp!.firstWindow()
-    await expect(window).toHaveTitle(/LibrePresenter/)
+    await expect(window).toHaveTitle(/HHC Presenter|HHC 投影系統|HHC 投影系统/)
     await completeOnboarding(window)
     return window
   })
@@ -163,7 +163,7 @@ test('launches packaged control and projection windows with recovery lifecycle',
       timeout: 15_000
     })
     const restartedControl = await electronApp.firstWindow()
-    await expect(restartedControl).toHaveTitle(/LibrePresenter/)
+    await expect(restartedControl).toHaveTitle(/HHC Presenter|HHC 投影系統|HHC 投影系统/)
     await expect
       .poll(async () =>
         access(staleLeaseDir).then(

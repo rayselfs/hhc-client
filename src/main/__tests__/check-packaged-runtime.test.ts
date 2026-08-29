@@ -33,8 +33,8 @@ async function writeRendererAsar(
   await rm(asarSource, { recursive: true })
 }
 
-async function writeValidMacPackage(root: string): Promise<string> {
-  const resourcesRoot = join(root, 'dist/mac-arm64/LibrePresenter.app/Contents/Resources')
+async function writeValidMacPackage(root: string, appName = 'HHC Presenter'): Promise<string> {
+  const resourcesRoot = join(root, `dist/mac-arm64/${appName}.app/Contents/Resources`)
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.GPL-2.0')
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.LGPL-2.1')
   await writeFileIn(resourcesRoot, 'licenses/ffmpeg/LICENSE.LGPL-2.1')
@@ -49,8 +49,12 @@ async function writeValidMacPackage(root: string): Promise<string> {
   return resourcesRoot
 }
 
-async function writeValidWindowsPackage(root: string): Promise<string> {
+async function writeValidWindowsPackage(
+  root: string,
+  executableName = 'hhc-presenter.exe'
+): Promise<string> {
   const resourcesRoot = join(root, 'dist/win-unpacked/resources')
+  await writeFileIn(root, `dist/win-unpacked/${executableName}`)
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.GPL-2.0')
   await writeFileIn(resourcesRoot, 'licenses/vlc/LICENSE.LGPL-2.1')
   await writeFileIn(resourcesRoot, 'licenses/ffmpeg/LICENSE.LGPL-2.1')
@@ -93,6 +97,20 @@ describe('check packaged runtime script', () => {
     await rm(join(resourcesRoot, 'video-engine/vlc/darwin-arm64/lib/libvlc.dylib'))
 
     await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
+  })
+
+  it('rejects the legacy macOS bundle name', async () => {
+    const root = await createTempRoot()
+    await writeValidMacPackage(root, 'LibrePresenter')
+
+    await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
+  })
+
+  it('rejects the legacy Windows executable name', async () => {
+    const root = await createTempRoot()
+    await writeValidWindowsPackage(root, 'libre-presenter.exe')
+
+    await expect(runChecker(root, 'win32-x64')).rejects.toMatchObject({ code: 1 })
   })
 
   it('rejects packaged apps missing the electron-vlc-player binding', async () => {
@@ -151,7 +169,7 @@ describe('check packaged runtime script', () => {
   it('rejects Windows installers larger than 450 MiB', async () => {
     const root = await createTempRoot()
     await writeValidWindowsPackage(root)
-    const installer = join(root, 'dist/libre-presenter-2.2.3-setup.exe')
+    const installer = join(root, 'dist/hhc-presenter-2.4.0-setup.exe')
     await writeFile(installer, '')
     await truncate(installer, 451 * 1024 * 1024)
 
