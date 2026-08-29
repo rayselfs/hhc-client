@@ -9,6 +9,7 @@ import {
   SYNC_CONNECTION_UNLINK_MARKER
 } from './sync-db'
 import { openFileExplorerDB } from './file-explorer-db'
+import { getBlobId } from './blob-identity'
 
 const guards = new Map<string, SyncDownloadCommitGuard>()
 const scopeFences = new Map<string, number>()
@@ -62,8 +63,14 @@ async function isVideoPosterScopeFenced(scopes: PosterScope[]): Promise<boolean>
 
 async function resolvePosterOwnership(job: MediaJobRecord): Promise<PosterOwnership> {
   const db = await openFileExplorerDB()
-  const item = await db.get('folder-items', job.itemId!)
-  const entries = await listSyncEntriesByLocalItem(job.itemId!)
+  const requestedItem = await db.get('folder-items', job.itemId!)
+  const item =
+    requestedItem?.type === 'file' || !job.sourceBlobId
+      ? requestedItem
+      : (await db.getAll('folder-items')).find(
+          (candidate) => candidate.type === 'file' && getBlobId(candidate) === job.sourceBlobId
+        )
+  const entries = await listSyncEntriesByLocalItem(item?.id ?? job.itemId!)
   const entryScopes: PosterScope[] = entries.map((entry) => {
     if (!entry.parentRemoteItemId) throw new MediaJobBlockedError('authentication')
     return [entry.providerConnectionId, entry.parentRemoteItemId]

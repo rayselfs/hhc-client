@@ -16,6 +16,7 @@ import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
 import { isIgnoredSystemFile } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
 import { enqueueCoverThumbnailJob } from '@renderer/lib/cover-thumbnail-jobs'
+import { ensurePdfPageJob } from '@renderer/lib/pdf-page-jobs'
 
 export { MAX_FILE_SIZE_WEB }
 
@@ -188,7 +189,6 @@ async function enrichUploadedFile(
         await enqueueCoverThumbnailJob({
           sourceBlobId: id,
           itemId: id,
-          file,
           mimeType: classification.mimeType
         })
       }
@@ -196,6 +196,10 @@ async function enrichUploadedFile(
 
     if (classification.kind === 'video' && !isWeb()) {
       await enqueueVideoPosterJob({ sourceBlobId: id, itemId: id })
+    }
+
+    if (classification.kind === 'pdf') {
+      await ensurePdfPageJob({ sourceBlobId: id, itemId: id, priority: -1 })
     }
   } catch (error) {
     console.warn('[media-enrichment] Failed to enqueue upload enrichment', { blobId: id, error })

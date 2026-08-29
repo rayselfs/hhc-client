@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { listMediaJobs, resetMediaWorkDBForTests } from '../media-work-db'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 
 const { mockRenderCover, mockRenderPdfPages, mockSaveCover, mockSavePdfPages } = vi.hoisted(() => ({
   mockRenderCover: vi.fn(),
@@ -29,6 +30,7 @@ describe('background thumbnail jobs', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     await resetMediaWorkDBForTests()
+    await resetFileExplorerDBForTests()
   })
 
   it('stores image covers returned by the Worker as blobs', async () => {
@@ -59,6 +61,33 @@ describe('background thumbnail jobs', () => {
     await vi.waitFor(async () => {
       expect((await listMediaJobs())[0]?.status).toBe('completed')
     })
+  })
+
+  it('finishes shared PDF prewarming through a surviving copy item', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', {
+      id: 'surviving-copy',
+      parentId: 'file-root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'slides-copy.pdf',
+      url: 'blob:shared-pdf',
+      size: 3,
+      mimeType: 'application/pdf'
+    })
+    await db.put('file-blobs', {
+      id: 'shared-pdf',
+      blob: new Blob(['pdf']),
+      refCount: 1
+    })
+    mockRenderPdfPages.mockResolvedValue([new Blob(['page'])])
+
+    await ensurePdfPageJob({ sourceBlobId: 'shared-pdf', itemId: 'deleted-original' })
+
+    await vi.waitFor(() => expect(mockRenderPdfPages).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(mockSavePdfPages).toHaveBeenCalledOnce())
   })
 
   it('blocks the job instead of falling back to renderer-thread PDF work', async () => {

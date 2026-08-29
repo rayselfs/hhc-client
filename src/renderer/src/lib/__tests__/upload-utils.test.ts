@@ -348,14 +348,20 @@ describe('uploadFiles classification', () => {
     expect(addFileItemToStore).not.toHaveBeenCalled()
   })
 
-  it('does not enqueue PDF pages or metadata during upload', async () => {
+  it('prewarms PDF pages at low priority without probing metadata during upload', async () => {
     const file = makeFile('slides.PDF', 100, '')
 
     await uploadFiles([file], 'parent-1')
 
     expect(ensureSourceMediaMetadata).not.toHaveBeenCalled()
-    expect(mediaJobQueue.enqueue).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'pdf-pages' })
+    await vi.waitFor(() =>
+      expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+        type: 'pdf-pages',
+        sourceBlobId: 'mock-id',
+        itemId: 'mock-id',
+        priority: -1,
+        dedupeKey: 'pdf-pages:mock-id'
+      })
     )
   })
 

@@ -5,12 +5,19 @@ import {
   BackgroundRenderingUnavailableError,
   renderPdfPageThumbnails
 } from './thumbnail-worker-client'
+import { getBlobId } from './blob-identity'
 
 const pendingFiles = new Map<string, File>()
 
 async function loadJobFile(sourceBlobId: string, itemId: string): Promise<File | null> {
   const db = await openFileExplorerDB()
-  const item = await db.get('folder-items', itemId)
+  const requestedItem = await db.get('folder-items', itemId)
+  const item =
+    requestedItem?.type === 'file'
+      ? requestedItem
+      : (await db.getAll('folder-items')).find(
+          (candidate) => candidate.type === 'file' && getBlobId(candidate) === sourceBlobId
+        )
   if (!item || item.type !== 'file') return null
 
   const blob = await getFileBlob(db, sourceBlobId)
@@ -55,6 +62,7 @@ export async function ensurePdfPageJob(input: {
   sourceBlobId: string
   itemId: string
   file?: File
+  priority?: number
 }): Promise<void> {
   const cachedThumbs = await getPdfPageThumbs(input.sourceBlobId)
   cachedThumbs.forEach((url) => URL.revokeObjectURL(url))
@@ -66,7 +74,8 @@ export async function ensurePdfPageJob(input: {
       type: 'pdf-pages',
       sourceBlobId: input.sourceBlobId,
       itemId: input.itemId,
-      dedupeKey: `pdf-pages:${input.sourceBlobId}`
+      dedupeKey: `pdf-pages:${input.sourceBlobId}`,
+      ...(input.priority !== undefined ? { priority: input.priority } : {})
     })
   } catch (error) {
     pendingFiles.delete(input.sourceBlobId)

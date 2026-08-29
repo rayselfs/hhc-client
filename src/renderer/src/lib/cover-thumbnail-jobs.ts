@@ -6,12 +6,19 @@ import {
   BackgroundRenderingUnavailableError,
   renderCoverThumbnail
 } from './thumbnail-worker-client'
+import { getBlobId } from './blob-identity'
 
 const pendingFiles = new Map<string, { file: File; mimeType: string }>()
 
 async function loadJobFile(sourceBlobId: string, itemId: string): Promise<File | null> {
   const db = await openFileExplorerDB()
-  const item = await db.get('folder-items', itemId)
+  const requestedItem = await db.get('folder-items', itemId)
+  const item =
+    requestedItem?.type === 'file'
+      ? requestedItem
+      : (await db.getAll('folder-items')).find(
+          (candidate) => candidate.type === 'file' && getBlobId(candidate) === sourceBlobId
+        )
   if (!item || item.type !== 'file') return null
 
   const blob = await getFileBlob(db, sourceBlobId)
