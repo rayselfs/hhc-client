@@ -21,7 +21,10 @@ import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 import { toast } from '@heroui/react/toast'
-import type { MediaProjectionActionResult } from '@renderer/stores/media-projection'
+import {
+  resolveMediaProjectionAction,
+  type MediaProjectionActionResult
+} from '@renderer/stores/media-projection'
 
 interface MediaPresenterProps {
   onExit: () => void
@@ -77,7 +80,7 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
 
   const navigate = useCallback(
     async (action: () => MediaProjectionActionResult): Promise<void> => {
-      if (!(await action())) {
+      if ((await resolveMediaProjectionAction(action())).status === 'blocked') {
         toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
       }
     },

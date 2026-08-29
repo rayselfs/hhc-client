@@ -1,8 +1,12 @@
 import type { FileItemRecord } from '@shared/types/folder'
 
+export type MediaProjectionPreflightResult =
+  | { status: 'ready'; validate?: () => boolean }
+  | { status: 'blocked' }
+
 export type MediaProjectionPreflight = (
   items: readonly FileItemRecord[]
-) => boolean | Promise<boolean>
+) => boolean | MediaProjectionPreflightResult | Promise<boolean | MediaProjectionPreflightResult>
 
 let preflight: MediaProjectionPreflight | null = null
 
@@ -15,6 +19,6 @@ export function registerMediaProjectionPreflight(next: MediaProjectionPreflight)
 
 export function prepareMediaProjection(
   items: readonly FileItemRecord[]
-): boolean | Promise<boolean> {
+): boolean | MediaProjectionPreflightResult | Promise<boolean | MediaProjectionPreflightResult> {
   return preflight?.(items) ?? true
 }

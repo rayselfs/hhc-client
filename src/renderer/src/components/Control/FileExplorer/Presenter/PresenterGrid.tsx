@@ -4,7 +4,10 @@ import { Button } from '@heroui/react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
-import type { MediaProjectionActionResult } from '@renderer/stores/media-projection'
+import {
+  resolveMediaProjectionAction,
+  type MediaProjectionActionResult
+} from '@renderer/stores/media-projection'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -86,11 +89,11 @@ export default function PresenterGrid({ previewCache }: PresenterGridProps): Rea
 
   const selectItem = useCallback(
     async (index: number): Promise<void> => {
-      if (!(await (jumpTo(index) as MediaProjectionActionResult))) {
-        toast.danger(failureMessageRef.current)
-        return
-      }
-      toggleGrid()
+      const outcome = await resolveMediaProjectionAction(
+        jumpTo(index) as MediaProjectionActionResult
+      )
+      if (outcome.status === 'success') toggleGrid()
+      else if (outcome.status === 'blocked') toast.danger(failureMessageRef.current)
     },
     [jumpTo, toggleGrid]
   )

@@ -112,9 +112,9 @@ describe('PresenterGrid Rendering Optimization', () => {
     expect(grid?.className).not.toContain('xl:grid-cols-8')
   })
 
-  it('keeps the grid open when navigation finalization is blocked', async () => {
+  it('keeps the grid open and stays quiet when navigation is superseded', async () => {
     const user = userEvent.setup()
-    const jumpTo = vi.fn(async () => false)
+    const jumpTo = vi.fn(async () => ({ status: 'superseded' }))
     useMediaProjectionStore.setState({ jumpTo } as never)
     render(<PresenterGrid />)
 
@@ -122,6 +122,18 @@ describe('PresenterGrid Rendering Optimization', () => {
 
     expect(jumpTo).toHaveBeenCalledWith(4)
     expect(useMediaProjectionStore.getState().showGrid).toBe(true)
-    expect(toastMocks.danger).toHaveBeenCalled()
+    expect(toastMocks.danger).not.toHaveBeenCalled()
+  })
+
+  it('shows the existing failure toast only when finalization is blocked', async () => {
+    const user = userEvent.setup()
+    const jumpTo = vi.fn(async () => ({ status: 'blocked' }))
+    useMediaProjectionStore.setState({ jumpTo } as never)
+    render(<PresenterGrid />)
+
+    await user.click(screen.getByTestId('grid-item-4'))
+
+    expect(useMediaProjectionStore.getState().showGrid).toBe(true)
+    expect(toastMocks.danger).toHaveBeenCalledTimes(1)
   })
 })

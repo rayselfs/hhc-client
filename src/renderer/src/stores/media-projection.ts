@@ -5,7 +5,10 @@ import { getBlobId } from '@renderer/lib/blob-identity'
 import { getMediaType, type MediaType, type MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { lockMediaResources } from '@renderer/lib/media-resource-locks'
-import { prepareMediaProjection } from '@renderer/lib/media-projection-preflight'
+import {
+  prepareMediaProjection,
+  type MediaProjectionPreflightResult
+} from '@renderer/lib/media-projection-preflight'
 import { isEditablePresentationMimeType } from '@renderer/lib/presentation-media'
 import {
   analyzePresentationReadiness,
@@ -21,7 +24,18 @@ interface StartPresentationWithReadinessOptions {
   presentationState?: MediaTypeStateMap['presentation']
 }
 
-export type MediaProjectionActionResult = boolean | Promise<boolean>
+export type MediaProjectionActionOutcome = {
+  status: 'success' | 'blocked' | 'superseded' | 'noop'
+}
+
+export type MediaProjectionActionResult = boolean | Promise<MediaProjectionActionOutcome>
+
+export async function resolveMediaProjectionAction(
+  result: MediaProjectionActionResult
+): Promise<MediaProjectionActionOutcome> {
+  const resolved = await result
+  return typeof resolved === 'boolean' ? { status: resolved ? 'success' : 'noop' } : resolved
+}
 
 export interface MediaProjectionStore {
   playlist: FileItemRecord[]
@@ -117,25 +131,44 @@ function getCurrentPresentationState(
   return state.typeStates.presentation ?? { slideIndex: 0 }
 }
 
+type ProjectionPreflightValue = boolean | MediaProjectionPreflightResult
+
+function isReadyPreflight(value: ProjectionPreflightValue): boolean {
+  return value === true || (typeof value !== 'boolean' && value.status === 'ready')
+}
+
+function validatesPreflight(value: ProjectionPreflightValue): boolean {
+  if (typeof value === 'boolean' || value.status !== 'ready') return true
+  try {
+    return value.validate?.() !== false
+  } catch {
+    return false
+  }
+}
+
 function commitAfterPreflight(
   generation: number,
-  result: boolean | Promise<boolean>,
+  result:
+    | boolean
+    | MediaProjectionPreflightResult
+    | Promise<boolean | MediaProjectionPreflightResult>,
   commit: () => void,
   isCurrent = (): boolean => true
 ): MediaProjectionActionResult {
   const canCommit = (): boolean => isCurrentProjectionAction(generation) && isCurrent()
-  if (typeof result === 'boolean') {
-    if (!result || !canCommit()) return false
+  if (!(result instanceof Promise)) {
+    if (!isReadyPreflight(result) || !canCommit() || !validatesPreflight(result)) return false
     commit()
     return true
   }
   return result.then(
     (ready) => {
-      if (!ready || !canCommit()) return false
+      if (!isReadyPreflight(ready)) return { status: 'blocked' }
+      if (!canCommit() || !validatesPreflight(ready)) return { status: 'superseded' }
       commit()
-      return true
+      return { status: 'success' }
     },
-    () => false
+    () => ({ status: 'blocked' })
   )
 }
 
@@ -153,7 +186,7 @@ function editablePreflightItems(
 
 function prepareEditableProjection(
   ...items: Array<FileItemRecord | null | undefined>
-): boolean | Promise<boolean> {
+): boolean | MediaProjectionPreflightResult | Promise<boolean | MediaProjectionPreflightResult> {
   const editableItems = editablePreflightItems(...items)
   return editableItems.length > 0 ? prepareMediaProjection(editableItems) : true
 }
@@ -168,7 +201,8 @@ function isSameNavigationState(
     current.currentIndex === state.currentIndex &&
     current.isPresenting === state.isPresenting &&
     current.isEnded === state.isEnded &&
-    current.sessionRevision === state.sessionRevision
+    current.sessionRevision === state.sessionRevision &&
+    current.typeStates.presentation === state.typeStates.presentation
   )
 }
 
@@ -309,10 +343,11 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
           ? fallbackReadyIndex
           : readyFiles.length - 1
 
-    if (!(await prepareEditableProjection(readyFiles[resolvedIndex]))) {
+    const preflight = await prepareEditableProjection(readyFiles[resolvedIndex])
+    if (!isReadyPreflight(preflight)) {
       return blockedReadinessReport(readyFiles[resolvedIndex], 'presentation-finalization-blocked')
     }
-    if (!isCurrentProjectionAction(generation)) {
+    if (!isCurrentProjectionAction(generation) || !validatesPreflight(preflight)) {
       return blockedReadinessReport(readyFiles[resolvedIndex], 'presentation-projection-superseded')
     }
 
@@ -366,12 +401,15 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
         generation,
         prepareEditableProjection(s.currentItem()),
         () => {
+          const current = get()
+          const currentPresentation = getCurrentPresentationState(current)
+          if (!currentPresentation) return
           set({
             typeStates: {
-              ...s.typeStates,
+              ...current.typeStates,
               presentation: {
-                ...presentation,
-                slideIndex: presentation.slideIndex + 1
+                ...currentPresentation,
+                slideIndex: currentPresentation.slideIndex + 1
               }
             }
           })
@@ -393,11 +431,12 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       generation,
       prepareEditableProjection(s.currentItem(), s.nextItem()),
       () => {
+        const current = get()
         set({
-          currentIndex: s.currentIndex + 1,
+          currentIndex: current.currentIndex + 1,
           zoomLevel: 1,
           pan: { x: 0, y: 0 },
-          typeStates: withoutTransientMediaRuntimeState(s.typeStates)
+          typeStates: withoutTransientMediaRuntimeState(current.typeStates)
         })
       },
       () => isSameNavigationState(s, get)
@@ -423,12 +462,15 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
         generation,
         prepareEditableProjection(s.currentItem()),
         () => {
+          const current = get()
+          const currentPresentation = getCurrentPresentationState(current)
+          if (!currentPresentation) return
           set({
             typeStates: {
-              ...s.typeStates,
+              ...current.typeStates,
               presentation: {
-                ...presentation,
-                slideIndex: presentation.slideIndex - 1
+                ...currentPresentation,
+                slideIndex: currentPresentation.slideIndex - 1
               }
             }
           })
@@ -441,11 +483,12 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       generation,
       prepareEditableProjection(s.currentItem(), s.prevItem()),
       () => {
+        const current = get()
         set({
-          currentIndex: s.currentIndex - 1,
+          currentIndex: current.currentIndex - 1,
           zoomLevel: 1,
           pan: { x: 0, y: 0 },
-          typeStates: withoutTransientMediaRuntimeState(s.typeStates)
+          typeStates: withoutTransientMediaRuntimeState(current.typeStates)
         })
       },
       () => isSameNavigationState(s, get)
@@ -460,15 +503,16 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       generation,
       prepareEditableProjection(s.currentItem(), s.playlist[clamped]),
       () => {
+        const current = get()
         set({
           currentIndex: clamped,
           isEnded: false,
           zoomLevel: 1,
           pan: { x: 0, y: 0 },
           typeStates:
-            clamped === s.currentIndex
-              ? s.typeStates
-              : withoutTransientMediaRuntimeState(s.typeStates)
+            clamped === current.currentIndex
+              ? current.typeStates
+              : withoutTransientMediaRuntimeState(current.typeStates)
         })
       },
       () => isSameNavigationState(s, get)

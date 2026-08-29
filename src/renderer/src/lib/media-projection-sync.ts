@@ -81,6 +81,11 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   useEffect(
     () =>
       registerMediaProjectionPreflight(async (items) => {
+        const ownedDocuments: Array<{
+          itemId: string
+          session: PresentationEditorSession
+          document: EditablePresentationDocument
+        }> = []
         for (const item of items) {
           if (!isEditablePresentationMimeType(item.mimeType)) continue
           const session = registry.get(item.id)
@@ -93,19 +98,34 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
             snapshot.save?.status === 'saved'
           ) {
             finalizedEditableDocumentsRef.current.set(item.id, { session, document })
+            ownedDocuments.push({ itemId: item.id, session, document })
             continue
           }
           try {
             const finalized = await registry.finalizeAndFlush(item.id)
             if (!finalized) return false
-            if (registry.get(item.id) !== session) return false
+            if (registry.get(item.id) !== session) {
+              return { status: 'ready' as const, validate: () => false }
+            }
             document = finalized
           } catch {
             return false
           }
           finalizedEditableDocumentsRef.current.set(item.id, { session, document })
+          ownedDocuments.push({ itemId: item.id, session, document })
         }
-        return true
+        return {
+          status: 'ready' as const,
+          validate: () =>
+            ownedDocuments.every(({ itemId, session, document }) => {
+              const snapshot = session.getSnapshot()
+              return (
+                registry.get(itemId) === session &&
+                snapshot.history.present === document &&
+                snapshot.draftKind == null
+              )
+            })
+        }
       }),
     [registry]
   )

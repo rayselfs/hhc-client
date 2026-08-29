@@ -3,7 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react'
 import { toast } from '@heroui/react/toast'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
-import type { MediaProjectionActionResult } from '@renderer/stores/media-projection'
+import {
+  resolveMediaProjectionAction,
+  type MediaProjectionActionResult
+} from '@renderer/stores/media-projection'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import NextItemPreview from './Preview/NextItemPreview'
 
@@ -70,7 +73,10 @@ export default function PresenterSidebar({
   }
 
   const goNext = async (): Promise<void> => {
-    if (!(await (next() as MediaProjectionActionResult))) {
+    if (
+      (await resolveMediaProjectionAction(next() as MediaProjectionActionResult)).status ===
+      'blocked'
+    ) {
       toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
     }
   }

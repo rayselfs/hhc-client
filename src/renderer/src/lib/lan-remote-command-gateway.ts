@@ -1,4 +1,7 @@
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import {
+  resolveMediaProjectionAction,
+  useMediaProjectionStore
+} from '@renderer/stores/media-projection'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useTimerStore } from '@renderer/stores/timer'
 import { getMediaType } from '@renderer/lib/presentability'
@@ -37,7 +40,7 @@ export async function executeLanRemoteCommand(command: LanRemoteCommand): Promis
         return rejected(command.requestId, 'presentation-not-active')
       }
       if (!projection.canPrev()) return rejected(command.requestId, 'previous-unavailable')
-      if (!(await projection.prev())) {
+      if ((await resolveMediaProjectionAction(projection.prev())).status !== 'success') {
         return rejected(command.requestId, 'presentation-finalization-blocked')
       }
       return accept(command.requestId)
@@ -46,7 +49,7 @@ export async function executeLanRemoteCommand(command: LanRemoteCommand): Promis
         return rejected(command.requestId, 'presentation-not-active')
       }
       if (!projection.canNext()) return rejected(command.requestId, 'next-unavailable')
-      if (!(await projection.next())) {
+      if ((await resolveMediaProjectionAction(projection.next())).status !== 'success') {
         return rejected(command.requestId, 'presentation-finalization-blocked')
       }
       return accept(command.requestId)
@@ -57,7 +60,9 @@ export async function executeLanRemoteCommand(command: LanRemoteCommand): Promis
       if (command.index >= projection.playlist.length) {
         return rejected(command.requestId, 'index-out-of-range')
       }
-      if (!(await projection.jumpTo(command.index))) {
+      if (
+        (await resolveMediaProjectionAction(projection.jumpTo(command.index))).status !== 'success'
+      ) {
         return rejected(command.requestId, 'presentation-finalization-blocked')
       }
       return accept(command.requestId)

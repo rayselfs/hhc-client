@@ -4,7 +4,10 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button, ProgressBar } from '@heroui/react'
 import { toast } from '@heroui/react/toast'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
-import type { MediaProjectionActionResult } from '@renderer/stores/media-projection'
+import {
+  resolveMediaProjectionAction,
+  type MediaProjectionActionResult
+} from '@renderer/stores/media-projection'
 import { getMediaType } from '@renderer/lib/presentability'
 
 export default function PresenterNavigation(): React.JSX.Element {
@@ -20,7 +23,7 @@ export default function PresenterNavigation(): React.JSX.Element {
   const prev = useMediaProjectionStore((s) => s.prev)
 
   const navigate = async (action: () => MediaProjectionActionResult): Promise<void> => {
-    if (!(await action())) {
+    if ((await resolveMediaProjectionAction(action())).status === 'blocked') {
       toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
     }
   }

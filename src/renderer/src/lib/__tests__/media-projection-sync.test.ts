@@ -400,7 +400,9 @@ describe('media projection sync', () => {
         remoteItemId: 'asset-1'
       })
     )
-    act(() => useMediaProjectionStore.getState().jumpTo(1))
+    act(() => {
+      void useMediaProjectionStore.getState().jumpTo(1)
+    })
     await act(async () => Promise.resolve())
     expect(onAccessRevoked).not.toHaveBeenCalled()
 
@@ -410,7 +412,9 @@ describe('media projection sync', () => {
         remoteItemId: 'asset-1'
       })
     )
-    act(() => useMediaProjectionStore.getState().jumpTo(0))
+    act(() => {
+      void useMediaProjectionStore.getState().jumpTo(0)
+    })
     await act(async () => Promise.resolve())
     expect(onAccessRevoked).toHaveBeenCalledWith({
       providerConnectionId: 'hhc-line:user-1',
@@ -1143,7 +1147,7 @@ describe('media projection sync', () => {
 
     const started = await useMediaProjectionStore.getState().startPresentation([editable], 0)
 
-    expect(started).toBe(false)
+    expect(started).toEqual({ status: 'blocked' })
     expect(useMediaProjectionStore.getState()).toMatchObject({
       playlist: [],
       currentIndex: 0,
@@ -1159,12 +1163,12 @@ describe('media projection sync', () => {
       isEnded: false
     })
     const advanced = await useMediaProjectionStore.getState().next()
-    expect(advanced).toBe(false)
+    expect(advanced).toEqual({ status: 'blocked' })
     expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
 
     useMediaProjectionStore.setState({ currentIndex: 1 })
     const reversed = await useMediaProjectionStore.getState().prev()
-    expect(reversed).toBe(false)
+    expect(reversed).toEqual({ status: 'blocked' })
     expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
   })
 
@@ -1181,8 +1185,12 @@ describe('media projection sync', () => {
     useMediaProjectionStore.setState({ playlist: [], isPresenting: false, snapshot: null })
     renderSync()
 
-    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toBe(false)
-    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toBe(true)
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'blocked'
+    })
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'success'
+    })
     await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
     expect(useMediaProjectionStore.getState()).toMatchObject({
       playlist: [editable],
@@ -1205,7 +1213,9 @@ describe('media projection sync', () => {
     })
     renderSync()
 
-    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toBe(false)
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'blocked'
+    })
     expect(useMediaProjectionStore.getState()).toMatchObject({
       playlist: [],
       currentIndex: 0,
@@ -1245,12 +1255,56 @@ describe('media projection sync', () => {
     registryMocks.get.mockReturnValue(reopenedSession)
     pending.resolve(document)
 
-    expect(await start).toBe(false)
+    expect(await start).toEqual({ status: 'blocked' })
     expect(useMediaProjectionStore.getState()).toMatchObject({
       isPresenting: false,
       sessionRevision: 11
     })
     expect(mockStartProjection).not.toHaveBeenCalled()
+  })
+
+  it('revalidates a clean editable session at the store commit boundary', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const replacementDocument = createBlankEditablePresentationDocument('Replacement')
+    const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
+    const closingSession = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: document },
+        draftKind: null,
+        save: { status: 'saved' }
+      }))
+    } as unknown as PresentationEditorSession
+    const replacementSession = {
+      getSnapshot: vi.fn(() => ({
+        history: { present: replacementDocument },
+        draftKind: null,
+        save: { status: 'saved' }
+      }))
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(closingSession)
+    useMediaProjectionStore.setState({
+      playlist: [],
+      currentIndex: 0,
+      isPresenting: false,
+      sessionRevision: 12,
+      snapshot: null
+    })
+    renderSync()
+
+    const staleStart = useMediaProjectionStore.getState().startPresentation([editable], 0)
+    registryMocks.get.mockReturnValue(replacementSession)
+
+    expect(await staleStart).toEqual({ status: 'superseded' })
+    expect(useMediaProjectionStore.getState()).toMatchObject({
+      isPresenting: false,
+      sessionRevision: 12
+    })
+    expect(mockStartProjection).not.toHaveBeenCalled()
+
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'success'
+    })
+    await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
   })
 
   it('does not project a deferred remote source after an explicit replacement start', async () => {

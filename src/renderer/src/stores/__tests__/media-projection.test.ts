@@ -117,7 +117,7 @@ describe('startPresentation', () => {
 
     expect(useMediaProjectionStore.getState().startPresentation([files[1]], 0)).toBe(true)
     pending.resolve(true)
-    expect(await staleStart).toBe(false)
+    expect(await staleStart).toEqual({ status: 'superseded' })
     expect(useMediaProjectionStore.getState().currentItem()?.id).toBe('b')
 
     const pendingExit = deferred<boolean>()
@@ -126,7 +126,7 @@ describe('startPresentation', () => {
     const staleExitStart = useMediaProjectionStore.getState().startPresentation([editable], 0)
     useMediaProjectionStore.getState().exit()
     pendingExit.resolve(true)
-    expect(await staleExitStart).toBe(false)
+    expect(await staleExitStart).toEqual({ status: 'superseded' })
     expect(useMediaProjectionStore.getState().isPresenting).toBe(false)
     unregisterExit()
   })
@@ -152,11 +152,49 @@ describe('startPresentation', () => {
     const next = useMediaProjectionStore.getState().next()
     const jump = useMediaProjectionStore.getState().jumpTo(2)
     second.resolve(true)
-    expect(await jump).toBe(true)
+    expect(await jump).toEqual({ status: 'success' })
     first.resolve(true)
-    expect(await next).toBe(false)
+    expect(await next).toEqual({ status: 'superseded' })
     expect(useMediaProjectionStore.getState().currentIndex).toBe(2)
     restore()
+  })
+
+  it('does not overwrite presentation runtime state published during a pending navigation', async () => {
+    const presentation = makeFile(
+      'deck',
+      'deck.pptx',
+      'application/vnd.librepresenter.presentation+json'
+    )
+    const pending = deferred<boolean>()
+    const unregister = registerMediaProjectionPreflight(() => pending.promise)
+    useMediaProjectionStore.setState({
+      playlist: [presentation],
+      currentIndex: 0,
+      isPresenting: true,
+      isEnded: false,
+      typeStates: { presentation: { slideIndex: 0, slideCount: 5 } }
+    })
+
+    const next = useMediaProjectionStore.getState().next()
+    useMediaProjectionStore.getState().setTypeState('presentation', {
+      slideIndex: 3,
+      slideCount: 5
+    })
+    pending.resolve(true)
+
+    expect(await next).toEqual({ status: 'superseded' })
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toEqual({
+      slideIndex: 3,
+      slideCount: 5
+    })
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
+
+    expect(await useMediaProjectionStore.getState().next()).toEqual({ status: 'success' })
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toEqual({
+      slideIndex: 4,
+      slideCount: 5
+    })
+    unregister()
   })
 
   it('does not revive a closed editable item after it reopens', async () => {
@@ -177,9 +215,9 @@ describe('startPresentation', () => {
     useMediaProjectionStore.getState().exit()
     const reopenedStart = useMediaProjectionStore.getState().startPresentation([editable], 0)
     second.resolve(true)
-    expect(await reopenedStart).toBe(true)
+    expect(await reopenedStart).toEqual({ status: 'success' })
     first.resolve(true)
-    expect(await staleStart).toBe(false)
+    expect(await staleStart).toEqual({ status: 'superseded' })
     expect(useMediaProjectionStore.getState().currentItem()?.id).toBe(editable.id)
     unregister()
   })
