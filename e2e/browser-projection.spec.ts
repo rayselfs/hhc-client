@@ -647,7 +647,7 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   await page.getByRole('button', { name: /Edit a copy|編輯副本/ }).click()
   const ribbonFrame = page.getByTestId('presentation-ribbon-frame')
   await expect(ribbonFrame).toBeVisible()
-  await page.getByRole('button', { name: /Design|設計|设计/ }).click()
+  await page.getByRole('tab', { name: /Design|設計|设计/ }).click()
   const formatBackgroundTrigger = ribbonFrame.getByRole('button', {
     name: /Format Background|設定背景格式|设置背景格式/
   })
