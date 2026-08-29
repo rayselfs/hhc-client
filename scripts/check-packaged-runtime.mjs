@@ -178,7 +178,7 @@ async function checkResourceRoot(resourceRoot, target) {
   const appAsar = join(resourceRoot, 'app.asar')
   if (await exists(appAsar)) {
     const packagedFiles = listPackage(appAsar)
-    const mainSource = extractFile(appAsar, 'out/main/index.js').toString('utf8')
+    const mainSource = extractFile(appAsar, join('out', 'main', 'index.js')).toString('utf8')
     if (!mainSource.includes('tw.org.alive.presenter')) {
       failures.push('Packaged main process must use the HHC Presenter AUMID')
     }
@@ -195,7 +195,7 @@ async function checkResourceRoot(resourceRoot, target) {
       failures.push('Missing compiled PDF worker in app.asar')
     } else if (
       pdfWorkers.some((file) => {
-        const source = extractFile(appAsar, file.slice(1)).toString('utf8')
+        const source = extractFile(appAsar, join(...file.slice(1).split('/'))).toString('utf8')
         return /\b(?:interface|type)\s+\w+|<K,\s*V>|:\s*(?:Map|Iterable)<|import\('pdfjs-dist/.test(
           source
         )
