@@ -28,7 +28,7 @@ import {
   type SyncEntryRecord
 } from '@renderer/lib/sync-db'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
-import { saveThumbnail } from '@renderer/lib/thumbnail-db'
+import { saveThumbnail, saveThumbnailBlob } from '@renderer/lib/thumbnail-db'
 import type { SyncDownloadCommitGuard } from '@renderer/lib/sync-provider'
 import { applySyncRefreshPlan, buildSyncRefreshPlan, type SyncRefreshPlan } from './sync-refresh'
 
@@ -371,11 +371,13 @@ export async function refreshImportedMediaAssets(
           const thumbnail = await generateThumbnail(file, item.mimeType)
           if (!thumbnail) return
           if ((await guard?.()) === false) return
-          await saveThumbnail(blobId, thumbnail)
+          if (typeof thumbnail === 'string') await saveThumbnail(blobId, thumbnail)
+          else await saveThumbnailBlob(blobId, thumbnail)
           if ((await guard?.()) === false) return
+          const dataUrl = typeof thumbnail === 'string' ? thumbnail : URL.createObjectURL(thumbnail)
           window.dispatchEvent(
             new CustomEvent('hhc:thumbnail-ready', {
-              detail: { itemId: item.id, dataUrl: thumbnail }
+              detail: { itemId: item.id, dataUrl }
             })
           )
         } finally {

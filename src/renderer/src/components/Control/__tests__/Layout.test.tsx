@@ -77,6 +77,7 @@ vi.mock('@renderer/lib/timer-adapter', () => ({
     onFinished: vi.fn(),
     onStopwatchTick: vi.fn(),
     sendCommand: vi.fn(),
+    syncMode: vi.fn(),
     dispose: vi.fn()
   }))
 }))

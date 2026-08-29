@@ -1,5 +1,5 @@
 import type { WorkerIncomingMessage, WorkerOutgoingMessage } from '@renderer/workers/timer.worker'
-import type { TimerCommand } from '@shared/types/timer'
+import type { TimerCommand, TimerMode } from '@shared/types/timer'
 import { isElectron } from './env'
 
 /**
@@ -9,6 +9,9 @@ import { isElectron } from './env'
 export interface TimerAdapter {
   /** Send a command to the timing engine */
   sendCommand(cmd: WorkerIncomingMessage): void
+
+  /** Keep the Electron main-process timer mode aligned with renderer state */
+  syncMode(mode: TimerMode): void
 
   /** Register callback for countdown tick events */
   onTick(callback: (remainingMs: number, progress: number) => void): void
@@ -64,6 +67,10 @@ export class BrowserTimerAdapter implements TimerAdapter {
 
   sendCommand(cmd: WorkerIncomingMessage): void {
     this.worker.postMessage(cmd)
+  }
+
+  syncMode(mode: TimerMode): void {
+    void mode
   }
 
   onTick(callback: (remainingMs: number, progress: number) => void): void {
@@ -131,6 +138,10 @@ export class ElectronTimerAdapter implements TimerAdapter {
       window.api.timer.timerCommand({ type: 'setDuration', seconds: cmd.durationMs / 1000 })
     }
     window.api.timer.timerCommand(toTimerCommand(cmd))
+  }
+
+  syncMode(mode: TimerMode): void {
+    window.api.timer.timerCommand({ type: 'setMode', mode })
   }
 
   onTick(callback: (remainingMs: number, progress: number) => void): void {

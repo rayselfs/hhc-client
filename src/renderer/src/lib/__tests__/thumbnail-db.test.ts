@@ -9,7 +9,8 @@ import {
   resetThumbnailDBForTests,
   saveCustomThumbnail,
   savePdfPageThumbBlobs,
-  saveThumbnail
+  saveThumbnail,
+  saveThumbnailBlob
 } from '../thumbnail-db'
 
 const DB_NAME = 'hhc-thumbnails'
@@ -74,6 +75,13 @@ describe('thumbnail-db', () => {
       storage: 'indexed-db'
     })
     await expect(asset?.blob?.text()).resolves.toBe('hello')
+  })
+
+  it('stores Worker-generated cover blobs without data URL conversion', async () => {
+    await saveThumbnailBlob('worker-source', new Blob(['worker-cover'], { type: 'image/jpeg' }))
+
+    const asset = await getDerivedAsset('worker-source', 'cover-thumbnail')
+    await expect(asset?.blob?.text()).resolves.toBe('worker-cover')
   })
 
   it('shares a generated cover between copied items', async () => {

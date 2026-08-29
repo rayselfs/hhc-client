@@ -177,6 +177,12 @@ describe('TimerAdapter', () => {
       expect(mockTimerCommand).toHaveBeenCalledWith({ type: 'removeTime', seconds: 10 })
     })
 
+    it('syncs stopwatch mode to the main process', () => {
+      adapter.syncMode('stopwatch')
+
+      expect(mockTimerCommand).toHaveBeenCalledWith({ type: 'setMode', mode: 'stopwatch' })
+    })
+
     it('onTick registers via window.api.timer.onTimerTick', () => {
       const tickCb = vi.fn()
       adapter.onTick(tickCb)

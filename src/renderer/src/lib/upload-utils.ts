@@ -11,12 +11,10 @@ import {
 } from '@renderer/lib/media-capabilities'
 import { classifyMediaImport, type MediaImportDecision } from '@renderer/lib/media-import-policy'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
-import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
 import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
 import { isIgnoredSystemFile } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
-import { ensurePdfPageJob } from '@renderer/lib/pdf-page-jobs'
 import { enqueueCoverThumbnailJob } from '@renderer/lib/cover-thumbnail-jobs'
 
 export { MAX_FILE_SIZE_WEB }
@@ -58,6 +56,17 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
 const UPLOAD_CONCURRENCY = 3
 const uploadSemaphore = createSemaphore(UPLOAD_CONCURRENCY)
 
+function createRendererBudget(maxWorkMs = 8): { yieldIfNeeded(): Promise<void> } {
+  let startedAt = performance.now()
+  return {
+    async yieldIfNeeded(): Promise<void> {
+      if (performance.now() - startedAt < maxWorkMs) return
+      await yieldToMain()
+      startedAt = performance.now()
+    }
+  }
+}
+
 export function getUploadMediaPlatform(): MediaPlatform {
   return isWeb() ? 'web' : 'electron'
 }
@@ -81,8 +90,10 @@ async function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSy
 
 async function collectFromEntry(
   entry: FileSystemEntry,
-  prefix = ''
+  prefix = '',
+  budget = createRendererBudget()
 ): Promise<{ file: File; relativePath: string }[]> {
+  await budget.yieldIfNeeded()
   if (entry.isFile) {
     const file = await new Promise<File>((resolve, reject) => {
       ;(entry as FileSystemFileEntry).file(resolve, reject)
@@ -93,8 +104,11 @@ async function collectFromEntry(
     const reader = (entry as FileSystemDirectoryEntry).createReader()
     const children = await readAllEntries(reader)
     const newPrefix = prefix ? `${prefix}/${entry.name}` : entry.name
-    const nested = await Promise.all(children.map((child) => collectFromEntry(child, newPrefix)))
-    return nested.flat()
+    const nested: { file: File; relativePath: string }[] = []
+    for (const child of children) {
+      nested.push(...(await collectFromEntry(child, newPrefix, budget)))
+    }
+    return nested
   }
   return []
 }
@@ -123,8 +137,10 @@ async function hasWebStorageCapacity(files: File[]): Promise<boolean> {
 async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]> {
   const candidates: UploadCandidate[] = []
   const platform = getUploadMediaPlatform()
+  const budget = createRendererBudget()
   let unsupportedCount = 0
   for (const file of files) {
+    await budget.yieldIfNeeded()
     if (isIgnoredSystemFile(file)) continue
     const classification = classifyMediaImport(file, platform)
     if (classification.action === 'skip') {
@@ -153,72 +169,72 @@ async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]
   return candidates
 }
 
+async function enrichUploadedFile(
+  id: string,
+  file: File,
+  classification: AcceptedMediaImportDecision
+): Promise<void> {
+  try {
+    if (canGenerateThumbnail(classification.mimeType, file.name)) {
+      if (classification.kind === 'video' && isWeb()) {
+        const dataUrl = await generateThumbnail(file, classification.mimeType)
+        if (typeof dataUrl === 'string') await saveThumbnail(id, dataUrl)
+        window.dispatchEvent(
+          new CustomEvent('hhc:thumbnail-ready', {
+            detail: { itemId: id, dataUrl: typeof dataUrl === 'string' ? dataUrl : null }
+          })
+        )
+      } else if (classification.kind !== 'video') {
+        await enqueueCoverThumbnailJob({
+          sourceBlobId: id,
+          itemId: id,
+          file,
+          mimeType: classification.mimeType
+        })
+      }
+    }
+
+    if (classification.kind === 'video' && !isWeb()) {
+      await enqueueVideoPosterJob({ sourceBlobId: id, itemId: id })
+    }
+  } catch (error) {
+    console.warn('[media-enrichment] Failed to enqueue upload enrichment', { blobId: id, error })
+  }
+}
+
 async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<number> {
   let uploadedCount = 0
-  await Promise.all(
-    destinations.map(async ({ file, classification, parentId }) => {
+  let nextIndex = 0
+  const uploadNext = async (): Promise<void> => {
+    while (nextIndex < destinations.length) {
+      const { file, classification, parentId } = destinations[nextIndex++]
       const release = await uploadSemaphore.acquire()
       let id: string | undefined
       try {
         id = await addFileItemToStore(file, parentId, classification.mimeType)
         uploadedCount++
-        if (
-          classification.kind === 'image' ||
-          classification.kind === 'video' ||
-          classification.kind === 'pdf'
-        ) {
-          void ensureSourceMediaMetadata(id, classification.mimeType)
-            .catch((error) => {
-              console.warn('[media-metadata] Failed to store upload metadata', {
-                blobId: id,
-                error
-              })
-            })
-            .finally(() => {
-              window.dispatchEvent(
-                new CustomEvent('hhc:media-metadata-ready', { detail: { blobId: id } })
-              )
-            })
-        }
-        const shouldUseBrowserThumbnail = classification.kind !== 'video' || isWeb()
-        if (shouldUseBrowserThumbnail && canGenerateThumbnail(classification.mimeType, file.name)) {
-          if (isWeb()) {
-            const dataUrl = await generateThumbnail(file, classification.mimeType)
-            if (dataUrl) await saveThumbnail(id, dataUrl)
-            window.dispatchEvent(
-              new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: id, dataUrl } })
-            )
-          } else {
-            await enqueueCoverThumbnailJob({
-              sourceBlobId: id,
-              itemId: id,
-              file,
-              mimeType: classification.mimeType
-            })
-          }
-        }
       } finally {
         release()
       }
-
-      if (id && classification.kind === 'pdf') {
-        await ensurePdfPageJob({ sourceBlobId: id, itemId: id, file })
-      }
-
-      if (id && classification.kind === 'video' && !isWeb()) {
-        await enqueueVideoPosterJob({
-          sourceBlobId: id,
-          itemId: id
-        })
-      }
-    })
+      await yieldToMain()
+      if (id) void enrichUploadedFile(id, file, classification)
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(UPLOAD_CONCURRENCY, destinations.length) }, uploadNext)
   )
   return uploadedCount
 }
 
 export async function uploadFiles(files: File[], parentId: string): Promise<number> {
   const candidates = await prepareUploadCandidates(files)
-  return uploadPreparedFiles(candidates.map((candidate) => ({ ...candidate, parentId })))
+  const destinations: UploadDestination[] = []
+  const budget = createRendererBudget()
+  for (const candidate of candidates) {
+    destinations.push({ ...candidate, parentId })
+    await budget.yieldIfNeeded()
+  }
+  return uploadPreparedFiles(destinations)
 }
 
 export async function prepareUploadFilesForKind(
@@ -235,7 +251,13 @@ export async function uploadFilesForKind(
   kind: Exclude<MediaKind, 'document'>
 ): Promise<number> {
   const candidates = await prepareUploadFilesForKind(files, kind)
-  return uploadPreparedFiles(candidates.map((candidate) => ({ ...candidate, parentId })))
+  const destinations: UploadDestination[] = []
+  const budget = createRendererBudget()
+  for (const candidate of candidates) {
+    destinations.push({ ...candidate, parentId })
+    await budget.yieldIfNeeded()
+  }
+  return uploadPreparedFiles(destinations)
 }
 
 export async function uploadFolderFiles(
@@ -275,14 +297,17 @@ export async function uploadFolderFiles(
     }
   }
 
-  const destinations = candidates.map((candidate) => {
+  const destinations: UploadDestination[] = []
+  const budget = createRendererBudget()
+  for (const candidate of candidates) {
     const parts = candidate.file.webkitRelativePath.split('/')
     const folderPath = parts.slice(0, parts.length - 1).join('/')
-    return {
+    destinations.push({
       ...candidate,
       parentId: pathToFolderId.get(folderPath) ?? currentFolderId
-    }
-  })
+    })
+    await budget.yieldIfNeeded()
+  }
   return uploadPreparedFiles(destinations)
 }
 
@@ -341,13 +366,16 @@ export async function uploadFromDataTransfer(
     }
   }
 
-  const destinations = candidates.map((candidate) => {
+  const destinations: UploadDestination[] = []
+  const budget = createRendererBudget()
+  for (const candidate of candidates) {
     const parts = (relativePaths.get(candidate.file) ?? candidate.file.name).split('/')
     const folderPath = parts.slice(0, parts.length - 1).join('/')
-    return {
+    destinations.push({
       ...candidate,
       parentId: folderPath ? (pathToFolderId.get(folderPath) ?? targetFolderId) : targetFolderId
-    }
-  })
+    })
+    await budget.yieldIfNeeded()
+  }
   return uploadPreparedFiles(destinations)
 }
