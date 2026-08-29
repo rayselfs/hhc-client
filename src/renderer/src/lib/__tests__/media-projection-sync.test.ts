@@ -1,11 +1,16 @@
 import { cleanup, renderHook, act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createBlankEditablePresentationDocument } from '@renderer/lib/editable-presentation'
+import {
+  addElementToSlide,
+  createBlankEditablePresentationDocument,
+  createTextElement
+} from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
+import type { ProjectionPayload } from '@shared/projection-messages'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { HhcAssetApiError } from '../hhc-asset-api'
 import { resetMediaProjectionPreflightForTests } from '../media-projection-preflight'
@@ -15,7 +20,13 @@ const registryMocks = vi.hoisted(() => ({
   finalizeAndFlush: vi.fn()
 }))
 const mockProject = vi.fn()
-const mockStartProjection = vi.fn(() => Promise.resolve())
+const mockStartProjection = vi.fn<
+  (
+    owner: string,
+    messages: Array<['file:show', ProjectionPayload<'file:show'>]>,
+    options: { bringToFront: boolean }
+  ) => Promise<void>
+>(() => Promise.resolve())
 const mockStopProjection = vi.fn(() => Promise.resolve())
 const remoteMocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -1399,7 +1410,13 @@ describe('media projection sync', () => {
 
   it('abandons a session-owned editable payload when that session is replaced during source loading', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
-    const replacementDocument = createBlankEditablePresentationDocument('Replacement')
+    const replacementBase = createBlankEditablePresentationDocument('Replacement')
+    const replacementText = createTextElement({ text: 'Replacement document content' })
+    const replacementDocument = addElementToSlide(
+      replacementBase,
+      replacementBase.slideOrder[0],
+      replacementText
+    )
     const editable = makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)
     const pending = deferred<{
       providerConnectionId: string
@@ -1476,5 +1493,14 @@ describe('media projection sync', () => {
 
     expect(mockStartProjection).not.toHaveBeenCalled()
     expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
+
+    expect(await useMediaProjectionStore.getState().startPresentation([editable], 0)).toEqual({
+      status: 'success'
+    })
+    await waitFor(() => expect(mockStartProjection).toHaveBeenCalledOnce())
+    const payload = mockStartProjection.mock.calls[0]?.[1][0]?.[1]
+    expect(payload?.editablePresentation?.slide.elements[replacementText.id]).toMatchObject({
+      text: 'Replacement document content'
+    })
   })
 })

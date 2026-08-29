@@ -1,9 +1,19 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import MediaPreview from '../MediaPreview'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 const toastMocks = vi.hoisted(() => ({ danger: vi.fn() }))
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  return {
+    promise: new Promise<T>((done) => {
+      resolve = done
+    }),
+    resolve
+  }
+}
 
 vi.mock('@heroui/react/toast', () => ({ toast: toastMocks }))
 
@@ -44,8 +54,9 @@ describe('MediaPreview', () => {
   })
 
   it('keeps superseded click-to-advance quiet', async () => {
+    const pending = deferred<{ status: 'superseded' }>()
     useMediaProjectionStore.setState({
-      next: vi.fn(async () => ({ status: 'superseded' }))
+      next: vi.fn(() => pending.promise)
     } as never)
     render(
       <MediaPreview
@@ -57,7 +68,11 @@ describe('MediaPreview', () => {
 
     fireEvent.click(screen.getByText('presenter.noMediaSelected'))
 
-    await Promise.resolve()
+    await act(async () => {
+      pending.resolve({ status: 'superseded' })
+      await pending.promise
+      await Promise.resolve()
+    })
     expect(toastMocks.danger).not.toHaveBeenCalled()
   })
 })
