@@ -49,7 +49,16 @@ it('applies a media replay in one reducer action', () => {
 
   const next = reduceProjectionRenderState(initialProjectionRenderState, {
     type: 'replay',
-    payload: { generation: 3, snapshot: mediaSnapshot }
+    payload: {
+      generation: 3,
+      snapshot: mediaSnapshot,
+      pendingFileControls: {
+        itemId: 'video-1',
+        seekSeconds: 42,
+        volume: 0.7,
+        transport: 'pause'
+      }
+    }
   })
 
   expect(next).toMatchObject({
@@ -57,7 +66,18 @@ it('applies a media replay in one reducer action', () => {
     showDefault: false,
     activeContent: 'file',
     fileData: mediaSnapshot.media.show,
-    mediaReplayState: mediaSnapshot.media.state
+    mediaReplayState: {
+      ...mediaSnapshot.media.state,
+      positionSeconds: 42,
+      volume: 0.7,
+      isPlaying: false
+    },
+    fileControlEvent: null
+  })
+  expect(mediaSnapshot.media.state).toMatchObject({
+    positionSeconds: 18,
+    volume: 0.35,
+    isPlaying: true
   })
 })
 

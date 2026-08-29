@@ -48,7 +48,26 @@ export function reduceProjectionRenderState(
   action: ProjectionRenderAction
 ): ProjectionRenderState {
   if (action.type === 'replay') {
-    const { generation, snapshot } = action.payload
+    const { generation, snapshot, pendingFileControls } = action.payload
+    const confirmedMediaState = snapshot.media.state
+    const mediaReplayState =
+      confirmedMediaState && pendingFileControls?.itemId === confirmedMediaState.itemId
+        ? {
+            ...confirmedMediaState,
+            ...(pendingFileControls.seekSeconds !== undefined
+              ? { positionSeconds: pendingFileControls.seekSeconds }
+              : {}),
+            ...(pendingFileControls.volume !== undefined
+              ? { volume: pendingFileControls.volume }
+              : {}),
+            ...(pendingFileControls.transport
+              ? {
+                  isPlaying: pendingFileControls.transport === 'play',
+                  ...(pendingFileControls.transport === 'play' ? { isEnded: false } : {})
+                }
+              : {})
+          }
+        : confirmedMediaState
     return {
       showDefault: snapshot.showDefault,
       isBlackout: snapshot.isBlackout,
@@ -59,7 +78,7 @@ export function reduceProjectionRenderState(
       bibleChapter: snapshot.bible.chapter,
       bibleSettings: snapshot.bible.settings ?? { fontSize: 90 },
       fileData: snapshot.media.show,
-      mediaReplayState: snapshot.media.state,
+      mediaReplayState,
       fileControlEvent: null,
       timerRingColor: snapshot.timer.ringColor?.color ?? null,
       generation

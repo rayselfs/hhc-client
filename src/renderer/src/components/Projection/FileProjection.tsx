@@ -268,7 +268,9 @@ export default function FileProjection({
         duration,
         isPlaying: next?.isPlaying ?? !video.paused,
         isEnded: next?.isEnded ?? video.ended,
-        playbackRate: Number.isFinite(video.playbackRate) ? video.playbackRate : 1
+        playbackRate: Number.isFinite(video.playbackRate) ? video.playbackRate : 1,
+        seekable: seekableRef.current,
+        volume: Number.isFinite(video.volume) ? video.volume : 1
       })
     },
     []
@@ -522,7 +524,6 @@ export default function FileProjection({
           queueVideoControl(data, { shouldPlay: false })
           break
         case 'seek':
-          if (!seekableRef.current) break
           if (playbackModeRef.current === 'vlc-embedded') {
             void window.api?.projectionVlc?.control({
               action: 'seek',
@@ -531,6 +532,7 @@ export default function FileProjection({
             })
             break
           }
+          if (!seekableRef.current) break
           queueVideoControl(data, { seekTo: data.value })
           break
         case 'zoom':

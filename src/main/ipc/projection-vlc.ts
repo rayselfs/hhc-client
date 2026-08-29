@@ -331,11 +331,18 @@ function sendState(
     session.durationMs !== undefined && session.durationMs > 0 ? session.durationMs / 1000 : 0
   let isPlaying = next?.isPlaying ?? false
   let isEnded = next?.isEnded ?? false
+  let seekable: boolean | undefined
+  let volume: number | undefined
   try {
     currentTime = Math.max(0, ownerPlayer.getTime()) / 1000
     if (duration === 0) duration = Math.max(0, ownerPlayer.getLength()) / 1000
     if (next?.isPlaying === undefined) isPlaying = ownerPlayer.isPlaying()
     if (next?.isEnded === undefined) isEnded = ownerPlayer.getState() === 6
+    seekable = ownerPlayer.isSeekable()
+    const nativeVolume = ownerPlayer.getVolume()
+    if (Number.isFinite(nativeVolume) && nativeVolume >= 0) {
+      volume = Math.max(0, Math.min(100, nativeVolume)) / 100
+    }
   } catch {
     // Native state can be unavailable after VLC reports a playback failure.
   }
@@ -346,7 +353,9 @@ function sendState(
     currentTime,
     duration,
     isPlaying,
-    isEnded
+    isEnded,
+    ...(seekable !== undefined ? { seekable } : {}),
+    ...(volume !== undefined ? { volume } : {})
   })
 }
 
@@ -608,6 +617,9 @@ async function startVlc(
     nextPlayer.on('lengthChanged', () => {
       if (session.phase === 'ready') sendState(wm, session)
     })
+    nextPlayer.on('buffering', () => {
+      if (session.phase === 'ready') sendState(wm, session)
+    })
     nextPlayer.on('playing', () => {
       if (!ownsSession(wm, session, embeddedPlayer)) return
       if (!session.mediaReady) {
@@ -704,11 +716,14 @@ function controlVlc(wm: WindowManager, command: ProjectionVlcControlRequest): vo
         session.player?.setTime(Math.max(0, Math.round(command.value * 1000)))
       } else if (session.mediaReady && session.seekable === true) {
         continueStartupAfterReadiness(wm, session)
+      } else if (session.seekable === false) {
+        session.pending.seekSeconds = undefined
       }
       break
     case 'volume':
       session.pending.volume = command.value
       applyPendingVolume(session)
+      if (session.phase === 'ready') sendState(wm, session)
       break
   }
 }

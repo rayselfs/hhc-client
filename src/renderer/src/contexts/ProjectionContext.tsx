@@ -352,10 +352,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       snapshot.media.show &&
       (!vlcFailure.itemId || snapshot.media.show.itemId === vlcFailure.itemId)
     ) {
-      getAdapter(adapterRef, browserSessionId).send('__system:replay', {
-        generation: state.generation,
-        snapshot: structuredClone(snapshot)
-      })
+      coordinator.replay(state.generation)
       return { ok: true, generation: state.generation }
     }
     const result = await window.api.projection.retry()

@@ -165,6 +165,8 @@ export interface AppMessages {
     isPlaying: boolean
     isEnded: boolean
     playbackRate?: number
+    seekable?: boolean
+    volume?: number
   }
   /** Presentation ended — show end screen on projection */
   'file:end': null
@@ -220,11 +222,19 @@ export interface ProjectionMediaReplayState {
   isEnded: boolean
   volume: number
   playbackRate?: number
+  seekable?: boolean
   pdfPage: number
   pdfScroll: number
   pdfViewMode: 'single' | 'continuous'
   zoom: number
   pan: { x: number; y: number }
+}
+
+export interface ProjectionPendingFileControls {
+  itemId: string
+  seekSeconds?: number
+  volume?: number
+  transport?: 'play' | 'pause'
 }
 
 export interface ProjectionSessionSnapshot {
@@ -261,6 +271,7 @@ export interface SystemMessages {
   '__system:replay': {
     generation: number
     snapshot: ProjectionSessionSnapshot
+    pendingFileControls?: ProjectionPendingFileControls
   }
   '__system:pong': null
   '__system:ping': null

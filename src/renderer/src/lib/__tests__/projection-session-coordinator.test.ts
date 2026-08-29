@@ -37,7 +37,9 @@ const playback: ProjectionPayload<'file:playback-state'> = {
   duration: 120,
   isPlaying: true,
   isEnded: false,
-  playbackRate: 1.5
+  playbackRate: 1.5,
+  seekable: true,
+  volume: 0.6
 }
 
 describe('ProjectionSessionCoordinator', () => {
@@ -75,9 +77,10 @@ describe('ProjectionSessionCoordinator', () => {
     })
   })
 
-  it('reduces repeated media controls to one final replay state', () => {
+  it('keeps requested media controls pending without confirming durable replay state', () => {
     const coordinator = createProjectionSessionCoordinator(send)
     coordinator.startSession('media', [['file:show', fileShow]])
+    coordinator.beginGeneration({ generation: 3, status: 'opening', reason: 'created' })
     coordinator.project('file:control', { action: 'seek', itemId: 'video-1', value: 8 })
     coordinator.project('file:control', { action: 'seek', itemId: 'video-1', value: 12 })
     coordinator.project('file:control', {
@@ -89,9 +92,80 @@ describe('ProjectionSessionCoordinator', () => {
 
     expect(coordinator.getSnapshot()?.media.state).toMatchObject({
       itemId: 'video-1',
-      positionSeconds: 12,
-      volume: 0.4,
-      isPlaying: true
+      positionSeconds: 0,
+      volume: 1,
+      isPlaying: false
+    })
+
+    coordinator.ready(3)
+    expect(send).toHaveBeenLastCalledWith('__system:replay', {
+      generation: 3,
+      snapshot: coordinator.getSnapshot(),
+      pendingFileControls: {
+        itemId: 'video-1',
+        seekSeconds: 12,
+        volume: 0.4,
+        transport: 'play'
+      }
+    })
+  })
+
+  it('retains sent controls through recovery until matching playback confirms them', () => {
+    const coordinator = createProjectionSessionCoordinator(send)
+    coordinator.startSession('media', [['file:show', fileShow]])
+    coordinator.beginGeneration({ generation: 3, status: 'opening', reason: 'created' })
+    coordinator.ready(3)
+    send.mockClear()
+
+    coordinator.project('file:control', { action: 'seek', itemId: 'video-1', value: 30 })
+    coordinator.project('file:control', { action: 'volume', itemId: 'video-1', value: 0.4 })
+    coordinator.project('file:control', { action: 'pause', itemId: 'video-1' })
+    coordinator.recordPlayback(3, {
+      ...playback,
+      currentTime: 24,
+      isPlaying: false,
+      volume: 0.6
+    })
+    coordinator.beginGeneration({ generation: 3, status: 'recovering', reason: 'renderer-crash' })
+    coordinator.ready(3)
+
+    expect(send).toHaveBeenLastCalledWith('__system:replay', {
+      generation: 3,
+      snapshot: coordinator.getSnapshot(),
+      pendingFileControls: {
+        itemId: 'video-1',
+        seekSeconds: 30,
+        volume: 0.4
+      }
+    })
+  })
+
+  it('clears confirmed controls and rejects pending seek when VLC is not seekable', () => {
+    const coordinator = createProjectionSessionCoordinator(send)
+    coordinator.startSession('media', [['file:show', fileShow]])
+    coordinator.beginGeneration({ generation: 3, status: 'opening', reason: 'created' })
+    coordinator.project('file:control', { action: 'seek', itemId: 'video-1', value: 30 })
+    coordinator.project('file:control', { action: 'volume', itemId: 'video-1', value: 0.4 })
+    coordinator.project('file:control', { action: 'play', itemId: 'video-1' })
+
+    coordinator.recordPlayback(3, {
+      ...playback,
+      currentTime: 30.5,
+      isPlaying: true,
+      seekable: false,
+      volume: 0.4
+    })
+    coordinator.ready(3)
+
+    expect(send).toHaveBeenLastCalledWith('__system:replay', {
+      generation: 3,
+      snapshot: coordinator.getSnapshot()
+    })
+    expect(coordinator.getSnapshot()?.media.state).toMatchObject({
+      positionSeconds: 30.5,
+      isPlaying: true,
+      seekable: false,
+      volume: 0.4
     })
   })
 
@@ -158,7 +232,7 @@ describe('ProjectionSessionCoordinator', () => {
       itemId: 'video-1',
       positionSeconds: 24,
       isPlaying: true,
-      volume: 0.4,
+      volume: 0.6,
       playbackRate: 1.5
     })
   })

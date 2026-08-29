@@ -310,6 +310,38 @@ describe('FileProjection copied media identity', () => {
     expect(mockProjectionVlcStop).toHaveBeenCalledWith({ itemId: 'video-id', attemptId })
   })
 
+  it('forwards embedded VLC seek to the owner session even before renderer capability state', async () => {
+    const { rerender } = render(
+      <FileProjection
+        fileName="clip.mkv"
+        initialItemId="video-id"
+        initialBlobId="video-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+        initialSeekable={false}
+      />
+    )
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalled())
+
+    rerender(
+      <FileProjection
+        fileName="clip.mkv"
+        initialItemId="video-id"
+        initialBlobId="video-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+        initialSeekable={false}
+        controlEvent={{ id: 1, data: { action: 'seek', itemId: 'video-id', value: 20 } }}
+      />
+    )
+
+    expect(window.api.projectionVlc.control).toHaveBeenCalledWith({
+      action: 'seek',
+      itemId: 'video-id',
+      value: 20
+    })
+  })
+
   it('uses live stream URLs without loading a stored source and ignores seek controls', async () => {
     const { container, rerender } = render(
       <FileProjection
@@ -377,7 +409,9 @@ describe('FileProjection copied media identity', () => {
       duration: 100,
       isPlaying: false,
       isEnded: false,
-      playbackRate: 1
+      playbackRate: 1,
+      seekable: false,
+      volume: 1
     })
   })
 
