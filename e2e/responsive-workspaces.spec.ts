@@ -417,7 +417,7 @@ async function installResizeFixture(page: Page): Promise<void> {
       mimeType?: string
     }>
     const item = items.find(
-      (candidate) => candidate.mimeType === 'application/vnd.librepresenter.presentation+json'
+      (candidate) => candidate.mimeType === 'application/vnd.hhc.presenter+json'
     )
     if (!item) throw new Error('editable presentation fixture item not found')
     const record = (await requestResult(read.objectStore('file-blobs').get(item.id))) as {
@@ -515,7 +515,7 @@ async function installResizeFixture(page: Page): Promise<void> {
     }
     document.updatedAt = Date.now()
     const blob = new Blob([JSON.stringify(document)], {
-      type: 'application/vnd.librepresenter.presentation+json'
+      type: 'application/vnd.hhc.presenter+json'
     })
     const write = db.transaction('file-blobs', 'readwrite')
     write.objectStore('file-blobs').put({

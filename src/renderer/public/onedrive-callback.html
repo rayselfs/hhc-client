@@ -100,12 +100,12 @@
     <script>
       const callbackUrl = window.location.href
       const payload = {
-        type: 'libre-presenter:onedrive-callback',
+        type: 'hhc-presenter:onedrive-callback',
         url: callbackUrl
       }
 
       try {
-        localStorage.setItem('libre-presenter:onedrive-callback', callbackUrl)
+        localStorage.setItem('hhc-presenter:onedrive-callback', callbackUrl)
       } catch {}
 
       if (window.opener) {

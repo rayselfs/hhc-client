@@ -285,7 +285,7 @@ describe('OneDrive credential IPC', () => {
 
     const result = (await getHandler('onedrive:complete-auth')(makeEvent(), {
       clientId: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
-      redirectUri: 'librepresenter://auth/onedrive',
+      redirectUri: 'hhc-presenter://auth/onedrive',
       code: 'code-1',
       codeVerifier: 'verifier-1'
     })) as {
@@ -311,7 +311,7 @@ describe('OneDrive credential IPC', () => {
     expect(init.method).toBe('POST')
     expect(init.body).toBeInstanceOf(URLSearchParams)
     expect(init.body.get('grant_type')).toBe('authorization_code')
-    expect(init.body.get('redirect_uri')).toBe('librepresenter://auth/onedrive')
+    expect(init.body.get('redirect_uri')).toBe('hhc-presenter://auth/onedrive')
     expect(init.body.get('code')).toBe('code-1')
     expect(init.body.get('code_verifier')).toBe('verifier-1')
     expect(mockNetFetch.mock.calls[1][0]).toBe('https://graph.microsoft.com/v1.0/me')
@@ -349,7 +349,7 @@ describe('OneDrive credential IPC', () => {
 
   it('returns the custom protocol auth redirect URI', async () => {
     await expect(getHandler('onedrive:get-auth-redirect-uri')(makeEvent())).resolves.toBe(
-      'librepresenter://auth/onedrive'
+      'hhc-presenter://auth/onedrive'
     )
   })
 
@@ -358,25 +358,22 @@ describe('OneDrive credential IPC', () => {
       string | null
     >
 
-    handleOneDriveAuthCallbackUrl('librepresenter://auth/onedrive?code=code-1&state=state-1', wm)
+    handleOneDriveAuthCallbackUrl('hhc-presenter://auth/onedrive?code=code-1&state=state-1', wm)
 
-    await expect(waiting).resolves.toBe('librepresenter://auth/onedrive?code=code-1&state=state-1')
+    await expect(waiting).resolves.toBe('hhc-presenter://auth/onedrive?code=code-1&state=state-1')
     expect(mockMainWindow.show).toHaveBeenCalled()
     expect(mockMainWindow.focus).toHaveBeenCalled()
   })
 
   it('ignores stale queued auth callbacks with a different state', async () => {
-    handleOneDriveAuthCallbackUrl(
-      'librepresenter://auth/onedrive?code=old-code&state=old-state',
-      wm
-    )
+    handleOneDriveAuthCallbackUrl('hhc-presenter://auth/onedrive?code=old-code&state=old-state', wm)
 
     const waiting = getHandler('onedrive:wait-auth-callback')(makeEvent(), 'state-1') as Promise<
       string | null
     >
 
-    handleOneDriveAuthCallbackUrl('librepresenter://auth/onedrive?code=code-1&state=state-1', wm)
+    handleOneDriveAuthCallbackUrl('hhc-presenter://auth/onedrive?code=code-1&state=state-1', wm)
 
-    await expect(waiting).resolves.toBe('librepresenter://auth/onedrive?code=code-1&state=state-1')
+    await expect(waiting).resolves.toBe('hhc-presenter://auth/onedrive?code=code-1&state=state-1')
   })
 })

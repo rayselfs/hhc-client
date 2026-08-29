@@ -275,7 +275,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
   {
     kind: 'presentation',
     extensions: ['lpdeck'],
-    canonicalMimeType: 'application/vnd.librepresenter.presentation+json',
+    canonicalMimeType: 'application/vnd.hhc.presenter+json',
     thumbnail: 'presentation',
     web: 'native',
     electron: 'native',

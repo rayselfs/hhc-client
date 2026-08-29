@@ -1,4 +1,4 @@
-import { LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID } from '@renderer/stores/settings'
+import { HHC_PRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID } from '@renderer/stores/settings'
 import {
   listProviderConnectionsByType,
   putProviderConnection,
@@ -87,7 +87,7 @@ export function createOAuthState(): string {
 export async function createOneDriveAuthRequest(
   input: OneDriveAuthRequestInput
 ): Promise<OneDriveAuthRequest> {
-  const clientId = input.clientId?.trim() || LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
+  const clientId = input.clientId?.trim() || HHC_PRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
   const state = input.state ?? createOAuthState()
   const codeVerifier = input.codeVerifier ?? createPkceVerifier()
   const codeChallenge = await createPkceChallenge(codeVerifier)

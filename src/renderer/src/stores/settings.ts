@@ -66,7 +66,7 @@ const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
 const DEFAULT_PROJECTION_DISPLAY_ID = ''
-export const LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID = APP_CONFIG.oneDriveClientId
+export const HHC_PRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID = APP_CONFIG.oneDriveClientId
 const RELOAD_DELAY_MS = 500
 const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
 const OFFLINE_POLICIES: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
@@ -120,7 +120,7 @@ export const DEFAULT_LAN_REMOTE: LanRemoteSettings = {
 }
 
 export function getEffectiveOneDriveClientId(): string {
-  return LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
+  return HHC_PRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

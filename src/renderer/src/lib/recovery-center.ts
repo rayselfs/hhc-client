@@ -220,7 +220,7 @@ export async function runRecoveryAction(
     try {
       const link = document.createElement('a')
       link.href = url
-      link.download = 'librepresenter-diagnostics.json'
+      link.download = 'hhc-presenter-diagnostics.json'
       link.click()
     } finally {
       URL.revokeObjectURL(url)

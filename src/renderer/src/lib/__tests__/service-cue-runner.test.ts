@@ -124,7 +124,7 @@ describe('projectServiceCue', () => {
 
   it('reports an editable finalization block without claiming a media cue projected', async () => {
     const startProjection = vi.fn(() => Promise.resolve())
-    const file = makeFile('deck', 'application/vnd.librepresenter.presentation+json')
+    const file = makeFile('deck', 'application/vnd.hhc.presenter+json')
     const cue: ServiceCue = {
       id: 'media-cue',
       type: 'media',

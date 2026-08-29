@@ -60,7 +60,7 @@ it('pairs a browser session and accepts authorized commands', async () => {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-libre-presenter-session': token!
+      'x-hhc-presenter-session': token!
     },
     body: JSON.stringify({ requestId: 'r1', type: 'presentation:next' })
   })
@@ -75,7 +75,7 @@ it('pairs a browser session and accepts authorized commands', async () => {
     projection: { isOpen: true }
   })
   const stateResponse = await fetch(`http://${host}:${port}/state`, {
-    headers: { 'x-libre-presenter-session': token! }
+    headers: { 'x-hhc-presenter-session': token! }
   })
   await expect(stateResponse.json()).resolves.toMatchObject({
     snapshot: {

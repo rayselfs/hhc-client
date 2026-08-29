@@ -182,7 +182,7 @@ it('downloads redacted diagnostics through a Blob URL and revokes it', async () 
     })
   ).resolves.toBe('{"redacted":true}')
   expect(clickedDownload).toEqual({
-    download: 'librepresenter-diagnostics.json',
+    download: 'hhc-presenter-diagnostics.json',
     href: 'blob:diagnostics'
   })
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:diagnostics')

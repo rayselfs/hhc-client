@@ -1,18 +1,18 @@
-export type LibrePresenterProtocolAction =
+export type HhcPresenterProtocolAction =
   | { kind: 'account-auth'; code: string; state: string }
   | { kind: 'onedrive-auth'; url: string }
   | { kind: 'ignore' }
 
 type ProtocolHandlers = {
-  onAccountAuth: (action: Extract<LibrePresenterProtocolAction, { kind: 'account-auth' }>) => void
+  onAccountAuth: (action: Extract<HhcPresenterProtocolAction, { kind: 'account-auth' }>) => void
   onOneDriveAuth: (url: string) => void
 }
 
-export function parseLibrePresenterProtocolUrl(value: string): LibrePresenterProtocolAction {
+export function parseHhcPresenterProtocolUrl(value: string): HhcPresenterProtocolAction {
   try {
     const url = new URL(value)
     if (
-      url.protocol !== 'librepresenter:' ||
+      url.protocol !== 'hhc-presenter:' ||
       url.hostname !== 'auth' ||
       url.port ||
       url.username ||
@@ -44,12 +44,12 @@ export function parseLibrePresenterProtocolUrl(value: string): LibrePresenterPro
   }
 }
 
-export function createLibrePresenterProtocolDispatcher(handlers: ProtocolHandlers): {
+export function createHhcPresenterProtocolDispatcher(handlers: ProtocolHandlers): {
   dispatch(value: string): boolean
   dispatchArgv(argv: string[]): boolean
 } {
   const dispatch = (value: string): boolean => {
-    const action = parseLibrePresenterProtocolUrl(value)
+    const action = parseHhcPresenterProtocolUrl(value)
     if (action.kind === 'account-auth') handlers.onAccountAuth(action)
     else if (action.kind === 'onedrive-auth') handlers.onOneDriveAuth(action.url)
     else return false

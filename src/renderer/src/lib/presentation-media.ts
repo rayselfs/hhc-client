@@ -2,7 +2,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 
 export const PPTX_MIME_TYPE =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-export const EDITABLE_PRESENTATION_MIME_TYPE = 'application/vnd.librepresenter.presentation+json'
+export const EDITABLE_PRESENTATION_MIME_TYPE = 'application/vnd.hhc.presenter+json'
 
 export function isPresentationMimeType(mimeType: string | undefined): boolean {
   return mimeType === PPTX_MIME_TYPE || mimeType === EDITABLE_PRESENTATION_MIME_TYPE

@@ -20,7 +20,7 @@ function makePresentationItem(id: string, name: string): FileItemRecord {
 function makeEditablePresentationItem(id: string, name: string): FileItemRecord {
   return {
     ...makePresentationItem(id, name),
-    mimeType: 'application/vnd.librepresenter.presentation+json'
+    mimeType: 'application/vnd.hhc.presenter+json'
   }
 }
 

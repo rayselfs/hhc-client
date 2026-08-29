@@ -8,16 +8,16 @@ import {
   type HhcPendingSignIn,
   type HhcSession
 } from '@shared/hhc-auth'
-import type { LibrePresenterProtocolAction } from '../protocol-router'
+import type { HhcPresenterProtocolAction } from '../protocol-router'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
 
 const CLIENT_ID = 'hhc-desktop'
-const REDIRECT_URI = 'librepresenter://auth/account'
+const REDIRECT_URI = 'hhc-presenter://auth/account'
 const SCOPE = 'openid profile'
 const REVOKE_TIMEOUT_MS = 5000
 
-type AccountAuthAction = Extract<LibrePresenterProtocolAction, { kind: 'account-auth' }>
+type AccountAuthAction = Extract<HhcPresenterProtocolAction, { kind: 'account-auth' }>
 
 type StoredCredential = {
   installationId: string
@@ -583,7 +583,7 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   private deviceName(): string {
-    return `LibrePresenter Electron (${process.platform})`
+    return `HHC Presenter Electron (${process.platform})`
   }
 }
 
