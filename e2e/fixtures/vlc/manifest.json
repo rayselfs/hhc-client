@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "provenance": {
+    "encoder": "FFmpeg 8.1.2 macOS arm64",
+    "videoSource": "testsrc2=size=320x180:rate=15",
+    "videoCodec": "h264",
+    "durationSeconds": 8
+  },
+  "fixtures": [
+    {
+      "file": "healthy.mp4",
+      "sha256": "321854c0ac85c424fc90de22c51fdb95607ac5095204eef3aa3ff978a89820ae",
+      "size": 125987,
+      "container": "mp4",
+      "codec": "h264",
+      "readable": true,
+      "durationSeconds": { "min": 7.9, "max": 8.1 },
+      "allowedDiagnostics": [],
+      "expectedSeekable": true,
+      "expectedPlayback": "native",
+      "expectedRemux": "source"
+    },
+    {
+      "file": "healthy.mkv",
+      "sha256": "a162cc7f22dece6199786b6366a550b62c8893e6c91f48912cfe6f7ecfe1ef03",
+      "size": 125367,
+      "container": "matroska",
+      "codec": "h264",
+      "readable": true,
+      "durationSeconds": { "min": 7.9, "max": 8.1 },
+      "allowedDiagnostics": [],
+      "expectedSeekable": true,
+      "expectedPlayback": "vlc-embedded",
+      "expectedRemux": "matroska-remux",
+      "matroska": {
+        "requiredElementIds": ["1a45dfa3", "114d9b74", "1f43b675", "1c53bb6b"]
+      }
+    },
+    {
+      "file": "broken-cues-readable.mkv",
+      "sha256": "acd604861a0ff5bf4399200e2b81e56e9a0421454a91f88b00f8274cfbb406c9",
+      "size": 125339,
+      "container": "matroska",
+      "codec": "h264",
+      "readable": true,
+      "durationSeconds": { "min": 7.9, "max": 8.1 },
+      "allowedDiagnostics": ["File ended prematurely at pos\\. 125339"],
+      "expectedSeekable": true,
+      "expectedPlayback": "vlc-embedded",
+      "expectedRemux": "matroska-remux",
+      "matroska": {
+        "requiredElementIds": ["1a45dfa3", "114d9b74", "1f43b675"],
+        "seekHeadCuesReferenceOffset": 112,
+        "missingCuesOffset": 125339,
+        "minimumClusterCount": 2
+      }
+    },
+    {
+      "file": "unreadable-truncated.mkv",
+      "sha256": "e1b1d62fa37e997a94f632b9e51131fbf1e615c9b6907edea5756b1883e3b3ee",
+      "size": 4000,
+      "container": "matroska",
+      "codec": "h264",
+      "readable": false,
+      "allowedDiagnostics": [
+        "File ended prematurely",
+        "Cannot determine format",
+        "Task finished with error code",
+        "Terminating thread with return code",
+        "Could not open encoder before EOF",
+        "Nothing was written into output file"
+      ],
+      "expectedSeekable": false,
+      "expectedPlayback": "failure",
+      "expectedRemux": "matroska-remux",
+      "expectedFailureCode": "media-open-failed",
+      "matroska": {
+        "requiredElementIds": ["1a45dfa3", "114d9b74", "1f43b675"]
+      }
+    }
+  ]
+}
