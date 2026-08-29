@@ -279,7 +279,7 @@ export default function FileProjection({
       const loadSequence = loadSequenceRef.current + 1
       loadSequenceRef.current = loadSequence
       if (playbackModeRef.current === 'vlc-embedded') {
-        await window.api?.projectionVlc?.stop().catch((error) => {
+        await window.api?.projectionVlc?.stop({ force: true }).catch((error) => {
           console.error('[file-projection] Failed to stop VLC before loading next item', error)
         })
         if (loadSequenceRef.current !== loadSequence) return
@@ -652,7 +652,7 @@ export default function FileProjection({
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
       disposePdf()
-      void window.api?.projectionVlc?.stop()
+      void window.api?.projectionVlc?.stop({ force: true })
     },
     [disposePdf]
   )
@@ -1002,9 +1002,11 @@ function VlcProjectionSurface({
 }): React.JSX.Element {
   useEffect(() => {
     if (!itemId || !blobId) return undefined
+    const attemptId = crypto.randomUUID()
     void window.api?.projectionVlc
       ?.start({
         itemId,
+        attemptId,
         sourceFileId: blobId,
         container: '#vlc-player',
         durationMs,
@@ -1024,7 +1026,7 @@ function VlcProjectionSurface({
         console.error('[projection-vlc] Failed to start embedded VLC playback', error)
       })
     return () => {
-      void window.api?.projectionVlc?.stop()
+      void window.api?.projectionVlc?.stop({ itemId, attemptId })
     }
   }, [blobId, durationMs, itemId, replayState])
 

@@ -402,7 +402,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const blackoutProjection = useCallback(
     async (enabled: boolean): Promise<void> => {
-      if (enabled) await window.api?.projectionVlc?.stop?.().catch(() => {})
+      if (enabled) await window.api?.projectionVlc?.stop?.({ force: true }).catch(() => {})
       getCoordinator().blackout(enabled)
     },
     [getCoordinator]
@@ -439,7 +439,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   )
 
   const stopProjection = useCallback(async (): Promise<void> => {
-    await window.api?.projectionVlc?.stop?.().catch(() => {})
+    await window.api?.projectionVlc?.stop?.({ force: true }).catch(() => {})
     await closeProjection()
   }, [closeProjection])
 

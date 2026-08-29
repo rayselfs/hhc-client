@@ -99,7 +99,7 @@ export default function ProjectionPage(): React.JSX.Element {
 
   useEffect(() => {
     if (state.isBlackout || state.showDefault || state.activeContent !== 'file') {
-      void window.api?.projectionVlc?.stop()
+      void window.api?.projectionVlc?.stop({ force: true })
     }
   }, [state.activeContent, state.isBlackout, state.showDefault])
 

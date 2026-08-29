@@ -7,7 +7,8 @@ import type {
   ProjectionVlcInfo,
   ProjectionVlcProbeRequest,
   ProjectionVlcProbeResult,
-  ProjectionVlcStartRequest
+  ProjectionVlcStartRequest,
+  ProjectionVlcStopRequest
 } from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
 import { getNativeFilePath } from './native-fs'
@@ -20,17 +21,39 @@ import {
   type VlcPlayerRuntimeResult
 } from '../vlc-player-runtime'
 
-let player: VlcPlayer | null = null
-let activeRuntime: VlcPlayerRuntime | null = null
-let playerListenerCleanup: (() => void) | null = null
-let playerResizeCleanup: (() => void) | null = null
-let currentItemId: string | null = null
-let currentDurationMs: number | undefined
+interface PendingVlcControls {
+  volume?: number
+  seekSeconds?: number
+  transport?: 'play' | 'pause'
+}
+
+interface OwnedVlcSession {
+  itemId: string
+  attemptId: string
+  generation: number
+  lifecycleVersion: number
+  player: VlcPlayer | null
+  runtime: VlcPlayerRuntime | null
+  sourceInstalled: boolean
+  mediaReady: boolean
+  seekable: boolean | null
+  pending: PendingVlcControls
+  phase: 'opening' | 'waiting-media' | 'waiting-seek' | 'waiting-transport' | 'ready'
+  seekTargetSeconds?: number
+  durationMs?: number
+  lastProgressPublicationMs: number | null
+  listenerCleanup: (() => void) | null
+  resizeCleanup: (() => void) | null
+  watchdog: ReturnType<typeof setTimeout> | null
+}
+
+let activeSession: OwnedVlcSession | null = null
 let lifecycleVersion = 0
-let lastProgressPublicationMs: number | null = null
 
 const VLC_PROGRESS_PUBLICATION_INTERVAL_MS = 250
 const VLC_PREMATURE_END_TOLERANCE_MS = 2_000
+const VLC_SEEK_CONFIRMATION_TOLERANCE_SECONDS = 1
+const VLC_START_WATCHDOG_MS = 15_000
 const VLC_FAILURE_DETAILS: Record<
   ProjectionVlcFailureCode,
   Pick<ProjectionVlcFailure, 'recoverable' | 'message'>
@@ -58,20 +81,17 @@ function getSafeItemId(itemId?: string): string | undefined {
 function publishFailure(
   wm: WindowManager,
   code: ProjectionVlcFailureCode,
-  generation: number,
-  ownerVersion: number,
-  itemId?: string,
-  ownerPlayer?: VlcPlayer
+  session: OwnedVlcSession
 ): void {
   if (
-    generation <= 0 ||
-    ownerVersion !== lifecycleVersion ||
-    wm.getProjectionState().lifecycle.generation !== generation ||
-    (ownerPlayer !== undefined && player !== ownerPlayer)
+    activeSession !== session ||
+    session.generation <= 0 ||
+    session.lifecycleVersion !== lifecycleVersion ||
+    wm.getProjectionState().lifecycle.generation !== session.generation
   ) {
     return
   }
-  const safeItemId = getSafeItemId(itemId)
+  const safeItemId = getSafeItemId(session.itemId)
   wm.sendToMain('projection-vlc:failure', {
     ...(safeItemId ? { itemId: safeItemId } : {}),
     code,
@@ -79,10 +99,15 @@ function publishFailure(
   })
 }
 
-function publishStarted(wm: WindowManager, generation: number, itemId: string): void {
-  const safeItemId = getSafeItemId(itemId)
-  if (safeItemId && generation > 0 && wm.getProjectionState().lifecycle.generation === generation) {
-    wm.sendToMain('projection-vlc:started', generation, safeItemId)
+function publishStarted(wm: WindowManager, session: OwnedVlcSession): void {
+  const safeItemId = getSafeItemId(session.itemId)
+  if (
+    activeSession === session &&
+    safeItemId &&
+    session.generation > 0 &&
+    wm.getProjectionState().lifecycle.generation === session.generation
+  ) {
+    wm.sendToMain('projection-vlc:started', session.generation, safeItemId)
   }
 }
 
@@ -121,6 +146,8 @@ function validateVlcStartRequest(value: unknown): ProjectionVlcStartRequest {
     !isRecord(value) ||
     typeof value.itemId !== 'string' ||
     value.itemId.length === 0 ||
+    (value.attemptId !== undefined &&
+      (typeof value.attemptId !== 'string' || value.attemptId.length === 0)) ||
     !isValidNativeFileId(value.sourceFileId) ||
     value.container !== '#vlc-player' ||
     !isOptionalFiniteNumber(value.durationMs, 0) ||
@@ -169,6 +196,21 @@ function validateVlcControlRequest(value: unknown): ProjectionVlcControlRequest 
     return value as unknown as ProjectionVlcControlRequest
   }
   throw new Error('Invalid VLC control request')
+}
+
+function validateVlcStopRequest(value: unknown): ProjectionVlcStopRequest | undefined {
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error('Invalid VLC stop request')
+  if (value.force === true) return { force: true }
+  if (
+    typeof value.itemId === 'string' &&
+    value.itemId.length > 0 &&
+    typeof value.attemptId === 'string' &&
+    value.attemptId.length > 0
+  ) {
+    return value as unknown as ProjectionVlcStopRequest
+  }
+  throw new Error('Invalid VLC stop request')
 }
 
 function captureListeners(
@@ -231,7 +273,6 @@ async function resolveVlcInfo(
   if (loaded.status === 'error') {
     return { info: { status: 'error', message: loaded.message } }
   }
-  activeRuntime = loaded.runtime
   const resolved = resolveVlcRuntime(loaded.runtime.probeDefaultVlcDir)
   if (resolved.status !== 'ready' || !resolved.path) {
     return {
@@ -264,26 +305,44 @@ async function probeVlcMedia(
   }
 }
 
-function sendState(wm: WindowManager, next?: { isPlaying?: boolean; isEnded?: boolean }): void {
-  if (!player || !currentItemId) return
-  const generation = wm.getProjectionState().lifecycle.generation
-  if (!Number.isSafeInteger(generation) || generation <= 0) return
+function ownsSession(
+  wm: WindowManager,
+  session: OwnedVlcSession,
+  ownerPlayer: VlcPlayer | null = session.player
+): boolean {
+  return (
+    activeSession === session &&
+    session.lifecycleVersion === lifecycleVersion &&
+    session.player === ownerPlayer &&
+    session.generation > 0 &&
+    wm.getProjectionState().lifecycle.generation === session.generation
+  )
+}
+
+function sendState(
+  wm: WindowManager,
+  session: OwnedVlcSession,
+  next?: { isPlaying?: boolean; isEnded?: boolean }
+): void {
+  const ownerPlayer = session.player
+  if (!ownerPlayer || !ownsSession(wm, session, ownerPlayer)) return
   let currentTime = 0
   let duration =
-    currentDurationMs !== undefined && currentDurationMs > 0 ? currentDurationMs / 1000 : 0
+    session.durationMs !== undefined && session.durationMs > 0 ? session.durationMs / 1000 : 0
   let isPlaying = next?.isPlaying ?? false
   let isEnded = next?.isEnded ?? false
   try {
-    currentTime = Math.max(0, player.getTime()) / 1000
-    if (duration === 0) duration = Math.max(0, player.getLength()) / 1000
-    if (next?.isPlaying === undefined) isPlaying = player.isPlaying()
-    if (next?.isEnded === undefined) isEnded = player.getState() === 6
+    currentTime = Math.max(0, ownerPlayer.getTime()) / 1000
+    if (duration === 0) duration = Math.max(0, ownerPlayer.getLength()) / 1000
+    if (next?.isPlaying === undefined) isPlaying = ownerPlayer.isPlaying()
+    if (next?.isEnded === undefined) isEnded = ownerPlayer.getState() === 6
   } catch {
     // Native state can be unavailable after VLC reports a playback failure.
   }
+  if (!ownsSession(wm, session, ownerPlayer)) return
 
-  wm.sendToMain('projection:message', generation, 'file:playback-state', {
-    itemId: currentItemId,
+  wm.sendToMain('projection:message', session.generation, 'file:playback-state', {
+    itemId: session.itemId,
     currentTime,
     duration,
     isPlaying,
@@ -291,43 +350,119 @@ function sendState(wm: WindowManager, next?: { isPlaying?: boolean; isEnded?: bo
   })
 }
 
-function hideNativePlayerWindow(currentPlayer: VlcPlayer): void {
+function setNativePlayerWindowVisible(
+  session: OwnedVlcSession,
+  currentPlayer: VlcPlayer,
+  visible: boolean
+): void {
   if (currentPlayer.playerId < 0) return
   try {
-    activeRuntime?.getBinding().setPlayerWindowVisible(currentPlayer.playerId, false)
+    session.runtime?.getBinding().setPlayerWindowVisible(currentPlayer.playerId, visible)
   } catch {
     // Window teardown can race with native view teardown.
   }
 }
 
-function didPlaybackEndPrematurely(): boolean {
-  if (!player) return false
+function didPlaybackEndPrematurely(session: OwnedVlcSession): boolean {
+  const ownerPlayer = session.player
+  if (!ownerPlayer) return false
   try {
-    const elapsedMs = Math.max(0, player.getTime())
+    const elapsedMs = Math.max(0, ownerPlayer.getTime())
     const durationMs =
-      currentDurationMs !== undefined && currentDurationMs > 0
-        ? currentDurationMs
-        : Math.max(0, player.getLength())
+      session.durationMs !== undefined && session.durationMs > 0
+        ? session.durationMs
+        : Math.max(0, ownerPlayer.getLength())
     return durationMs > 0 && elapsedMs + VLC_PREMATURE_END_TOLERANCE_MS < durationMs
   } catch {
     return false
   }
 }
 
-async function stopVlc(invalidateLifecycle = true): Promise<void> {
-  if (invalidateLifecycle) lifecycleVersion += 1
-  currentItemId = null
-  currentDurationMs = undefined
-  lastProgressPublicationMs = null
-  if (!player) return
-  const currentPlayer = player
-  player = null
-  hideNativePlayerWindow(currentPlayer)
-  currentPlayer.destroy()
-  playerListenerCleanup?.()
-  playerListenerCleanup = null
-  playerResizeCleanup?.()
-  playerResizeCleanup = null
+function destroySessionResources(session: OwnedVlcSession): void {
+  if (session.watchdog) clearTimeout(session.watchdog)
+  session.watchdog = null
+  const currentPlayer = session.player
+  session.player = null
+  if (currentPlayer) {
+    setNativePlayerWindowVisible(session, currentPlayer, false)
+    try {
+      currentPlayer.destroy()
+    } catch {
+      // Keep invalidation authoritative when native teardown already failed.
+    }
+  }
+  try {
+    session.listenerCleanup?.()
+  } catch {
+    // Keep invalidation authoritative when listener teardown races window destruction.
+  }
+  session.listenerCleanup = null
+  try {
+    session.resizeCleanup?.()
+  } catch {
+    // Keep invalidation authoritative when listener teardown races window destruction.
+  }
+  session.resizeCleanup = null
+}
+
+function invalidateSession(session: OwnedVlcSession): void {
+  if (activeSession === session) {
+    activeSession = null
+    lifecycleVersion += 1
+  }
+  destroySessionResources(session)
+}
+
+async function stopVlc(request?: ProjectionVlcStopRequest): Promise<void> {
+  const session = activeSession
+  if (!session) return
+  if (
+    request &&
+    !('force' in request) &&
+    (request.itemId !== session.itemId || request.attemptId !== session.attemptId)
+  ) {
+    return
+  }
+  invalidateSession(session)
+}
+
+function applyPendingVolume(session: OwnedVlcSession): void {
+  if (!session.player || !session.sourceInstalled || session.pending.volume === undefined) return
+  session.player.setVolume(Math.round(Math.max(0, Math.min(1, session.pending.volume)) * 100))
+}
+
+function finishStartup(wm: WindowManager, session: OwnedVlcSession, isPlaying: boolean): void {
+  const ownerPlayer = session.player
+  if (!ownerPlayer || !ownsSession(wm, session, ownerPlayer)) return
+  session.phase = 'ready'
+  session.pending.seekSeconds = undefined
+  session.pending.transport = undefined
+  if (session.watchdog) clearTimeout(session.watchdog)
+  session.watchdog = null
+  setNativePlayerWindowVisible(session, ownerPlayer, true)
+  sendState(wm, session, { isPlaying, isEnded: false })
+}
+
+function applyFinalTransport(wm: WindowManager, session: OwnedVlcSession): void {
+  const ownerPlayer = session.player
+  if (!ownerPlayer || !ownsSession(wm, session, ownerPlayer)) return
+  session.phase = 'waiting-transport'
+  if (session.pending.transport === 'play') ownerPlayer.play()
+  else ownerPlayer.pause()
+}
+
+function continueStartupAfterReadiness(wm: WindowManager, session: OwnedVlcSession): void {
+  const ownerPlayer = session.player
+  if (!ownerPlayer || !ownsSession(wm, session, ownerPlayer)) return
+  const seekSeconds = session.pending.seekSeconds
+  if (seekSeconds !== undefined && session.seekable === true) {
+    session.seekTargetSeconds = seekSeconds
+    session.phase = 'waiting-seek'
+    ownerPlayer.setTime(Math.max(0, Math.round(seekSeconds * 1000)))
+    return
+  }
+  if (session.seekable === false) session.pending.seekSeconds = undefined
+  applyFinalTransport(wm, session)
 }
 
 async function startVlc(
@@ -339,28 +474,58 @@ async function startVlc(
   if (!projectionWindow || projectionWindow.isDestroyed())
     throw new Error('Projection window not open')
   const generation = wm.getProjectionState().lifecycle.generation
-  const startVersion = lifecycleVersion + 1
-  lifecycleVersion = startVersion
+  const previousSession = activeSession
+  const startVersion = ++lifecycleVersion
+  const session: OwnedVlcSession = {
+    itemId: request.itemId,
+    attemptId: request.attemptId ?? `${request.itemId}-${startVersion}`,
+    generation,
+    lifecycleVersion: startVersion,
+    player: null,
+    runtime: null,
+    sourceInstalled: false,
+    mediaReady: false,
+    seekable: null,
+    pending: {
+      ...(request.initialVolume !== undefined ? { volume: request.initialVolume } : {}),
+      ...(request.initialPositionSeconds !== undefined && request.initialPositionSeconds > 0
+        ? { seekSeconds: request.initialPositionSeconds }
+        : {}),
+      transport: request.initialPlaybackState === 'playing' ? 'play' : 'pause'
+    },
+    phase: 'opening',
+    durationMs: request.durationMs,
+    lastProgressPublicationMs: null,
+    listenerCleanup: null,
+    resizeCleanup: null,
+    watchdog: null
+  }
+  activeSession = session
+  if (previousSession) destroySessionResources(previousSession)
+  session.watchdog = setTimeout(() => {
+    if (!ownsSession(wm, session)) return
+    publishFailure(wm, 'media-open-failed', session)
+    invalidateSession(session)
+  }, VLC_START_WATCHDOG_MS)
 
   const { info, runtime } = await resolveVlcInfo(loadRuntime)
-  if (startVersion !== lifecycleVersion) return
+  if (!ownsSession(wm, session)) return
   if (info.status !== 'ready' || !info.vlcDir) {
     publishFailure(
       wm,
       info.status === 'missing' ? 'runtime-missing' : 'binding-unavailable',
-      generation,
-      startVersion,
-      request.itemId
+      session
     )
+    invalidateSession(session)
     throw new Error(info.message ?? 'VLC runtime not found')
   }
   if (!runtime) {
-    publishFailure(wm, 'binding-unavailable', generation, startVersion, request.itemId)
+    publishFailure(wm, 'binding-unavailable', session)
+    invalidateSession(session)
     throw new Error('VLC native binding unavailable')
   }
 
-  await stopVlc(false)
-  if (startVersion !== lifecycleVersion) return
+  session.runtime = runtime
   const beforeWindowListeners = captureListeners(projectionWindow, VLC_WINDOW_EVENTS)
   const beforeWebContentsListeners = captureListeners(
     projectionWindow.webContents,
@@ -376,17 +541,16 @@ async function startVlc(
       controls: false,
       autoAdvancePlaylist: false
     })
+    session.player = nextPlayer
     await nextPlayer.embed()
-    if (startVersion !== lifecycleVersion) {
-      hideNativePlayerWindow(nextPlayer)
-      nextPlayer.destroy()
+    if (!ownsSession(wm, session, nextPlayer)) {
       createListenerCleanup(projectionWindow, beforeWindowListeners, beforeWebContentsListeners)()
+      if (session.player === nextPlayer) destroySessionResources(session)
       return
     }
     if (!nextPlayer.isEmbedded()) throw new Error('VLC player failed to embed')
 
-    player = nextPlayer
-    playerListenerCleanup = createListenerCleanup(
+    session.listenerCleanup = createListenerCleanup(
       projectionWindow,
       beforeWindowListeners,
       beforeWebContentsListeners
@@ -395,79 +559,109 @@ async function startVlc(
     const notifyLayoutChange = (): void => embeddedPlayer.notifyLayoutChange()
     projectionWindow.on('resize', notifyLayoutChange)
     projectionWindow.on('resized', notifyLayoutChange)
-    playerResizeCleanup = () => {
+    session.resizeCleanup = () => {
       projectionWindow.removeListener('resize', notifyLayoutChange)
       projectionWindow.removeListener('resized', notifyLayoutChange)
     }
-    currentItemId = request.itemId
-    currentDurationMs = request.durationMs
-    lastProgressPublicationMs = null
 
     nextPlayer.on('timeChanged', () => {
+      if (!ownsSession(wm, session, embeddedPlayer)) return
+      if (session.phase === 'waiting-seek') {
+        let currentSeconds = Number.NaN
+        try {
+          currentSeconds = embeddedPlayer.getTime() / 1000
+        } catch {
+          return
+        }
+        if (
+          session.seekTargetSeconds !== undefined &&
+          Math.abs(currentSeconds - session.seekTargetSeconds) <=
+            VLC_SEEK_CONFIRMATION_TOLERANCE_SECONDS
+        ) {
+          session.pending.seekSeconds = undefined
+          session.seekTargetSeconds = undefined
+          applyFinalTransport(wm, session)
+        }
+        return
+      }
+      if (session.phase === 'waiting-transport' && session.pending.transport === 'play') {
+        let isPlaying = false
+        try {
+          isPlaying = embeddedPlayer.isPlaying()
+        } catch {
+          return
+        }
+        if (isPlaying) finishStartup(wm, session, true)
+        return
+      }
+      if (session.phase !== 'ready') return
       const now = Date.now()
       if (
-        lastProgressPublicationMs !== null &&
-        now - lastProgressPublicationMs < VLC_PROGRESS_PUBLICATION_INTERVAL_MS
+        session.lastProgressPublicationMs !== null &&
+        now - session.lastProgressPublicationMs < VLC_PROGRESS_PUBLICATION_INTERVAL_MS
       ) {
         return
       }
-      lastProgressPublicationMs = now
-      sendState(wm)
+      session.lastProgressPublicationMs = now
+      sendState(wm, session)
     })
-    nextPlayer.on('lengthChanged', () => sendState(wm))
-    nextPlayer.on('playing', () => sendState(wm, { isPlaying: true, isEnded: false }))
-    nextPlayer.on('paused', () => sendState(wm, { isPlaying: false }))
-    nextPlayer.on('stopped', () => sendState(wm, { isPlaying: false }))
+    nextPlayer.on('lengthChanged', () => {
+      if (session.phase === 'ready') sendState(wm, session)
+    })
+    nextPlayer.on('playing', () => {
+      if (!ownsSession(wm, session, embeddedPlayer)) return
+      if (!session.mediaReady) {
+        session.mediaReady = true
+        try {
+          session.seekable = embeddedPlayer.isSeekable()
+        } catch {
+          session.seekable = false
+        }
+        continueStartupAfterReadiness(wm, session)
+        return
+      }
+      if (session.phase === 'waiting-transport' && session.pending.transport === 'play') {
+        finishStartup(wm, session, true)
+      } else if (session.phase === 'ready') {
+        sendState(wm, session, { isPlaying: true, isEnded: false })
+      }
+    })
+    nextPlayer.on('paused', () => {
+      if (!ownsSession(wm, session, embeddedPlayer)) return
+      if (session.phase === 'waiting-transport' && session.pending.transport === 'pause') {
+        finishStartup(wm, session, false)
+      } else if (session.phase === 'ready') {
+        sendState(wm, session, { isPlaying: false })
+      }
+    })
+    nextPlayer.on('stopped', () => {
+      if (session.phase === 'ready') sendState(wm, session, { isPlaying: false })
+    })
     nextPlayer.on('endReached', () => {
-      const endedPrematurely = didPlaybackEndPrematurely()
-      sendState(wm, { isPlaying: false, isEnded: true })
+      if (!ownsSession(wm, session, embeddedPlayer)) return
+      const endedPrematurely = didPlaybackEndPrematurely(session)
+      sendState(wm, session, { isPlaying: false, isEnded: true })
       if (endedPrematurely) {
-        publishFailure(
-          wm,
-          'playback-failed',
-          generation,
-          startVersion,
-          request.itemId,
-          embeddedPlayer
-        )
+        publishFailure(wm, 'playback-failed', session)
       }
     })
     nextPlayer.on('error', () => {
-      sendState(wm, { isPlaying: false, isEnded: true })
-      publishFailure(
-        wm,
-        'playback-failed',
-        generation,
-        startVersion,
-        request.itemId,
-        embeddedPlayer
-      )
+      if (!ownsSession(wm, session, embeddedPlayer)) return
+      sendState(wm, session, { isPlaying: false, isEnded: true })
+      publishFailure(wm, 'playback-failed', session)
+      invalidateSession(session)
     })
     nextPlayer.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
-    if (request.initialVolume !== undefined) {
-      nextPlayer.setVolume(Math.round(Math.max(0, Math.min(1, request.initialVolume)) * 100))
-    }
-    if (request.initialPositionSeconds !== undefined && request.initialPositionSeconds > 0) {
-      nextPlayer.setTime(Math.max(0, Math.round(request.initialPositionSeconds * 1000)))
-    }
-    if (request.initialPlaybackState === 'playing') nextPlayer.play()
-    sendState(wm, { isPlaying: false, isEnded: false })
-    publishStarted(wm, generation, request.itemId)
+    session.sourceInstalled = true
+    session.phase = 'waiting-media'
+    setNativePlayerWindowVisible(session, nextPlayer, false)
+    applyPendingVolume(session)
+    nextPlayer.play()
+    publishStarted(wm, session)
   } catch (error) {
-    const ownsActivePlayer = player === nextPlayer
-    let listenerCleanup = ownsActivePlayer ? playerListenerCleanup : null
-    const resizeCleanup = ownsActivePlayer ? playerResizeCleanup : null
-    if (ownsActivePlayer) {
-      player = null
-      playerListenerCleanup = null
-      playerResizeCleanup = null
-      currentItemId = null
-      currentDurationMs = undefined
-      lastProgressPublicationMs = null
-    }
-    if (!listenerCleanup) {
+    if (!session.listenerCleanup) {
       try {
-        listenerCleanup = createListenerCleanup(
+        session.listenerCleanup = createListenerCleanup(
           projectionWindow,
           beforeWindowListeners,
           beforeWebContentsListeners
@@ -477,41 +671,44 @@ async function startVlc(
       }
     }
     try {
-      nextPlayer?.destroy()
+      if (activeSession === session) publishFailure(wm, 'media-open-failed', session)
+      invalidateSession(session)
     } catch {
       // Preserve the original startup rejection.
     }
-    try {
-      listenerCleanup?.()
-    } catch {
-      // Preserve the original startup rejection.
-    }
-    try {
-      resizeCleanup?.()
-    } catch {
-      // Preserve the original startup rejection.
-    }
-    publishFailure(wm, 'media-open-failed', generation, startVersion, request.itemId)
     throw error
   }
 }
 
-function controlVlc(command: ProjectionVlcControlRequest): void {
-  if (!player) return
-  if (command.itemId && command.itemId !== currentItemId) return
+function controlVlc(wm: WindowManager, command: ProjectionVlcControlRequest): void {
+  const session = activeSession
+  if (!session) return
+  if (command.itemId && command.itemId !== session.itemId) return
 
   switch (command.action) {
     case 'play':
-      player.play()
+      session.pending.transport = 'play'
+      if (session.phase === 'ready') session.player?.play()
+      else if (session.mediaReady && session.phase !== 'waiting-seek')
+        applyFinalTransport(wm, session)
       break
     case 'pause':
-      player.pause()
+      session.pending.transport = 'pause'
+      if (session.phase === 'ready') session.player?.pause()
+      else if (session.mediaReady && session.phase !== 'waiting-seek')
+        applyFinalTransport(wm, session)
       break
     case 'seek':
-      player.setTime(Math.max(0, Math.round(command.value * 1000)))
+      session.pending.seekSeconds = command.value
+      if (session.phase === 'ready' && session.seekable === true) {
+        session.player?.setTime(Math.max(0, Math.round(command.value * 1000)))
+      } else if (session.mediaReady && session.seekable === true) {
+        continueStartupAfterReadiness(wm, session)
+      }
       break
     case 'volume':
-      player.setVolume(Math.round(Math.max(0, Math.min(1, command.value)) * 100))
+      session.pending.volume = command.value
+      applyPendingVolume(session)
       break
   }
 }
@@ -542,11 +739,11 @@ export function registerProjectionVlcHandlers(
 
   ipcMain.handle('projection-vlc:control', (event, command: unknown) => {
     if (!isProjectionOrMainWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    controlVlc(validateVlcControlRequest(command))
+    controlVlc(wm, validateVlcControlRequest(command))
   })
 
-  ipcMain.handle('projection-vlc:stop', async (event) => {
+  ipcMain.handle('projection-vlc:stop', async (event, request: unknown) => {
     if (!isProjectionOrMainWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    await stopVlc()
+    await stopVlc(validateVlcStopRequest(request))
   })
 }

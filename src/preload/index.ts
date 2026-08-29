@@ -135,7 +135,8 @@ const projectionVlcApi = {
     typedInvoke('projection-vlc:probe', request),
   control: (command: IpcInvokeMap['projection-vlc:control']['args'][0]) =>
     typedInvoke('projection-vlc:control', command),
-  stop: () => typedInvoke('projection-vlc:stop'),
+  stop: (request: IpcInvokeMap['projection-vlc:stop']['args'][0]) =>
+    typedInvoke('projection-vlc:stop', request),
   onFailure: (callback: (failure: IpcMainToRendererMap['projection-vlc:failure'][0]) => void) =>
     typedOn('projection-vlc:failure', callback),
   onStarted: (callback: (generation: number, itemId: string) => void) =>

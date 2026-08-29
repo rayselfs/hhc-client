@@ -86,6 +86,7 @@ export interface ProjectionVlcInfo {
 
 export interface ProjectionVlcStartRequest {
   itemId: string
+  attemptId?: string
   sourceFileId: string
   container: string
   durationMs?: number
@@ -107,6 +108,8 @@ export type ProjectionVlcControlRequest =
   | { action: 'pause'; itemId?: string }
   | { action: 'seek'; itemId?: string; value: number }
   | { action: 'volume'; itemId?: string; value: number }
+
+export type ProjectionVlcStopRequest = { itemId: string; attemptId: string } | { force: true }
 
 export interface LocalSyncConnectionInfo {
   id: string
@@ -280,7 +283,7 @@ export interface IpcInvokeMap {
   'projection-vlc:start': { args: [ProjectionVlcStartRequest]; result: void }
   'projection-vlc:probe': { args: [ProjectionVlcProbeRequest]; result: ProjectionVlcProbeResult }
   'projection-vlc:control': { args: [ProjectionVlcControlRequest]; result: void }
-  'projection-vlc:stop': { args: []; result: void }
+  'projection-vlc:stop': { args: [ProjectionVlcStopRequest]; result: void }
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }

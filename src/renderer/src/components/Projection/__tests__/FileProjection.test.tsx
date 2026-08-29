@@ -270,7 +270,7 @@ describe('FileProjection copied media identity', () => {
   })
 
   it('passes replay state to embedded VLC startup', async () => {
-    render(
+    const { unmount } = render(
       <FileProjection
         generation={4}
         fileName="clip.mkv"
@@ -297,12 +297,17 @@ describe('FileProjection copied media identity', () => {
     await waitFor(() => {
       expect(window.api.projectionVlc.start).toHaveBeenCalledWith(
         expect.objectContaining({
+          attemptId: expect.any(String),
           initialPositionSeconds: 18,
           initialVolume: 0.35,
           initialPlaybackState: 'playing'
         })
       )
     })
+
+    const attemptId = vi.mocked(window.api.projectionVlc.start).mock.calls[0][0].attemptId
+    unmount()
+    expect(mockProjectionVlcStop).toHaveBeenCalledWith({ itemId: 'video-id', attemptId })
   })
 
   it('uses live stream URLs without loading a stored source and ignores seek controls', async () => {
