@@ -667,6 +667,7 @@ async function startVlc(
       if (!ownsSession(wm, session, embeddedPlayer)) return
       if (!session.mediaReady) {
         session.mediaReady = true
+        if (!applyPendingVolume(wm, session)) return
         try {
           session.seekable = embeddedPlayer.isSeekable()
         } catch {

@@ -817,6 +817,8 @@ describe('projection-vlc listener cleanup', () => {
     expect(current.pause).not.toHaveBeenCalled()
 
     current.emit('playing')
+    expect(current.setVolume).toHaveBeenCalledTimes(2)
+    expect(current.setVolume).toHaveBeenLastCalledWith(70)
     expect(current.setTime).toHaveBeenCalledWith(20_000)
     expect(current.pause).not.toHaveBeenCalled()
 
