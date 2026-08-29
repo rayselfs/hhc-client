@@ -164,6 +164,9 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(checksumStep).toContain("-printf '%f\\0'")
     expect(checksumStep).toContain('test -s')
     expect(release).toContain('needs: [quality-gates, prepare, package]')
+    expect(release).toContain(
+      "if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')"
+    )
     expect(release.indexOf('- name: Download desktop artifacts')).toBeLessThan(
       release.indexOf('- name: Generate release checksums')
     )
