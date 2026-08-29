@@ -6,6 +6,7 @@ import { Readable } from 'stream'
 import { isValidNativeFileId } from '../../shared/native-media'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
+import { mutateVideoSource } from './video-remux'
 
 const NATIVE_MEDIA_SCHEME = 'hhc-media:'
 const NATIVE_MEDIA_HOST = 'file'
@@ -183,18 +184,20 @@ export function registerNativeFsHandlers(wm: WindowManager): void {
       await fs.mkdir(dir, { recursive: true })
       const temporaryPath = join(dir, `.${id}.${randomUUID()}.tmp`)
 
-      try {
-        await fs.copyFile(sourcePath, temporaryPath)
-        const copiedStat = await fs.stat(temporaryPath)
-        if (!copiedStat.isFile() || copiedStat.size !== sourceStat.size) {
-          throw new Error('Native file copy verification failed')
+      return mutateVideoSource(id as string, async () => {
+        try {
+          await fs.copyFile(sourcePath, temporaryPath)
+          const copiedStat = await fs.stat(temporaryPath)
+          if (!copiedStat.isFile() || copiedStat.size !== sourceStat.size) {
+            throw new Error('Native file copy verification failed')
+          }
+          await fs.rename(temporaryPath, destinationPath)
+          return { size: copiedStat.size }
+        } catch (error) {
+          await fs.unlink(temporaryPath).catch(() => undefined)
+          throw error
         }
-        await fs.rename(temporaryPath, destinationPath)
-        return { size: copiedStat.size }
-      } catch (error) {
-        await fs.unlink(temporaryPath).catch(() => undefined)
-        throw error
-      }
+      })
     }
   )
 
@@ -213,11 +216,13 @@ export function registerNativeFsHandlers(wm: WindowManager): void {
   ipcMain.handle('native-fs:delete-file', async (event, id: unknown): Promise<void> => {
     if (!isMainWindow(wm, event)) throw new Error('Unauthorized native file deletion')
     const filePath = getNativeFilePath(id)
-    try {
-      await fs.unlink(filePath)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    }
+    await mutateVideoSource(id as string, async () => {
+      try {
+        await fs.unlink(filePath)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      }
+    })
   })
 }
 

@@ -13,6 +13,7 @@ import type { WindowManager } from '../windowManager'
 import { getNativeFilePath } from './native-fs'
 import { isMainWindow } from './validate'
 import { isIgnoredSystemPath } from '../../shared/file-ignore-policy'
+import { mutateVideoSource } from './video-remux'
 
 interface StoredLocalSyncConnection extends LocalSyncConnectionInfo {
   rootPath: string
@@ -358,18 +359,20 @@ export function registerLocalSyncHandlers(wm: WindowManager): void {
       const destinationDir = dirname(destinationPath)
       await fs.mkdir(destinationDir, { recursive: true })
       const temporaryPath = join(destinationDir, `.${request.targetFileId}.${process.pid}.tmp`)
-      try {
-        await fs.copyFile(sourcePath, temporaryPath)
-        const copiedStat = await fs.stat(temporaryPath)
-        if (!copiedStat.isFile() || copiedStat.size !== sourceStat.size) {
-          throw new Error('Local sync file copy verification failed')
+      return mutateVideoSource(request.targetFileId, async () => {
+        try {
+          await fs.copyFile(sourcePath, temporaryPath)
+          const copiedStat = await fs.stat(temporaryPath)
+          if (!copiedStat.isFile() || copiedStat.size !== sourceStat.size) {
+            throw new Error('Local sync file copy verification failed')
+          }
+          await fs.rename(temporaryPath, destinationPath)
+          return { size: copiedStat.size }
+        } catch (error) {
+          await fs.unlink(temporaryPath).catch(() => undefined)
+          throw error
         }
-        await fs.rename(temporaryPath, destinationPath)
-        return { size: copiedStat.size }
-      } catch (error) {
-        await fs.unlink(temporaryPath).catch(() => undefined)
-        throw error
-      }
+      })
     }
   )
 

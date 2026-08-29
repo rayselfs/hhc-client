@@ -8,6 +8,7 @@ import type {
 import type { WindowManager } from '../windowManager'
 import { getNativeFilePath } from './native-fs'
 import { isMainWindow } from './validate'
+import { mutateVideoSource } from './video-remux'
 
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
 const STORAGE_USAGE_LIMIT_RATIO = 0.8
@@ -106,34 +107,36 @@ export function registerOneDriveDownloadHandlers(wm: WindowManager): void {
       const temporaryPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`
       await fs.mkdir(targetDirectory, { recursive: true })
       await assertNativeStorageCapacity(targetDirectory, request.expectedSize ?? 0)
-      const response = await net.fetch(createGraphContentUrl(request.remoteItemId), {
-        headers: { Authorization: `Bearer ${request.accessToken}` }
-      })
-
-      if (!response.ok) throw new Error(`OneDrive download failed: ${response.status}`)
-
-      try {
-        const size = await writeResponseBodyToFile(response, temporaryPath, (downloadedBytes) => {
-          event.sender.send('onedrive:download-progress', {
-            targetFileId: request.targetFileId,
-            downloadedBytes,
-            downloadTotalBytes: request.expectedSize
-          })
+      return mutateVideoSource(request.targetFileId, async () => {
+        const response = await net.fetch(createGraphContentUrl(request.remoteItemId), {
+          headers: { Authorization: `Bearer ${request.accessToken}` }
         })
-        await assertNativeStorageCapacity(targetDirectory)
-        if (request.expectedSize !== undefined && size !== request.expectedSize) {
-          throw new Error('OneDrive download size mismatch')
+
+        if (!response.ok) throw new Error(`OneDrive download failed: ${response.status}`)
+
+        try {
+          const size = await writeResponseBodyToFile(response, temporaryPath, (downloadedBytes) => {
+            event.sender.send('onedrive:download-progress', {
+              targetFileId: request.targetFileId,
+              downloadedBytes,
+              downloadTotalBytes: request.expectedSize
+            })
+          })
+          await assertNativeStorageCapacity(targetDirectory)
+          if (request.expectedSize !== undefined && size !== request.expectedSize) {
+            throw new Error('OneDrive download size mismatch')
+          }
+          await fs.rename(temporaryPath, targetPath)
+          return {
+            fileId: request.targetFileId,
+            size,
+            mimeType: request.mimeType ?? response.headers.get('Content-Type') ?? undefined
+          }
+        } catch (error) {
+          await fs.rm(temporaryPath, { force: true }).catch(() => undefined)
+          throw error
         }
-        await fs.rename(temporaryPath, targetPath)
-        return {
-          fileId: request.targetFileId,
-          size,
-          mimeType: request.mimeType ?? response.headers.get('Content-Type') ?? undefined
-        }
-      } catch (error) {
-        await fs.rm(temporaryPath, { force: true }).catch(() => undefined)
-        throw error
-      }
+      })
     }
   )
 }

@@ -33,6 +33,10 @@ const {
 const mainWindow = { id: 1 }
 const projectionWindow = { id: 2 }
 
+vi.mock('../../ipc/video-remux', () => ({
+  mutateVideoSource: vi.fn((_sourceFileId: string, mutation: () => Promise<unknown>) => mutation())
+}))
+
 vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp/hhc-user-data') },
   BrowserWindow: { fromWebContents: vi.fn(() => mainWindow) },
