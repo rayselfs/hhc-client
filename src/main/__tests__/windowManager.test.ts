@@ -36,6 +36,9 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
     moveTop = vi.fn()
     focus = vi.fn()
     show = vi.fn()
+    setIgnoreMouseEvents = vi.fn()
+    setFullScreen = vi.fn()
+    maximize = vi.fn()
     setAlwaysOnTop = vi.fn()
     close = vi.fn()
     destroy = vi.fn()
@@ -164,14 +167,16 @@ describe('WindowManager', () => {
     expect(optimizer.watchWindowShortcuts).not.toHaveBeenCalled()
   })
 
-  it('accepts the first click on the main control window', () => {
+  it('does not change the control window state when an external display exists', () => {
     const wm = WindowManager.getInstance()
 
     wm.createMainWindow()
+    const control = FakeBrowserWindow.instances[0]
+    control.emitOnce('ready-to-show')
 
-    expect(FakeBrowserWindow.instances[0].options).toMatchObject({
-      acceptFirstMouse: true
-    })
+    expect(control.maximize).not.toHaveBeenCalled()
+    expect(control.setFullScreen).not.toHaveBeenCalled()
+    expect(control.show).toHaveBeenCalledOnce()
   })
 
   it('rejects external top-level navigation and allows the loaded app document', () => {
@@ -197,6 +202,30 @@ describe('WindowManager', () => {
     expect(displays).toHaveLength(2)
     expect(displays[0].id).toBe(1)
     expect(displays[1].id).toBe(2)
+  })
+
+  it('creates an output-only projection at the selected display bounds', () => {
+    const wm = WindowManager.getInstance()
+
+    wm.createProjectionWindow('2')
+
+    const projection = FakeBrowserWindow.instances[0]
+    expect(projection.options).toMatchObject({
+      width: 1920,
+      height: 1080,
+      x: 1920,
+      y: 0,
+      show: false,
+      frame: false,
+      fullscreen: false,
+      focusable: false,
+      fullscreenable: false,
+      minimizable: false,
+      maximizable: false,
+      movable: false,
+      resizable: false
+    })
+    expect(projection.setIgnoreMouseEvents).toHaveBeenCalledWith(true)
   })
 
   it('brings an existing projection to the top without activating or pinning it', () => {
@@ -249,16 +278,17 @@ describe('WindowManager', () => {
     expect(projection.moveTop).not.toHaveBeenCalled()
   })
 
-  it('brings a newly ready projection forward exactly once without activation', () => {
+  it('shows projection without focus or z-order mutation', () => {
     const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
+    wm.createProjectionWindow('2')
     const projection = FakeBrowserWindow.instances[0]
 
     projection.emitOnce('ready-to-show')
 
-    expect(projection.showInactive).not.toHaveBeenCalled()
-    expect(projection.moveTop).toHaveBeenCalledOnce()
+    expect(projection.showInactive).toHaveBeenCalledOnce()
     expect(projection.focus).not.toHaveBeenCalled()
+    expect(projection.moveTop).not.toHaveBeenCalled()
+    expect(projection.setFullScreen).not.toHaveBeenCalled()
     expect(projection.show).not.toHaveBeenCalled()
     expect(projection.setAlwaysOnTop).not.toHaveBeenCalled()
   })

@@ -92,14 +92,10 @@ export class WindowManager {
       _cachedDisplay = undefined
     })
 
-    const externalDisplay = this.getExternalDisplay()
-    const hasSecondScreen = externalDisplay !== undefined
-
     this.mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
       show: false,
-      acceptFirstMouse: true,
       autoHideMenuBar: true,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -144,12 +140,6 @@ export class WindowManager {
     })
 
     this.mainWindow.once('ready-to-show', () => {
-      if (process.platform === 'win32' && hasSecondScreen) {
-        this.mainWindow?.maximize()
-      }
-      if (process.platform === 'darwin' && hasSecondScreen) {
-        this.mainWindow?.setFullScreen(true)
-      }
       this.mainWindow?.show()
     })
 
@@ -204,8 +194,14 @@ export class WindowManager {
       height: hasSecondScreen ? targetDisplay.bounds.height : 600,
       x: targetDisplay.bounds.x,
       y: targetDisplay.bounds.y,
-      fullscreen: hasSecondScreen,
-      frame: !hasSecondScreen,
+      fullscreen: false,
+      frame: false,
+      focusable: false,
+      fullscreenable: false,
+      minimizable: false,
+      maximizable: false,
+      movable: false,
+      resizable: false,
       show: false,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -216,6 +212,7 @@ export class WindowManager {
       },
       title: 'Projection'
     })
+    projectionWindow.setIgnoreMouseEvents(true)
     this.projectionWindow = projectionWindow
     this.guardTopLevelNavigation(projectionWindow)
 
@@ -259,7 +256,7 @@ export class WindowManager {
 
     projectionWindow.once('ready-to-show', () => {
       if (this.projectionWindow !== projectionWindow) return
-      if (reason === 'created') this.bringProjectionToFront()
+      projectionWindow.showInactive()
     })
 
     projectionWindow.webContents.on('did-start-loading', () => {
