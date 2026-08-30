@@ -27,6 +27,7 @@ import { registerUpdateService } from './updateService'
 import { createHhcAuthService, registerHhcAuthIpc } from './ipc/hhc-auth'
 import { registerHhcAssetHandlers } from './ipc/hhc-assets'
 import { createHhcPresenterProtocolDispatcher } from './protocol-router'
+import { registerAppProtocol } from './app-protocol'
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local-model', privileges: { secure: true, supportFetchAPI: true, stream: true } },
@@ -66,14 +67,6 @@ const protocolDispatcher = createHhcPresenterProtocolDispatcher({
     handleOneDriveAuthCallbackUrl(url, wm)
   }
 })
-
-function registerAppProtocol(): void {
-  if (process.defaultApp && process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('hhc-presenter', process.execPath, [process.argv[1]])
-    return
-  }
-  app.setAsDefaultProtocolClient('hhc-presenter')
-}
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 

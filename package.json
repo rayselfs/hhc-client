@@ -13,7 +13,7 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
     "predev": "npm run prepare:video-engine",
-    "dev": "electron-vite dev",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run typecheck && electron-vite build && npm run check:bundle",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:desktop-native": "node scripts/check-desktop-native.mjs",
