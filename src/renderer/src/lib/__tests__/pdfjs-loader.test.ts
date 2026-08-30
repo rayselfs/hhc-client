@@ -31,7 +31,9 @@ describe('loadPdfjsLib', () => {
     const pdfjs = await loadPdfjsLib()
 
     expect(pdfjs.GlobalWorkerOptions.workerSrc).toContain('pdf-worker')
-    expect((globalThis as typeof globalThis & { pdfjsWorker?: unknown }).pdfjsWorker).toBeUndefined()
+    expect(
+      (globalThis as typeof globalThis & { pdfjsWorker?: unknown }).pdfjsWorker
+    ).toBeUndefined()
   })
 
   it('installs the official local handler only for an existing background worker', async () => {

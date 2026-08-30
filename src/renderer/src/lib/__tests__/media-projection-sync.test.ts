@@ -21,10 +21,7 @@ const registryMocks = vi.hoisted(() => ({
 }))
 const mockProject = vi.fn()
 const mockStartProjection = vi.fn<
-  (
-    owner: string,
-    messages: Array<['file:show', ProjectionPayload<'file:show'>]>
-  ) => Promise<void>
+  (owner: string, messages: Array<['file:show', ProjectionPayload<'file:show'>]>) => Promise<void>
 >(() => Promise.resolve())
 const mockStopProjection = vi.fn(() => Promise.resolve())
 const remoteMocks = vi.hoisted(() => ({
@@ -214,18 +211,15 @@ describe('media projection sync', () => {
 
     const rendered = renderHook(() => useMediaProjectionSync({ auth }))
     await waitFor(() => {
-      expect(mockStartProjection).toHaveBeenCalledWith(
-        'media',
+      expect(mockStartProjection).toHaveBeenCalledWith('media', [
         [
-          [
-            'file:show',
-            expect.objectContaining({
-              mimeType,
-              streamUrl: 'https://www.alive.org.tw/api/assets/content?ticket=matrix-secret'
-            })
-          ]
+          'file:show',
+          expect.objectContaining({
+            mimeType,
+            streamUrl: 'https://www.alive.org.tw/api/assets/content?ticket=matrix-secret'
+          })
         ]
-      )
+      ])
     })
     rendered.unmount()
     mockStartProjection.mockClear()
@@ -245,18 +239,15 @@ describe('media projection sync', () => {
 
     const nativeRendered = renderHook(() => useMediaProjectionSync({ auth }))
     await waitFor(() => {
-      expect(mockStartProjection).toHaveBeenCalledWith(
-        'media',
+      expect(mockStartProjection).toHaveBeenCalledWith('media', [
         [
-          [
-            'file:show',
-            expect.objectContaining({
-              mimeType,
-              streamUrl: expect.stringMatching(/^hhc-media:\/\/lease\//)
-            })
-          ]
+          'file:show',
+          expect.objectContaining({
+            mimeType,
+            streamUrl: expect.stringMatching(/^hhc-media:\/\/lease\//)
+          })
         ]
-      )
+      ])
     })
     expect(item.url).toBe('blob:remote')
     nativeRendered.unmount()
@@ -322,15 +313,9 @@ describe('media projection sync', () => {
       }
     })
     await act(async () => Promise.resolve())
-    expect(mockStartProjection).toHaveBeenCalledWith(
-      'media',
-      [
-        [
-          'file:show',
-          expect.objectContaining({ streamUrl: expect.stringContaining('ticket=first') })
-        ]
-      ]
-    )
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
+      ['file:show', expect.objectContaining({ streamUrl: expect.stringContaining('ticket=first') })]
+    ])
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000)
@@ -827,10 +812,9 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(mockStartProjection).toHaveBeenCalledWith(
-      'media',
-      [['file:show', expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })]]
-    )
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
+      ['file:show', expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })]
+    ])
   })
 
   it('projects embedded VLC video through the desktop engine', async () => {
@@ -860,22 +844,19 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(mockStartProjection).toHaveBeenCalledWith(
-      'media',
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
       [
-        [
-          'file:show',
-          expect.objectContaining({
-            itemId: 'vlc-item',
-            blobId: 'source-blob',
-            playbackMode: 'vlc-embedded',
-            playbackVariant: 'matroska-remux',
-            seekable: true,
-            durationMs: 15000
-          })
-        ]
+        'file:show',
+        expect.objectContaining({
+          itemId: 'vlc-item',
+          blobId: 'source-blob',
+          playbackMode: 'vlc-embedded',
+          playbackVariant: 'matroska-remux',
+          seekable: true,
+          durationMs: 15000
+        })
       ]
-    )
+    ])
   })
 
   it('promotes a downloaded remote VLC item to its persistent local snapshot source', async () => {
@@ -899,19 +880,16 @@ describe('media projection sync', () => {
       expect(entry?.remoteSource).toBeUndefined()
       expect(entry?.sourceUrl).toBe('blob:source-blob')
     })
-    expect(mockStartProjection).toHaveBeenCalledWith(
-      'media',
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
       [
-        [
-          'file:show',
-          expect.objectContaining({
-            itemId: 'vlc-item',
-            blobId: 'source-blob',
-            playbackMode: 'vlc-embedded'
-          })
-        ]
+        'file:show',
+        expect.objectContaining({
+          itemId: 'vlc-item',
+          blobId: 'source-blob',
+          playbackMode: 'vlc-embedded'
+        })
       ]
-    )
+    ])
   })
 
   it.each([
@@ -1109,20 +1087,17 @@ describe('media projection sync', () => {
     await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
     expect(registryMocks.finalizeAndFlush).not.toHaveBeenCalled()
     expect(calls).toEqual(['snapshot'])
-    expect(mockStartProjection).toHaveBeenCalledWith(
-      'media',
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
       [
-        [
-          'file:show',
-          expect.objectContaining({
-            presentation: { slideIndex: 0, slideCount: 1 },
-            editablePresentation: expect.objectContaining({
-              slide: expect.objectContaining({ id: activeSlideId })
-            })
+        'file:show',
+        expect.objectContaining({
+          presentation: { slideIndex: 0, slideCount: 1 },
+          editablePresentation: expect.objectContaining({
+            slide: expect.objectContaining({ id: activeSlideId })
           })
-        ]
+        })
       ]
-    )
+    ])
   })
 
   it('keeps media start and navigation state atomic when editable finalization is blocked', async () => {
@@ -1442,24 +1417,21 @@ describe('media projection sync', () => {
     })
 
     await waitFor(() => expect(mockStartProjection).toHaveBeenCalledOnce())
-    expect(mockStartProjection).toHaveBeenCalledWith(
-      'media',
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
       [
-        [
-          'file:show',
-          expect.objectContaining({
-            editablePresentation: expect.objectContaining({
-              slide: expect.objectContaining({
-                elements: expect.objectContaining({
-                  [secondDocument.slides[secondDocument.slideOrder[0]].elementOrder[0]]:
-                    expect.objectContaining({ type: 'text', text: 'Current session' })
-                })
+        'file:show',
+        expect.objectContaining({
+          editablePresentation: expect.objectContaining({
+            slide: expect.objectContaining({
+              elements: expect.objectContaining({
+                [secondDocument.slides[secondDocument.slideOrder[0]].elementOrder[0]]:
+                  expect.objectContaining({ type: 'text', text: 'Current session' })
               })
             })
           })
-        ]
+        })
       ]
-    )
+    ])
   })
 
   it('does not project a deferred remote source after an explicit replacement start', async () => {

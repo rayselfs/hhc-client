@@ -64,7 +64,11 @@ beforeEach(() => {
   mockAdapter._reset()
   window.open = mockWindowOpen as unknown as typeof window.open
   window.focus = vi.fn()
-  mockWindowOpen.mockReturnValue({ closed: false, close: vi.fn(), blur: vi.fn() } as unknown as Window)
+  mockWindowOpen.mockReturnValue({
+    closed: false,
+    close: vi.fn(),
+    blur: vi.fn()
+  } as unknown as Window)
 })
 
 afterEach(() => {
