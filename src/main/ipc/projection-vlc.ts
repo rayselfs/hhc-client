@@ -482,6 +482,16 @@ function finishStartup(wm: WindowManager, session: OwnedVlcSession, isPlaying: b
 function applyFinalTransport(wm: WindowManager, session: OwnedVlcSession): void {
   const ownerPlayer = session.player
   if (!ownerPlayer || !ownsSession(wm, session, ownerPlayer)) return
+  if (session.pending.transport === 'play') {
+    try {
+      if (ownerPlayer.isPlaying()) {
+        finishStartup(wm, session, true)
+        return
+      }
+    } catch {
+      // Fall through to the owner-safe native play request.
+    }
+  }
   session.phase = 'waiting-transport'
   runOwnedNativeAction(wm, session, (player) => {
     if (session.pending.transport === 'play') player.play()
@@ -671,6 +681,10 @@ async function startVlc(
           session.seekable = embeddedPlayer.isSeekable()
         } catch {
           session.seekable = false
+        }
+        if (session.pending.seekSeconds === undefined && session.pending.transport === 'play') {
+          finishStartup(wm, session, true)
+          return
         }
         continueStartupAfterReadiness(wm, session)
         return

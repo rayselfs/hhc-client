@@ -653,6 +653,33 @@ describe('projection-vlc listener cleanup', () => {
     )
   })
 
+  it('finishes a queued immediate play on the first playing event', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      attemptId: 'attempt-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+    const current = mockVlcPlayers[0]
+    getHandler('projection-vlc:control')(makeEvent(), {
+      action: 'play',
+      itemId: 'item-1'
+    })
+    mockSetPlayerWindowVisible.mockClear()
+    mockWindowManager.sendToMain.mockClear()
+
+    current.emit('playing')
+
+    expect(current.play).toHaveBeenCalledOnce()
+    expect(mockSetPlayerWindowVisible).toHaveBeenLastCalledWith(7, true)
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+      'projection:message',
+      4,
+      'file:playback-state',
+      expect.objectContaining({ itemId: 'item-1', isPlaying: true, isEnded: false })
+    )
+  })
+
   it('keeps bootstrap events internal and publishes owner-confirmed capability and volume', async () => {
     await getHandler('projection-vlc:start')(makeEvent(), {
       itemId: 'item-1',
@@ -904,6 +931,34 @@ describe('projection-vlc listener cleanup', () => {
     current.emit('timeChanged')
     expect(current.pause).not.toHaveBeenCalled()
     expect(current.play).toHaveBeenCalledTimes(2)
+  })
+
+  it('finishes seek-to-play startup when native playback is already confirmed', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      attemptId: 'attempt-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player',
+      initialPositionSeconds: 18,
+      initialPlaybackState: 'playing'
+    })
+    const current = mockVlcPlayers[0]
+
+    current.emit('playing')
+    current.getTime.mockReturnValue(18_000)
+    current.isPlaying.mockReturnValue(true)
+    mockSetPlayerWindowVisible.mockClear()
+    mockWindowManager.sendToMain.mockClear()
+    current.emit('timeChanged')
+
+    expect(current.play).toHaveBeenCalledOnce()
+    expect(mockSetPlayerWindowVisible).toHaveBeenLastCalledWith(7, true)
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+      'projection:message',
+      4,
+      'file:playback-state',
+      expect.objectContaining({ itemId: 'item-1', isPlaying: true, isEnded: false })
+    )
   })
 
   it('waits for owner-matched readiness before seeking or applying final transport', async () => {
