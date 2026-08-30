@@ -228,56 +228,6 @@ describe('WindowManager', () => {
     expect(projection.setIgnoreMouseEvents).toHaveBeenCalledWith(true)
   })
 
-  it('brings an existing projection to the top without activating or pinning it', () => {
-    const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.moveTop.mockClear()
-
-    expect(wm.bringProjectionToFront()).toBe(true)
-    expect(projection.moveTop).toHaveBeenCalledOnce()
-    expect(projection.focus).not.toHaveBeenCalled()
-    expect(projection.show).not.toHaveBeenCalled()
-    expect(projection.setAlwaysOnTop).not.toHaveBeenCalled()
-  })
-
-  it('restores a minimized projection before moving it to the top', () => {
-    const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.isMinimized.mockReturnValue(true)
-
-    expect(wm.bringProjectionToFront()).toBe(true)
-    expect(projection.restore).toHaveBeenCalledOnce()
-    expect(projection.restore.mock.invocationCallOrder[0]).toBeLessThan(
-      projection.moveTop.mock.invocationCallOrder[0]
-    )
-  })
-
-  it('shows a hidden projection without activation before moving it to the top', () => {
-    const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.isVisible.mockReturnValue(false)
-
-    expect(wm.bringProjectionToFront()).toBe(true)
-    expect(projection.showInactive).toHaveBeenCalledOnce()
-    expect(projection.moveTop).toHaveBeenCalledOnce()
-  })
-
-  it('returns false when projection is missing or destroyed', () => {
-    const wm = WindowManager.getInstance()
-
-    expect(wm.bringProjectionToFront()).toBe(false)
-
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.isDestroyed.mockReturnValue(true)
-
-    expect(wm.bringProjectionToFront()).toBe(false)
-    expect(projection.moveTop).not.toHaveBeenCalled()
-  })
-
   it('shows projection without focus or z-order mutation', () => {
     const wm = WindowManager.getInstance()
     wm.createProjectionWindow('2')

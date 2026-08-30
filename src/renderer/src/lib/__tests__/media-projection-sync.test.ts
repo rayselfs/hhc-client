@@ -23,8 +23,7 @@ const mockProject = vi.fn()
 const mockStartProjection = vi.fn<
   (
     owner: string,
-    messages: Array<['file:show', ProjectionPayload<'file:show'>]>,
-    options: { bringToFront: boolean }
+    messages: Array<['file:show', ProjectionPayload<'file:show'>]>
   ) => Promise<void>
 >(() => Promise.resolve())
 const mockStopProjection = vi.fn(() => Promise.resolve())
@@ -225,8 +224,7 @@ describe('media projection sync', () => {
               streamUrl: 'https://www.alive.org.tw/api/assets/content?ticket=matrix-secret'
             })
           ]
-        ],
-        { bringToFront: false }
+        ]
       )
     })
     rendered.unmount()
@@ -257,8 +255,7 @@ describe('media projection sync', () => {
               streamUrl: expect.stringMatching(/^hhc-media:\/\/lease\//)
             })
           ]
-        ],
-        { bringToFront: false }
+        ]
       )
     })
     expect(item.url).toBe('blob:remote')
@@ -332,8 +329,7 @@ describe('media projection sync', () => {
           'file:show',
           expect.objectContaining({ streamUrl: expect.stringContaining('ticket=first') })
         ]
-      ],
-      { bringToFront: false }
+      ]
     )
 
     await act(async () => {
@@ -341,8 +337,7 @@ describe('media projection sync', () => {
     })
     expect(mockProject).toHaveBeenCalledWith(
       'file:show',
-      expect.objectContaining({ streamUrl: expect.stringContaining('ticket=second') }),
-      { bringToFront: false }
+      expect.objectContaining({ streamUrl: expect.stringContaining('ticket=second') })
     )
     expect(item.url).toBe('blob:remote')
     vi.useRealTimers()
@@ -819,8 +814,7 @@ describe('media projection sync', () => {
 
     expect(mockProject).toHaveBeenCalledWith(
       'file:show',
-      expect.objectContaining({ currentIndex: 1, itemId: 'b', blobId: 'b' }),
-      { bringToFront: true }
+      expect.objectContaining({ currentIndex: 1, itemId: 'b', blobId: 'b' })
     )
   })
 
@@ -835,8 +829,7 @@ describe('media projection sync', () => {
 
     expect(mockStartProjection).toHaveBeenCalledWith(
       'media',
-      [['file:show', expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })]],
-      { bringToFront: false }
+      [['file:show', expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })]]
     )
   })
 
@@ -881,8 +874,7 @@ describe('media projection sync', () => {
             durationMs: 15000
           })
         ]
-      ],
-      { bringToFront: false }
+      ]
     )
   })
 
@@ -918,8 +910,7 @@ describe('media projection sync', () => {
             playbackMode: 'vlc-embedded'
           })
         ]
-      ],
-      { bringToFront: false }
+      ]
     )
   })
 
@@ -1034,12 +1025,11 @@ describe('media projection sync', () => {
       expect.objectContaining({
         itemId: 'deck',
         presentation: { slideIndex: 1, slideCount: 5 }
-      }),
-      { bringToFront: true }
+      })
     )
   })
 
-  it('foregrounds a newly started media session', () => {
+  it('starts a newly presented media session without window policy options', () => {
     useMediaProjectionStore.setState({ isPresenting: false })
     renderSync()
     mockStartProjection.mockClear()
@@ -1048,9 +1038,7 @@ describe('media projection sync', () => {
       useMediaProjectionStore.setState({ isPresenting: true })
     })
 
-    expect(mockStartProjection).toHaveBeenCalledWith('media', expect.any(Array), {
-      bringToFront: true
-    })
+    expect(mockStartProjection).toHaveBeenCalledWith('media', expect.any(Array))
   })
 
   it('reclaims Media ownership when an explicit start replaces retained Media controls', () => {
@@ -1064,9 +1052,7 @@ describe('media projection sync', () => {
         .startPresentation([makeFile('replacement', 'replacement.png')], 0)
     })
 
-    expect(mockStartProjection).toHaveBeenCalledWith('media', expect.any(Array), {
-      bringToFront: true
-    })
+    expect(mockStartProjection).toHaveBeenCalledWith('media', expect.any(Array))
   })
 
   it('does not close projection after the Media close transaction already ended the session', () => {
@@ -1093,20 +1079,6 @@ describe('media projection sync', () => {
 
     expect(mockStartProjection).not.toHaveBeenCalled()
     expect(mockProject).not.toHaveBeenCalled()
-  })
-
-  it('does not foreground pan and zoom transport updates', () => {
-    renderSync()
-    mockProject.mockClear()
-
-    act(() => {
-      useMediaProjectionStore.getState().setPan(10, 20)
-      useMediaProjectionStore.getState().setZoomLevel(1.5)
-    })
-
-    expect(mockProject).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), {
-      bringToFront: true
-    })
   })
 
   it('uses the current preflight-finalized editable document for its projection payload', async () => {
@@ -1149,8 +1121,7 @@ describe('media projection sync', () => {
             })
           })
         ]
-      ],
-      { bringToFront: false }
+      ]
     )
   })
 
@@ -1487,8 +1458,7 @@ describe('media projection sync', () => {
             })
           })
         ]
-      ],
-      { bringToFront: true }
+      ]
     )
   })
 

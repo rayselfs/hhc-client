@@ -50,6 +50,7 @@ import { ProjectionProvider, useProjection } from '../ProjectionContext'
 
 const mockWindowOpen = vi.fn<(url?: string, target?: string) => Window | null>()
 const originalOpen = window.open
+const originalFocus = window.focus
 
 function renderProjection(): ReturnType<
   typeof renderHook<ReturnType<typeof useProjection>, unknown>
@@ -62,12 +63,14 @@ beforeEach(() => {
   vi.useFakeTimers()
   mockAdapter._reset()
   window.open = mockWindowOpen as unknown as typeof window.open
-  mockWindowOpen.mockReturnValue({ closed: false, close: vi.fn() } as unknown as Window)
+  window.focus = vi.fn()
+  mockWindowOpen.mockReturnValue({ closed: false, close: vi.fn(), blur: vi.fn() } as unknown as Window)
 })
 
 afterEach(() => {
   vi.useRealTimers()
   window.open = originalOpen
+  window.focus = originalFocus
 })
 
 describe('ProjectionContext web recovery', () => {
@@ -183,7 +186,9 @@ describe('ProjectionContext web recovery', () => {
     expect(mockWindowOpen).toHaveBeenCalledTimes(2)
   })
 
-  it('does not focus browser windows for explicit foreground intent', async () => {
+  it('returns focus to the control window after opening a browser projection', async () => {
+    const popup = { closed: false, close: vi.fn(), blur: vi.fn() } as unknown as Window
+    mockWindowOpen.mockReturnValue(popup)
     const focus = vi.spyOn(window, 'focus').mockImplementation(() => undefined)
     const { result } = renderProjection()
     let operationPromise: ReturnType<typeof result.current.startProjection>
@@ -194,11 +199,12 @@ describe('ProjectionContext web recovery', () => {
     })
     await operationPromise!
 
-    expect(focus).not.toHaveBeenCalled()
+    expect(popup.blur).toHaveBeenCalledOnce()
+    expect(focus).toHaveBeenCalledOnce()
   })
 
   it('ends the session when popup polling observes an explicit close', async () => {
-    const popup = { closed: false, close: vi.fn() } as unknown as Window
+    const popup = { closed: false, close: vi.fn(), blur: vi.fn() } as unknown as Window
     mockWindowOpen.mockReturnValue(popup)
     const { result } = renderProjection()
     let operationPromise: ReturnType<typeof result.current.startProjection>
@@ -239,6 +245,7 @@ describe('ProjectionContext web recovery', () => {
       mockAdapter._trigger('__system:ready', { generation: 1 })
     })
     await operationPromise!
+    focus.mockClear()
 
     expect(result.current.sessionSummary).toMatchObject({
       owner: 'media',
@@ -323,7 +330,6 @@ describe('ProjectionContext Electron recovery', () => {
           retry: mockRetry,
           getGeneration: vi.fn(),
           moveToDisplay: vi.fn(),
-          bringToFront: vi.fn(() => Promise.resolve({ broughtToFront: true })),
           close: mockClose,
           getDisplays: vi.fn(),
           send: vi.fn(),

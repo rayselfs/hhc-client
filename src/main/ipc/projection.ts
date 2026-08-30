@@ -43,11 +43,6 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
     return { generation: windowManager.getProjectionState().lifecycle.generation }
   })
 
-  ipcMain.handle('projection:bring-to-front', (event) => {
-    if (!isMainWindow(windowManager, event)) return { broughtToFront: false }
-    return { broughtToFront: windowManager.bringProjectionToFront() }
-  })
-
   ipcMain.handle('projection:close', (event) => {
     if (!isMainWindow(windowManager, event)) return { closed: false }
     windowManager.closeProjection()

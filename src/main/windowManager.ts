@@ -361,21 +361,6 @@ export class WindowManager {
     )
   }
 
-  bringProjectionToFront(): boolean {
-    const projectionWindow = this.projectionWindow
-    if (!projectionWindow || projectionWindow.isDestroyed()) return false
-
-    try {
-      if (projectionWindow.isMinimized()) projectionWindow.restore()
-      if (!projectionWindow.isVisible()) projectionWindow.showInactive()
-      projectionWindow.moveTop()
-      return true
-    } catch (error) {
-      console.warn('Failed to bring projection window to front:', error)
-      return false
-    }
-  }
-
   getMainWindow(): BrowserWindow | null {
     return this.mainWindow
   }

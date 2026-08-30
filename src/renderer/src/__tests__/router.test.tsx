@@ -69,7 +69,6 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
       startProjection: vi.fn(() => Promise.resolve({ ok: true, generation: 1 })),
       stopProjection: vi.fn(() => Promise.resolve()),
       retryProjection: vi.fn(),
-      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
       blackoutProjection: vi.fn(),
       getProjectionSnapshot: vi.fn(() => null),

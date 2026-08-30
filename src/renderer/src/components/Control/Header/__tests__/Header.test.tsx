@@ -76,9 +76,6 @@ function baseProjectionContext(): MockProjectionContext {
     retryProjection: vi.fn<MockProjectionContext['retryProjection']>(() =>
       Promise.resolve({ ok: true, generation: 1 })
     ),
-    bringProjectionToFront: vi.fn<MockProjectionContext['bringProjectionToFront']>(() =>
-      Promise.resolve()
-    ),
     closeProjection: vi.fn<MockProjectionContext['closeProjection']>(() => Promise.resolve()),
     blackoutProjection: vi.fn<MockProjectionContext['blackoutProjection']>(() => Promise.resolve()),
     getProjectionSnapshot: vi.fn<MockProjectionContext['getProjectionSnapshot']>(() => null),
