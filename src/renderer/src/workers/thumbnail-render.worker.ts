@@ -1,4 +1,4 @@
-import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
+import { loadPdfjsWorkerLib } from '@renderer/lib/pdfjs-loader'
 import type {
   ThumbnailWorkerRequest,
   ThumbnailWorkerResponse
@@ -107,13 +107,14 @@ async function renderPdf(id: string, file: File, allPages: boolean): Promise<Blo
     throw new BackgroundRenderingUnavailableError('OffscreenCanvas is unavailable')
   }
   if (file.size > MAX_PDF_SIZE) return []
-  const pdfjs = await loadPdfjsLib()
+  const pdfjs = await loadPdfjsWorkerLib()
   const pdf = await pdfjs.getDocument({
     data: await file.arrayBuffer(),
     CanvasFactory: OffscreenCanvasFactory,
     FilterFactory: WorkerFilterFactory,
     disableFontFace: true,
-    useSystemFonts: false
+    useSystemFonts: false,
+    verbosity: pdfjs.VerbosityLevel.ERRORS
   }).promise
 
   try {

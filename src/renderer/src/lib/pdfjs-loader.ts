@@ -1,6 +1,6 @@
 import pdfWorkerUrl from './pdf-worker-polyfill.worker.ts?worker&url'
 
-export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
+function installPdfjsPolyfills(): void {
   if (!('getOrInsertComputed' in Map.prototype)) {
     Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
       value<K, V>(this: Map<K, V>, key: K, factory: (key: K) => V): V {
@@ -23,12 +23,21 @@ export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
       writable: true
     })
   }
+}
+
+export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
+  installPdfjsPolyfills()
 
   const pdfjsLib = await import('pdfjs-dist')
-  if (typeof document === 'undefined') {
-    const { WorkerMessageHandler } = await import('pdfjs-dist/build/pdf.worker.mjs')
-    Object.assign(globalThis, { pdfjsWorker: { WorkerMessageHandler } })
-  }
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+  return pdfjsLib
+}
+
+export async function loadPdfjsWorkerLib(): Promise<typeof import('pdfjs-dist')> {
+  installPdfjsPolyfills()
+
+  const pdfjsLib = await import('pdfjs-dist')
+  const { WorkerMessageHandler } = await import('pdfjs-dist/build/pdf.worker.mjs')
+  Object.assign(globalThis, { pdfjsWorker: { WorkerMessageHandler } })
   return pdfjsLib
 }

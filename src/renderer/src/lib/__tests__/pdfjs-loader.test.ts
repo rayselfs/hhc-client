@@ -5,14 +5,19 @@ const { workerMessageHandler } = vi.hoisted(() => ({
 }))
 
 vi.mock('pdfjs-dist', () => ({
-  GlobalWorkerOptions: { workerSrc: '' }
+  GlobalWorkerOptions: { workerSrc: '' },
+  VerbosityLevel: { ERRORS: 0 }
 }))
 
 vi.mock('pdfjs-dist/build/pdf.worker.mjs', () => ({
   WorkerMessageHandler: workerMessageHandler
 }))
 
-import { loadPdfjsLib } from '../pdfjs-loader'
+vi.mock('../pdf-worker-polyfill.worker.ts?worker&url', () => ({
+  default: '/assets/pdf-worker-test.js'
+}))
+
+import { loadPdfjsLib, loadPdfjsWorkerLib } from '../pdfjs-loader'
 
 describe('loadPdfjsLib', () => {
   afterEach(() => {
@@ -20,10 +25,19 @@ describe('loadPdfjsLib', () => {
     delete (globalThis as typeof globalThis & { pdfjsWorker?: unknown }).pdfjsWorker
   })
 
-  it('registers the official fake-worker handler inside a Worker context', async () => {
+  it('configures renderer PDF.js without installing a main-thread worker handler', async () => {
+    vi.stubGlobal('document', {})
+
+    const pdfjs = await loadPdfjsLib()
+
+    expect(pdfjs.GlobalWorkerOptions.workerSrc).toContain('pdf-worker')
+    expect((globalThis as typeof globalThis & { pdfjsWorker?: unknown }).pdfjsWorker).toBeUndefined()
+  })
+
+  it('installs the official local handler only for an existing background worker', async () => {
     vi.stubGlobal('document', undefined)
 
-    await loadPdfjsLib()
+    await loadPdfjsWorkerLib()
 
     expect((globalThis as typeof globalThis & { pdfjsWorker?: unknown }).pdfjsWorker).toEqual({
       WorkerMessageHandler: workerMessageHandler
