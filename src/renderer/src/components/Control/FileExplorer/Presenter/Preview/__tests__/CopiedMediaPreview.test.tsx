@@ -366,6 +366,39 @@ describe('copied media preview identity', () => {
     expect(container.querySelector('input.video-seek-range')).toHaveValue('42')
   })
 
+  it('hides the central button after owner-confirmed playback starts', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.typeStates.video = {
+      hasStarted: true,
+      isPlaying: true,
+      isEnded: false,
+      currentTime: 0,
+      duration: 120,
+      seekable: true
+    }
+    const { container } = render(<VideoPreview item={item} />)
+    await getLoadedVideo(container)
+
+    expect(container.querySelector('button.absolute.inset-0.flex')).toBeNull()
+    expect(container.querySelector('input.video-seek-range')).toBeEnabled()
+  })
+
+  it('shows a disabled timeline when duration is known but seek is unavailable', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.typeStates.video = {
+      hasStarted: false,
+      isPlaying: false,
+      isEnded: false,
+      currentTime: 0,
+      duration: 120,
+      seekable: false
+    }
+    const { container } = render(<VideoPreview item={item} />)
+    await getLoadedVideo(container)
+
+    expect(container.querySelector('input.video-seek-range')).toBeDisabled()
+  })
+
   it('seeks a video relative to the current playback time', async () => {
     const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
 

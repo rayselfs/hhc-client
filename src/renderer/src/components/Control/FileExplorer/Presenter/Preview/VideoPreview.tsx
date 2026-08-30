@@ -439,7 +439,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         />
       )}
 
-      {displayedHasStarted && (
+      {displayedDuration > 0 && (
         <div
           className="absolute bottom-0 left-0 right-0 z-20"
           onMouseDown={(e) => e.stopPropagation()}
