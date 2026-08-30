@@ -1,10 +1,11 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import { presentMediaItem } from '@renderer/lib/projection-actions'
 import PdfPreview from '../PdfPreview'
 
-const { getPageMock, mockGetDocument, mockGetFileSource } = vi.hoisted(() => {
+const { getPageMock, mockGetDocument, mockGetFileSource, mockSendCommand } = vi.hoisted(() => {
   const getPageMock = vi.fn().mockResolvedValue({
     getViewport: vi.fn().mockReturnValue({ width: 100, height: 140 }),
     render: vi.fn().mockReturnValue({ promise: Promise.resolve() })
@@ -16,7 +17,7 @@ const { getPageMock, mockGetDocument, mockGetFileSource } = vi.hoisted(() => {
       loadingTask: { destroy: vi.fn() }
     })
   })
-  return { getPageMock, mockGetDocument, mockGetFileSource: vi.fn() }
+  return { getPageMock, mockGetDocument, mockGetFileSource: vi.fn(), mockSendCommand: vi.fn() }
 })
 
 vi.mock('react-i18next', () => ({
@@ -34,7 +35,7 @@ vi.mock('@heroui/react/toast', () => ({
 }))
 
 vi.mock('@renderer/contexts/PresenterCommandContext', () => ({
-  usePresenterCommands: () => ({ sendCommand: vi.fn() })
+  usePresenterCommands: () => ({ sendCommand: mockSendCommand })
 }))
 
 vi.mock('@renderer/lib/pdfjs-loader', () => ({
@@ -146,6 +147,7 @@ async function presentRemotePdf(item: FileItemRecord, sourceUrl: string): Promis
 describe('PdfPreview scroll mode lazy rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSendCommand.mockReset()
     mockStoreState.snapshot = null
     mockGetFileSource.mockResolvedValue({
       url: 'blob:fake-pdf',
@@ -257,6 +259,7 @@ describe('PdfPreview scroll mode lazy rendering', () => {
 describe('PdfPreview slide sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSendCommand.mockReset()
     mockStoreState.snapshot = null
     mockStoreState.typeStates.pdf.viewMode = 'slide'
     mockGetFileSource.mockResolvedValue({
@@ -282,5 +285,34 @@ describe('PdfPreview slide sidebar', () => {
     const sidebar = container.querySelector('.pdf-sidebar-bg')?.parentElement
     expect(sidebar).toHaveStyle({ minWidth: '190px' })
     expect(sidebar).toHaveStyle({ width: 'max(25%, 190px)' })
+  })
+
+  it('sends one projection command when React checks updater purity', async () => {
+    render(
+      <StrictMode>
+        <PdfPreview item={makeItem()} />
+      </StrictMode>
+    )
+    await waitFor(() => expect(getPageMock).toHaveBeenCalled())
+    mockSendCommand.mockClear()
+
+    act(() => window.dispatchEvent(new CustomEvent('media:pdfNextPage')))
+
+    expect(mockSendCommand).toHaveBeenCalledOnce()
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pdfPage', value: 2 })
+  })
+
+  it('sends the latest page for rapid next commands', async () => {
+    render(<PdfPreview item={makeItem()} />)
+    await waitFor(() => expect(getPageMock).toHaveBeenCalled())
+    mockSendCommand.mockClear()
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('media:pdfNextPage'))
+      window.dispatchEvent(new CustomEvent('media:pdfNextPage'))
+    })
+
+    expect(mockSendCommand).toHaveBeenNthCalledWith(1, { action: 'pdfPage', value: 2 })
+    expect(mockSendCommand).toHaveBeenNthCalledWith(2, { action: 'pdfPage', value: 3 })
   })
 })
