@@ -99,7 +99,7 @@ export default function ProjectionPage(): React.JSX.Element {
 
   useEffect(() => {
     if (state.isBlackout || state.showDefault || state.activeContent !== 'file') {
-      void window.api?.projectionVlc?.stop()
+      void window.api?.projectionVlc?.stop({ force: true })
     }
   }, [state.activeContent, state.isBlackout, state.showDefault])
 
@@ -122,6 +122,8 @@ export default function ProjectionPage(): React.JSX.Element {
         initialMimeType={state.fileData.mimeType}
         initialStreamUrl={state.fileData.streamUrl}
         initialPlaybackMode={state.fileData.playbackMode}
+        initialPlaybackVariant={state.fileData.playbackVariant}
+        vlcStartRevision={state.vlcStartRevision}
         initialSeekable={state.fileData.seekable}
         initialDurationMs={state.fileData.durationMs}
         initialPresentation={state.fileData.presentation}

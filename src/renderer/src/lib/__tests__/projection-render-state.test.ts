@@ -49,16 +49,43 @@ it('applies a media replay in one reducer action', () => {
 
   const next = reduceProjectionRenderState(initialProjectionRenderState, {
     type: 'replay',
-    payload: { generation: 3, snapshot: mediaSnapshot }
+    payload: {
+      generation: 3,
+      snapshot: mediaSnapshot,
+      pendingFileControls: {
+        itemId: 'video-1',
+        seekSeconds: 42,
+        volume: 0.7,
+        transport: 'pause'
+      }
+    }
   })
 
   expect(next).toMatchObject({
     generation: 3,
+    vlcStartRevision: 1,
     showDefault: false,
     activeContent: 'file',
     fileData: mediaSnapshot.media.show,
-    mediaReplayState: mediaSnapshot.media.state
+    mediaReplayState: {
+      ...mediaSnapshot.media.state,
+      positionSeconds: 42,
+      volume: 0.7,
+      isPlaying: false
+    },
+    fileControlEvent: null
   })
+  expect(mediaSnapshot.media.state).toMatchObject({
+    positionSeconds: 18,
+    volume: 0.35,
+    isPlaying: true
+  })
+
+  const retried = reduceProjectionRenderState(next, {
+    type: 'replay',
+    payload: { generation: 3, snapshot: mediaSnapshot }
+  })
+  expect(retried.vlcStartRevision).toBe(2)
 })
 
 it('selects intentional blackout without losing retained content', () => {

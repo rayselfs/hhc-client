@@ -14,6 +14,7 @@ import {
 } from './ipc/native-fs'
 import { registerProjectionVlcHandlers } from './ipc/projection-vlc'
 import { registerVideoPosterHandlers } from './ipc/video-poster'
+import { cleanupStaleVideoRemuxTemps } from './ipc/video-remux'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
 import { registerLanRemoteIpc } from './ipc/lan-remote'
 import {
@@ -95,6 +96,9 @@ if (!gotSingleInstanceLock) {
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     await clearStaleNativeMediaLeasesOnStartup()
+    void cleanupStaleVideoRemuxTemps().catch((error) => {
+      console.warn('[MAIN] Failed to clear stale video remux files', error)
+    })
     electronApp.setAppUserModelId('tw.org.alive.presenter')
     registerAppProtocol()
 

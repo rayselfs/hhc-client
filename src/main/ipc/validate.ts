@@ -125,7 +125,10 @@ function validateProjectionPayload(channel: string, data: unknown): boolean {
         typeof obj.mimeType === 'string' &&
         Array.isArray(obj.playlist) &&
         typeof obj.currentIndex === 'number' &&
-        Number.isInteger(obj.currentIndex)
+        Number.isInteger(obj.currentIndex) &&
+        (obj.playbackVariant === undefined ||
+          obj.playbackVariant === 'source' ||
+          obj.playbackVariant === 'matroska-remux')
       )
     case 'file:control':
       if (typeof obj.action !== 'string') return false
@@ -155,7 +158,10 @@ function validateProjectionPayload(channel: string, data: unknown): boolean {
         isFiniteNumber(obj.currentTime) &&
         isFiniteNumber(obj.duration) &&
         typeof obj.isPlaying === 'boolean' &&
-        typeof obj.isEnded === 'boolean'
+        typeof obj.isEnded === 'boolean' &&
+        (obj.seekable === undefined || typeof obj.seekable === 'boolean') &&
+        (obj.volume === undefined ||
+          (isFiniteNumber(obj.volume) && obj.volume >= 0 && obj.volume <= 1))
       )
     case 'timer:tick':
       return (
@@ -216,6 +222,7 @@ function validateMediaReplayState(value: unknown): boolean {
     isFiniteNumber(value.durationSeconds) &&
     typeof value.isPlaying === 'boolean' &&
     typeof value.isEnded === 'boolean' &&
+    (value.seekable === undefined || typeof value.seekable === 'boolean') &&
     isFiniteNumber(value.volume) &&
     isFiniteNumber(value.pdfPage) &&
     isFiniteNumber(value.pdfScroll) &&
@@ -223,6 +230,17 @@ function validateMediaReplayState(value: unknown): boolean {
     isFiniteNumber(value.zoom) &&
     isFiniteNumber(value.pan.x) &&
     isFiniteNumber(value.pan.y)
+  )
+}
+
+function validatePendingFileControls(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.itemId !== 'string') return false
+  return (
+    (value.seekSeconds === undefined ||
+      (isFiniteNumber(value.seekSeconds) && value.seekSeconds >= 0)) &&
+    (value.volume === undefined ||
+      (isFiniteNumber(value.volume) && value.volume >= 0 && value.volume <= 1)) &&
+    (value.transport === undefined || value.transport === 'play' || value.transport === 'pause')
   )
 }
 
@@ -252,7 +270,9 @@ function validateProjectionReplayPayload(generation: number, data: unknown): boo
     validateNullablePayload('bible:chapter', bible.chapter) &&
     validateNullablePayload('bible:settings', bible.settings) &&
     validateNullablePayload('file:show', media.show) &&
-    (media.state === null || validateMediaReplayState(media.state))
+    (media.state === null || validateMediaReplayState(media.state)) &&
+    (data.pendingFileControls === undefined ||
+      validatePendingFileControls(data.pendingFileControls))
   )
 }
 

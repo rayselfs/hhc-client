@@ -57,7 +57,7 @@ vi.mock('fs', () => ({
 }))
 
 vi.mock('../../video-engine-runtime', () => ({
-  resolveFfmpegPosterRuntime: mockResolveFfmpegPosterRuntime
+  resolveFfmpegRuntime: mockResolveFfmpegPosterRuntime
 }))
 
 vi.mock('../../ipc/native-fs', () => ({
@@ -154,7 +154,21 @@ describe('video poster IPC', () => {
 
     expect(mockSpawn).toHaveBeenLastCalledWith(
       '/runtime/ffmpeg',
-      expect.arrayContaining(['-frames:v', '1', '-vf', 'scale=640:-2', '-pix_fmt', 'yuvj420p']),
+      [
+        '-hide_banner',
+        '-y',
+        '-ss',
+        '00:00:01',
+        '-i',
+        `/native-files/${validId}`,
+        '-frames:v',
+        '1',
+        '-vf',
+        'scale=640:-2',
+        '-pix_fmt',
+        'yuvj420p',
+        expect.stringContaining('.poster.jpg')
+      ],
       expect.objectContaining({ shell: false })
     )
     expect(mockRm).toHaveBeenCalledWith(expect.stringContaining('.poster.jpg'), { force: true })

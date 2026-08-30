@@ -10,6 +10,7 @@ const currentTarget = `${process.platform}-${process.arch}`
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='))
 const requestedTarget = targetArg ? targetArg.slice('--target='.length) : currentTarget
 const checkAll = args.has('--all')
+const unpackedOnly = args.has('--unpacked-only')
 const maxWindowsInstallerBytes = 450 * 1024 * 1024
 
 const licenseFiles = [
@@ -135,9 +136,9 @@ async function checkResourceRoot(resourceRoot, target) {
   }
 
   const updaterConfigPath = join(resourceRoot, 'app-update.yml')
-  if (!(await exists(updaterConfigPath))) {
+  if (!(await exists(updaterConfigPath)) && !unpackedOnly) {
     failures.push('Missing app-update.yml')
-  } else {
+  } else if (await exists(updaterConfigPath)) {
     const updaterConfig = await readFile(updaterConfigPath, 'utf8')
     for (const expected of [
       /^owner:\s*rayselfs\s*$/m,
@@ -176,8 +177,8 @@ async function checkResourceRoot(resourceRoot, target) {
 
   const appAsar = join(resourceRoot, 'app.asar')
   if (await exists(appAsar)) {
-    const packagedFiles = listPackage(appAsar)
-    const mainSource = extractFile(appAsar, 'out/main/index.js').toString('utf8')
+    const packagedFiles = listPackage(appAsar).map(toPosix)
+    const mainSource = extractFile(appAsar, join('out', 'main', 'index.js')).toString('utf8')
     if (!mainSource.includes('tw.org.alive.presenter')) {
       failures.push('Packaged main process must use the HHC Presenter AUMID')
     }
@@ -194,7 +195,7 @@ async function checkResourceRoot(resourceRoot, target) {
       failures.push('Missing compiled PDF worker in app.asar')
     } else if (
       pdfWorkers.some((file) => {
-        const source = extractFile(appAsar, file.slice(1)).toString('utf8')
+        const source = extractFile(appAsar, join(...file.slice(1).split('/'))).toString('utf8')
         return /\b(?:interface|type)\s+\w+|<K,\s*V>|:\s*(?:Map|Iterable)<|import\('pdfjs-dist/.test(
           source
         )

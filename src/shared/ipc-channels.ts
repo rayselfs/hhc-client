@@ -70,6 +70,11 @@ export type ProjectionVlcFailureCode =
   | 'binding-unavailable'
   | 'media-open-failed'
   | 'playback-failed'
+  | 'matroska-remux-failed'
+  | 'insufficient-storage'
+  | 'source-replaced'
+  | 'remux-timeout'
+  | 'remux-cancelled'
 
 export interface ProjectionVlcFailure {
   itemId?: string
@@ -80,26 +85,19 @@ export interface ProjectionVlcFailure {
 
 export interface ProjectionVlcInfo {
   status: ProjectionVlcStatus
-  vlcDir?: string
   message?: string
 }
 
 export interface ProjectionVlcStartRequest {
   itemId: string
+  attemptId?: string
   sourceFileId: string
   container: string
   durationMs?: number
   initialPositionSeconds?: number
   initialVolume?: number
   initialPlaybackState?: 'playing' | 'paused' | 'ended'
-}
-
-export interface ProjectionVlcProbeRequest {
-  sourceFileId: string
-}
-
-export interface ProjectionVlcProbeResult {
-  durationMs?: number
+  playbackVariant?: 'source' | 'matroska-remux'
 }
 
 export type ProjectionVlcControlRequest =
@@ -107,6 +105,8 @@ export type ProjectionVlcControlRequest =
   | { action: 'pause'; itemId?: string }
   | { action: 'seek'; itemId?: string; value: number }
   | { action: 'volume'; itemId?: string; value: number }
+
+export type ProjectionVlcStopRequest = { itemId: string; attemptId: string } | { force: true }
 
 export interface LocalSyncConnectionInfo {
   id: string
@@ -278,9 +278,8 @@ export interface IpcInvokeMap {
   'video-poster:generate': { args: [VideoPosterRequest]; result: VideoPosterResult }
   'projection-vlc:get-info': { args: []; result: ProjectionVlcInfo }
   'projection-vlc:start': { args: [ProjectionVlcStartRequest]; result: void }
-  'projection-vlc:probe': { args: [ProjectionVlcProbeRequest]; result: ProjectionVlcProbeResult }
   'projection-vlc:control': { args: [ProjectionVlcControlRequest]; result: void }
-  'projection-vlc:stop': { args: []; result: void }
+  'projection-vlc:stop': { args: [ProjectionVlcStopRequest]; result: void }
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }

@@ -270,7 +270,7 @@ describe('FileProjection copied media identity', () => {
   })
 
   it('passes replay state to embedded VLC startup', async () => {
-    render(
+    const { unmount } = render(
       <FileProjection
         generation={4}
         fileName="clip.mkv"
@@ -278,6 +278,7 @@ describe('FileProjection copied media identity', () => {
         initialBlobId="video-blob"
         initialMimeType="video/x-matroska"
         initialPlaybackMode="vlc-embedded"
+        initialPlaybackVariant="matroska-remux"
         initialReplayState={{
           itemId: 'video-id',
           positionSeconds: 18,
@@ -297,12 +298,114 @@ describe('FileProjection copied media identity', () => {
     await waitFor(() => {
       expect(window.api.projectionVlc.start).toHaveBeenCalledWith(
         expect.objectContaining({
+          attemptId: expect.any(String),
           initialPositionSeconds: 18,
           initialVolume: 0.35,
-          initialPlaybackState: 'playing'
+          initialPlaybackState: 'playing',
+          playbackVariant: 'matroska-remux'
         })
       )
     })
+
+    const attemptId = vi.mocked(window.api.projectionVlc.start).mock.calls[0][0].attemptId
+    unmount()
+    expect(mockProjectionVlcStop).toHaveBeenCalledWith({ itemId: 'video-id', attemptId })
+  })
+
+  it('forwards embedded VLC seek to the owner session even before renderer capability state', async () => {
+    const { rerender } = render(
+      <FileProjection
+        fileName="clip.mkv"
+        initialItemId="video-id"
+        initialBlobId="video-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+        initialSeekable={false}
+      />
+    )
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalled())
+
+    rerender(
+      <FileProjection
+        fileName="clip.mkv"
+        initialItemId="video-id"
+        initialBlobId="video-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+        initialSeekable={false}
+        controlEvent={{ id: 1, data: { action: 'seek', itemId: 'video-id', value: 20 } }}
+      />
+    )
+
+    expect(window.api.projectionVlc.control).toHaveBeenCalledWith({
+      action: 'seek',
+      itemId: 'video-id',
+      value: 20
+    })
+  })
+
+  it('starts and controls the new VLC owner while the old owner stop is pending', async () => {
+    let resolveOldStop: (() => void) | undefined
+    const { rerender } = render(
+      <FileProjection
+        fileName="old.mkv"
+        initialItemId="old-id"
+        initialBlobId="old-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+      />
+    )
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalledOnce())
+    mockProjectionVlcStop.mockImplementation((request: { force?: boolean }) =>
+      request.force
+        ? new Promise<void>((resolve) => {
+            resolveOldStop = resolve
+          })
+        : Promise.resolve()
+    )
+    vi.mocked(window.api.projectionVlc.start).mockClear()
+    vi.mocked(window.api.projectionVlc.control).mockClear()
+
+    rerender(
+      <FileProjection
+        fileName="new.mkv"
+        initialItemId="new-id"
+        initialBlobId="new-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+        controlEvent={{ id: 1, data: { action: 'play', itemId: 'new-id' } }}
+      />
+    )
+
+    await waitFor(() =>
+      expect(window.api.projectionVlc.start).toHaveBeenCalledWith(
+        expect.objectContaining({ itemId: 'new-id', sourceFileId: 'new-blob' })
+      )
+    )
+    expect(window.api.projectionVlc.control).toHaveBeenCalledWith({
+      action: 'play',
+      itemId: 'new-id'
+    })
+    expect(mockProjectionVlcStop).not.toHaveBeenCalledWith({ force: true })
+    resolveOldStop?.()
+  })
+
+  it('restarts embedded VLC exactly once for a same-generation replay revision', async () => {
+    const props = {
+      generation: 4,
+      fileName: 'clip.mkv',
+      initialItemId: 'video-id',
+      initialBlobId: 'video-blob',
+      initialMimeType: 'video/x-matroska',
+      initialPlaybackMode: 'vlc-embedded' as const,
+      initialPlaybackVariant: 'matroska-remux' as const
+    }
+    const { rerender } = render(<FileProjection {...props} vlcStartRevision={1} />)
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalledOnce())
+
+    rerender(<FileProjection {...props} vlcStartRevision={2} />)
+
+    await waitFor(() => expect(window.api.projectionVlc.start).toHaveBeenCalledTimes(2))
   })
 
   it('uses live stream URLs without loading a stored source and ignores seek controls', async () => {
@@ -372,7 +475,9 @@ describe('FileProjection copied media identity', () => {
       duration: 100,
       isPlaying: false,
       isEnded: false,
-      playbackRate: 1
+      playbackRate: 1,
+      seekable: false,
+      volume: 1
     })
   })
 

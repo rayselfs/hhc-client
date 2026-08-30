@@ -352,10 +352,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       snapshot.media.show &&
       (!vlcFailure.itemId || snapshot.media.show.itemId === vlcFailure.itemId)
     ) {
-      getAdapter(adapterRef, browserSessionId).send('__system:replay', {
-        generation: state.generation,
-        snapshot: structuredClone(snapshot)
-      })
+      coordinator.replay(state.generation)
       return { ok: true, generation: state.generation }
     }
     const result = await window.api.projection.retry()
@@ -402,7 +399,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const blackoutProjection = useCallback(
     async (enabled: boolean): Promise<void> => {
-      if (enabled) await window.api?.projectionVlc?.stop?.().catch(() => {})
+      if (enabled) await window.api?.projectionVlc?.stop?.({ force: true }).catch(() => {})
       getCoordinator().blackout(enabled)
     },
     [getCoordinator]
@@ -439,7 +436,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   )
 
   const stopProjection = useCallback(async (): Promise<void> => {
-    await window.api?.projectionVlc?.stop?.().catch(() => {})
+    await window.api?.projectionVlc?.stop?.({ force: true }).catch(() => {})
     await closeProjection()
   }, [closeProjection])
 

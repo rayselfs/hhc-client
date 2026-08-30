@@ -29,6 +29,10 @@ const mockWindowManager = {
   getMainWindow: vi.fn(() => mockMainWindow)
 }
 
+vi.mock('../../ipc/video-remux', () => ({
+  mutateVideoSource: vi.fn((_sourceFileId: string, mutation: () => Promise<unknown>) => mutation())
+}))
+
 vi.mock('fs', () => {
   const promises = {
     stat: mockStat,

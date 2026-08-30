@@ -30,6 +30,8 @@ type FileProjectionProps = {
   initialMimeType?: string
   initialStreamUrl?: string
   initialPlaybackMode?: 'native' | 'vlc-embedded'
+  initialPlaybackVariant?: 'source' | 'matroska-remux'
+  vlcStartRevision?: number
   initialSeekable?: boolean
   initialDurationMs?: number
   initialPresentation?: {
@@ -87,6 +89,8 @@ export default function FileProjection({
   initialMimeType,
   initialStreamUrl,
   initialPlaybackMode,
+  initialPlaybackVariant,
+  vlcStartRevision,
   initialSeekable,
   initialDurationMs,
   initialPresentation,
@@ -268,7 +272,9 @@ export default function FileProjection({
         duration,
         isPlaying: next?.isPlaying ?? !video.paused,
         isEnded: next?.isEnded ?? video.ended,
-        playbackRate: Number.isFinite(video.playbackRate) ? video.playbackRate : 1
+        playbackRate: Number.isFinite(video.playbackRate) ? video.playbackRate : 1,
+        seekable: seekableRef.current,
+        volume: Number.isFinite(video.volume) ? video.volume : 1
       })
     },
     []
@@ -278,14 +284,19 @@ export default function FileProjection({
     async (itemId: string, blobId: string, fileMimeType: string, options: LoadFileOptions = {}) => {
       const loadSequence = loadSequenceRef.current + 1
       loadSequenceRef.current = loadSequence
-      if (playbackModeRef.current === 'vlc-embedded') {
-        await window.api?.projectionVlc?.stop().catch((error) => {
+      const previousPlaybackMode = playbackModeRef.current
+      const nextPlaybackMode = options.playbackMode ?? 'native'
+      const liveVideo = currentItemIdRef.current === itemId ? mediaRef.current : null
+      currentItemIdRef.current = itemId
+      playbackModeRef.current = nextPlaybackMode
+      seekableRef.current = options.seekable !== false
+      durationMsRef.current = options.durationMs
+      if (previousPlaybackMode === 'vlc-embedded' && nextPlaybackMode !== 'vlc-embedded') {
+        await window.api?.projectionVlc?.stop({ force: true }).catch((error) => {
           console.error('[file-projection] Failed to stop VLC before loading next item', error)
         })
         if (loadSequenceRef.current !== loadSequence) return
       }
-      const liveVideo = currentItemIdRef.current === itemId ? mediaRef.current : null
-      currentItemIdRef.current = itemId
       const replay = replayStateRef.current?.itemId === itemId ? replayStateRef.current : null
       const videoReplay =
         replay ??
@@ -307,9 +318,6 @@ export default function FileProjection({
             playbackRate: videoReplay.playbackRate ?? 1
           }
         : null
-      playbackModeRef.current = options.playbackMode ?? 'native'
-      seekableRef.current = options.seekable !== false
-      durationMsRef.current = options.durationMs
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
       disposePdf()
@@ -522,7 +530,6 @@ export default function FileProjection({
           queueVideoControl(data, { shouldPlay: false })
           break
         case 'seek':
-          if (!seekableRef.current) break
           if (playbackModeRef.current === 'vlc-embedded') {
             void window.api?.projectionVlc?.control({
               action: 'seek',
@@ -531,6 +538,7 @@ export default function FileProjection({
             })
             break
           }
+          if (!seekableRef.current) break
           queueVideoControl(data, { seekTo: data.value })
           break
         case 'zoom':
@@ -652,7 +660,7 @@ export default function FileProjection({
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
       disposePdf()
-      void window.api?.projectionVlc?.stop()
+      void window.api?.projectionVlc?.stop({ force: true })
     },
     [disposePdf]
   )
@@ -841,14 +849,16 @@ export default function FileProjection({
     )
   }
 
-  if (mimeType?.startsWith('video/') && playbackModeRef.current === 'vlc-embedded') {
+  if (initialMimeType?.startsWith('video/') && initialPlaybackMode === 'vlc-embedded') {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
         <VlcProjectionSurface
-          itemId={currentItemIdRef.current}
+          itemId={initialItemId ?? null}
           blobId={initialBlobId}
           durationMs={durationMsRef.current}
           replayState={initialReplayState}
+          playbackVariant={initialPlaybackVariant}
+          startRevision={vlcStartRevision}
         />
       </div>
     )
@@ -993,21 +1003,28 @@ function VlcProjectionSurface({
   itemId,
   blobId,
   durationMs,
-  replayState
+  replayState,
+  playbackVariant,
+  startRevision
 }: {
   itemId: string | null
   blobId?: string
   durationMs?: number
   replayState?: ProjectionMediaReplayState | null
+  playbackVariant?: 'source' | 'matroska-remux'
+  startRevision?: number
 }): React.JSX.Element {
   useEffect(() => {
     if (!itemId || !blobId) return undefined
+    const attemptId = crypto.randomUUID()
     void window.api?.projectionVlc
       ?.start({
         itemId,
+        attemptId,
         sourceFileId: blobId,
         container: '#vlc-player',
         durationMs,
+        playbackVariant,
         initialPositionSeconds:
           replayState?.itemId === itemId ? replayState.positionSeconds : undefined,
         initialVolume: replayState?.itemId === itemId ? replayState.volume : undefined,
@@ -1024,9 +1041,9 @@ function VlcProjectionSurface({
         console.error('[projection-vlc] Failed to start embedded VLC playback', error)
       })
     return () => {
-      void window.api?.projectionVlc?.stop()
+      void window.api?.projectionVlc?.stop({ itemId, attemptId })
     }
-  }, [blobId, durationMs, itemId, replayState])
+  }, [blobId, durationMs, itemId, playbackVariant, replayState, startRevision])
 
   return <div id="vlc-player" className="h-full w-full bg-black" />
 }

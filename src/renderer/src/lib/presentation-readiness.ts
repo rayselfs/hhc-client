@@ -35,6 +35,7 @@ export interface PresentationReadinessItem {
   support: MediaSupportMode | null
   derivativeId?: string
   playbackMode?: 'native' | 'vlc-embedded'
+  playbackVariant?: 'source' | 'matroska-remux'
   seekable?: boolean
   durationMs?: number
   remoteItem?: {
@@ -58,6 +59,7 @@ export interface PresentationSnapshotEntry {
   sourceUrl: string
   derivativeId?: string
   playbackMode?: 'native' | 'vlc-embedded'
+  playbackVariant?: 'source' | 'matroska-remux'
   seekable?: boolean
   durationMs?: number
   remoteItem?: {
@@ -102,6 +104,7 @@ export function createPresentationSnapshot(
       sourceUrl: item.url,
       derivativeId: readinessByItemId.get(item.id)?.derivativeId,
       playbackMode: readinessByItemId.get(item.id)?.playbackMode,
+      playbackVariant: readinessByItemId.get(item.id)?.playbackVariant,
       seekable: readinessByItemId.get(item.id)?.seekable,
       durationMs: readinessByItemId.get(item.id)?.durationMs,
       remoteItem: readinessByItemId.get(item.id)?.remoteItem
@@ -207,7 +210,12 @@ async function analyzePresentationItem(
         reason: 'ready-remote',
         support,
         playbackMode: support === 'desktop-engine' ? 'vlc-embedded' : 'native',
-        seekable: capability.kind === 'video' || capability.kind === 'audio',
+        ...(support === 'desktop-engine' && capability.canonicalMimeType === 'video/x-matroska'
+          ? { playbackVariant: 'matroska-remux' as const }
+          : {}),
+        ...(support !== 'desktop-engine'
+          ? { seekable: capability.kind === 'video' || capability.kind === 'audio' }
+          : {}),
         remoteItem: {
           providerConnectionId: syncEntry.providerConnectionId,
           remoteItemId: syncEntry.remoteItemId,
@@ -274,7 +282,9 @@ async function analyzePresentationItem(
   }
 
   const metadata =
-    capability.kind === 'video' ? await ensureSourceMediaMetadata(blobId, item.mimeType) : null
+    capability.kind === 'video' && support !== 'desktop-engine'
+      ? await ensureSourceMediaMetadata(blobId, item.mimeType)
+      : null
   const durationMs = metadata?.durationMs
 
   if (
@@ -300,8 +310,9 @@ async function analyzePresentationItem(
         reason: 'ready-vlc-embedded',
         support,
         playbackMode: 'vlc-embedded',
-        seekable: true,
-        durationMs
+        ...(capability.canonicalMimeType === 'video/x-matroska'
+          ? { playbackVariant: 'matroska-remux' as const }
+          : {})
       }
     }
 

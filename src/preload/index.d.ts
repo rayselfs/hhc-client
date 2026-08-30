@@ -16,9 +16,8 @@ import type {
   ProjectionVlcControlRequest,
   ProjectionVlcFailure,
   ProjectionVlcInfo,
-  ProjectionVlcProbeRequest,
-  ProjectionVlcProbeResult,
   ProjectionVlcStartRequest,
+  ProjectionVlcStopRequest,
   LocalSyncConnectionInfo,
   LocalSyncImportFileRequest,
   LocalSyncWatchStatus,
@@ -145,9 +144,8 @@ interface VideoPosterAPI {
 interface ProjectionVlcAPI {
   getInfo: () => Promise<ProjectionVlcInfo>
   start: (request: ProjectionVlcStartRequest) => Promise<void>
-  probe: (request: ProjectionVlcProbeRequest) => Promise<ProjectionVlcProbeResult>
   control: (command: ProjectionVlcControlRequest) => Promise<void>
-  stop: () => Promise<void>
+  stop: (request: ProjectionVlcStopRequest) => Promise<void>
   onFailure: (callback: (failure: ProjectionVlcFailure) => void) => () => void
   onStarted: (callback: (generation: number, itemId: string) => void) => () => void
 }

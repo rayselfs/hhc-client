@@ -38,7 +38,9 @@ export default function MediaProjectionBridge({
         isPlaying: data.isPlaying,
         isEnded: data.isEnded,
         currentTime: data.currentTime,
-        duration: data.duration
+        duration: data.duration,
+        seekable: data.seekable,
+        volume: data.volume
       })
     })
   }, [on])

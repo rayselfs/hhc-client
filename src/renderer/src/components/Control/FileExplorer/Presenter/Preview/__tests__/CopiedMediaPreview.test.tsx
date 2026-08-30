@@ -59,6 +59,8 @@ const storeState = {
       isEnded?: boolean
       currentTime?: number
       duration?: number
+      seekable?: boolean
+      volume?: number
     }
   },
   setTypeState: vi.fn(),
@@ -66,11 +68,22 @@ const storeState = {
   exit: mockExit,
   canNext: () => true
 }
+const storeListeners = new Set<(state: typeof storeState) => void>()
+
+function notifyStore(): void {
+  for (const listener of storeListeners) listener(storeState)
+}
 
 vi.mock('@renderer/stores/media-projection', () => ({
   useMediaProjectionStore: Object.assign(
     vi.fn((selector: (state: typeof storeState) => unknown) => selector(storeState)),
-    { getState: () => storeState }
+    {
+      getState: () => storeState,
+      subscribe: (listener: (state: typeof storeState) => void) => {
+        storeListeners.add(listener)
+        return () => storeListeners.delete(listener)
+      }
+    }
   )
 }))
 
@@ -320,7 +333,7 @@ describe('copied media preview identity', () => {
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'play', itemId: 'copy-id' })
   })
 
-  it('syncs video playback state immediately on first play', async () => {
+  it('does not confirm durable video playback state from a requested play', async () => {
     const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
 
     await waitFor(() => {
@@ -332,11 +345,7 @@ describe('copied media preview identity', () => {
     expect(playButton).not.toBeNull()
     fireEvent.click(playButton!)
 
-    expect(storeState.setTypeState).toHaveBeenCalledWith('video', {
-      hasStarted: true,
-      isPlaying: true,
-      isEnded: false
-    })
+    expect(storeState.setTypeState).not.toHaveBeenCalled()
   })
 
   it('renders projection playback state as the authoritative control state', async () => {
@@ -366,6 +375,52 @@ describe('copied media preview identity', () => {
 
     expect(video.currentTime).toBe(35)
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 35 })
+  })
+
+  it('disables pointer and relative seek until projection confirms seekability', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.typeStates.video = {
+      hasStarted: true,
+      isPlaying: false,
+      isEnded: false,
+      currentTime: 30,
+      duration: 100,
+      seekable: false
+    }
+    const { container } = render(<VideoPreview item={item} />)
+    const video = await getLoadedVideo(container)
+    mockSendCommand.mockClear()
+
+    expect(container.querySelector('input.video-seek-range')).toBeDisabled()
+    seekRelative(5)
+
+    expect(video.currentTime).toBe(30)
+    expect(mockSendCommand).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'seek' }))
+  })
+
+  it('keeps a requested seek visible until confirmed playback time arrives', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.typeStates.video = {
+      hasStarted: true,
+      isPlaying: false,
+      isEnded: false,
+      currentTime: 30,
+      duration: 100,
+      seekable: true
+    }
+    const { container, rerender } = render(<VideoPreview item={item} />)
+    await getLoadedVideo(container)
+
+    seekRelative(5)
+    expect(container.querySelector('input.video-seek-range')).toHaveValue('35')
+
+    storeState.typeStates.video = {
+      ...storeState.typeStates.video,
+      currentTime: 34.5
+    }
+    act(() => notifyStore())
+    rerender(<VideoPreview item={item} />)
+    expect(container.querySelector('input.video-seek-range')).toHaveValue('34.5')
   })
 
   it('shows accumulated video seek feedback for repeated same-direction jumps', async () => {

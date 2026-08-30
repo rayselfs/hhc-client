@@ -68,6 +68,7 @@ describe('buildFileProjectionPayload', () => {
           mimeType: 'video/mp4',
           sourceUrl: 'blob:original-id',
           playbackMode: 'vlc-embedded',
+          playbackVariant: 'matroska-remux',
           seekable: true,
           durationMs: 1234
         }
@@ -82,6 +83,7 @@ describe('buildFileProjectionPayload', () => {
       playlist: [{ id: 'copy-id', name: 'copy-id.mp4', mimeType: 'video/mp4' }],
       currentIndex: 0,
       playbackMode: 'vlc-embedded',
+      playbackVariant: 'matroska-remux',
       seekable: true,
       durationMs: 1234
     })

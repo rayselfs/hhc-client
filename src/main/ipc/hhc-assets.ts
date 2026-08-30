@@ -21,6 +21,7 @@ import {
   releaseNativeMediaLease
 } from './native-fs'
 import { isMainWindow } from './validate'
+import { mutateVideoSource } from './video-remux'
 
 const HHC_ASSET_ORIGIN = APP_CONFIG.hhcAssetOrigin
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9_-]{1,255}$/
@@ -341,29 +342,31 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
       activeDownloads.set(targetFileId, controller)
       const destinationPath = getNativeFilePath(targetFileId)
       const temporaryPath = `${destinationPath}.${randomUUID()}.tmp`
-      try {
-        const downloaded = await downloadContent(
-          auth,
-          collectionId,
-          itemId,
-          temporaryPath,
-          controller.signal
-        )
-        if (controller.signal.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
-        await fs.mkdir(dirname(destinationPath), { recursive: true })
-        if (controller.signal.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
-        await fs.rename(temporaryPath, destinationPath)
-        return {
-          fileId: targetFileId,
-          size: downloaded.size,
-          mimeType: downloaded.mimeType
+      return mutateVideoSource(targetFileId, async () => {
+        try {
+          const downloaded = await downloadContent(
+            auth,
+            collectionId,
+            itemId,
+            temporaryPath,
+            controller.signal
+          )
+          if (controller.signal.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
+          await fs.mkdir(dirname(destinationPath), { recursive: true })
+          if (controller.signal.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
+          await fs.rename(temporaryPath, destinationPath)
+          return {
+            fileId: targetFileId,
+            size: downloaded.size,
+            mimeType: downloaded.mimeType
+          }
+        } catch (error) {
+          await fs.rm(temporaryPath, { force: true }).catch(() => undefined)
+          throw error
+        } finally {
+          if (activeDownloads.get(targetFileId) === controller) activeDownloads.delete(targetFileId)
         }
-      } catch (error) {
-        await fs.rm(temporaryPath, { force: true }).catch(() => undefined)
-        throw error
-      } finally {
-        if (activeDownloads.get(targetFileId) === controller) activeDownloads.delete(targetFileId)
-      }
+      })
     })
   )
 

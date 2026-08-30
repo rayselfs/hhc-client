@@ -54,6 +54,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const [isVolumeHovered, setIsVolumeHovered] = useState(false)
   const [isDraggingSeek, setIsDraggingSeek] = useState(false)
   const [localSeekTime, setLocalSeekTime] = useState(0)
+  const [pendingSeek, setPendingSeek] = useState<{ itemId: string; time: number } | null>(null)
   const [flashState, setFlashState] = useState<{ icon: 'play' | 'pause'; key: number } | null>(null)
   const [seekFlashState, setSeekFlashState] = useState<SeekFlashState | null>(null)
 
@@ -76,7 +77,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
   const projectionPlaybackState = useMediaProjectionStore((s) => s.typeStates.video)
-  const setTypeState = useMediaProjectionStore((s) => s.setTypeState)
   const metadataDuration = useMediaProjectionStore((s) => {
     const durationMs = s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.durationMs
     return durationMs && durationMs > 0 ? durationMs / 1000 : undefined
@@ -87,7 +87,11 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     return entry.remoteSource ? entry.sourceUrl : null
   })
   const MediaElement = item.mimeType.startsWith('audio/') ? 'audio' : 'video'
-  const displayedCurrentTime = projectionPlaybackState?.currentTime ?? currentTime
+  const seekable = projectionPlaybackState ? projectionPlaybackState.seekable === true : true
+  const displayedCurrentTime =
+    (pendingSeek?.itemId === item.id && seekable ? pendingSeek.time : undefined) ??
+    projectionPlaybackState?.currentTime ??
+    currentTime
   const displayedDuration = projectionPlaybackState?.duration ?? metadataDuration ?? duration
   const displayedHasStarted = projectionPlaybackState?.hasStarted ?? hasStarted
   const displayedIsPlaying = projectionPlaybackState?.isPlaying ?? isPlaying
@@ -110,17 +114,31 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       setHasStarted(resolved.hasStarted)
       setIsPlaying(resolved.isPlaying)
       setIsEnded(resolved.isEnded)
-      setTypeState('video', resolved)
     },
-    [setTypeState]
+    []
   )
 
   useEffect(() => {
     if (playbackStateRef.current.hasStarted) return
     playbackStateRef.current = { hasStarted: false, isPlaying: false, isEnded: false }
     hasStartedRef.current = false
-    setTypeState('video', { hasStarted: false, isPlaying: false, isEnded: false })
-  }, [item.id, setTypeState])
+  }, [item.id])
+
+  useEffect(
+    () =>
+      useMediaProjectionStore.subscribe((state) => {
+        const confirmed = state.typeStates.video
+        setPendingSeek((pending) => {
+          if (!pending || pending.itemId !== item.id) return pending
+          if (confirmed?.seekable !== true) return null
+          return confirmed.currentTime !== undefined &&
+            Math.abs(confirmed.currentTime - pending.time) <= 1
+            ? null
+            : pending
+        })
+      }),
+    [item.id]
+  )
 
   useEffect(() => {
     let revokeSource: (() => void) | null = null
@@ -270,6 +288,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const commitSeek = useCallback(
     (seekTo: number): void => {
+      if (!seekable) return
       const durationValue = durationRef.current
       const max = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : seekTo
       const clamped = Math.max(0, Math.min(seekTo, max))
@@ -278,18 +297,19 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       currentTimeRef.current = clamped
       localSeekTimeRef.current = clamped
       setLocalSeekTime(clamped)
+      setPendingSeek({ itemId: item.id, time: clamped })
       setCurrentTime(clamped)
       if (videoRef.current) videoRef.current.currentTime = clamped
       sendCommand({ action: 'seek', itemId: item.id, value: clamped })
     },
-    [item.id, sendCommand]
+    [item.id, seekable, sendCommand]
   )
 
   useEffect(() => {
     const handleRelativeSeek = (event: Event): void => {
       const detail = (event as CustomEvent<{ seconds?: number }>).detail
       const offset = detail?.seconds
-      if (typeof offset !== 'number' || !Number.isFinite(offset)) return
+      if (!seekable || typeof offset !== 'number' || !Number.isFinite(offset)) return
       const base =
         videoRef.current && videoRef.current.readyState >= 1
           ? videoRef.current.currentTime
@@ -300,7 +320,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
     window.addEventListener('media:videoSeekRelative', handleRelativeSeek)
     return () => window.removeEventListener('media:videoSeekRelative', handleRelativeSeek)
-  }, [commitSeek, triggerSeekFlash])
+  }, [commitSeek, seekable, triggerSeekFlash])
 
   const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
     if (target.hasPointerCapture?.(pointerId)) {
@@ -429,6 +449,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             min={0}
             max={displayedDuration || 1}
             step={0.1}
+            disabled={!seekable}
             value={isDraggingSeek ? localSeekTime : displayedCurrentTime}
             className="video-seek-range w-full"
             ref={seekInputRef}

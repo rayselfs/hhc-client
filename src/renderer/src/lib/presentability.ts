@@ -16,6 +16,8 @@ export type MediaTypeStateMap = {
     isEnded?: boolean
     currentTime?: number
     duration?: number
+    seekable?: boolean
+    volume?: number
   }
   pdf: { viewMode: 'slide' | 'scroll'; thumbsCollapsed?: boolean }
   presentation: { slideIndex: number; slideCount?: number }

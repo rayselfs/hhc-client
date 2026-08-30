@@ -88,8 +88,12 @@ async function writeValidWindowsPackage(
   return resourcesRoot
 }
 
-async function runChecker(root: string, target = 'darwin-arm64'): Promise<void> {
-  await execFileAsync(process.execPath, [scriptPath, `--target=${target}`], {
+async function runChecker(
+  root: string,
+  target = 'darwin-arm64',
+  extraArgs: string[] = []
+): Promise<void> {
+  await execFileAsync(process.execPath, [scriptPath, `--target=${target}`, ...extraArgs], {
     cwd: root,
     env: {
       ...process.env,
@@ -142,6 +146,15 @@ describe('check packaged runtime script', () => {
     )
 
     await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
+  })
+
+  it('allows updater metadata to be absent only for a dir-target check', async () => {
+    const root = await createTempRoot()
+    const resourcesRoot = await writeValidMacPackage(root)
+    await rm(join(resourcesRoot, 'app-update.yml'))
+
+    await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
+    await expect(runChecker(root, 'darwin-arm64', ['--unpacked-only'])).resolves.toBeUndefined()
   })
 
   it('rejects packaged apps missing the electron-vlc-player binding', async () => {

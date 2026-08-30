@@ -234,6 +234,61 @@ describe('validateProjectionTransportTuple', () => {
     expect(validateProjectionTransportTuple([4, '__system:ready', { generation: 3 }])).toBe(false)
   })
 
+  it('accepts optional VLC playback capability and volume state', () => {
+    expect(
+      validateProjectionMessageTuple([
+        'file:playback-state',
+        {
+          itemId: 'video-1',
+          currentTime: 12,
+          duration: 100,
+          isPlaying: false,
+          isEnded: false,
+          seekable: true,
+          volume: 0.35
+        }
+      ])
+    ).toBe(true)
+  })
+
+  it('accepts known playback variants and rejects unknown file projection variants', () => {
+    const show = {
+      itemId: 'video-1',
+      blobId: 'blob-1',
+      fileName: 'video.mkv',
+      mimeType: 'video/x-matroska',
+      playlist: [],
+      currentIndex: 0
+    }
+    expect(
+      validateProjectionMessageTuple(['file:show', { ...show, playbackVariant: 'matroska-remux' }])
+    ).toBe(true)
+    expect(
+      validateProjectionMessageTuple(['file:show', { ...show, playbackVariant: 'transcode' }])
+    ).toBe(false)
+  })
+
+  it.each([
+    ['non-boolean seekability', { seekable: 'yes' }],
+    ['negative volume', { volume: -0.01 }],
+    ['volume above one', { volume: 1.01 }],
+    ['non-finite volume', { volume: Number.NaN }]
+  ])('rejects invalid VLC playback capability state: %s', (_label, invalid) => {
+    expect(
+      validateProjectionMessageTuple([
+        'file:playback-state',
+        {
+          itemId: 'video-1',
+          currentTime: 12,
+          duration: 100,
+          isPlaying: false,
+          isEnded: false,
+          ...invalid
+        }
+      ])
+    ).toBe(false)
+  })
+
   it('accepts a minimally valid replay snapshot', () => {
     expect(
       validateProjectionTransportTuple([

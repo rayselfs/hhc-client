@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['line'], ['html', { outputFolder: 'playwright-report/electron', open: 'never' }]],
   use: {
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure'
   }
 })
