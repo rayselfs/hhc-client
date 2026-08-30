@@ -741,6 +741,14 @@
     "apiKey": "密钥",
     "region": "区域"
   },
+  "authCallback": {
+    "pendingTitle": "正在完成登录...",
+    "pendingDescription": "请稍候并保持此页面打开。",
+    "completeTitle": "登录完成",
+    "completeDescription": "请返回 HHC 投影系统。你可以关闭这个页面。",
+    "failedTitle": "无法完成登录",
+    "failedDescription": "请返回 HHC 投影系统并重新登录。"
+  },
   "userMenu": {
     "guest": "访客",
     "accountMenu": "{{name}}的帐号菜单",

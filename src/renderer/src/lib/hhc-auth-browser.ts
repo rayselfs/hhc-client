@@ -1,4 +1,5 @@
 import {
+  HHC_AUTH_CALLBACK_CHANNEL,
   HHC_AUTH_TRANSACTION_TTL_MS,
   type HhcAuthAdapter,
   type HhcPendingSignIn,
@@ -105,6 +106,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   private readonly fetcher: typeof fetch
   private readonly now: () => number
   private readonly window: BrowserWindow
+  private readonly callbackChannel: BroadcastChannel | null
   private transaction: Transaction | null = null
   private completionInFlight: Promise<void> | null = null
   private signOutInFlight: Promise<void> | null = null
@@ -123,6 +125,11 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     this.window = options.window ?? window
     this.callbackUri = HHC_AUTH.callbackUri
     this.window.addEventListener('message', this.onMessage)
+    this.callbackChannel =
+      typeof BroadcastChannel === 'undefined'
+        ? null
+        : new BroadcastChannel(HHC_AUTH_CALLBACK_CHANNEL)
+    this.callbackChannel?.addEventListener('message', this.onBroadcast)
   }
 
   subscribe(listener: (session: HhcSession | null) => void): () => void {
@@ -134,6 +141,8 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     this.authGeneration += 1
     this.closeTransaction()
     this.window.removeEventListener('message', this.onMessage)
+    this.callbackChannel?.removeEventListener('message', this.onBroadcast)
+    this.callbackChannel?.close()
   }
 
   async signIn(): Promise<HhcPendingSignIn> {
@@ -306,6 +315,17 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   private readonly onMessage = (event: MessageEvent<unknown>): void => {
     const transaction = this.transaction
     const expectedOrigin = new URL(this.callbackUri).origin
+    if (!transaction || event.origin !== expectedOrigin || event.source !== transaction.popup)
+      return
+    this.acceptCallback(event.data)
+  }
+
+  private readonly onBroadcast = (event: MessageEvent<unknown>): void => {
+    this.acceptCallback(event.data)
+  }
+
+  private acceptCallback(data: unknown): void {
+    const transaction = this.transaction
     if (!transaction || transaction.generation !== this.authGeneration || this.signedOut) return
     if (this.now() >= transaction.expiresAt) {
       this.authGeneration += 1
@@ -313,28 +333,35 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       return
     }
     if (
-      event.origin !== expectedOrigin ||
-      event.source !== transaction.popup ||
-      !event.data ||
-      typeof event.data !== 'object' ||
-      !('code' in event.data) ||
-      !('state' in event.data) ||
-      typeof event.data.code !== 'string' ||
-      typeof event.data.state !== 'string' ||
-      !event.data.code ||
-      event.data.state !== transaction.state
+      !data ||
+      typeof data !== 'object' ||
+      !('code' in data) ||
+      !('state' in data) ||
+      typeof data.code !== 'string' ||
+      typeof data.state !== 'string' ||
+      !data.code ||
+      data.state !== transaction.state
     )
       return
 
-    this.closeTransaction()
-    const completion = this.completeSignIn(transaction, event.data.code).finally(() => {
-      if (this.completionInFlight === completion) this.completionInFlight = null
-    })
+    this.transaction = null
+    if (transaction.timeoutId) clearTimeout(transaction.timeoutId)
+    const completion = this.completeSignIn(transaction, data.code)
+      .then((completed) => {
+        this.notifyCallback(transaction, completed ? 'complete' : 'failed')
+      })
+      .catch((error) => {
+        this.notifyCallback(transaction, 'failed')
+        throw error
+      })
+      .finally(() => {
+        if (this.completionInFlight === completion) this.completionInFlight = null
+      })
     this.completionInFlight = completion
     void completion.catch(() => undefined)
   }
 
-  private async completeSignIn(transaction: Transaction, code: string): Promise<void> {
+  private async completeSignIn(transaction: Transaction, code: string): Promise<boolean> {
     const generation = transaction.generation
     try {
       const response = await this.fetcher(`${this.accountApi}/oauth/token`, {
@@ -354,10 +381,10 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       })
       const data = await responseJson<TokenResponse>(response)
       if (!data.access_token) throw new Error('HHC account did not issue an access token')
-      if (generation !== this.authGeneration || this.signedOut) return
+      if (generation !== this.authGeneration || this.signedOut) return false
 
       const sessionData = await this.requestSession()
-      if (generation !== this.authGeneration || this.signedOut) return
+      if (generation !== this.authGeneration || this.signedOut) return false
       if (!sessionData.authenticated || !sessionData.user?.id || !sessionData.user.display_name) {
         throw new Error('HHC account session is unavailable')
       }
@@ -371,9 +398,22 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
         roles
       }
       this.notify()
+      return true
     } catch (error) {
       if (generation === this.authGeneration && !this.signedOut) this.clearSession()
       throw error
+    }
+  }
+
+  private notifyCallback(transaction: Transaction, status: 'complete' | 'failed'): void {
+    const message = { state: transaction.state, status }
+    this.callbackChannel?.postMessage(message)
+    try {
+      if (!transaction.popup.closed) {
+        transaction.popup.postMessage(message, new URL(this.callbackUri).origin)
+      }
+    } catch {
+      // Browser isolation may sever the popup WindowProxy; BroadcastChannel remains available.
     }
   }
 

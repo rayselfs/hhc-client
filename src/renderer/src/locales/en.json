@@ -741,6 +741,14 @@
     "apiKey": "Key",
     "region": "Region"
   },
+  "authCallback": {
+    "pendingTitle": "Completing sign-in...",
+    "pendingDescription": "Keep this page open for a moment.",
+    "completeTitle": "Sign-in complete",
+    "completeDescription": "Return to HHC Presenter. You can close this page.",
+    "failedTitle": "Unable to complete sign-in",
+    "failedDescription": "Return to HHC Presenter and try signing in again."
+  },
   "userMenu": {
     "guest": "Guest",
     "accountMenu": "Account menu for {{name}}",

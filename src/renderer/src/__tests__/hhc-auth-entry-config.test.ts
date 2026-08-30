@@ -84,6 +84,16 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(read('electron.vite.config.ts')).toContain('OAUTH_CALLBACK_PWA_DENYLIST')
   })
 
+  it('builds the hosted renderer with root-relative assets', () => {
+    const packageJson = JSON.parse(read('package.json')) as { scripts: Record<string, string> }
+    const staticWebApp = read('.github/workflows/azure-static-web-apps-zealous-river-03bbb7100.yml')
+
+    expect(packageJson.scripts['build:web']).toContain('electron-vite build --mode web')
+    expect(packageJson.scripts['build:web']).toContain('npm run check:web-build')
+    expect(read('electron.vite.config.ts')).toContain('hostedWebBase(mode)')
+    expect(staticWebApp).toContain('run: npm run build:web')
+  })
+
   it.each([
     ['browser', false, adapterFactories.browser, adapterFactories.electron],
     ['electron', true, adapterFactories.electron, adapterFactories.browser]

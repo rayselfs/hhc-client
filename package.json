@@ -15,6 +15,8 @@
     "predev": "npm run prepare:video-engine",
     "dev": "node scripts/dev.mjs",
     "build": "npm run typecheck && electron-vite build && npm run check:bundle",
+    "build:web": "npm run typecheck && electron-vite build --mode web && npm run check:web-build && npm run check:bundle",
+    "check:web-build": "node scripts/check-web-build.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:desktop-native": "node scripts/check-desktop-native.mjs",
     "postinstall": "electron-builder install-app-deps",
