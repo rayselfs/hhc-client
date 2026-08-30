@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   BrowserHhcAuthAdapter,
   createBrowserHhcAuthAdapter,
@@ -7,6 +7,17 @@ import {
 
 const ACCOUNT_ORIGIN = 'https://account.alive.org.tw'
 const CLIENT_ORIGIN = 'https://client.alive.org.tw'
+const broadcastChannels: MockBroadcastChannel[] = []
+
+class MockBroadcastChannel extends EventTarget {
+  readonly close = vi.fn()
+  readonly postMessage = vi.fn()
+
+  constructor(readonly name: string) {
+    super()
+    broadcastChannels.push(this)
+  }
+}
 
 function jwt(claims: object): string {
   return `header.${btoa(JSON.stringify(claims)).replaceAll('=', '')}.signature`
@@ -24,6 +35,7 @@ function popup(): Window {
     closed: false,
     close: vi.fn(),
     focus: vi.fn(),
+    postMessage: vi.fn(),
     location: { href: '' }
   } as unknown as Window
 }
@@ -58,6 +70,12 @@ function createAdapter(
 describe('browser HHC auth', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    broadcastChannels.length = 0
+    vi.stubGlobal('BroadcastChannel', MockBroadcastChannel)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('creates an S256 PKCE challenge', async () => {
@@ -347,7 +365,8 @@ describe('browser HHC auth', () => {
       })
     )
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
-    expect(opened.close).toHaveBeenCalledTimes(1)
+    await new Promise((resolve) => setTimeout(resolve, 550))
+    expect(opened.close).not.toHaveBeenCalled()
     expect(await adapter.getAccessToken()).toContain('.')
     expect(await adapter.getAccessToken()).not.toContain('refresh')
     expect(await adapter.getSession()).toEqual({
@@ -366,6 +385,59 @@ describe('browser HHC auth', () => {
     )
     await Promise.resolve()
     expect(fetcher).toHaveBeenCalledTimes(3)
+  })
+
+  it('exchanges a matching callback received without a popup opener', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/oauth/token')) {
+        return response({
+          access_token: jwt({ sub: 'user-1', roles: [], exp: 9_999_999_999 })
+        })
+      }
+      if (String(input).endsWith('/session')) {
+        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+      }
+      throw new Error(`Unexpected URL: ${String(input)}`)
+    })
+    const { adapter, open } = createAdapter({ fetcher })
+    await adapter.signIn()
+    const opened = open.mock.results[0]?.value as Window
+    const state = new URL(String(opened.location.href)).searchParams.get('state')!
+
+    expect(broadcastChannels).toHaveLength(1)
+    expect(broadcastChannels[0]?.name).toBe('hhc-auth-callback')
+    broadcastChannels[0]?.dispatchEvent(
+      new MessageEvent('message', { data: { code: 'broadcast-code', state } })
+    )
+
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+    expect(broadcastChannels[0]?.postMessage).toHaveBeenCalledWith({
+      state,
+      status: 'complete'
+    })
+    expect(await adapter.getSession()).toMatchObject({ userId: 'user-1' })
+    adapter.dispose()
+    expect(broadcastChannels[0]?.close).toHaveBeenCalledOnce()
+  })
+
+  it('reports a failed callback exchange to the callback page', async () => {
+    const fetcher = vi.fn(async () => response({ error: 'invalid code' }, 400))
+    const { adapter, open } = createAdapter({ fetcher })
+    await adapter.signIn()
+    const opened = open.mock.results[0]?.value as Window
+    const state = new URL(String(opened.location.href)).searchParams.get('state')!
+
+    broadcastChannels[0]?.dispatchEvent(
+      new MessageEvent('message', { data: { code: 'rejected-code', state } })
+    )
+
+    await vi.waitFor(() =>
+      expect(broadcastChannels[0]?.postMessage).toHaveBeenCalledWith({
+        state,
+        status: 'failed'
+      })
+    )
+    adapter.dispose()
   })
 
   it('rejects expired callbacks without exchanging', async () => {

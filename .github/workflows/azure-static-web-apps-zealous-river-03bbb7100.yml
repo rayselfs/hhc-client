@@ -43,7 +43,7 @@ jobs:
           VITE_BIBLE_API_HOST: ${{ vars.VITE_BIBLE_API_HOST }}
           VITE_BIBLE_API_V1_PREFIX: ${{ vars.VITE_BIBLE_API_V1_PREFIX }}
           VITE_BIBLE_API_V2_PREFIX: ${{ vars.VITE_BIBLE_API_V2_PREFIX }}
-        run: npm run build
+        run: npm run build:web
 
       - name: Build And Deploy
         id: builddeploy

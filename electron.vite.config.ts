@@ -98,6 +98,14 @@ function devCspUnsafeInline(): Plugin {
   }
 }
 
+function hostedWebBase(mode: string): Plugin {
+  return {
+    name: 'hosted-web-base',
+    enforce: 'post',
+    config: () => (mode === 'web' ? { base: '/' } : undefined)
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const buildConfig = createBuildConfig(mode)
 
@@ -133,6 +141,7 @@ export default defineConfig(({ mode }) => {
         include: ['pdfjs-dist', 'pdfjs-dist/build/pdf.worker.mjs']
       },
       plugins: [
+        hostedWebBase(mode),
         react(),
         tailwindcss(),
         configuredOriginsCsp(buildConfig.hhcAccountOrigin, buildConfig.hhcAssetOrigin),

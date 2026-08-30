@@ -1,4 +1,5 @@
 export const HHC_AUTH_TRANSACTION_TTL_MS = 5 * 60_000
+export const HHC_AUTH_CALLBACK_CHANNEL = 'hhc-auth-callback'
 
 export interface HhcSession {
   userId: string

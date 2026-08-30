@@ -741,6 +741,14 @@
     "apiKey": "金鑰",
     "region": "區域"
   },
+  "authCallback": {
+    "pendingTitle": "正在完成登入...",
+    "pendingDescription": "請稍候並保持此頁面開啟。",
+    "completeTitle": "登入完成",
+    "completeDescription": "請返回 HHC 投影系統。你可以關閉這個頁面。",
+    "failedTitle": "無法完成登入",
+    "failedDescription": "請返回 HHC 投影系統並重新登入。"
+  },
   "userMenu": {
     "guest": "訪客",
     "accountMenu": "{{name}}的帳號選單",

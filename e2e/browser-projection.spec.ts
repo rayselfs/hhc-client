@@ -376,10 +376,9 @@ test('restores the HHC account session without storing the access token', async 
   const popupPromise = context.waitForEvent('page')
   await page.getByRole('menuitem', { name: 'Login' }).click()
   const popup = await popupPromise
-  await expect.poll(() => popup.isClosed()).toBe(true)
-  expect(callbackRequests).toBe(1)
-
   await expect(page.getByRole('button', { name: 'Account menu for Ada Lovelace' })).toBeVisible()
+  expect(popup.isClosed()).toBe(false)
+  expect(callbackRequests).toBe(1)
   await page.reload()
   await expect(page.getByRole('button', { name: 'Account menu for Ada Lovelace' })).toBeVisible()
   expect(sessionRequests).toBeGreaterThanOrEqual(3)
