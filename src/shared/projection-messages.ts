@@ -12,6 +12,8 @@
 import type { TimerTickPayload, TimerSyncPayload, StopwatchTickPayload } from './types/timer'
 import type { ProjectionTheme } from './types/projection-theme'
 
+export type FilePlaybackPhase = 'preparing' | 'ready' | 'playing' | 'paused' | 'ended'
+
 type EditableProjectionSlideBackground =
   | { type: 'solid'; color: string; transparency: number }
   | { type: 'color'; color: string }
@@ -161,6 +163,7 @@ export interface AppMessages {
   /** File playback state reported by projection video element */
   'file:playback-state': {
     itemId: string
+    phase: FilePlaybackPhase
     currentTime: number
     duration: number
     isPlaying: boolean

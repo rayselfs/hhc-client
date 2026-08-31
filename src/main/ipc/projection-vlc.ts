@@ -34,6 +34,7 @@ interface OwnedVlcSession {
   runtime: VlcPlayerRuntime | null
   sourceInstalled: boolean
   mediaReady: boolean
+  confirmedPlaybackStarted: boolean
   seekable: boolean | null
   pending: PendingVlcControls
   phase: 'opening' | 'waiting-media' | 'waiting-seek' | 'waiting-transport' | 'ready'
@@ -352,8 +353,16 @@ function sendState(
   }
   if (!ownsSession(wm, session, ownerPlayer)) return
 
+  const phase = isEnded
+    ? 'ended'
+    : isPlaying
+      ? 'playing'
+      : session.confirmedPlaybackStarted
+        ? 'paused'
+        : 'ready'
   wm.sendToMain('projection:message', session.generation, 'file:playback-state', {
     itemId: session.itemId,
+    phase,
     currentTime,
     duration,
     isPlaying,
@@ -477,6 +486,7 @@ function finishStartup(wm: WindowManager, session: OwnedVlcSession, isPlaying: b
   session.watchdog = null
   setNativePlayerWindowVisible(session, ownerPlayer, true)
   sendState(wm, session, { isPlaying, isEnded: false })
+  publishStarted(wm, session)
 }
 
 function applyFinalTransport(wm: WindowManager, session: OwnedVlcSession): void {
@@ -535,6 +545,10 @@ async function startVlc(
     runtime: null,
     sourceInstalled: false,
     mediaReady: false,
+    confirmedPlaybackStarted:
+      (request.initialPositionSeconds ?? 0) > 0 ||
+      request.initialPlaybackState === 'playing' ||
+      request.initialPlaybackState === 'ended',
     seekable: null,
     pending: {
       ...(request.initialVolume !== undefined ? { volume: request.initialVolume } : {}),
@@ -552,6 +566,17 @@ async function startVlc(
   }
   activeSession = session
   if (previousSession) destroySessionResources(previousSession)
+  if (ownsSession(wm, session)) {
+    wm.sendToMain('projection:message', session.generation, 'file:playback-state', {
+      itemId: session.itemId,
+      phase: 'preparing',
+      currentTime: request.initialPositionSeconds ?? 0,
+      duration: request.durationMs ? request.durationMs / 1000 : 0,
+      isPlaying: false,
+      isEnded: false,
+      ...(request.initialVolume !== undefined ? { volume: request.initialVolume } : {})
+    })
+  }
   let playbackPath: string
   try {
     playbackPath = await resolveVideoPlaybackPath(
@@ -675,6 +700,9 @@ async function startVlc(
     })
     nextPlayer.on('playing', () => {
       if (!ownsSession(wm, session, embeddedPlayer)) return
+      if (session.pending.transport === 'play' || session.phase === 'ready') {
+        session.confirmedPlaybackStarted = true
+      }
       if (!session.mediaReady) {
         session.mediaReady = true
         try {
@@ -726,7 +754,6 @@ async function startVlc(
     setNativePlayerWindowVisible(session, nextPlayer, false)
     if (!applyPendingVolume(wm, session)) return
     if (!runOwnedNativeAction(wm, session, (player) => player.play())) return
-    publishStarted(wm, session)
   } catch (error) {
     if (!session.listenerCleanup) {
       try {

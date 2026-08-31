@@ -268,6 +268,13 @@ export default function FileProjection({
         (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0)
       send('file:playback-state', {
         itemId,
+        phase: (next?.isEnded ?? video.ended)
+          ? 'ended'
+          : (next?.isPlaying ?? !video.paused)
+            ? 'playing'
+            : video.currentTime > 0
+              ? 'paused'
+              : 'ready',
         currentTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
         duration,
         isPlaying: next?.isPlaying ?? !video.paused,

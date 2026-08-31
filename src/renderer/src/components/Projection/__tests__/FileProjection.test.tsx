@@ -471,6 +471,7 @@ describe('FileProjection copied media identity', () => {
 
     expect(mockProjectionSend).toHaveBeenCalledWith('file:playback-state', {
       itemId: 'live-id',
+      phase: 'paused',
       currentTime: 12,
       duration: 100,
       isPlaying: false,

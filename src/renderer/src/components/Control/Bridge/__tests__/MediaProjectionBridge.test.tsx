@@ -131,6 +131,7 @@ describe('MediaProjectionBridge', () => {
     act(() => {
       mocks.handlers.get('file:playback-state')?.({
         itemId: 'video-1',
+        phase: 'paused',
         currentTime: 24,
         duration: 120,
         isPlaying: false,
@@ -141,6 +142,7 @@ describe('MediaProjectionBridge', () => {
     })
 
     expect(useMediaProjectionStore.getState().typeStates.video).toMatchObject({
+      phase: 'paused',
       currentTime: 24,
       duration: 120,
       isPlaying: false,
@@ -174,6 +176,7 @@ describe('MediaProjectionBridge', () => {
     act(() => {
       mocks.handlers.get('file:playback-state')?.({
         itemId: 'video-1',
+        phase: 'ready',
         currentTime: 0,
         duration: 120,
         isPlaying: false,
@@ -182,6 +185,7 @@ describe('MediaProjectionBridge', () => {
       })
       mocks.handlers.get('file:playback-state')?.({
         itemId: 'video-1',
+        phase: 'playing',
         currentTime: 0,
         duration: 120,
         isPlaying: true,

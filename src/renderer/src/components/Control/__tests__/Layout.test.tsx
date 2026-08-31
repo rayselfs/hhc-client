@@ -248,6 +248,7 @@ describe('Layout', () => {
     await waitFor(() => expect(projectionEvents.playback).not.toBeNull())
     projectionEvents.playback?.({
       itemId: 'video-1',
+      phase: 'playing',
       currentTime: 12,
       duration: 60,
       isPlaying: true,

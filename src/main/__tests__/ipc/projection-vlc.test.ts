@@ -248,7 +248,52 @@ describe('projection-vlc listener cleanup', () => {
       container: '#vlc-player'
     })
 
+    expect(mockWindowManager.sendToMain).not.toHaveBeenCalledWith(
+      'projection-vlc:started',
+      4,
+      'item-1'
+    )
+    mockVlcPlayers[0].emit('playing')
+    expect(mockWindowManager.sendToMain).not.toHaveBeenCalledWith(
+      'projection-vlc:started',
+      4,
+      'item-1'
+    )
+    mockVlcPlayers[0].emit('paused')
     expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:started', 4, 'item-1')
+  })
+
+  it('publishes preparing and retains play until owner-confirmed playing', async () => {
+    const playbackPath = deferred<string>()
+    mockResolveVideoPlaybackPath.mockReturnValueOnce(playbackPath.promise)
+    const startPromise = Promise.resolve(
+      getHandler('projection-vlc:start')(makeEvent(), {
+        itemId: 'item-1',
+        attemptId: 'attempt-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player'
+      })
+    )
+
+    await vi.waitFor(() =>
+      expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+        'projection:message',
+        4,
+        'file:playback-state',
+        expect.objectContaining({ itemId: 'item-1', phase: 'preparing', isPlaying: false })
+      )
+    )
+    getHandler('projection-vlc:control')(makeEvent(), { action: 'play', itemId: 'item-1' })
+    playbackPath.resolve('/native-files/prepared.mkv')
+    await startPromise
+    mockVlcPlayers[0].emit('playing')
+
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+      'projection:message',
+      4,
+      'file:playback-state',
+      expect.objectContaining({ phase: 'playing', isPlaying: true })
+    )
   })
 
   it('publishes sanitized typed failures without returning native diagnostics', async () => {
@@ -358,6 +403,8 @@ describe('projection-vlc listener cleanup', () => {
     ).resolves.toBeUndefined()
     expect(mockVlcPlayers).toHaveLength(2)
     expect(mockVlcPlayers[0].destroy).toHaveBeenCalledOnce()
+    mockVlcPlayers[1].emit('playing')
+    mockVlcPlayers[1].emit('paused')
     expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:started', 4, 'item-1')
   })
 
@@ -529,6 +576,7 @@ describe('projection-vlc listener cleanup', () => {
       'file:playback-state',
       expect.objectContaining({
         itemId: 'item-1',
+        phase: 'ended',
         isPlaying: false,
         isEnded: true
       })
@@ -703,6 +751,7 @@ describe('projection-vlc listener cleanup', () => {
       'file:playback-state',
       expect.objectContaining({
         itemId: 'item-1',
+        phase: 'ready',
         isPlaying: false,
         seekable: true,
         volume: 0.35
