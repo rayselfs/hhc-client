@@ -259,6 +259,7 @@ describe('projection:send-to-main', () => {
     const handler = getOnHandler('projection:send-to-main')
     const payload = {
       itemId: 'video-id',
+      phase: 'playing',
       currentTime: 12,
       duration: 100,
       isPlaying: true,
