@@ -784,7 +784,11 @@ function controlVlc(wm: WindowManager, command: ProjectionVlcControlRequest): vo
   switch (command.action) {
     case 'play':
       session.pending.transport = 'play'
-      if (session.phase === 'ready') runOwnedNativeAction(wm, session, (player) => player.play())
+      if (session.phase === 'ready')
+        runOwnedNativeAction(wm, session, (player) => {
+          if (player.shouldReplayFromStart()) player.replayFromStart()
+          else player.play()
+        })
       else if (session.mediaReady && session.phase !== 'waiting-seek')
         applyFinalTransport(wm, session)
       break

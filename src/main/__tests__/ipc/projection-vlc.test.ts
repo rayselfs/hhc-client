@@ -44,6 +44,8 @@ const mockVlcPlayers: Array<{
   setVolume: ReturnType<typeof vi.fn>
   setTime: ReturnType<typeof vi.fn>
   play: ReturnType<typeof vi.fn>
+  replayFromStart: ReturnType<typeof vi.fn>
+  shouldReplayFromStart: ReturnType<typeof vi.fn>
   emit: (event: string, ...args: unknown[]) => boolean
 }> = []
 let mockEmbedImplementation: () => Promise<void> = () => Promise.resolve()
@@ -127,6 +129,8 @@ vi.mock('electron-vlc-player', () => ({
     isSeekable = vi.fn(() => true)
     getState = vi.fn(() => 0)
     play = vi.fn()
+    replayFromStart = vi.fn()
+    shouldReplayFromStart = vi.fn(() => false)
     pause = vi.fn()
     setTime = vi.fn()
     setVolume = vi.fn()
@@ -726,6 +730,25 @@ describe('projection-vlc listener cleanup', () => {
       'file:playback-state',
       expect.objectContaining({ itemId: 'item-1', isPlaying: true, isEnded: false })
     )
+  })
+
+  it('uses the native replay path after media ends', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+    const current = mockVlcPlayers[0]
+    current.emit('playing')
+    current.emit('paused')
+    current.emit('endReached')
+    current.shouldReplayFromStart.mockReturnValue(true)
+
+    getHandler('projection-vlc:control')(makeEvent(), { action: 'play', itemId: 'item-1' })
+
+    expect(current.shouldReplayFromStart).toHaveBeenCalledOnce()
+    expect(current.replayFromStart).toHaveBeenCalledOnce()
+    expect(current.play).toHaveBeenCalledOnce()
   })
 
   it('keeps bootstrap events internal and publishes owner-confirmed capability and volume', async () => {
