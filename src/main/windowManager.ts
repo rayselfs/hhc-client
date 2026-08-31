@@ -182,6 +182,7 @@ export class WindowManager {
     const primaryDisplay = screen.getPrimaryDisplay()
     const targetDisplay = this.getProjectionDisplay(displayId)
     const hasSecondScreen = targetDisplay.id !== primaryDisplay.id
+    const useMacSimpleFullscreen = process.platform === 'darwin' && hasSecondScreen
     this.projectionDisplayId = String(targetDisplay.id)
     let windowGeneration = this.nextProjectionGeneration(
       reason === 'renderer-crash' ? 'recovering' : 'opening',
@@ -197,7 +198,7 @@ export class WindowManager {
       fullscreen: false,
       enableLargerThanScreen: hasSecondScreen,
       frame: false,
-      focusable: false,
+      focusable: useMacSimpleFullscreen,
       fullscreenable: false,
       minimizable: false,
       maximizable: false,
@@ -214,7 +215,6 @@ export class WindowManager {
       title: 'Projection'
     })
     projectionWindow.setIgnoreMouseEvents(true)
-    if (hasSecondScreen) projectionWindow.setAlwaysOnTop(true, 'screen-saver')
     this.projectionWindow = projectionWindow
     this.guardTopLevelNavigation(projectionWindow)
 
@@ -259,6 +259,11 @@ export class WindowManager {
     projectionWindow.once('ready-to-show', () => {
       if (this.projectionWindow !== projectionWindow) return
       projectionWindow.showInactive()
+      if (useMacSimpleFullscreen) {
+        projectionWindow.setSimpleFullScreen(true)
+        projectionWindow.setFocusable(false)
+        this.mainWindow?.focus()
+      }
     })
 
     projectionWindow.webContents.on('did-start-loading', () => {

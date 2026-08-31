@@ -38,6 +38,8 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
     show = vi.fn()
     setIgnoreMouseEvents = vi.fn()
     setFullScreen = vi.fn()
+    setSimpleFullScreen = vi.fn()
+    setFocusable = vi.fn()
     maximize = vi.fn()
     setAlwaysOnTop = vi.fn()
     close = vi.fn()
@@ -219,7 +221,7 @@ describe('WindowManager', () => {
       frame: false,
       fullscreen: false,
       enableLargerThanScreen: true,
-      focusable: false,
+      focusable: process.platform === 'darwin',
       fullscreenable: false,
       minimizable: false,
       maximizable: false,
@@ -229,10 +231,12 @@ describe('WindowManager', () => {
     expect(projection.setIgnoreMouseEvents).toHaveBeenCalledWith(true)
   })
 
-  it('shows external projection above system chrome without taking focus', () => {
+  it('uses macOS simple fullscreen without keeping projection always on top', () => {
     const wm = WindowManager.getInstance()
+    wm.createMainWindow()
     wm.createProjectionWindow('2')
-    const projection = FakeBrowserWindow.instances[0]
+    const control = FakeBrowserWindow.instances[0]
+    const projection = FakeBrowserWindow.instances[1]
 
     projection.emitOnce('ready-to-show')
 
@@ -241,7 +245,12 @@ describe('WindowManager', () => {
     expect(projection.moveTop).not.toHaveBeenCalled()
     expect(projection.setFullScreen).not.toHaveBeenCalled()
     expect(projection.show).not.toHaveBeenCalled()
-    expect(projection.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
+    expect(projection.setAlwaysOnTop).not.toHaveBeenCalled()
+    if (process.platform === 'darwin') {
+      expect(projection.setSimpleFullScreen).toHaveBeenCalledWith(true)
+      expect(projection.setFocusable).toHaveBeenCalledWith(false)
+      expect(control.focus).toHaveBeenCalledOnce()
+    }
   })
 
   it('consumes exactly one main-window close permit', () => {
@@ -499,7 +508,11 @@ describe('WindowManager', () => {
     expect(recovered.moveTop).not.toHaveBeenCalled()
     expect(moved.focus).not.toHaveBeenCalled()
     expect(recovered.focus).not.toHaveBeenCalled()
-    expect(moved.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
-    expect(recovered.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
+    expect(moved.setAlwaysOnTop).not.toHaveBeenCalled()
+    expect(recovered.setAlwaysOnTop).not.toHaveBeenCalled()
+    if (process.platform === 'darwin') {
+      expect(moved.setSimpleFullScreen).toHaveBeenCalledWith(true)
+      expect(recovered.setSimpleFullScreen).toHaveBeenCalledWith(true)
+    }
   })
 })
