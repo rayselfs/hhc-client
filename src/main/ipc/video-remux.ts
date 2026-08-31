@@ -171,6 +171,8 @@ async function ensureRemux(sourceFileId: string, state: SourceState): Promise<st
           temporaryOutput,
           '-map',
           '0',
+          '-c',
+          'copy',
           '-f',
           'null',
           '-'
