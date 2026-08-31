@@ -1136,6 +1136,7 @@
     "notesPlaceholder": "Add notes...",
     "loading": "Loading...",
     "imageLoadFailed": "Failed to load image",
+    "videoPreparing": "Preparing video...",
     "videoLoadFailed": "Failed to load video",
     "pdfLoadFailed": "Failed to load PDF"
   }

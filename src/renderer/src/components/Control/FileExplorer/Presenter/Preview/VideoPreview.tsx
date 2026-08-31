@@ -77,6 +77,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
   const projectionPlaybackState = useMediaProjectionStore((s) => s.typeStates.video)
+  const usesProjectionVlc = useMediaProjectionStore(
+    (s) =>
+      s.snapshot?.entries.some(
+        (entry) => entry.itemId === item.id && entry.playbackMode === 'vlc-embedded'
+      ) === true
+  )
   const metadataDuration = useMediaProjectionStore((s) => {
     const durationMs = s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.durationMs
     return durationMs && durationMs > 0 ? durationMs / 1000 : undefined
@@ -96,6 +102,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const displayedHasStarted = projectionPlaybackState?.hasStarted ?? hasStarted
   const displayedIsPlaying = projectionPlaybackState?.isPlaying ?? isPlaying
   const displayedIsEnded = projectionPlaybackState?.isEnded ?? isEnded
+  const isPreparing = usesProjectionVlc && projectionPlaybackState?.phase === 'preparing'
   const transform =
     zoomLevel !== 1
       ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
@@ -205,6 +212,20 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   }, [])
 
   const handlePlayPause = useCallback((): void => {
+    if (usesProjectionVlc) {
+      if (displayedIsEnded) {
+        triggerFlash('play')
+        sendCommand({ action: 'seek', itemId: item.id, value: 0 })
+        sendCommand({ action: 'play', itemId: item.id })
+      } else if (displayedIsPlaying) {
+        triggerFlash('pause')
+        sendCommand({ action: 'pause', itemId: item.id })
+      } else {
+        if (hasStartedRef.current) triggerFlash('play')
+        sendCommand({ action: 'play', itemId: item.id })
+      }
+      return
+    }
     if (!videoRef.current) return
     if (displayedIsEnded) {
       triggerFlash('play')
@@ -230,15 +251,29 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         .catch(() => setPlaybackState({ isPlaying: false }))
       sendCommand({ action: 'play', itemId: item.id })
     }
-  }, [displayedIsEnded, displayedIsPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [
+    displayedIsEnded,
+    displayedIsPlaying,
+    item.id,
+    sendCommand,
+    setPlaybackState,
+    triggerFlash,
+    usesProjectionVlc
+  ])
 
   const pauseVideo = useCallback((): void => {
-    if (!videoRef.current || !displayedIsPlaying) return
+    if (!displayedIsPlaying) return
+    if (usesProjectionVlc) {
+      triggerFlash('pause')
+      sendCommand({ action: 'pause', itemId: item.id })
+      return
+    }
+    if (!videoRef.current) return
     triggerFlash('pause')
     setPlaybackState({ isPlaying: false })
     videoRef.current.pause()
     sendCommand({ action: 'pause', itemId: item.id })
-  }, [displayedIsPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [displayedIsPlaying, item.id, sendCommand, setPlaybackState, triggerFlash, usesProjectionVlc])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
@@ -299,10 +334,10 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       setLocalSeekTime(clamped)
       setPendingSeek({ itemId: item.id, time: clamped })
       setCurrentTime(clamped)
-      if (videoRef.current) videoRef.current.currentTime = clamped
+      if (videoRef.current && !usesProjectionVlc) videoRef.current.currentTime = clamped
       sendCommand({ action: 'seek', itemId: item.id, value: clamped })
     },
-    [item.id, seekable, sendCommand]
+    [item.id, seekable, sendCommand, usesProjectionVlc]
   )
 
   useEffect(() => {
@@ -310,8 +345,9 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       const detail = (event as CustomEvent<{ seconds?: number }>).detail
       const offset = detail?.seconds
       if (!seekable || typeof offset !== 'number' || !Number.isFinite(offset)) return
-      const base =
-        videoRef.current && videoRef.current.readyState >= 1
+      const base = usesProjectionVlc
+        ? (projectionPlaybackState?.currentTime ?? currentTimeRef.current)
+        : videoRef.current && videoRef.current.readyState >= 1
           ? videoRef.current.currentTime
           : currentTimeRef.current
       commitSeek(base + offset)
@@ -320,7 +356,13 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
     window.addEventListener('media:videoSeekRelative', handleRelativeSeek)
     return () => window.removeEventListener('media:videoSeekRelative', handleRelativeSeek)
-  }, [commitSeek, seekable, triggerSeekFlash])
+  }, [
+    commitSeek,
+    projectionPlaybackState?.currentTime,
+    seekable,
+    triggerSeekFlash,
+    usesProjectionVlc
+  ])
 
   const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
     if (target.hasPointerCapture?.(pointerId)) {
@@ -379,17 +421,19 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         )}
       </div>
 
-      {!displayedHasStarted && (
+      {isPreparing && (
+        <div
+          role="status"
+          className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 text-white pointer-events-none"
+        >
+          {t('presenter.videoPreparing')}
+        </div>
+      )}
+
+      {!displayedHasStarted && !isPreparing && (
         <button
           className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
-          onClick={() => {
-            setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
-            videoRef.current
-              ?.play()
-              .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
-              .catch(() => setPlaybackState({ isPlaying: false }))
-            sendCommand({ action: 'play', itemId: item.id })
-          }}
+          onClick={handlePlayPause}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="rounded-full p-4 presenter-media-control">
@@ -430,7 +474,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         </div>
       )}
 
-      {displayedHasStarted && !displayedIsEnded && (
+      {displayedHasStarted && !displayedIsEnded && !isPreparing && (
         <button
           className="absolute inset-0 z-10 cursor-pointer"
           aria-label="Toggle play"
