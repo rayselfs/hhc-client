@@ -943,7 +943,12 @@ describe('FileProjection copied media identity', () => {
 
     await act(async () => resolvePdf?.(pdf))
     await waitFor(() => expect(renderResolves.has(1)).toBe(true))
-    expect(container.querySelector('[data-pdf-preview="1"]')).not.toBeNull()
+    const renderedPreview = container.querySelector<HTMLElement>('[data-pdf-preview="1"]')
+    const canvasHost = container.querySelector<HTMLElement>('[data-pdf-canvas-host="1"]')
+    expect(renderedPreview).not.toBeNull()
+    expect(canvasHost).not.toBeNull()
+    expect(canvasHost).not.toContainElement(renderedPreview)
+    expect(canvasHost?.parentElement).toBe(renderedPreview?.parentElement)
     expect(container.querySelector('canvas[data-pdf-page="1"]')).toBeNull()
 
     await act(async () => renderResolves.get(1)?.())

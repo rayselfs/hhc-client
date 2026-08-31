@@ -1061,12 +1061,11 @@ function PdfCanvas({
   pageNumber: number
   continuous?: boolean
 }): React.JSX.Element | null {
-  const containerRef = useRef<HTMLDivElement | null>(null)
+  const canvasHostRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const container = containerRef.current
-    if (!container || !canvas) return
-    container.innerHTML = ''
+    const canvasHost = canvasHostRef.current
+    if (!canvasHost || !canvas) return
     Object.assign(canvas.style, {
       width: continuous ? '100%' : '',
       height: continuous ? 'auto' : '',
@@ -1074,16 +1073,13 @@ function PdfCanvas({
       maxHeight: continuous ? 'none' : '100%',
       objectFit: 'contain'
     })
-    container.appendChild(canvas)
-    return () => {
-      container.innerHTML = ''
-    }
+    canvasHost.replaceChildren(canvas)
+    return () => canvas.remove()
   }, [canvas, continuous])
 
   if (!canvas && !previewUrl) return null
   return (
     <div
-      ref={containerRef}
       className={`flex items-center justify-center w-full${continuous ? '' : ' h-full'}`}
       style={
         continuous && size
@@ -1091,6 +1087,11 @@ function PdfCanvas({
           : undefined
       }
     >
+      <div
+        ref={canvasHostRef}
+        data-pdf-canvas-host={pageNumber}
+        className={`flex h-full w-full items-center justify-center${canvas ? '' : ' hidden'}`}
+      />
       {!canvas && previewUrl && (
         <img
           data-pdf-preview={pageNumber}

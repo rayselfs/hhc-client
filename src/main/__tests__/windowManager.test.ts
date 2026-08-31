@@ -218,6 +218,7 @@ describe('WindowManager', () => {
       show: false,
       frame: false,
       fullscreen: false,
+      enableLargerThanScreen: true,
       focusable: false,
       fullscreenable: false,
       minimizable: false,
@@ -228,7 +229,7 @@ describe('WindowManager', () => {
     expect(projection.setIgnoreMouseEvents).toHaveBeenCalledWith(true)
   })
 
-  it('shows projection without focus or z-order mutation', () => {
+  it('shows external projection above system chrome without taking focus', () => {
     const wm = WindowManager.getInstance()
     wm.createProjectionWindow('2')
     const projection = FakeBrowserWindow.instances[0]
@@ -240,7 +241,7 @@ describe('WindowManager', () => {
     expect(projection.moveTop).not.toHaveBeenCalled()
     expect(projection.setFullScreen).not.toHaveBeenCalled()
     expect(projection.show).not.toHaveBeenCalled()
-    expect(projection.setAlwaysOnTop).not.toHaveBeenCalled()
+    expect(projection.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
   })
 
   it('consumes exactly one main-window close permit', () => {
@@ -482,7 +483,7 @@ describe('WindowManager', () => {
     })
   })
 
-  it('does not foreground a crash recovery or display replacement', () => {
+  it('does not focus a crash recovery or display replacement', () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000)
     const wm = WindowManager.getInstance()
@@ -498,7 +499,7 @@ describe('WindowManager', () => {
     expect(recovered.moveTop).not.toHaveBeenCalled()
     expect(moved.focus).not.toHaveBeenCalled()
     expect(recovered.focus).not.toHaveBeenCalled()
-    expect(moved.setAlwaysOnTop).not.toHaveBeenCalled()
-    expect(recovered.setAlwaysOnTop).not.toHaveBeenCalled()
+    expect(moved.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
+    expect(recovered.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
   })
 })

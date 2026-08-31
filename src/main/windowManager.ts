@@ -195,6 +195,7 @@ export class WindowManager {
       x: targetDisplay.bounds.x,
       y: targetDisplay.bounds.y,
       fullscreen: false,
+      enableLargerThanScreen: hasSecondScreen,
       frame: false,
       focusable: false,
       fullscreenable: false,
@@ -213,6 +214,7 @@ export class WindowManager {
       title: 'Projection'
     })
     projectionWindow.setIgnoreMouseEvents(true)
+    if (hasSecondScreen) projectionWindow.setAlwaysOnTop(true, 'screen-saver')
     this.projectionWindow = projectionWindow
     this.guardTopLevelNavigation(projectionWindow)
 

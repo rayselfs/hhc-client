@@ -87,10 +87,11 @@ build alone are not acceptance.
 
 ### 1. Output-only projection window
 
-On an external display, create a borderless window at the selected display's exact bounds rather
-than entering macOS native fullscreen. Configure it as non-focusable, non-fullscreenable,
-non-minimizable, and mouse-ignoring. Show it once with `showInactive()` after renderer readiness.
-Do not call `focus()`, `moveTop()`, `setFullScreen()`, or permanent `setAlwaysOnTop()`.
+On an external display, create a borderless window at the selected display's exact bounds with
+macOS larger-than-screen placement enabled rather than entering native fullscreen Space. Configure
+it as non-focusable, non-fullscreenable, non-minimizable, and mouse-ignoring. Show it once with
+`showInactive()` after renderer readiness. Use the `screen-saver` window level only for that external
+output so it covers macOS system chrome. Do not call `focus()`, `moveTop()`, or `setFullScreen()`.
 
 On the primary-display development fallback, preserve the current bounded preview size but apply
 the same output-only focus and mouse policy. The control window owns close and display selection, so
