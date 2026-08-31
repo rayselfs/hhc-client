@@ -3,8 +3,8 @@
 ## Goal
 
 Make projection an output-only surface controlled exclusively from the control window, and make
-macOS VLC/MKV playback and PDF navigation reliable in both Electron development and packaged
-desktop builds.
+macOS VLC/MKV playback feel like normal local video playback—including on a cold derivative cache—
+while keeping PDF navigation reliable in Electron development and packaged desktop builds.
 
 The work is complete only when the operator-visible workflow passes on a real macOS control window
 and external projection display. Unit tests, commit count, `projection-vlc:started`, and a packaged
@@ -26,6 +26,9 @@ build alone are not acceptance.
 5. The projection `BrowserWindow` uses macOS native fullscreen. `electron-vlc-player` observes that
    fullscreen state and its `destroy()` may call `setFullScreen(false)` when replacing a player,
    causing the projection to leave fullscreen during a file switch.
+6. The external-display workaround uses the `screen-saver` always-on-top level. It covers macOS
+   system chrome, but it is not a real fullscreen lifecycle and incorrectly remains above unrelated
+   applications.
 
 ### VLC playback
 
@@ -37,6 +40,15 @@ build alone are not acceptance.
    paused-at-zero state stores `false`, later playing state cannot change it to `true`.
 3. `VideoPreview` hides both the central-play transition and the timeline behind that stuck state,
    preventing operator seek verification even when VLC is playing.
+4. Desktop-engine MKV starts a Chromium `<video>` preview and the projection VLC player at the same
+   time. The Chromium path is not authoritative and can stall on Matroska while presenting optimistic
+   local state that disagrees with VLC.
+5. VLC path resolution, cached-derivative verification, native embed, bootstrap play, and final
+   transport have no operator-visible lifecycle. A play request can therefore remain at `00:00`
+   with controls claiming playback until a later native event arrives.
+6. Cold Matroska preparation performs stream-copy remux and then decodes the complete derivative for
+   validation. The second full decode is unnecessary for container validation and adds avoidable
+   first-play latency.
 
 ### PDF rendering and navigation
 
@@ -59,6 +71,8 @@ build alone are not acceptance.
 
 - The main window is the only operator control surface.
 - The Electron projection window never receives keyboard or mouse focus.
+- A one-time macOS fullscreen transition may temporarily require a focusable window, but completion
+  immediately restores the control window and makes projection non-focusable before content replay.
 - Play, pause, seek, volume, item replacement, PDF page changes, Bible content, Timer content, replay,
   and recovery messages never change projection window focus, z-order, fullscreen, or bounds.
 - Browser mode retains the same content ownership. The browser may activate a popup during the
@@ -82,16 +96,25 @@ build alone are not acceptance.
   existing cached preview.
 - Unsupported or damaged media returns a typed, recoverable error to the control window and does not
   contaminate the next item.
+- A play request never renders an optimistic `playing` state. Preparation is explicit, queued play is
+  preserved, and `playing` appears only after the owner-matched native VLC event.
+- Warm-cache playback should produce authoritative state within one second. On the current test Mac,
+  the 36 MB cold-cache fixture must produce its first advancing frame within three seconds; exceeding
+  that budget is a failed acceptance result rather than a successful "responsive" preparation.
 
 ## Architecture
 
 ### 1. Output-only projection window
 
-On an external display, create a borderless window at the selected display's exact bounds with
-macOS larger-than-screen placement enabled rather than entering native fullscreen Space. Configure
-it as non-focusable, non-fullscreenable, non-minimizable, and mouse-ignoring. Show it once with
-`showInactive()` after renderer readiness. Use the `screen-saver` window level only for that external
-output so it covers macOS system chrome. Do not call `focus()`, `moveTop()`, or `setFullScreen()`.
+On an external macOS display, create a borderless window on the selected display, show it inactive,
+and enter Electron simple fullscreen once. Simple fullscreen covers the display without creating a
+separate native fullscreen Space and without exposing a fullscreen state that
+`electron-vlc-player.destroy()` will exit. The window is focusable only for this initial transition;
+afterward restore the control window, make projection non-focusable, and keep it mouse-ignoring.
+Never use `alwaysOnTop`, the `screen-saver` window level, `moveTop()`, or content-triggered fullscreen.
+
+On Windows, retain the borderless exact-display-bounds window. It does not require the macOS simple
+fullscreen transition or any always-on-top level.
 
 On the primary-display development fallback, preserve the current bounded preview size but apply
 the same output-only focus and mouse policy. The control window owns close and display selection, so
@@ -108,9 +131,9 @@ Remove the projection foreground operation end to end:
 External-display presence must not maximize or fullscreen the control window. Control-window state is
 independent of projection availability.
 
-Display move and crash recovery create a replacement output-only window, advance generation, wait
-for the projection renderer ready handshake, and replay the coordinator snapshot. No content caller
-recreates or foregrounds the window directly.
+Display move and crash recovery create a replacement output-only window, advance generation, finish
+the platform-specific display transition, wait for the projection renderer ready handshake, and
+replay the coordinator snapshot. No content caller recreates or foregrounds the window directly.
 
 ### 2. VLC session boundary
 
@@ -120,28 +143,40 @@ Do not add a second player, worker pool, renderer retry loop, or import-time nor
 
 VLC owns only its native child view and playback session. Replacing a file hides and destroys the old
 child/session after invalidating ownership. It does not own the projection `BrowserWindow` lifecycle.
-Using a display-bound non-native-fullscreen projection removes the fullscreen state that
-`electron-vlc-player.destroy()` currently attempts to leave.
+Simple fullscreen is established before VLC construction and remains outside the player's fullscreen
+state.
+
+Matroska keeps its fingerprinted, atomic stream-copy derivative. Validate the completed derivative
+with an error-strict packet stream-copy scan (`-c copy -f null`) rather than decoding every frame.
+This preserves truncated-payload detection without a second full decode and adds no new process,
+worker, persistent job system, or source mutation.
 
 The startup state machine is:
 
-1. Install the source, hide the native child, apply volume, and issue the existing internal bootstrap
+1. Publish owner-matched `preparing` before derivative lookup/remux. Retain play, pause, seek, and
+   volume commands received during this phase.
+2. Install the source, hide the native child, apply volume, and issue the existing internal bootstrap
    play.
-2. On the first owner-matched `playing`, record media readiness and confirmed seekability.
-3. If a seek is pending, apply it and wait for owner-matched time confirmation before final transport.
-4. If final transport is pause, request pause and finish on owner-matched `paused`.
-5. If final transport is play and no seek remains, the first `playing` event already confirms the
+3. On the first owner-matched `playing`, record media readiness and confirmed seekability.
+4. If a seek is pending, apply it and wait for owner-matched time confirmation before final transport.
+5. If final transport is pause, request pause and finish on owner-matched `paused`.
+6. If final transport is play and no seek remains, the first `playing` event already confirms the
    desired transport. Finish startup immediately; do not request redundant play or wait for another
    event.
-6. Finishing startup reveals the native child, clears the watchdog and pending transport, and
-   publishes authoritative playback state.
+7. Finishing startup reveals the native child, clears the watchdog and pending transport, publishes
+   authoritative `ready`/`playing` state, and only then publishes the VLC-started acknowledgement.
 
 All callbacks continue to verify active session, player, item, attempt, lifecycle, and projection
 generation before reading native state or publishing.
 
 ### 3. Video control state
 
-`hasStarted` is monotonic for the active item:
+For a desktop-engine item, Control does not call the local Chromium media element's `play()` or use
+its events as presentation truth. It sends commands to projection and renders the owner-matched VLC
+state. Native browser/MP4 preview behavior remains unchanged.
+
+The active video lifecycle is explicit: `preparing`, `ready`, `playing`, `paused`, `ended`, or the
+existing typed failure. `hasStarted` is monotonic for the active item:
 
 ```text
 previous hasStarted OR currentTime > 0 OR isPlaying
@@ -156,6 +191,8 @@ The timeline is an availability control, not a started-state control:
 - enable seek only when `seekable === true`;
 - retain the existing pending-seek indication until authoritative state confirms position;
 - show the central play button before the first start and after end, not over confirmed playback.
+- show a non-blocking preparing indicator while VLC is resolving the current item; a queued play may
+  auto-start, but the UI must not claim `playing` until VLC confirms it.
 
 ### 4. PDF execution environments
 
@@ -198,17 +235,18 @@ claim to repair PDF source bytes.
 
 Write each regression before production code and observe the expected failure.
 
-1. `WindowManager` tests assert projection options are output-only and content flow never calls
-   focus, z-order, or fullscreen APIs. Display move and crash recovery still advance generation and
-   replay after readiness.
+1. `WindowManager` tests assert macOS external projection enters simple fullscreen once, restores
+   control focus, becomes non-focusable, and never uses always-on-top, native fullscreen, or
+   content-triggered window mutations. Display move and crash recovery retain the same contract.
 2. IPC/preload/renderer contract tests prove the foreground API is removed without leaving an
    untyped escape hatch.
 3. Media-sync tests prove start and item replacement send content only.
-4. VLC unit tests reproduce immediate play without seek and prove the first owner-matched `playing`
-   completes startup exactly once. Existing seek, pause, rapid replacement, remux, failure, and stale
-   event tests remain green.
-5. Bridge/component tests prove `false -> playing` makes `hasStarted` true, hides the central button,
-   renders the timeline after duration, and disables only seek for non-seekable input.
+4. VLC unit tests prove `preparing` publication, queued control retention, and the first owner-matched
+   `playing` completing startup exactly once. Remux tests prove derivative validation uses a packet
+   stream-copy scan rather than full decode; existing failure and stale-event coverage remains green.
+5. Bridge/component tests prove desktop-engine preview never starts Chromium playback, preparing is
+   visible without optimistic playing, `false -> playing` makes `hasStarted` true, and the timeline
+   follows authoritative duration/seekability.
 6. PDF preview tests capture React console errors, issue next/previous and rapid repeated navigation,
    and prove no render-phase cross-component update occurs.
 7. PDF worker tests distinguish renderer real-worker setup from the intentional in-background-worker
@@ -259,11 +297,11 @@ Required observations:
 
 1. Open projection, start Media, switch mixed MP4/MKV content at least 20 times, and confirm the
    control window retains keyboard focus throughout.
-2. Confirm projection remains display-filling and never enters/leaves a native fullscreen Space
-   during playback or replacement.
-3. Start both MKVs immediately after selection without waiting for readiness. The UI remains
-   responsive, reports preparation when remux is required, and reaches authoritative playing or a
-   typed recoverable failure.
+2. Confirm projection uses macOS simple fullscreen, remains display-filling, is not always-on-top
+   above other applications, and never enters/leaves a native fullscreen Space during replacement.
+3. Clear only the task-created derivative for each MKV, then test one cold-cache start and one
+   warm-cache start. A single play request is retained through preparation, Control never claims
+   playing early, and first advancing frame meets the one/three-second warm/cold budgets.
 4. Pause/resume and seek near the beginning, middle, and end of the long MKV. Control and projection
    time/transport agree after confirmation.
 5. Confirm the central play button and timeline follow the product contract.
