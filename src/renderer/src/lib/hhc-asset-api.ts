@@ -4,7 +4,8 @@ import type {
   HhcAssetCollectionItem,
   HhcAssetCollectionPage,
   HhcAssetContentRequest,
-  HhcAssetContentTicket
+  HhcAssetContentTicket,
+  HhcAssetSyncReceipt
 } from '@shared/hhc-assets'
 import { isElectron } from './env'
 import type { SyncRemoteContentSource } from './sync-provider'
@@ -25,6 +26,7 @@ export interface HhcAssetApi {
   getCollectionChanges(collectionId: string, cursor?: string): Promise<HhcAssetCollectionChangePage>
   getCollectionItem(collectionId: string, itemId: string): Promise<HhcAssetCollectionItem>
   issueContentTicket(collectionId: string, itemId: string): Promise<HhcAssetContentTicket>
+  recordSyncReceipt(receipt: HhcAssetSyncReceipt): Promise<void>
   getRemoteContentSource(collectionId: string, itemId: string): Promise<SyncRemoteContentSource>
   downloadContent(
     request: HhcAssetContentRequest,

@@ -120,6 +120,7 @@ function api(overrides: Partial<HhcAssetApi> = {}): HhcAssetApi {
     getCollectionChanges: resetChanges(),
     getCollectionItem: vi.fn(),
     issueContentTicket: vi.fn(),
+    recordSyncReceipt: vi.fn(async () => undefined),
     getRemoteContentSource: vi.fn(),
     downloadContent: vi.fn(),
     ...overrides

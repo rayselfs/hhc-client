@@ -89,6 +89,13 @@ export interface HhcAssetNativeLease {
   etag: string
 }
 
+export interface HhcAssetSyncReceipt {
+  collectionItemId: string
+  contentVersion: string
+  state: 'available-offline'
+  appVersion: string
+}
+
 const MAX_PAGE_ITEMS = 500
 
 function record(value: unknown): Record<string, unknown> {

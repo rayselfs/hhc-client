@@ -194,6 +194,8 @@ const hhcAssetsApi = {
     typedInvoke('hhc-assets:get-collection-item', request),
   issueContentTicket: (request: IpcInvokeMap['hhc-assets:issue-content-ticket']['args'][0]) =>
     typedInvoke('hhc-assets:issue-content-ticket', request),
+  recordSyncReceipt: (receipt: IpcInvokeMap['hhc-assets:record-sync-receipt']['args'][0]) =>
+    typedInvoke('hhc-assets:record-sync-receipt', receipt),
   downloadFile: (request: IpcInvokeMap['hhc-assets:download-file']['args'][0]) =>
     typedInvoke('hhc-assets:download-file', request),
   cancelDownload: (targetFileId: string) => typedInvoke('hhc-assets:cancel-download', targetFileId),

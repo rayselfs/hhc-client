@@ -124,12 +124,29 @@ describe('browser HHC Asset API', () => {
     await api.listCollections('page / one')
     await api.getCollectionChanges('collection / one', 'revision / 7')
     await api.getCollectionItem('collection / one', 'item / one')
+    fetcher.mockResolvedValueOnce(new Response(null, { status: 204 }))
+    await api.recordSyncReceipt({
+      collectionItemId: 'item_1',
+      contentVersion: '"etag"',
+      state: 'available-offline',
+      appVersion: '2.4.0'
+    })
 
     expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
       `${ORIGIN}/api/assets/collections?limit=500&cursor=page+%2F+one`,
       `${ORIGIN}/api/assets/collections/collection%20%2F%20one/changes?cursor=revision+%2F+7`,
-      `${ORIGIN}/api/assets/collections/collection%20%2F%20one/items/item%20%2F%20one`
+      `${ORIGIN}/api/assets/collections/collection%20%2F%20one/items/item%20%2F%20one`,
+      `${ORIGIN}/api/assets/sync-receipts`
     ])
+    expect(fetcher.mock.calls[3]?.[1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        collectionItemId: 'item_1',
+        contentVersion: '"etag"',
+        state: 'available-offline',
+        appVersion: '2.4.0'
+      })
+    })
     for (const [, init] of fetcher.mock.calls) {
       expect(new Headers(init?.headers).get('authorization')).toBe('Bearer token-1')
     }
@@ -266,6 +283,7 @@ describe('Electron HHC Asset API', () => {
       getCollectionChanges: vi.fn(),
       getCollectionItem: vi.fn(),
       issueContentTicket: vi.fn(),
+      recordSyncReceipt: vi.fn(async () => undefined),
       downloadFile: vi.fn(async () => ({ fileId: 'file_1', size: 1, mimeType: 'image/jpeg' })),
       createContentLease: vi.fn(),
       releaseContentLease: vi.fn()
@@ -279,6 +297,12 @@ describe('Electron HHC Asset API', () => {
       itemId: 'item_1',
       rootRemoteFolderId: 'collection_1',
       targetFileId: 'file_1'
+    })
+    await api.recordSyncReceipt({
+      collectionItemId: 'item_1',
+      contentVersion: '"etag"',
+      state: 'available-offline',
+      appVersion: '2.4.0'
     })
 
     expect(hhcAssets.listCollections).toHaveBeenCalledWith('cursor_1')
@@ -295,6 +319,7 @@ describe('Electron HHC Asset API', () => {
       'getCollectionItem',
       'issueContentTicket',
       'listCollections',
+      'recordSyncReceipt',
       'releaseContentLease'
     ])
   })

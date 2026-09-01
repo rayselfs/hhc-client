@@ -329,6 +329,31 @@ describe('HHC Asset IPC', () => {
     })
   })
 
+  it('posts an exact bounded available-offline receipt with main-owned auth', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 204 }))
+    const receipt = {
+      collectionItemId: 'item_1',
+      contentVersion: '"etag-1"',
+      state: 'available-offline' as const,
+      appVersion: '2.4.0'
+    }
+
+    await expect(
+      handler('hhc-assets:record-sync-receipt')(event(), receipt)
+    ).resolves.toBeUndefined()
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://www.alive.org.tw/api/assets/sync-receipts',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(receipt) })
+    )
+    expect(new Headers(mockFetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+      'Bearer token-1'
+    )
+
+    await expect(
+      handler('hhc-assets:record-sync-receipt')(event(), { ...receipt, userId: 'leak' })
+    ).rejects.toThrow('Invalid HHC Asset request')
+  })
+
   it('rejects negative item and tombstone revisions', async () => {
     mockFetch
       .mockResolvedValueOnce(

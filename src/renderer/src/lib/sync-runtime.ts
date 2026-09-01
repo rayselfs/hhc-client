@@ -11,10 +11,14 @@ import {
   type HhcLineCloudAuth
 } from './cloud-provider'
 import { listProviderConnectionsByType, type ProviderConnectionRecord } from './sync-db'
+import type { MeetingWindowsApi } from './meeting-windows-api'
 
 const LOCAL_SYNC_POLL_MS = 3_000
 const ONEDRIVE_IDLE_REFRESH_MS = 60_000
 const ONEDRIVE_ACTIVE_REFRESH_MS = 15_000
+const HHC_IDLE_REFRESH_MS = 60_000
+const HHC_ACTIVE_REFRESH_MS = 15_000
+const HHC_MEETING_REFRESH_MS = 2_000
 
 const localRefreshInFlight = new Set<string>()
 let oneDriveRefreshInFlight = false
@@ -29,6 +33,7 @@ export interface SyncRuntimeOptions {
     connectionId: string
     rootFolderId: string
   }) => void | Promise<void>
+  meetingWindows?: MeetingWindowsApi
 }
 
 interface RefreshTimingSummary {
@@ -281,65 +286,100 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
   }
 
   let stopped = false
-  let cloudTimeout: number | undefined
-  let cloudRefreshRunning = false
-  let cloudRefreshPending = false
+  let oneDriveTimeout: number | undefined
+  let oneDriveRunning = false
+  let oneDrivePending = false
+  let hhcTimeout: number | undefined
+  let hhcRunning = false
+  let hhcPending = false
+  const meetingWindows = options.meetingWindows
 
-  const scheduleCloudRefresh = (delay: number): void => {
+  const scheduleOneDrive = (delay: number): void => {
     if (stopped) return
-    cloudTimeout = window.setTimeout(() => {
-      cloudTimeout = undefined
-      void runCloudRefresh()
+    oneDriveTimeout = window.setTimeout(() => {
+      oneDriveTimeout = undefined
+      void runOneDrive()
     }, delay)
   }
 
-  const runCloudRefresh = async (): Promise<void> => {
-    cloudRefreshRunning = true
-    const [oneDrive, hhc] = await Promise.all([
-      refreshOneDrive()
-        .then((summaries) => ({ summaries, retrySoon: false }))
-        .catch((error) => {
-          console.warn('[sync] Failed to refresh OneDrive folders', error)
-          return { summaries: [] as OneDriveRefreshSummary[], retrySoon: true }
-        }),
+  const runOneDrive = async (): Promise<void> => {
+    oneDriveRunning = true
+    let delay = ONEDRIVE_ACTIVE_REFRESH_MS
+    try {
+      delay = getNextCloudDelay(await refreshOneDrive())
+    } catch (error) {
+      console.warn('[sync] Failed to refresh OneDrive folders', error)
+    } finally {
+      oneDriveRunning = false
+    }
+    if (oneDrivePending) {
+      oneDrivePending = false
+      scheduleOneDrive(0)
+    } else {
+      scheduleOneDrive(delay)
+    }
+  }
+
+  const scheduleHhc = (delay: number): void => {
+    if (stopped) return
+    hhcTimeout = window.setTimeout(() => {
+      hhcTimeout = undefined
+      void runHhc()
+    }, delay)
+  }
+
+  const runHhc = async (): Promise<void> => {
+    hhcRunning = true
+    const now = Date.now()
+    const [windows, result] = await Promise.all([
+      meetingWindows?.list(now).catch(() => []) ?? Promise.resolve([]),
       refreshAllHhcFolders(options).catch(() => {
         console.warn('[sync] Failed to enumerate HHC LINE roots')
         return { summaries: [] as CloudRefreshSummary[], retrySoon: true }
       })
     ])
-    const summaries = [...oneDrive.summaries, ...hhc.summaries]
-    cloudRefreshRunning = false
-    if (cloudRefreshPending) {
-      cloudRefreshPending = false
-      scheduleCloudRefresh(0)
-      return
-    }
-    scheduleCloudRefresh(
-      oneDrive.retrySoon || hhc.retrySoon
-        ? ONEDRIVE_ACTIVE_REFRESH_MS
-        : getNextCloudDelay(summaries)
+    const activeMeeting = windows.some(
+      (value) => Date.parse(value.startsAt) <= now && now < Date.parse(value.endsAt)
     )
+    hhcRunning = false
+    if (hhcPending) {
+      hhcPending = false
+      scheduleHhc(0)
+    } else {
+      scheduleHhc(
+        activeMeeting
+          ? HHC_MEETING_REFRESH_MS
+          : result.retrySoon
+            ? HHC_ACTIVE_REFRESH_MS
+            : Math.min(HHC_IDLE_REFRESH_MS, getNextCloudDelay(result.summaries))
+      )
+    }
   }
 
   const unsubscribeOfflinePolicy = useSettingsStore.subscribe((state, previousState) => {
     if (state.defaultSyncOfflinePolicy === previousState.defaultSyncOfflinePolicy) return
-    if (cloudTimeout !== undefined) {
-      window.clearTimeout(cloudTimeout)
-      cloudTimeout = undefined
+    if (oneDriveTimeout !== undefined) {
+      window.clearTimeout(oneDriveTimeout)
+      oneDriveTimeout = undefined
     }
-    if (cloudRefreshRunning) {
-      cloudRefreshPending = true
-      return
+    if (hhcTimeout !== undefined) {
+      window.clearTimeout(hhcTimeout)
+      hhcTimeout = undefined
     }
-    scheduleCloudRefresh(0)
+    if (oneDriveRunning) oneDrivePending = true
+    else scheduleOneDrive(0)
+    if (hhcRunning) hhcPending = true
+    else scheduleHhc(0)
   })
 
-  void runCloudRefresh()
+  void runOneDrive()
+  void runHhc()
 
   return () => {
     stopped = true
     unsubscribeOfflinePolicy()
     if (localInterval !== undefined) window.clearInterval(localInterval)
-    if (cloudTimeout !== undefined) window.clearTimeout(cloudTimeout)
+    if (oneDriveTimeout !== undefined) window.clearTimeout(oneDriveTimeout)
+    if (hhcTimeout !== undefined) window.clearTimeout(hhcTimeout)
   }
 }
