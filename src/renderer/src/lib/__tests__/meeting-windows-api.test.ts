@@ -9,7 +9,9 @@ describe('meeting windows API', () => {
       async () =>
         new Response(
           JSON.stringify({
-            data: [{ startsAt: '2026-09-02T01:00:00Z', endsAt: '2026-09-02T03:00:00Z' }]
+            data: [{ startsAt: '2026-09-02T01:00:00Z', endsAt: '2026-09-02T03:00:00Z' }],
+            meta: {},
+            error: null
           })
         )
     )
