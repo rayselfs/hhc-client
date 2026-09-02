@@ -249,4 +249,9 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${GITHUB_REF_NAME}" release-artifacts/* --generate-notes --verify-tag
+        shell: bash
+        run: |
+          mapfile -d '' artifacts < <(
+            find release-artifacts -maxdepth 1 -type f -print0 | sort -z
+          )
+          gh release create "${GITHUB_REF_NAME}" "${artifacts[@]}" --generate-notes --verify-tag
