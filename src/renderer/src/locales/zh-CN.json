@@ -1136,6 +1136,7 @@
     "notesPlaceholder": "添加备注...",
     "loading": "加载中...",
     "imageLoadFailed": "无法加载图片",
+    "videoPreparing": "视频准备中…",
     "videoLoadFailed": "无法加载视频",
     "pdfLoadFailed": "无法加载 PDF"
   }

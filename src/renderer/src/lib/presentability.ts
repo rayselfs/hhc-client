@@ -1,5 +1,6 @@
 import type { AnyItemRecord, FileItemRecord } from '@shared/types/folder'
 import { isFileItem } from '@shared/types/folder'
+import type { FilePlaybackPhase } from '@shared/projection-messages'
 import {
   getMediaSupport,
   resolveMediaCapability,
@@ -11,6 +12,7 @@ import { isElectron } from './env'
 export type MediaTypeStateMap = {
   image: Record<string, never>
   video: {
+    phase?: FilePlaybackPhase
     hasStarted?: boolean
     isPlaying?: boolean
     isEnded?: boolean

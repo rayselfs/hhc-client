@@ -38,6 +38,8 @@ test('starts one projection popup and keeps passive timer ticks non-activating',
   await projection.waitForLoadState('domcontentloaded')
   await expect(projection).toHaveURL(/#\/projection\?generation=[1-9]\d*&session=[0-9a-f-]+$/i)
   await expect(projection.locator('.timer-digits').first()).toBeVisible()
+  const focusCallsAfterOpen = await page.evaluate(() => window.__projectionFocusCalls)
+  expect(focusCallsAfterOpen).toBe(1)
 
   const beforeReload = await projection.locator('.timer-digits').first().textContent()
   await projection.reload()
@@ -49,7 +51,7 @@ test('starts one projection popup and keeps passive timer ticks non-activating',
   await projection.waitForTimeout(1200)
 
   expect(context.pages()).toHaveLength(2)
-  expect(await page.evaluate(() => window.__projectionFocusCalls)).toBe(0)
+  expect(await page.evaluate(() => window.__projectionFocusCalls)).toBe(focusCallsAfterOpen)
   expect(beforeReload).not.toBeNull()
 
   await page.close({ runBeforeUnload: true })

@@ -39,6 +39,7 @@ const storeState = {
       itemId: string
       sourceUrl: string
       seekable?: boolean
+      playbackMode?: 'native' | 'vlc-embedded'
       remoteSource?: {
         providerConnectionId: string
         remoteItemId: string
@@ -54,6 +55,7 @@ const storeState = {
   },
   typeStates: {} as {
     video?: {
+      phase?: 'preparing' | 'ready' | 'playing' | 'paused' | 'ended'
       hasStarted?: boolean
       isPlaying?: boolean
       isEnded?: boolean
@@ -135,6 +137,18 @@ function setPendingRemoteSource(): void {
           remoteItemId: 'asset-1',
           rootRemoteFolderId: 'collection-1'
         }
+      }
+    ]
+  }
+}
+
+function setVlcPlaybackMode(): void {
+  storeState.snapshot = {
+    entries: [
+      {
+        itemId: 'copy-id',
+        sourceUrl: 'blob:original-id',
+        playbackMode: 'vlc-embedded'
       }
     ]
   }
@@ -364,6 +378,101 @@ describe('copied media preview identity', () => {
 
     expect(screen.getByText('00:42 / 03:03')).toBeInTheDocument()
     expect(container.querySelector('input.video-seek-range')).toHaveValue('42')
+  })
+
+  it('sends play without starting Chromium for a VLC-owned item', async () => {
+    setVlcPlaybackMode()
+    storeState.typeStates.video = {
+      phase: 'ready',
+      hasStarted: false,
+      isPlaying: false,
+      isEnded: false,
+      currentTime: 0,
+      duration: 81,
+      seekable: true
+    }
+    const { container } = render(<VideoPreview item={makeCopy('video/x-matroska', 'movie.mkv')} />)
+    const video = await getLoadedVideo(container)
+
+    fireEvent.click(container.querySelector('button.absolute.inset-0.flex')!)
+
+    expect(video.play).not.toHaveBeenCalled()
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'play', itemId: 'copy-id' })
+  })
+
+  it('keeps VLC pause and seek projection-authoritative', async () => {
+    setVlcPlaybackMode()
+    storeState.typeStates.video = {
+      phase: 'playing',
+      hasStarted: true,
+      isPlaying: true,
+      isEnded: false,
+      currentTime: 30,
+      duration: 100,
+      seekable: true
+    }
+    const { container } = render(<VideoPreview item={makeCopy('video/x-matroska', 'movie.mkv')} />)
+    const video = await getLoadedVideo(container)
+
+    fireEvent.click(screen.getByLabelText('Toggle play'))
+    expect(video.pause).not.toHaveBeenCalled()
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pause', itemId: 'copy-id' })
+
+    mockSendCommand.mockClear()
+    seekRelative(5)
+    expect(video.currentTime).toBe(30)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 35 })
+  })
+
+  it('shows preparation without claiming playback for a VLC-owned item', () => {
+    setVlcPlaybackMode()
+    storeState.typeStates.video = {
+      phase: 'preparing',
+      hasStarted: false,
+      isPlaying: false,
+      isEnded: false,
+      currentTime: 0,
+      duration: 81
+    }
+
+    const { container } = render(<VideoPreview item={makeCopy('video/x-matroska', 'movie.mkv')} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('presenter.videoPreparing')
+    expect(container.querySelector('button.absolute.inset-0.flex')).toBeNull()
+    expect(screen.queryByLabelText('Toggle play')).toBeNull()
+  })
+
+  it('hides the central button after owner-confirmed playback starts', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.typeStates.video = {
+      hasStarted: true,
+      isPlaying: true,
+      isEnded: false,
+      currentTime: 0,
+      duration: 120,
+      seekable: true
+    }
+    const { container } = render(<VideoPreview item={item} />)
+    await getLoadedVideo(container)
+
+    expect(container.querySelector('button.absolute.inset-0.flex')).toBeNull()
+    expect(container.querySelector('input.video-seek-range')).toBeEnabled()
+  })
+
+  it('shows a disabled timeline when duration is known but seek is unavailable', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.typeStates.video = {
+      hasStarted: false,
+      isPlaying: false,
+      isEnded: false,
+      currentTime: 0,
+      duration: 120,
+      seekable: false
+    }
+    const { container } = render(<VideoPreview item={item} />)
+    await getLoadedVideo(container)
+
+    expect(container.querySelector('input.video-seek-range')).toBeDisabled()
   })
 
   it('seeks a video relative to the current playback time', async () => {

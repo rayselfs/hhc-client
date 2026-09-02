@@ -34,6 +34,7 @@ interface OwnedVlcSession {
   runtime: VlcPlayerRuntime | null
   sourceInstalled: boolean
   mediaReady: boolean
+  confirmedPlaybackStarted: boolean
   seekable: boolean | null
   pending: PendingVlcControls
   phase: 'opening' | 'waiting-media' | 'waiting-seek' | 'waiting-transport' | 'ready'
@@ -352,8 +353,16 @@ function sendState(
   }
   if (!ownsSession(wm, session, ownerPlayer)) return
 
+  const phase = isEnded
+    ? 'ended'
+    : isPlaying
+      ? 'playing'
+      : session.confirmedPlaybackStarted
+        ? 'paused'
+        : 'ready'
   wm.sendToMain('projection:message', session.generation, 'file:playback-state', {
     itemId: session.itemId,
+    phase,
     currentTime,
     duration,
     isPlaying,
@@ -477,11 +486,22 @@ function finishStartup(wm: WindowManager, session: OwnedVlcSession, isPlaying: b
   session.watchdog = null
   setNativePlayerWindowVisible(session, ownerPlayer, true)
   sendState(wm, session, { isPlaying, isEnded: false })
+  publishStarted(wm, session)
 }
 
 function applyFinalTransport(wm: WindowManager, session: OwnedVlcSession): void {
   const ownerPlayer = session.player
   if (!ownerPlayer || !ownsSession(wm, session, ownerPlayer)) return
+  if (session.pending.transport === 'play') {
+    try {
+      if (ownerPlayer.isPlaying()) {
+        finishStartup(wm, session, true)
+        return
+      }
+    } catch {
+      // Fall through to the owner-safe native play request.
+    }
+  }
   session.phase = 'waiting-transport'
   runOwnedNativeAction(wm, session, (player) => {
     if (session.pending.transport === 'play') player.play()
@@ -525,6 +545,10 @@ async function startVlc(
     runtime: null,
     sourceInstalled: false,
     mediaReady: false,
+    confirmedPlaybackStarted:
+      (request.initialPositionSeconds ?? 0) > 0 ||
+      request.initialPlaybackState === 'playing' ||
+      request.initialPlaybackState === 'ended',
     seekable: null,
     pending: {
       ...(request.initialVolume !== undefined ? { volume: request.initialVolume } : {}),
@@ -542,6 +566,17 @@ async function startVlc(
   }
   activeSession = session
   if (previousSession) destroySessionResources(previousSession)
+  if (ownsSession(wm, session)) {
+    wm.sendToMain('projection:message', session.generation, 'file:playback-state', {
+      itemId: session.itemId,
+      phase: 'preparing',
+      currentTime: request.initialPositionSeconds ?? 0,
+      duration: request.durationMs ? request.durationMs / 1000 : 0,
+      isPlaying: false,
+      isEnded: false,
+      ...(request.initialVolume !== undefined ? { volume: request.initialVolume } : {})
+    })
+  }
   let playbackPath: string
   try {
     playbackPath = await resolveVideoPlaybackPath(
@@ -665,12 +700,19 @@ async function startVlc(
     })
     nextPlayer.on('playing', () => {
       if (!ownsSession(wm, session, embeddedPlayer)) return
+      if (session.pending.transport === 'play' || session.phase === 'ready') {
+        session.confirmedPlaybackStarted = true
+      }
       if (!session.mediaReady) {
         session.mediaReady = true
         try {
           session.seekable = embeddedPlayer.isSeekable()
         } catch {
           session.seekable = false
+        }
+        if (session.pending.seekSeconds === undefined && session.pending.transport === 'play') {
+          finishStartup(wm, session, true)
+          return
         }
         continueStartupAfterReadiness(wm, session)
         return
@@ -712,7 +754,6 @@ async function startVlc(
     setNativePlayerWindowVisible(session, nextPlayer, false)
     if (!applyPendingVolume(wm, session)) return
     if (!runOwnedNativeAction(wm, session, (player) => player.play())) return
-    publishStarted(wm, session)
   } catch (error) {
     if (!session.listenerCleanup) {
       try {
@@ -743,7 +784,11 @@ function controlVlc(wm: WindowManager, command: ProjectionVlcControlRequest): vo
   switch (command.action) {
     case 'play':
       session.pending.transport = 'play'
-      if (session.phase === 'ready') runOwnedNativeAction(wm, session, (player) => player.play())
+      if (session.phase === 'ready')
+        runOwnedNativeAction(wm, session, (player) => {
+          if (player.shouldReplayFromStart()) player.replayFromStart()
+          else player.play()
+        })
       else if (session.mediaReady && session.phase !== 'waiting-seek')
         applyFinalTransport(wm, session)
       break

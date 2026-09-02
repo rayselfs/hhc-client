@@ -8,6 +8,7 @@ import { verifyVlcFixtures } from './helpers/vlc-fixtures'
 
 interface PlaybackState {
   itemId: string
+  phase: 'preparing' | 'ready' | 'playing' | 'paused' | 'ended'
   currentTime: number
   duration: number
   isPlaying: boolean
@@ -384,8 +385,10 @@ test('VLC production matrix', async ({ browserName: _browserName }, testInfo) =>
       )
       .toBe(1)
     expect(
-      (await evidence(control)).states.some((state) => state.itemId === unreadableItemId)
-    ).toBe(false)
+      (await evidence(control)).states
+        .filter((state) => state.itemId === unreadableItemId)
+        .map((state) => state.phase)
+    ).toEqual(['preparing'])
     await expect(access(`${unreadableCache}.mkv`)).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(access(`${unreadableCache}.json`)).rejects.toMatchObject({ code: 'ENOENT' })
     expect(

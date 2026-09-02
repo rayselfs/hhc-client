@@ -27,11 +27,6 @@ export type {
 
 interface ProjectOptions {
   autoOpen?: boolean
-  bringToFront?: boolean
-}
-
-export interface StartProjectionOptions {
-  bringToFront?: boolean
 }
 
 export interface ProjectionSessionSummary {
@@ -53,12 +48,10 @@ interface ProjectionContextValue {
   ensureProjectionOpen: () => Promise<ProjectionOperationResult>
   startProjection: (
     owner: ProjectionOwner,
-    payloads?: ProjectionContentMessageTuple[],
-    options?: StartProjectionOptions
+    payloads?: ProjectionContentMessageTuple[]
   ) => Promise<ProjectionOperationResult>
   stopProjection: () => Promise<void>
   retryProjection: () => Promise<ProjectionOperationResult>
-  bringProjectionToFront: () => Promise<void>
   closeProjection: () => Promise<void>
   blackoutProjection: (enabled: boolean) => Promise<void>
   getProjectionSnapshot: () => ProjectionSessionSnapshot | null
@@ -276,13 +269,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
   }, [browserSessionId, endBrowserSession, getCoordinator, stopPolling, updateOpen])
 
-  const bringProjectionToFront = useCallback(async (): Promise<void> => {
-    if (!isElectron()) return
-    await window.api.projection.bringToFront().catch((error) => {
-      console.warn('[Projection] Bring to front failed:', error)
-    })
-  }, [])
-
   const openBrowserProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
     const coordinator = getCoordinator()
     const adapter = getAdapter(adapterRef, browserSessionId)
@@ -305,6 +291,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       return { ok: false, generation, reason: 'popup-blocked' }
     }
     projectionWindowRef.current = win
+    win.blur()
+    window.focus()
     updateOpen(true)
     startPolling()
     return coordinator.waitForReady(generation)
@@ -413,8 +401,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const startProjection = useCallback(
     async (
       owner: ProjectionOwner,
-      payloads: ProjectionContentMessageTuple[] = [],
-      options?: StartProjectionOptions
+      payloads: ProjectionContentMessageTuple[] = []
     ): Promise<ProjectionOperationResult> => {
       const coordinator = getCoordinator()
       coordinator.startSession(owner, payloads)
@@ -429,10 +416,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       } else {
         result = await openProjection()
       }
-      if (result.ok && options?.bringToFront !== false) await bringProjectionToFront()
       return result
     },
-    [bringProjectionToFront, getCoordinator, openProjection]
+    [getCoordinator, openProjection]
   )
 
   const stopProjection = useCallback(async (): Promise<void> => {
@@ -478,11 +464,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         )
       }
       if (options?.autoOpen && !isProjectionOpenRef.current) await openProjection()
-      if (options?.bringToFront && isProjectionOpenRef.current) {
-        await bringProjectionToFront()
-      }
     },
-    [bringProjectionToFront, getCoordinator, openProjection]
+    [getCoordinator, openProjection]
   )
 
   const on = useCallback(
@@ -527,7 +510,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       startProjection,
       stopProjection,
       retryProjection,
-      bringProjectionToFront,
       closeProjection,
       blackoutProjection,
       getProjectionSnapshot,
@@ -547,7 +529,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       startProjection,
       stopProjection,
       retryProjection,
-      bringProjectionToFront,
       closeProjection,
       blackoutProjection,
       getProjectionSnapshot,

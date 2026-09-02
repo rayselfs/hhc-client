@@ -131,6 +131,7 @@ describe('MediaProjectionBridge', () => {
     act(() => {
       mocks.handlers.get('file:playback-state')?.({
         itemId: 'video-1',
+        phase: 'paused',
         currentTime: 24,
         duration: 120,
         isPlaying: false,
@@ -141,6 +142,7 @@ describe('MediaProjectionBridge', () => {
     })
 
     expect(useMediaProjectionStore.getState().typeStates.video).toMatchObject({
+      phase: 'paused',
       currentTime: 24,
       duration: 120,
       isPlaying: false,
@@ -148,5 +150,50 @@ describe('MediaProjectionBridge', () => {
       seekable: false,
       volume: 0.4
     })
+  })
+
+  it('keeps hasStarted monotonic across owner-confirmed playback states', () => {
+    useMediaProjectionStore.setState({
+      playlist: [
+        {
+          id: 'video-1',
+          parentId: 'root',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'Movie.mkv',
+          url: 'blob:video-1',
+          size: 10,
+          mimeType: 'video/x-matroska'
+        }
+      ],
+      currentIndex: 0,
+      typeStates: {}
+    })
+    render(<MediaProjectionBridge />)
+
+    act(() => {
+      mocks.handlers.get('file:playback-state')?.({
+        itemId: 'video-1',
+        phase: 'ready',
+        currentTime: 0,
+        duration: 120,
+        isPlaying: false,
+        isEnded: false,
+        seekable: true
+      })
+      mocks.handlers.get('file:playback-state')?.({
+        itemId: 'video-1',
+        phase: 'playing',
+        currentTime: 0,
+        duration: 120,
+        isPlaying: true,
+        isEnded: false,
+        seekable: true
+      })
+    })
+
+    expect(useMediaProjectionStore.getState().typeStates.video?.hasStarted).toBe(true)
   })
 })

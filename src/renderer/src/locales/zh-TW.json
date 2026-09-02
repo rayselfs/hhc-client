@@ -1136,6 +1136,7 @@
     "notesPlaceholder": "新增備註...",
     "loading": "載入中...",
     "imageLoadFailed": "無法載入圖片",
+    "videoPreparing": "影片準備中…",
     "videoLoadFailed": "無法載入影片",
     "pdfLoadFailed": "無法載入 PDF"
   }

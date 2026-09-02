@@ -49,6 +49,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   const [retryToken, setRetryToken] = useState(0)
   const blobId = getBlobId(item)
 
+  const currentPageRef = useRef(1)
   const slideCanvasRef = useRef<HTMLCanvasElement>(null)
   const scrollCanvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -79,6 +80,18 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       })
     },
     []
+  )
+
+  const selectPage = useCallback(
+    (requestedPage: number): void => {
+      if (pageCount <= 0) return
+      const nextPage = Math.min(pageCount, Math.max(1, requestedPage))
+      if (nextPage === currentPageRef.current) return
+      currentPageRef.current = nextPage
+      setCurrentPage(nextPage)
+      sendCommand({ action: 'pdfPage', value: nextPage })
+    },
+    [pageCount, sendCommand]
   )
 
   useEffect(() => {
@@ -117,6 +130,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         doc = pdf
         setPdfDoc(pdf)
         setPageCount(pdf.numPages)
+        currentPageRef.current = 1
         setCurrentPage(1)
         setLoading(false)
       } catch {
@@ -190,27 +204,15 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   }, [pdfDoc, pdfViewMode, pageCount])
 
   useEffect(() => {
-    const handleNext = (): void => {
-      setCurrentPage((p) => {
-        const next = Math.min(p + 1, pageCount)
-        sendCommand({ action: 'pdfPage', value: next })
-        return next
-      })
-    }
-    const handlePrev = (): void => {
-      setCurrentPage((p) => {
-        const prev = Math.max(p - 1, 1)
-        sendCommand({ action: 'pdfPage', value: prev })
-        return prev
-      })
-    }
+    const handleNext = (): void => selectPage(currentPageRef.current + 1)
+    const handlePrev = (): void => selectPage(currentPageRef.current - 1)
     window.addEventListener('media:pdfNextPage', handleNext)
     window.addEventListener('media:pdfPrevPage', handlePrev)
     return () => {
       window.removeEventListener('media:pdfNextPage', handleNext)
       window.removeEventListener('media:pdfPrevPage', handlePrev)
     }
-  }, [pageCount, sendCommand])
+  }, [selectPage])
 
   const handleScroll = useCallback(() => {
     if (rafRef.current !== null) return
@@ -344,10 +346,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
                 className={`relative rounded overflow-hidden border-2 transition-colors shrink-0 ${
                   currentPage === i + 1 ? 'border-white/80' : 'border-transparent'
                 }`}
-                onClick={() => {
-                  setCurrentPage(i + 1)
-                  sendCommand({ action: 'pdfPage', value: i + 1 })
-                }}
+                onClick={() => selectPage(i + 1)}
               >
                 <img src={url} alt={`page ${i + 1}`} style={{ width: '100%', display: 'block' }} />
                 <span className="absolute bottom-0.5 right-1 text-white/60 text-xs">{i + 1}</span>

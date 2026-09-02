@@ -155,6 +155,8 @@ function validateProjectionPayload(channel: string, data: unknown): boolean {
     case 'file:playback-state':
       return (
         typeof obj.itemId === 'string' &&
+        typeof obj.phase === 'string' &&
+        ['preparing', 'ready', 'playing', 'paused', 'ended'].includes(obj.phase) &&
         isFiniteNumber(obj.currentTime) &&
         isFiniteNumber(obj.duration) &&
         typeof obj.isPlaying === 'boolean' &&

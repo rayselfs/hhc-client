@@ -33,6 +33,7 @@ const fileShow: ProjectionPayload<'file:show'> = {
 
 const playback: ProjectionPayload<'file:playback-state'> = {
   itemId: 'video-1',
+  phase: 'playing',
   currentTime: 24,
   duration: 120,
   isPlaying: true,

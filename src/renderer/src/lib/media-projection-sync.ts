@@ -69,7 +69,6 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     (
       state: MediaProjectionStore,
       startSession?: boolean,
-      bringToFront?: boolean,
       forceRemoteSource?: boolean
     ) => Promise<void>
   >(async () => undefined)
@@ -182,7 +181,6 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     async (
       state: MediaProjectionStore,
       startSession = false,
-      bringToFront = false,
       forceRemoteSource = false
     ): Promise<void> => {
       if (!startSession && activeOwner !== 'media') return
@@ -276,7 +274,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
                 )
                 renewalTimerRef.current = setTimeout(() => {
                   void projectCurrentItemRef
-                    .current(useMediaProjectionStore.getState(), false, false, true)
+                    .current(useMediaProjectionStore.getState(), false, true)
                     .catch(() => undefined)
                 }, delay)
               }
@@ -308,7 +306,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
             if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
             renewalTimerRef.current = setTimeout(() => {
               void projectCurrentItemRef
-                .current(useMediaProjectionStore.getState(), false, false, true)
+                .current(useMediaProjectionStore.getState(), false, true)
                 .catch(() => undefined)
             }, RENEWAL_RETRY_MS)
           }
@@ -368,9 +366,9 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
 
       if (sequence === projectSequenceRef.current) {
         if (startSession) {
-          void startProjection('media', [['file:show', payload]], { bringToFront })
+          void startProjection('media', [['file:show', payload]])
         } else {
-          void project('file:show', payload, { bringToFront })
+          void project('file:show', payload)
         }
       }
     },
@@ -407,8 +405,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
 
       if (started || indexChanged || playlistChanged || endedCleared || presentationChanged) {
         if (indexChanged || playlistChanged) clearRemoteSource()
-        const explicitContentChange = started || indexChanged || endedCleared || presentationChanged
-        void projectCurrentItem(state, started, explicitContentChange).catch(() => undefined)
+        void projectCurrentItem(state, started).catch(() => undefined)
       }
     })
     return () => {
@@ -508,6 +505,6 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     didInitializeRef.current = true
     const state = useMediaProjectionStore.getState()
     if (!state.isPresenting || activeOwner !== 'media') return
-    void projectCurrentItem(state, true, false).catch(() => undefined)
+    void projectCurrentItem(state, true).catch(() => undefined)
   }, [activeOwner, projectCurrentItem])
 }

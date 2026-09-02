@@ -92,14 +92,10 @@ export class WindowManager {
       _cachedDisplay = undefined
     })
 
-    const externalDisplay = this.getExternalDisplay()
-    const hasSecondScreen = externalDisplay !== undefined
-
     this.mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
       show: false,
-      acceptFirstMouse: true,
       autoHideMenuBar: true,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -144,12 +140,6 @@ export class WindowManager {
     })
 
     this.mainWindow.once('ready-to-show', () => {
-      if (process.platform === 'win32' && hasSecondScreen) {
-        this.mainWindow?.maximize()
-      }
-      if (process.platform === 'darwin' && hasSecondScreen) {
-        this.mainWindow?.setFullScreen(true)
-      }
       this.mainWindow?.show()
     })
 
@@ -192,6 +182,7 @@ export class WindowManager {
     const primaryDisplay = screen.getPrimaryDisplay()
     const targetDisplay = this.getProjectionDisplay(displayId)
     const hasSecondScreen = targetDisplay.id !== primaryDisplay.id
+    const useMacSimpleFullscreen = process.platform === 'darwin' && hasSecondScreen
     this.projectionDisplayId = String(targetDisplay.id)
     let windowGeneration = this.nextProjectionGeneration(
       reason === 'renderer-crash' ? 'recovering' : 'opening',
@@ -204,8 +195,15 @@ export class WindowManager {
       height: hasSecondScreen ? targetDisplay.bounds.height : 600,
       x: targetDisplay.bounds.x,
       y: targetDisplay.bounds.y,
-      fullscreen: hasSecondScreen,
-      frame: !hasSecondScreen,
+      fullscreen: false,
+      enableLargerThanScreen: hasSecondScreen,
+      frame: false,
+      focusable: useMacSimpleFullscreen,
+      fullscreenable: false,
+      minimizable: false,
+      maximizable: false,
+      movable: false,
+      resizable: false,
       show: false,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -216,6 +214,7 @@ export class WindowManager {
       },
       title: 'Projection'
     })
+    projectionWindow.setIgnoreMouseEvents(true)
     this.projectionWindow = projectionWindow
     this.guardTopLevelNavigation(projectionWindow)
 
@@ -259,7 +258,12 @@ export class WindowManager {
 
     projectionWindow.once('ready-to-show', () => {
       if (this.projectionWindow !== projectionWindow) return
-      if (reason === 'created') this.bringProjectionToFront()
+      projectionWindow.showInactive()
+      if (useMacSimpleFullscreen) {
+        projectionWindow.setSimpleFullScreen(true)
+        projectionWindow.setFocusable(false)
+        this.mainWindow?.focus()
+      }
     })
 
     projectionWindow.webContents.on('did-start-loading', () => {
@@ -362,21 +366,6 @@ export class WindowManager {
       !this.projectionWindow.isDestroyed() &&
       this.projectionWindow.webContents === sender
     )
-  }
-
-  bringProjectionToFront(): boolean {
-    const projectionWindow = this.projectionWindow
-    if (!projectionWindow || projectionWindow.isDestroyed()) return false
-
-    try {
-      if (projectionWindow.isMinimized()) projectionWindow.restore()
-      if (!projectionWindow.isVisible()) projectionWindow.showInactive()
-      projectionWindow.moveTop()
-      return true
-    } catch (error) {
-      console.warn('Failed to bring projection window to front:', error)
-      return false
-    }
   }
 
   getMainWindow(): BrowserWindow | null {

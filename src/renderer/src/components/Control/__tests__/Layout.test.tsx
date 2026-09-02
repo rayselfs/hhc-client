@@ -102,7 +102,6 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
       startProjection: vi.fn(() => Promise.resolve({ ok: true, generation: 1 })),
       stopProjection: vi.fn(() => Promise.resolve()),
       retryProjection: vi.fn(),
-      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
       blackoutProjection: vi.fn(),
       getProjectionSnapshot: vi.fn(() => null),
@@ -249,6 +248,7 @@ describe('Layout', () => {
     await waitFor(() => expect(projectionEvents.playback).not.toBeNull(), { timeout: 5_000 })
     projectionEvents.playback?.({
       itemId: 'video-1',
+      phase: 'playing',
       currentTime: 12,
       duration: 60,
       isPlaying: true,

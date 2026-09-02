@@ -249,7 +249,6 @@ export interface IpcInvokeMap {
     result: { retried: boolean; generation: number }
   }
   'projection:get-generation': { args: []; result: { generation: number } }
-  'projection:bring-to-front': { args: []; result: { broughtToFront: boolean } }
   'projection:close': { args: []; result: { closed: boolean } }
   'projection:get-displays': { args: []; result: DisplayInfo[] }
   'theme:get': { args: []; result: { source: string; shouldUseDarkColors: boolean } }

@@ -471,6 +471,7 @@ describe('FileProjection copied media identity', () => {
 
     expect(mockProjectionSend).toHaveBeenCalledWith('file:playback-state', {
       itemId: 'live-id',
+      phase: 'paused',
       currentTime: 12,
       duration: 100,
       isPlaying: false,
@@ -943,7 +944,12 @@ describe('FileProjection copied media identity', () => {
 
     await act(async () => resolvePdf?.(pdf))
     await waitFor(() => expect(renderResolves.has(1)).toBe(true))
-    expect(container.querySelector('[data-pdf-preview="1"]')).not.toBeNull()
+    const renderedPreview = container.querySelector<HTMLElement>('[data-pdf-preview="1"]')
+    const canvasHost = container.querySelector<HTMLElement>('[data-pdf-canvas-host="1"]')
+    expect(renderedPreview).not.toBeNull()
+    expect(canvasHost).not.toBeNull()
+    expect(canvasHost).not.toContainElement(renderedPreview)
+    expect(canvasHost?.parentElement).toBe(renderedPreview?.parentElement)
     expect(container.querySelector('canvas[data-pdf-page="1"]')).toBeNull()
 
     await act(async () => renderResolves.get(1)?.())
@@ -951,6 +957,39 @@ describe('FileProjection copied media identity', () => {
       expect(container.querySelector('canvas[data-pdf-page="1"]')).not.toBeNull()
     })
     expect(container.querySelector('[data-pdf-preview="1"]')).toBeNull()
+  })
+
+  it('keeps the requested cached PDF page until its full render completes', async () => {
+    const { renderResolves } = mockPdf(2, true)
+    mockGetPdfPageThumbs.mockResolvedValue(['blob:page-1', 'blob:page-2'])
+    const { container, rerender } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+      />
+    )
+    await waitFor(() => expect(renderResolves.has(1)).toBe(true))
+
+    rerender(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        controlEvent={{ id: 1, data: { action: 'pdfPage', value: 2 } }}
+      />
+    )
+    await waitFor(() => expect(renderResolves.has(2)).toBe(true))
+    expect(container.querySelector('[data-pdf-preview="2"]')).not.toBeNull()
+    expect(container.querySelector('canvas[data-pdf-page="2"]')).toBeNull()
+
+    await act(async () => renderResolves.get(2)?.())
+    await waitFor(() => {
+      expect(container.querySelector('canvas[data-pdf-page="2"]')).not.toBeNull()
+    })
+    expect(container.querySelector('[data-pdf-preview="2"]')).toBeNull()
   })
 
   it('keeps only pages 48-52 mounted when continuous mode scrolls to page 50', async () => {

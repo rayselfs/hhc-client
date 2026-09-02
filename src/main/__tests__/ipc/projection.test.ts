@@ -16,7 +16,6 @@ const mockWindowManager = {
   retryProjectionWindow: vi.fn(() => ({ retried: true, generation: 5 })),
   markProjectionReady: vi.fn(() => true),
   isCurrentProjectionSender: vi.fn(() => true),
-  bringProjectionToFront: vi.fn(),
   closeProjection: vi.fn(),
   sendToProjection: vi.fn(),
   sendToMain: vi.fn(),
@@ -170,26 +169,8 @@ describe('projection:move-to-display', () => {
 })
 
 describe('projection:bring-to-front', () => {
-  it('allows the main window to bring projection forward', () => {
-    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
-    mockWindowManager.bringProjectionToFront.mockReturnValue(true)
-
-    expect(getHandler('projection:bring-to-front')(makeEvent())).toEqual({
-      broughtToFront: true
-    })
-    expect(mockWindowManager.bringProjectionToFront).toHaveBeenCalledOnce()
-  })
-
-  it('rejects projection and unknown windows', () => {
-    for (const window of [mockProjectionWindow, mockUnknownWindow]) {
-      vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(window as never)
-
-      expect(getHandler('projection:bring-to-front')(makeEvent())).toEqual({
-        broughtToFront: false
-      })
-    }
-
-    expect(mockWindowManager.bringProjectionToFront).not.toHaveBeenCalled()
+  it('does not register a projection foreground handler', () => {
+    expect((ipcMain as ExtendedIpcMain)._getHandler('projection:bring-to-front')).toBeUndefined()
   })
 })
 
@@ -278,6 +259,7 @@ describe('projection:send-to-main', () => {
     const handler = getOnHandler('projection:send-to-main')
     const payload = {
       itemId: 'video-id',
+      phase: 'playing',
       currentTime: 12,
       duration: 100,
       isPlaying: true,

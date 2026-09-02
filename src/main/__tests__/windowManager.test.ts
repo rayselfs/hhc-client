@@ -36,6 +36,11 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
     moveTop = vi.fn()
     focus = vi.fn()
     show = vi.fn()
+    setIgnoreMouseEvents = vi.fn()
+    setFullScreen = vi.fn()
+    setSimpleFullScreen = vi.fn()
+    setFocusable = vi.fn()
+    maximize = vi.fn()
     setAlwaysOnTop = vi.fn()
     close = vi.fn()
     destroy = vi.fn()
@@ -164,14 +169,16 @@ describe('WindowManager', () => {
     expect(optimizer.watchWindowShortcuts).not.toHaveBeenCalled()
   })
 
-  it('accepts the first click on the main control window', () => {
+  it('does not change the control window state when an external display exists', () => {
     const wm = WindowManager.getInstance()
 
     wm.createMainWindow()
+    const control = FakeBrowserWindow.instances[0]
+    control.emitOnce('ready-to-show')
 
-    expect(FakeBrowserWindow.instances[0].options).toMatchObject({
-      acceptFirstMouse: true
-    })
+    expect(control.maximize).not.toHaveBeenCalled()
+    expect(control.setFullScreen).not.toHaveBeenCalled()
+    expect(control.show).toHaveBeenCalledOnce()
   })
 
   it('rejects external top-level navigation and allows the loaded app document', () => {
@@ -199,68 +206,51 @@ describe('WindowManager', () => {
     expect(displays[1].id).toBe(2)
   })
 
-  it('brings an existing projection to the top without activating or pinning it', () => {
+  it('creates an output-only projection at the selected display bounds', () => {
     const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.moveTop.mockClear()
 
-    expect(wm.bringProjectionToFront()).toBe(true)
-    expect(projection.moveTop).toHaveBeenCalledOnce()
-    expect(projection.focus).not.toHaveBeenCalled()
-    expect(projection.show).not.toHaveBeenCalled()
-    expect(projection.setAlwaysOnTop).not.toHaveBeenCalled()
+    wm.createProjectionWindow('2')
+
+    const projection = FakeBrowserWindow.instances[0]
+    expect(projection.options).toMatchObject({
+      width: 1920,
+      height: 1080,
+      x: 1920,
+      y: 0,
+      show: false,
+      frame: false,
+      fullscreen: false,
+      enableLargerThanScreen: true,
+      focusable: process.platform === 'darwin',
+      fullscreenable: false,
+      minimizable: false,
+      maximizable: false,
+      movable: false,
+      resizable: false
+    })
+    expect(projection.setIgnoreMouseEvents).toHaveBeenCalledWith(true)
   })
 
-  it('restores a minimized projection before moving it to the top', () => {
+  it('uses macOS simple fullscreen without keeping projection always on top', () => {
     const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.isMinimized.mockReturnValue(true)
-
-    expect(wm.bringProjectionToFront()).toBe(true)
-    expect(projection.restore).toHaveBeenCalledOnce()
-    expect(projection.restore.mock.invocationCallOrder[0]).toBeLessThan(
-      projection.moveTop.mock.invocationCallOrder[0]
-    )
-  })
-
-  it('shows a hidden projection without activation before moving it to the top', () => {
-    const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.isVisible.mockReturnValue(false)
-
-    expect(wm.bringProjectionToFront()).toBe(true)
-    expect(projection.showInactive).toHaveBeenCalledOnce()
-    expect(projection.moveTop).toHaveBeenCalledOnce()
-  })
-
-  it('returns false when projection is missing or destroyed', () => {
-    const wm = WindowManager.getInstance()
-
-    expect(wm.bringProjectionToFront()).toBe(false)
-
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
-    projection.isDestroyed.mockReturnValue(true)
-
-    expect(wm.bringProjectionToFront()).toBe(false)
-    expect(projection.moveTop).not.toHaveBeenCalled()
-  })
-
-  it('brings a newly ready projection forward exactly once without activation', () => {
-    const wm = WindowManager.getInstance()
-    wm.createProjectionWindow()
-    const projection = FakeBrowserWindow.instances[0]
+    wm.createMainWindow()
+    wm.createProjectionWindow('2')
+    const control = FakeBrowserWindow.instances[0]
+    const projection = FakeBrowserWindow.instances[1]
 
     projection.emitOnce('ready-to-show')
 
-    expect(projection.showInactive).not.toHaveBeenCalled()
-    expect(projection.moveTop).toHaveBeenCalledOnce()
+    expect(projection.showInactive).toHaveBeenCalledOnce()
     expect(projection.focus).not.toHaveBeenCalled()
+    expect(projection.moveTop).not.toHaveBeenCalled()
+    expect(projection.setFullScreen).not.toHaveBeenCalled()
     expect(projection.show).not.toHaveBeenCalled()
     expect(projection.setAlwaysOnTop).not.toHaveBeenCalled()
+    if (process.platform === 'darwin') {
+      expect(projection.setSimpleFullScreen).toHaveBeenCalledWith(true)
+      expect(projection.setFocusable).toHaveBeenCalledWith(false)
+      expect(control.focus).toHaveBeenCalledOnce()
+    }
   })
 
   it('consumes exactly one main-window close permit', () => {
@@ -502,7 +492,7 @@ describe('WindowManager', () => {
     })
   })
 
-  it('does not foreground a crash recovery or display replacement', () => {
+  it('does not focus a crash recovery or display replacement', () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000)
     const wm = WindowManager.getInstance()
@@ -520,5 +510,9 @@ describe('WindowManager', () => {
     expect(recovered.focus).not.toHaveBeenCalled()
     expect(moved.setAlwaysOnTop).not.toHaveBeenCalled()
     expect(recovered.setAlwaysOnTop).not.toHaveBeenCalled()
+    if (process.platform === 'darwin') {
+      expect(moved.setSimpleFullScreen).toHaveBeenCalledWith(true)
+      expect(recovered.setSimpleFullScreen).toHaveBeenCalledWith(true)
+    }
   })
 })

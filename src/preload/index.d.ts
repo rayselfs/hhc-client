@@ -68,7 +68,6 @@ interface ProjectionAPI {
   moveToDisplay: (displayId: string) => Promise<{ moved: boolean; generation: number }>
   retry: () => Promise<{ retried: boolean; generation: number }>
   getGeneration: () => Promise<{ generation: number }>
-  bringToFront: () => Promise<{ broughtToFront: boolean }>
   close: () => Promise<{ closed: boolean }>
   send: <C extends ProjectionChannel>(
     generation: number,

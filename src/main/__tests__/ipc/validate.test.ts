@@ -240,6 +240,7 @@ describe('validateProjectionTransportTuple', () => {
         'file:playback-state',
         {
           itemId: 'video-1',
+          phase: 'ready',
           currentTime: 12,
           duration: 100,
           isPlaying: false,
@@ -249,6 +250,34 @@ describe('validateProjectionTransportTuple', () => {
         }
       ])
     ).toBe(true)
+  })
+
+  it('requires a known file playback phase', () => {
+    expect(
+      validateProjectionMessageTuple([
+        'file:playback-state',
+        {
+          itemId: 'video-1',
+          phase: 'buffering',
+          currentTime: 0,
+          duration: 0,
+          isPlaying: false,
+          isEnded: false
+        }
+      ])
+    ).toBe(false)
+    expect(
+      validateProjectionMessageTuple([
+        'file:playback-state',
+        {
+          itemId: 'video-1',
+          currentTime: 0,
+          duration: 0,
+          isPlaying: false,
+          isEnded: false
+        }
+      ])
+    ).toBe(false)
   })
 
   it('accepts known playback variants and rejects unknown file projection variants', () => {

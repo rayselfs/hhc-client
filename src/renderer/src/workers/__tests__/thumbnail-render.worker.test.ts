@@ -6,7 +6,10 @@ const { getDocument, destroy } = vi.hoisted(() => ({
 }))
 
 vi.mock('@renderer/lib/pdfjs-loader', () => ({
-  loadPdfjsLib: vi.fn(async () => ({ getDocument }))
+  loadPdfjsWorkerLib: vi.fn(async () => ({
+    getDocument,
+    VerbosityLevel: { ERRORS: 0 }
+  }))
 }))
 
 describe('thumbnail render worker', () => {
@@ -78,7 +81,11 @@ describe('thumbnail render worker', () => {
     await vi.waitFor(() => expect(postMessage).toHaveBeenCalled())
 
     const options = getDocument.mock.calls[0][0]
-    expect(options).toMatchObject({ disableFontFace: true, useSystemFonts: false })
+    expect(options).toMatchObject({
+      disableFontFace: true,
+      useSystemFonts: false,
+      verbosity: 0
+    })
     expect(options.data).toBeInstanceOf(ArrayBuffer)
     const factory = new options.CanvasFactory({})
     const created = factory.create(10, 20)

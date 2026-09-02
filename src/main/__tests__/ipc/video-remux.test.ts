@@ -105,6 +105,8 @@ describe('video remux cache', () => {
         expect.stringMatching(/\.tmp\.mkv$/),
         '-map',
         '0',
+        '-c',
+        'copy',
         '-f',
         'null',
         '-'
