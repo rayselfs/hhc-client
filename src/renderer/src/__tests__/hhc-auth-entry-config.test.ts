@@ -183,7 +183,9 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(release.indexOf('- name: Generate release checksums')).toBeLessThan(
       release.indexOf('- name: Publish GitHub release')
     )
-    expect(release).toContain('gh release create "${GITHUB_REF_NAME}" release-artifacts/*')
+    expect(release).toContain('find release-artifacts -maxdepth 1 -type f -print0')
+    expect(release).toContain('gh release create "${GITHUB_REF_NAME}" "${artifacts[@]}"')
+    expect(release).not.toContain('release-artifacts/*')
   })
 
   it('keeps Asset tickets outside runtime caches and persisted browser storage', () => {
