@@ -29,6 +29,9 @@ import type { HhcLineAccessRequestAuth } from './hhc-line-access'
 
 type DownloadedContent = Awaited<ReturnType<HhcAssetApi['downloadContent']>>
 
+const receiptAttempts = new Set<string>()
+let receiptWarningCount = 0
+
 type HhcLineProviderOptions = {
   api: HhcAssetApi
   getSession: () => HhcSession | null | Promise<HhcSession | null>
@@ -213,7 +216,27 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
       },
       signal
     )
-    return this.save(request, content, metadata, canCommit)
+    const result = await this.save(request, content, metadata, canCommit)
+    const contentVersion = metadata.etag ?? metadata.contentHash
+    if (request.offlinePolicy === 'always-offline' && contentVersion) {
+      const key = `${request.remoteItemId}\0${contentVersion}`
+      if (!receiptAttempts.has(key)) {
+        receiptAttempts.add(key)
+        void this.options.api
+          .recordSyncReceipt({
+            collectionItemId: request.remoteItemId,
+            contentVersion,
+            state: 'available-offline',
+            appVersion: __APP_VERSION__
+          })
+          .catch(() => {
+            if (receiptWarningCount++ < 3) {
+              console.warn('[sync] Failed to record HHC available-offline receipt')
+            }
+          })
+      }
+    }
+    return result
   }
 
   classifyError(error: unknown): SyncRetryClassification {

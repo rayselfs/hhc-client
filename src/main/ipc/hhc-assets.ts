@@ -10,7 +10,8 @@ import {
   type HhcAssetCollectionChangePage,
   type HhcAssetCollectionItem,
   type HhcAssetCollectionPage,
-  type HhcAssetContentTicket
+  type HhcAssetContentTicket,
+  type HhcAssetSyncReceipt
 } from '@shared/hhc-assets'
 import type { WindowManager } from '../windowManager'
 import type { HhcAuthService } from './hhc-auth'
@@ -79,6 +80,18 @@ function cursor(value: unknown): string | undefined {
     typeof value !== 'string' ||
     new TextEncoder().encode(value).byteLength > MAX_CURSOR_BYTES ||
     hasControlCharacter
+  ) {
+    throw new Error('Invalid HHC Asset request')
+  }
+  return value
+}
+
+function boundedText(value: unknown, maxBytes: number): string {
+  if (
+    typeof value !== 'string' ||
+    value.trim().length === 0 ||
+    new TextEncoder().encode(value).byteLength > maxBytes ||
+    [...value].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
   ) {
     throw new Error('Invalid HHC Asset request')
   }
@@ -319,6 +332,30 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
         expiresAt,
         etag: response.etag
       }
+    })
+  )
+
+  ipcMain.handle(
+    'hhc-assets:record-sync-receipt',
+    authorized(async (value: unknown): Promise<void> => {
+      const input = validateExactObject(value, [
+        'collectionItemId',
+        'contentVersion',
+        'state',
+        'appVersion'
+      ])
+      if (input.state !== 'available-offline') throw new Error('Invalid HHC Asset request')
+      const receipt: HhcAssetSyncReceipt = {
+        collectionItemId: opaqueId(input.collectionItemId),
+        contentVersion: boundedText(input.contentVersion, 255),
+        state: input.state,
+        appVersion: boundedText(input.appVersion, 64)
+      }
+      await fetchAsset(auth, '/api/assets/sync-receipts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(receipt)
+      })
     })
   )
 

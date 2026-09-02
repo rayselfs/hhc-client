@@ -30,7 +30,8 @@ import type {
   HhcAssetItemRequest,
   HhcAssetNativeDownloadRequest,
   HhcAssetNativeDownloadResult,
-  HhcAssetNativeLease
+  HhcAssetNativeLease,
+  HhcAssetSyncReceipt
 } from './hhc-assets'
 
 export type WhisperModel = 'whisper-base' | 'whisper-small' | 'whisper-medium'
@@ -319,6 +320,7 @@ export interface IpcInvokeMap {
     args: [HhcAssetItemRequest]
     result: HhcAssetContentTicket
   }
+  'hhc-assets:record-sync-receipt': { args: [HhcAssetSyncReceipt]; result: void }
   'hhc-assets:download-file': {
     args: [HhcAssetNativeDownloadRequest]
     result: HhcAssetNativeDownloadResult
