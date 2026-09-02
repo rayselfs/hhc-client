@@ -4,6 +4,7 @@ import type { FolderRecord } from '@shared/types/folder'
 import type { CloudRefreshSummary, HhcLineCloudAuth } from '../cloud-provider'
 import type { ProviderConnectionRecord } from '../sync-db'
 import { useSettingsStore } from '@renderer/stores/settings'
+import type { MeetingWindowsApi } from '../meeting-windows-api'
 
 vi.mock('../env', () => ({
   isElectron: vi.fn(() => false)
@@ -116,6 +117,10 @@ function idleSummary(connectionId: string, rootFolderId: string): CloudRefreshSu
   }
 }
 
+function windows(values: { startsAt: string; endsAt: string }[] = []): MeetingWindowsApi {
+  return { list: vi.fn(async () => values) }
+}
+
 describe('startSyncRuntime', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -158,6 +163,54 @@ describe('startSyncRuntime', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(2)
 
+    stop()
+  })
+
+  it('polls only HHC every two seconds inside a meeting window and exits to cold cadence', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-meeting')
+    const target = root('root-meeting', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    const meetingWindows = windows([
+      {
+        startsAt: new Date(Date.now() - 1_000).toISOString(),
+        endsAt: new Date(Date.now() + 4_500).toISOString()
+      }
+    ])
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), meetingWindows })
+    await flushMicrotasks()
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+    expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(3)
+    expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(4)
+    await vi.advanceTimersByTimeAsync(59_999)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(4)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(5)
+    stop()
+  })
+
+  it('falls back to cold HHC cadence when meeting window lookup fails', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-window-failure')
+    const target = root('root-window-failure', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    const meetingWindows: MeetingWindowsApi = { list: vi.fn(async () => []) }
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), meetingWindows })
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(59_999)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
     stop()
   })
 

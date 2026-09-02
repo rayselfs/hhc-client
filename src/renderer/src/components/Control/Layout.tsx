@@ -26,6 +26,7 @@ import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
+import { createMeetingWindowsApi } from '@renderer/lib/meeting-windows-api'
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
@@ -45,6 +46,7 @@ export default function Layout(): React.JSX.Element {
     }),
     [endSession, getAccessToken, getAuthGeneration, refreshAccessToken]
   )
+  const meetingWindows = useMemo(() => createMeetingWindowsApi(hhcAuth), [hhcAuth])
   const handleHhcAccessRevoked = useCallback(
     async (scope: { connectionId: string; rootFolderId: string }): Promise<void> => {
       const { revokeHhcLineRootAccess } = await import('@renderer/lib/hhc-line-access')
@@ -71,6 +73,7 @@ export default function Layout(): React.JSX.Element {
   useEffect(() => {
     const cleanup = initializeApp({
       hhcAuth,
+      meetingWindows,
       getHhcAuthGeneration: getAuthGeneration,
       onHhcAccessRevoked: handleHhcAccessRevoked
     })
@@ -97,7 +100,7 @@ export default function Layout(): React.JSX.Element {
       unsub()
       unsub2()
     }
-  }, [getAuthGeneration, handleHhcAccessRevoked, hhcAuth])
+  }, [getAuthGeneration, handleHhcAccessRevoked, hhcAuth, meetingWindows])
 
   if (!initialized) return <AppLoadingScreen />
 

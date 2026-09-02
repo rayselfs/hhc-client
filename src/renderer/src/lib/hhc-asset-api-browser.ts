@@ -145,6 +145,13 @@ export function createBrowserHhcAssetApi(options: BrowserHhcAssetApiOptions): Hh
       }
       return { contentUrl: `${configuredOrigin}${contentUrl}`, expiresAt: parsedExpiry, etag }
     },
+    async recordSyncReceipt(receipt) {
+      await request('/api/assets/sync-receipts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(receipt)
+      })
+    },
     async getRemoteContentSource(collectionId, itemId) {
       const ticket = await this.issueContentTicket(collectionId, itemId)
       return {

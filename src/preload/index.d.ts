@@ -42,7 +42,8 @@ import type {
   HhcAssetItemRequest,
   HhcAssetNativeDownloadRequest,
   HhcAssetNativeDownloadResult,
-  HhcAssetNativeLease
+  HhcAssetNativeLease,
+  HhcAssetSyncReceipt
 } from '../shared/hhc-assets'
 import type { LanRemoteAck, LanRemoteCommand, LanRemoteSnapshot } from '../shared/lan-remote'
 import type {
@@ -188,6 +189,7 @@ interface HhcAssetsAPI {
   ) => Promise<HhcAssetCollectionChangePage>
   getCollectionItem: (request: HhcAssetItemRequest) => Promise<HhcAssetCollectionItem>
   issueContentTicket: (request: HhcAssetItemRequest) => Promise<HhcAssetContentTicket>
+  recordSyncReceipt: (receipt: HhcAssetSyncReceipt) => Promise<void>
   downloadFile: (request: HhcAssetNativeDownloadRequest) => Promise<HhcAssetNativeDownloadResult>
   cancelDownload: (targetFileId: string) => Promise<void>
   createContentLease: (request: HhcAssetItemRequest) => Promise<HhcAssetNativeLease>

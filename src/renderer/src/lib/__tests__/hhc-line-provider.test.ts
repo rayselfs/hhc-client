@@ -55,7 +55,8 @@ function api(): HhcAssetApi {
       expiresAt: 9_999_999_999,
       etag: '"etag-1"'
     })),
-    downloadContent: vi.fn(async () => new Response('content'))
+    downloadContent: vi.fn(async () => new Response('content')),
+    recordSyncReceipt: vi.fn(async () => undefined)
   }
 }
 
@@ -192,6 +193,75 @@ describe('HHC LINE read-only provider', () => {
       }),
       expect.any(AbortSignal)
     )
+  })
+
+  it.each(['on-demand', 'online-only'] as const)(
+    'does not emit an available-offline receipt for %s downloads',
+    async (offlinePolicy) => {
+      const client = api()
+      const provider = new HhcLineReadonlyProvider({
+        api: client,
+        getSession: vi.fn(),
+        saveDownloadedContent: vi.fn(async () => ({
+          blobId: 'blob_1',
+          size: 7,
+          mimeType: 'image/jpeg'
+        }))
+      })
+
+      await provider.downloadContent(
+        {
+          providerConnectionId: 'hhc-line:user_1',
+          rootRemoteFolderId: collection.id,
+          remoteItemId: item.id,
+          targetBlobId: 'blob_1',
+          offlinePolicy
+        },
+        new AbortController().signal,
+        () => true
+      )
+
+      expect(client.recordSyncReceipt).not.toHaveBeenCalled()
+    }
+  )
+
+  it('emits one telemetry-only receipt after an always-offline commit per item version', async () => {
+    const client = api()
+    vi.mocked(client.recordSyncReceipt).mockRejectedValue(new Error('telemetry unavailable'))
+    const saveDownloadedContent = vi.fn(async () => ({
+      blobId: 'blob_1',
+      size: 7,
+      mimeType: 'image/jpeg'
+    }))
+    const provider = new HhcLineReadonlyProvider({
+      api: client,
+      getSession: vi.fn(),
+      saveDownloadedContent
+    })
+    const request = {
+      providerConnectionId: 'hhc-line:user_1',
+      rootRemoteFolderId: collection.id,
+      remoteItemId: item.id,
+      targetBlobId: 'blob_1',
+      offlinePolicy: 'always-offline' as const
+    }
+
+    await expect(
+      provider.downloadContent(request, new AbortController().signal, () => true)
+    ).resolves.toMatchObject({ blobId: 'blob_1' })
+    await new HhcLineReadonlyProvider({
+      api: client,
+      getSession: vi.fn(),
+      saveDownloadedContent
+    }).downloadContent(request, new AbortController().signal, () => true)
+    await vi.waitFor(() => expect(client.recordSyncReceipt).toHaveBeenCalledOnce())
+    expect(saveDownloadedContent).toHaveBeenCalledTimes(2)
+    expect(client.recordSyncReceipt).toHaveBeenCalledWith({
+      collectionItemId: item.id,
+      contentVersion: item.etag,
+      state: 'available-offline',
+      appVersion: '0.0.0-test'
+    })
   })
 
   it.each(['changes', 'metadata', 'source'] as const)(

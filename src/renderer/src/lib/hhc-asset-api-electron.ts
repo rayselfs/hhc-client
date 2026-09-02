@@ -50,6 +50,7 @@ export function createElectronHhcAssetApi(): HhcAssetApi {
       }
       return ticket
     },
+    recordSyncReceipt: (receipt) => invoke(window.api.hhcAssets.recordSyncReceipt(receipt)),
     getRemoteContentSource: async (collectionId, itemId) => {
       const lease = await invoke(window.api.hhcAssets.createContentLease({ collectionId, itemId }))
       if (

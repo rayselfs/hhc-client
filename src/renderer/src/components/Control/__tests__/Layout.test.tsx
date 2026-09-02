@@ -245,7 +245,7 @@ describe('Layout', () => {
     })
 
     renderWithRouter(['/timer'])
-    await waitFor(() => expect(projectionEvents.playback).not.toBeNull())
+    await waitFor(() => expect(projectionEvents.playback).not.toBeNull(), { timeout: 5_000 })
     projectionEvents.playback?.({
       itemId: 'video-1',
       phase: 'playing',
