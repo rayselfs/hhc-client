@@ -26,9 +26,13 @@ function project(value: unknown): MediaSyncWindow[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error()
   const root = value as Record<string, unknown>
   if (
-    Object.keys(root).some((key) => key !== 'data') ||
+    Object.keys(root).sort().join(',') !== 'data,error,meta' ||
     !Array.isArray(root.data) ||
-    root.data.length > 500
+    root.data.length > 500 ||
+    !root.meta ||
+    typeof root.meta !== 'object' ||
+    Array.isArray(root.meta) ||
+    root.error !== null
   ) {
     throw new Error()
   }
