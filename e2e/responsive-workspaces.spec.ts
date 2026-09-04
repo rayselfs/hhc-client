@@ -761,6 +761,13 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   }))
   expect(ribbonMetrics.scrollWidth).toBeGreaterThan(ribbonMetrics.clientWidth)
 
+  await viewport.evaluate((element) => {
+    element.scrollLeft = 0
+    element.scrollTop = 0
+  })
+  await expect
+    .poll(() => viewport.evaluate((element) => [element.scrollLeft, element.scrollTop]))
+    .toEqual([0, 0])
   await page
     .locator('.presentation-stage [data-slide-surface]')
     .click({ button: 'right', position: { x: 20, y: 20 } })
