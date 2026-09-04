@@ -183,7 +183,7 @@ export function buildLocalSyncImportPlan(input: LocalSyncImportPlanInput): Local
       name: remoteItem.name,
       parentId,
       sortIndex,
-      createdAt: now,
+      createdAt: remoteItem.sourceCreatedAt ?? now,
       expiresAt: null,
       syncLink: {
         providerConnectionId: input.connection.id,
@@ -219,7 +219,7 @@ export function buildLocalSyncImportPlan(input: LocalSyncImportPlanInput): Local
       parentId,
       type: 'file',
       sortIndex,
-      createdAt: now,
+      createdAt: remoteItem.sourceCreatedAt ?? now,
       expiresAt: null,
       name: remoteItem.name,
       url: policy.disabled ? `unsupported:${itemId}` : `blob:${itemId}`,
@@ -552,7 +552,8 @@ export async function refreshLocalSyncConnection(
       name: item.name,
       mimeType: item.mimeType,
       size: item.size,
-      etag: item.etag
+      etag: item.etag,
+      sourceCreatedAt: item.sourceCreatedAt
     }))
   })
 

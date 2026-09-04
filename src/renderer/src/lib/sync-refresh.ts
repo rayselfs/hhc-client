@@ -296,7 +296,10 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
       name: remoteItem.name,
       parentId,
       sortIndex,
-      createdAt: input.existingFolders.find((folder) => folder.id === folderId)?.createdAt ?? now,
+      createdAt:
+        remoteItem.sourceCreatedAt ??
+        input.existingFolders.find((folder) => folder.id === folderId)?.createdAt ??
+        now,
       expiresAt: null,
       syncLink: {
         providerConnectionId: input.providerConnectionId,
@@ -346,7 +349,10 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
       parentId,
       type: 'file',
       sortIndex,
-      createdAt: input.existingItems.find((item) => item.id === itemId)?.createdAt ?? now,
+      createdAt:
+        remoteItem.sourceCreatedAt ??
+        input.existingItems.find((item) => item.id === itemId)?.createdAt ??
+        now,
       expiresAt: null,
       name: remoteItem.name,
       url: policy.disabled ? `unsupported:${itemId}` : `blob:${itemId}`,
@@ -508,7 +514,7 @@ export function buildSyncDeltaRefreshPlan(input: BuildSyncRefreshPlanInput): Syn
       name: remoteItem.name,
       parentId,
       sortIndex,
-      createdAt: existingFolder?.createdAt ?? now,
+      createdAt: remoteItem.sourceCreatedAt ?? existingFolder?.createdAt ?? now,
       expiresAt: null,
       syncLink: {
         providerConnectionId: input.providerConnectionId,
@@ -565,7 +571,7 @@ export function buildSyncDeltaRefreshPlan(input: BuildSyncRefreshPlanInput): Syn
       parentId,
       type: 'file',
       sortIndex,
-      createdAt: existingItem?.createdAt ?? now,
+      createdAt: remoteItem.sourceCreatedAt ?? existingItem?.createdAt ?? now,
       expiresAt: null,
       name: remoteItem.name,
       url: policy.disabled ? `unsupported:${itemId}` : `blob:${itemId}`,

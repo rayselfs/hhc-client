@@ -75,6 +75,7 @@ describe('OneDriveReadonlyProvider', () => {
             name: 'Media',
             folder: {},
             parentReference: { id: 'root' },
+            createdDateTime: '2026-09-01T02:03:04Z',
             eTag: 'folder-etag'
           },
           {
@@ -85,6 +86,7 @@ describe('OneDriveReadonlyProvider', () => {
               hashes: { quickXorHash: 'hash-1' }
             },
             parentReference: { id: 'folder-1' },
+            createdDateTime: 'invalid',
             size: 1024,
             eTag: 'file-etag'
           }
@@ -112,6 +114,7 @@ describe('OneDriveReadonlyProvider', () => {
           size: undefined,
           etag: 'folder-etag',
           contentHash: undefined,
+          sourceCreatedAt: Date.parse('2026-09-01T02:03:04Z'),
           deleted: false
         },
         {

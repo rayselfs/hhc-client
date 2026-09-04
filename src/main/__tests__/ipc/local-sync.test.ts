@@ -254,18 +254,58 @@ describe('local sync IPC', () => {
     })
     mockStat.mockImplementation(async (filePath: string) => {
       if (filePath === ROOT_PATH) {
-        return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+          size: 0,
+          birthtimeMs: 1,
+          mtimeMs: 1
+        }
       }
-      return { isDirectory: () => false, isFile: () => true, size: 2048, mtimeMs: 5 }
+      if (filePath === path.join(ROOT_PATH, 'Sunday')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+          size: 0,
+          birthtimeMs: 20,
+          mtimeMs: 2
+        }
+      }
+      if (filePath === path.join(ROOT_PATH, 'intro.mp4')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+          size: 2048,
+          birthtimeMs: 10,
+          mtimeMs: 5
+        }
+      }
+      return {
+        isDirectory: () => false,
+        isFile: () => true,
+        size: 2048,
+        birthtimeMs: 0,
+        mtimeMs: 6
+      }
     })
 
     const result = await getHandler('local-sync:scan-folder')(makeEvent(), CONNECTION_ID)
 
     expect(result).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: 'folder', name: 'Sunday' }),
-        expect.objectContaining({ kind: 'file', name: 'intro.mp4', size: 2048 }),
-        expect.objectContaining({ kind: 'file', name: 'message.mkv', size: 2048 })
+        expect.objectContaining({ kind: 'folder', name: 'Sunday', sourceCreatedAt: 20 }),
+        expect.objectContaining({
+          kind: 'file',
+          name: 'intro.mp4',
+          size: 2048,
+          sourceCreatedAt: 10
+        }),
+        expect.objectContaining({
+          kind: 'file',
+          name: 'message.mkv',
+          size: 2048,
+          sourceCreatedAt: 6
+        })
       ])
     )
     expect(JSON.stringify(result)).not.toContain(ROOT_PATH)

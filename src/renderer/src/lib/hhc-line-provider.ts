@@ -15,6 +15,7 @@ import { unlinkSyncConnectionFromApp } from './sync-unlink'
 import { dispatchRecoverySourceChanged } from './recovery-source-events'
 import {
   SyncDownloadCancelledError,
+  parseSourceCreatedAt,
   type ReadOnlySyncProvider,
   type RemoteSyncItem,
   type SyncChangePage,
@@ -54,6 +55,7 @@ type HhcLineProviderOptions = {
 }
 
 function mapItem(item: HhcAssetCollectionItem): RemoteSyncItem {
+  const sourceCreatedAt = parseSourceCreatedAt(item.createdAt)
   return {
     remoteItemId: item.id,
     parentRemoteItemId: item.collectionId,
@@ -62,7 +64,8 @@ function mapItem(item: HhcAssetCollectionItem): RemoteSyncItem {
     ...(item.mimeType ? { mimeType: item.mimeType } : {}),
     ...(item.sizeBytes === undefined ? {} : { size: item.sizeBytes }),
     ...(item.etag ? { etag: item.etag } : {}),
-    contentHash: item.sourceRevision
+    contentHash: item.sourceRevision,
+    ...(sourceCreatedAt === undefined ? {} : { sourceCreatedAt })
   }
 }
 
