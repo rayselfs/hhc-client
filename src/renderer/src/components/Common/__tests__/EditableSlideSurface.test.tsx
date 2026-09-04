@@ -700,7 +700,7 @@ describe('EditableSlideSurface', () => {
     expect(updates).not.toHaveProperty('height')
   })
 
-  it('renders imported text runs and clears them on the first plain-text edit', () => {
+  it('renders imported text runs and keeps normalized rich text after editing', () => {
     const flushAnimationFrame = mockAnimationFrame()
     const handleUpdate = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -752,7 +752,58 @@ describe('EditableSlideSurface', () => {
     expect(handleUpdate).toHaveBeenCalledWith(
       slideId,
       text.id,
-      expect.objectContaining({ text: 'Edited', runs: undefined })
+      expect.objectContaining({
+        text: 'Edited',
+        paragraphs: [
+          expect.objectContaining({
+            runs: [expect.objectContaining({ text: 'Edited', fontFamily: 'Arial' })]
+          })
+        ]
+      })
+    )
+  })
+
+  it('updates one imported run without flattening adjacent run styles', () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Bold plain',
+      autoSize: 'fixed',
+      runs: [
+        { ...createTextElement({ fontFamily: 'Arial', bold: true }), text: 'Bold' },
+        { ...createTextElement({ fontFamily: 'Calibri', italic: true }), text: ' plain' }
+      ]
+    })
+    const withText = addElementToSlide(document, slideId, text)
+    render(
+      <EditableSurfaceHarness
+        document={withText}
+        slideId={slideId}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    fireEvent.pointerDown(screen.getByRole('textbox'), { clientX: 40, clientY: 20, pointerId: 1 })
+    screen.getByText('Bold').textContent = 'Bolder'
+    fireEvent.input(screen.getByRole('textbox'))
+    act(() => flushAnimationFrame())
+
+    expect(handleUpdate).toHaveBeenCalledWith(
+      slideId,
+      text.id,
+      expect.objectContaining({
+        text: 'Bolder plain',
+        paragraphs: [
+          expect.objectContaining({
+            runs: [
+              expect.objectContaining({ text: 'Bolder', fontFamily: 'Arial', bold: true }),
+              expect.objectContaining({ text: ' plain', fontFamily: 'Calibri', italic: true })
+            ]
+          })
+        ]
+      })
     )
   })
 

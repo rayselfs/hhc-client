@@ -14,6 +14,11 @@ import {
   getSlideBackgroundCss,
   getSlideBackgroundPrimaryColor
 } from '@renderer/lib/editable-presentation'
+import {
+  getPlainText,
+  normalizeTextParagraphs,
+  resolveTypingStyle
+} from '@renderer/lib/presentation-rich-text'
 
 interface EditableSlideSurfaceProps {
   document: EditablePresentationDocument
@@ -1175,6 +1180,8 @@ function TextElementContent({
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
   const registeredFinalizerRef = useRef<TextEditFinalizer | null>(null)
   const contentHeight = hasContentHeight(element)
+  const paragraphs = useMemo(() => normalizeTextParagraphs(element), [element])
+  const hasRichText = Boolean(element.paragraphs?.length || element.runs?.length)
 
   const notifyTextEditLifecycle = useCallback((): void => {
     onTextEditFinalizerChange?.(registeredFinalizerRef.current)
@@ -1193,10 +1200,20 @@ function TextElementContent({
     settlePendingText()
   }
 
-  const commitText = (text: string): void => {
+  const commitText = (): void => {
+    const content = contentRef.current
+    if (!content) return
+    const nextParagraphs = serializeTextContent(content, paragraphs)
+    const text = getPlainText(nextParagraphs)
     onUpdateElement?.(slideId, element.id, {
       text,
-      runs: undefined,
+      runs: nextParagraphs.flatMap((paragraph, index) =>
+        paragraph.runs.map((run, runIndex) => ({
+          ...run,
+          text: `${index > 0 && runIndex === 0 ? '\n' : ''}${run.text}`
+        }))
+      ),
+      paragraphs: nextParagraphs,
       ...(isContentAutoSizedText(element)
         ? measureAutoSizedTextElement(contentRef.current, element, text)
         : {})
@@ -1217,7 +1234,7 @@ function TextElementContent({
       textFrameRef.current = null
       if (isComposingRef.current) return
       const content = contentRef.current
-      if (content) commitText(content.textContent ?? '')
+      if (content) commitText()
     })
   }
 
@@ -1234,7 +1251,7 @@ function TextElementContent({
       }
       if (isComposingRef.current) return
       pendingBlurTextRef.current = null
-      commitText(content.textContent ?? '')
+      commitText()
       onFinishTextEdit?.()
     })
   }
@@ -1273,7 +1290,7 @@ function TextElementContent({
       cancelPendingTextCommit()
       registeredFinalizerRef.current = null
       notifyTextEditLifecycle()
-      commitText(content.textContent ?? '')
+      commitText()
       onFinishTextEdit?.()
       return true
     }
@@ -1300,7 +1317,6 @@ function TextElementContent({
     if (!content) return
     if (initializedEditingElementRef.current === element.id) return
     initializedEditingElementRef.current = element.id
-    content.textContent = element.text
     focusEditableContent(content, pendingCaretPointRef.current)
     pendingCaretPointRef.current = null
   }, [editing, element.id, element.locked, element.text])
@@ -1395,27 +1411,84 @@ function TextElementContent({
         scheduleBlurCommit()
       }}
     >
-      {editing
-        ? null
-        : element.runs?.length
-          ? element.runs.map((run, index) => (
-              <span
-                key={index}
-                style={{
-                  color: run.color,
-                  fontFamily: run.fontFamily,
-                  fontSize: `${run.fontSize}px`,
-                  fontWeight: run.bold ? 700 : 400,
-                  fontStyle: run.italic ? 'italic' : 'normal',
-                  textDecoration: run.underline ? 'underline' : 'none'
-                }}
-              >
-                {run.text}
-              </span>
-            ))
-          : element.text}
+      {!hasRichText
+        ? element.text
+        : paragraphs.map((paragraph, paragraphIndex) => (
+            <div
+              key={paragraphIndex}
+              data-text-paragraph={paragraphIndex}
+              style={{
+                minHeight: '1em',
+                textAlign: paragraph.align,
+                lineHeight:
+                  paragraph.lineSpacing.kind === 'multiple'
+                    ? paragraph.lineSpacing.value
+                    : `${paragraph.lineSpacing.points}pt`,
+                marginLeft: paragraph.marginLeft,
+                textIndent: paragraph.textIndent
+              }}
+            >
+              {paragraph.runs.map((run, runIndex) => (
+                <span
+                  key={runIndex}
+                  data-text-run={runIndex}
+                  style={{
+                    color: run.color,
+                    backgroundColor: run.highlightColor ?? undefined,
+                    fontFamily: run.fontFamily,
+                    fontSize: `${run.fontSize}px`,
+                    fontWeight: run.bold ? 700 : 400,
+                    fontStyle: run.italic ? 'italic' : 'normal',
+                    textDecoration:
+                      [run.underline && 'underline', run.strikethrough && 'line-through']
+                        .filter(Boolean)
+                        .join(' ') || 'none',
+                    verticalAlign:
+                      run.baseline === 'superscript'
+                        ? 'super'
+                        : run.baseline === 'subscript'
+                          ? 'sub'
+                          : 'baseline',
+                    letterSpacing: run.characterSpacing ? `${run.characterSpacing}px` : undefined
+                  }}
+                >
+                  {run.text}
+                </span>
+              ))}
+              {paragraph.runs.length === 0 ? <br /> : null}
+            </div>
+          ))}
     </div>
   )
+}
+
+function serializeTextContent(
+  content: HTMLDivElement,
+  sourceParagraphs: ReturnType<typeof normalizeTextParagraphs>
+): ReturnType<typeof normalizeTextParagraphs> {
+  const paragraphNodes = Array.from(
+    content.querySelectorAll<HTMLElement>(':scope > [data-text-paragraph]')
+  )
+  if (paragraphNodes.length === 0) {
+    const style = resolveTypingStyle(sourceParagraphs, 0)
+    return [
+      {
+        ...sourceParagraphs[0],
+        runs: style && content.textContent ? [{ text: content.textContent, ...style }] : [],
+        typingStyle: style
+      }
+    ]
+  }
+  return paragraphNodes.map((paragraphNode, paragraphIndex) => {
+    const sourceParagraph = sourceParagraphs[paragraphIndex] ?? sourceParagraphs.at(-1)!
+    const runNodes = Array.from(paragraphNode.querySelectorAll<HTMLElement>('[data-text-run]'))
+    const runs = runNodes.flatMap((runNode, runIndex) => {
+      const text = runNode.textContent ?? ''
+      const sourceRun = sourceParagraph.runs[runIndex] ?? sourceParagraph.runs.at(-1)
+      return text && sourceRun ? [{ ...sourceRun, text }] : []
+    })
+    return { ...sourceParagraph, runs }
+  })
 }
 
 function calculateImageResize(
