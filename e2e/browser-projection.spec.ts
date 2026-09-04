@@ -298,7 +298,7 @@ test('restores the HHC account session without storing the access token', async 
         headers: { ...corsHeaders, 'content-type': 'application/json' },
         body: JSON.stringify({
           contentUrl,
-          expiresAt: '2099-08-17T01:00:00Z',
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
           etag: media.find((item) => item.id === itemId)?.etag ?? '"etag"'
         })
       })
