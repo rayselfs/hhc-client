@@ -21,14 +21,12 @@ export function registerUpdateService(wm: WindowManager): void {
     wm.sendToMain('update:status-changed', payload)
   }
 
-  const checkForUpdates = async (): Promise<
-    Awaited<ReturnType<typeof autoUpdater.checkForUpdates>>
-  > => {
-    if (checking || downloading) return null
+  const checkForUpdates = async (): Promise<void> => {
+    if (checking || downloading) return
 
     checking = true
     try {
-      return await autoUpdater.checkForUpdates()
+      await autoUpdater.checkForUpdates()
     } finally {
       checking = false
     }
@@ -72,17 +70,6 @@ export function registerUpdateService(wm: WindowManager): void {
     checking = false
     downloading = false
     sendStatus({ status: 'error', error: error.message })
-  })
-
-  ipcMain.handle('update:check', async (event) => {
-    if (!isMainWindow(wm, event)) throw new Error('Unauthorized update access')
-    const result = await checkForUpdates()
-    if (!result?.updateInfo) return { updateAvailable: false }
-
-    return {
-      updateAvailable: result.updateInfo.version !== app.getVersion(),
-      version: result.updateInfo.version
-    }
   })
 
   ipcMain.handle('update:install-downloaded', (event) => {

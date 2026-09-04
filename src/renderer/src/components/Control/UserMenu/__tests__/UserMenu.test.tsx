@@ -30,7 +30,6 @@ const auth = vi.hoisted(() => ({
 }))
 const toastDanger = vi.hoisted(() => vi.fn())
 const updateApi = vi.hoisted(() => ({
-  checkForUpdates: vi.fn(async () => ({ updateAvailable: false })),
   installDownloaded: vi.fn(async () => undefined),
   downloadMacInstaller: vi.fn(async () => undefined)
 }))
@@ -85,7 +84,6 @@ beforeEach(async () => {
   useUpdateStore.getState().reset()
   updateApi.installDownloaded.mockClear()
   updateApi.downloadMacInstaller.mockClear()
-  updateApi.checkForUpdates.mockClear()
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: { update: updateApi }
@@ -129,14 +127,21 @@ describe('UserMenu', () => {
     expect(screen.getByText(label)).toBeInTheDocument()
   })
 
-  it('manually checks for updates from an idle Electron session', async () => {
+  it('shows background checking as a disabled status', () => {
     vi.mocked(isElectron).mockReturnValue(true)
     renderUserMenu()
 
-    fireEvent.click(screen.getByText('Check for Updates').closest('[role="menuitem"]')!)
+    const item = screen.getByText('Checking...').closest('[role="menuitem"]')
+    expect(item).toHaveAttribute('aria-disabled', 'true')
+  })
 
-    await waitFor(() => expect(updateApi.checkForUpdates).toHaveBeenCalledOnce())
-    expect(useUpdateStore.getState().status).toBe('not-available')
+  it('shows the latest version as a disabled status', () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    useUpdateStore.setState({ status: 'not-available' })
+    renderUserMenu()
+
+    const item = screen.getByText('Up to Date').closest('[role="menuitem"]')
+    expect(item).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('asks before installing a downloaded Windows update', async () => {
@@ -144,7 +149,7 @@ describe('UserMenu', () => {
     useUpdateStore.setState({ status: 'downloaded', availableVersion: '2.4.1' })
     renderUserMenu()
 
-    fireEvent.click(screen.getByText('Install update').closest('[role="menuitem"]')!)
+    fireEvent.click(screen.getByText('Update v2.4.1').closest('[role="menuitem"]')!)
     expect(await screen.findByText('Install update now?')).toBeInTheDocument()
     expect(updateApi.installDownloaded).not.toHaveBeenCalled()
 
@@ -158,7 +163,7 @@ describe('UserMenu', () => {
     useUpdateStore.setState({ status: 'available', availableVersion: '2.4.1' })
     renderUserMenu()
 
-    fireEvent.click(screen.getByText('Download update 2.4.1').closest('[role="menuitem"]')!)
+    fireEvent.click(screen.getByText('Update v2.4.1').closest('[role="menuitem"]')!)
 
     expect(updateApi.downloadMacInstaller).toHaveBeenCalledOnce()
     expect(updateApi.installDownloaded).not.toHaveBeenCalled()

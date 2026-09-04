@@ -30,7 +30,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('electron-updater', () => ({ autoUpdater: mocks.autoUpdater }))
 vi.mock('electron', () => ({
-  app: { isPackaged: true, getVersion: vi.fn(() => '2.4.0') },
+  app: { isPackaged: true },
   ipcMain: { handle: mocks.ipcHandle },
   shell: { openPath: mocks.openPath }
 }))
@@ -164,7 +164,6 @@ describe('registerUpdateService', () => {
     register('darwin')
     mocks.isMainWindow.mockReturnValue(false)
 
-    await expect(mocks.ipcHandlers.get('update:check')?.({})).rejects.toThrow('Unauthorized')
     await expect(mocks.ipcHandlers.get('update:download-mac-installer')?.({})).rejects.toThrow(
       'Unauthorized'
     )
