@@ -306,11 +306,17 @@ describe('FileBrowser presentation open behavior', () => {
   })
 
   it('opens an imported PPTX search result in the presentation workspace', async () => {
-    const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
+    const deck = makeFile({
+      id: 'deck-1',
+      name: 'Deck.pptx',
+      mimeType: PPTX_MIME_TYPE,
+      createdAt: new Date(2026, 8, 4, 22, 3, 5).getTime()
+    })
     act(() => {
       useFileExplorerSearch.setState({ searchQuery: 'Deck' })
     })
     await renderWithItems([deck])
+    expect(screen.getByText('2026/09/04 22:03:05')).toBeInTheDocument()
 
     act(() => {
       fireEvent.doubleClick(screen.getByText('Deck.pptx'))

@@ -1,7 +1,9 @@
 import {
   publishPersistedFileItem,
+  useFavoritesExplorerSettings,
   useFileExplorerStore,
-  useFileExplorerSettings
+  useFileExplorerSettings,
+  useTrashExplorerSettings
 } from '@renderer/stores/file-explorer'
 import type { FileItemRecord } from '@shared/types/folder'
 
@@ -63,6 +65,29 @@ const initialStoreState = {
   persistenceError: null,
   pendingPersistenceCount: 0
 }
+
+describe.each([
+  ['files', useFileExplorerSettings],
+  ['favorites', useFavoritesExplorerSettings],
+  ['trash', useTrashExplorerSettings]
+] as const)('%s explorer settings', (_name, store) => {
+  it('migrates only the legacy Created column width', async () => {
+    const options = store.persist.getOptions()
+    const migrate = options.migrate
+
+    expect(options.version).toBe(2)
+    await expect(
+      Promise.resolve(
+        migrate?.({ colWidths: { created: 112, size: 80, kind: 96 }, marker: true }, 0)
+      )
+    ).resolves.toEqual({ colWidths: { created: 160, size: 80, kind: 96 }, marker: true })
+    await expect(
+      Promise.resolve(
+        migrate?.({ colWidths: { created: 180, size: 80, kind: 96 }, marker: true }, 1)
+      )
+    ).resolves.toEqual({ colWidths: { created: 180, size: 80, kind: 96 }, marker: true })
+  })
+})
 
 describe('useFileExplorerStore', () => {
   beforeEach(() => {

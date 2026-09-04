@@ -30,6 +30,24 @@ const items: GridViewItem[] = [
 ]
 
 describe('inline rename in file views', () => {
+  it('shows the complete local creation timestamp', () => {
+    render(
+      <ListView
+        items={[{ ...items[0], createdAt: new Date(2026, 8, 4, 22, 3, 5).getTime() }]}
+        sortField="name"
+        sortDir="asc"
+        onSortChange={vi.fn()}
+        colWidths={{ created: 160, size: 80, kind: 120 }}
+        onColWidthChange={vi.fn()}
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('2026/09/04 22:03:05')).toBeInTheDocument()
+  })
+
   it('renders and submits inline rename in grid view', () => {
     const onRenameSubmit = vi.fn()
     render(
