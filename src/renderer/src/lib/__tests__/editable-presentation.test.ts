@@ -479,7 +479,7 @@ describe('editable presentation documents', () => {
     expect(svg).toContain('feDropShadow')
   })
 
-  it('renders imported text runs with their own SVG thumbnail styles', () => {
+  it('renders rich text thumbnails through browser XHTML layout', () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
     const text = createTextElement({
@@ -492,7 +492,9 @@ describe('editable presentation documents', () => {
           bold: true,
           italic: false,
           underline: false,
-          color: '#FF0000'
+          color: '#FF0000',
+          highlightColor: '#FFFF00',
+          characterSpacing: 2
         },
         {
           text: ' small',
@@ -501,7 +503,9 @@ describe('editable presentation documents', () => {
           bold: false,
           italic: true,
           underline: true,
-          color: '#0000FF'
+          color: '#0000FF',
+          strikethrough: true,
+          baseline: 'superscript'
         }
       ]
     })
@@ -509,15 +513,18 @@ describe('editable presentation documents', () => {
       generateEditablePresentationThumbnail(addElementToSlide(document, slideId, text))
     )
 
-    expect(svg).toContain('<tspan')
-    expect(svg).toContain('font-size="72"')
-    expect(svg).toContain('font-family="Arial"')
-    expect(svg).toContain('font-weight="700"')
+    expect(svg).toContain('<foreignObject')
+    expect(svg).toContain('font-size:72px')
+    expect(svg).toContain('font-family:Arial')
+    expect(svg).toContain('font-weight:700')
     expect(svg).toContain('Large &amp;')
-    expect(svg).toContain('font-size="36"')
-    expect(svg).toContain('font-family="Calibri"')
-    expect(svg).toContain('font-style="italic"')
-    expect(svg).toContain('text-decoration="underline"')
+    expect(svg).toContain('background-color:#FFFF00')
+    expect(svg).toContain('letter-spacing:2px')
+    expect(svg).toContain('font-size:36px')
+    expect(svg).toContain('font-family:Calibri')
+    expect(svg).toContain('font-style:italic')
+    expect(svg).toContain('text-decoration:underline line-through')
+    expect(svg).toContain('vertical-align:super')
   })
 
   it('marks newly inserted text boxes as content auto-sized until a fixed width is provided', () => {

@@ -3,6 +3,7 @@ import { openFileExplorerDB } from './file-explorer-db'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { readPresentationArrayBuffer } from './presentation-source'
 import { persistEditablePresentationCreation } from './editable-presentation-creation'
+import { normalizeTextParagraphs } from './presentation-rich-text'
 import { FOLDER_DURATION_MS, type FileItemRecord } from '@shared/types/folder'
 import type { PlaceholderInfo, PresentationData } from '@aiden0z/pptx-renderer'
 import type { SlideData, SlideNode } from '@aiden0z/pptx-renderer'
@@ -1805,19 +1806,7 @@ function renderElementSvg(
 ): string {
   const transform = `rotate(${element.rotation} ${element.x + element.width / 2} ${element.y + element.height / 2})`
   if (element.type === 'text') {
-    if (element.runs?.length) {
-      const lineAdvance = element.fontSize * element.lineHeight
-      const body = element.runs
-        .flatMap((run) =>
-          run.text.split('\n').map((text, index) => {
-            const lineBreak = index > 0
-            return `<tspan${lineBreak ? ` x="${element.x}" dy="${lineAdvance}"` : ''} fill="${escapeXml(run.color)}" font-size="${run.fontSize}" font-family="${escapeXml(run.fontFamily)}" font-weight="${run.bold ? 700 : 400}" font-style="${run.italic ? 'italic' : 'normal'}"${run.underline ? ' text-decoration="underline"' : ''}>${escapeXml(text)}</tspan>`
-          })
-        )
-        .join('')
-      return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" opacity="${element.opacity}" transform="${transform}">${body}</text>`
-    }
-    return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" fill="${escapeXml(element.color)}" font-size="${element.fontSize}" font-family="${escapeXml(element.fontFamily)}" font-weight="${element.bold ? 700 : 400}" font-style="${element.italic ? 'italic' : 'normal'}" opacity="${element.opacity}" transform="${transform}">${escapeXml(element.text)}</text>`
+    return renderTextElementForeignObject(element, transform)
   }
   if (element.type === 'shape') {
     if (element.shape === 'ellipse') {
@@ -1832,6 +1821,40 @@ function renderElementSvg(
     return `<line x1="${element.x}" y1="${element.y}" x2="${element.x + element.width}" y2="${element.y + element.height}" stroke="${escapeXml(element.strokeColor)}" stroke-width="${element.strokeWidth}" opacity="${element.opacity}" transform="${transform}"/>`
   }
   return ''
+}
+
+function renderTextElementForeignObject(element: EditableTextElement, transform: string): string {
+  const paragraphs = normalizeTextParagraphs(element)
+  const body = paragraphs
+    .map((paragraph, paragraphIndex) => {
+      const marker =
+        paragraph.list?.kind === 'bullet'
+          ? `${paragraph.list.char} `
+          : paragraph.list?.kind === 'number'
+            ? `${(paragraph.list.startAt ?? 1) + paragraphIndex}. `
+            : ''
+      const runs = paragraph.runs
+        .map((run) => {
+          const decorations = [run.underline && 'underline', run.strikethrough && 'line-through']
+            .filter(Boolean)
+            .join(' ')
+          const verticalAlign =
+            run.baseline === 'superscript'
+              ? 'super'
+              : run.baseline === 'subscript'
+                ? 'sub'
+                : 'baseline'
+          return `<span style="color:${escapeXml(run.color)};background-color:${escapeXml(run.highlightColor ?? 'transparent')};font-family:${escapeXml(run.fontFamily)};font-size:${run.fontSize}px;font-weight:${run.bold ? 700 : 400};font-style:${run.italic ? 'italic' : 'normal'};text-decoration:${decorations || 'none'};vertical-align:${verticalAlign};letter-spacing:${run.characterSpacing ?? 0}px">${escapeXml(run.text)}</span>`
+        })
+        .join('')
+      const lineHeight =
+        paragraph.lineSpacing.kind === 'multiple'
+          ? String(paragraph.lineSpacing.value)
+          : `${paragraph.lineSpacing.points}pt`
+      return `<div style="min-height:1em;text-align:${paragraph.align};text-align-last:left;line-height:${lineHeight};margin-left:${paragraph.marginLeft}px;text-indent:${paragraph.textIndent}px">${escapeXml(marker)}${runs}</div>`
+    })
+    .join('')
+  return `<foreignObject x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" opacity="${element.opacity}" transform="${transform}"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word">${body}</div></foreignObject>`
 }
 
 function renderImageElementSvg(

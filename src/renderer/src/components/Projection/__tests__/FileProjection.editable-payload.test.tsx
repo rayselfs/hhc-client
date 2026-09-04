@@ -66,7 +66,31 @@ describe('FileProjection editable payload', () => {
                 align: 'center',
                 lineHeight: 1.15,
                 autoSize: 'fixed',
-                autoWidth: false
+                autoWidth: false,
+                paragraphs: [
+                  {
+                    runs: [
+                      {
+                        text: 'Holy Spirit come',
+                        fontFamily: 'Inter Variable',
+                        fontSize: 64,
+                        bold: true,
+                        italic: false,
+                        underline: false,
+                        color: '#111827',
+                        strikethrough: true,
+                        baseline: 'superscript',
+                        characterSpacing: 2,
+                        highlightColor: '#ffff00'
+                      }
+                    ],
+                    align: 'justify',
+                    lineSpacing: { kind: 'multiple', value: 1.15 },
+                    list: null,
+                    marginLeft: 0,
+                    textIndent: 0
+                  }
+                ]
               },
               'image-1': {
                 id: 'image-1',
@@ -97,6 +121,12 @@ describe('FileProjection editable payload', () => {
     expect(mockGetFileSource).not.toHaveBeenCalled()
     const textContent = screen.getByText('Holy Spirit come')
     expect(textContent).toBeInTheDocument()
+    expect(textContent).toHaveStyle({
+      backgroundColor: '#ffff00',
+      textDecoration: 'line-through',
+      verticalAlign: 'super',
+      letterSpacing: '2px'
+    })
     expect(textContent.style.padding).toBe('')
     expect(textContent.style.boxSizing).toBe('')
     expect(textContent.closest('[data-slide-element]')).toHaveStyle({
