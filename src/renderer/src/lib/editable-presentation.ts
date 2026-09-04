@@ -125,6 +125,7 @@ export type EditableListStyle =
 export interface EditableTextParagraph {
   runs: EditableTextRun[]
   typingStyle?: EditableTextStyle
+  typingStyleCaret?: number
   align: EditableTextAlign
   lineSpacing: EditableLineSpacing
   list: EditableListStyle | null
@@ -1351,6 +1352,7 @@ function getEditableShapeKind(presetGeometry: string | undefined): EditableShape
 function normalizeTextAlign(value: string | undefined): EditableTextAlign {
   if (value === 'ctr') return 'center'
   if (value === 'r') return 'right'
+  if (value === 'just') return 'justify'
   return 'left'
 }
 
@@ -1523,7 +1525,7 @@ function resolveTextParagraphs(
             : baseline < 0
               ? ('subscript' as const)
               : ('normal' as const),
-        characterSpacing: fontSizeToPx(spacing),
+        characterSpacing: characterSpacingToPx(spacing),
         highlightColor: readTextColor(run.properties?.child('highlight'), theme)
       }
     })
@@ -1607,6 +1609,10 @@ function emuToPx(emu: number): number {
 
 function fontSizeToPx(hundredthsOfPoint: number): number {
   return (hundredthsOfPoint / 100) * (CSS_PX_PER_INCH / 72)
+}
+
+function characterSpacingToPx(thousandthsOfPoint: number): number {
+  return (thousandthsOfPoint / 1000) * (CSS_PX_PER_INCH / 72)
 }
 
 function isXmlTrue(value: string | undefined): boolean {

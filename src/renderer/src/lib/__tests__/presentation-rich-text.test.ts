@@ -79,6 +79,15 @@ describe('presentation rich text', () => {
     expect(resolveTypingStyle(empty, 0)).toMatchObject({ color: '#123456' })
     expect(merged[0].runs).toHaveLength(1)
     expect(merged[0].runs[0].text).toBe('Hello')
+    expect(applyCharacterStyle(merged, 3, 3, { bold: true })[0]).toMatchObject({
+      typingStyle: { bold: true },
+      typingStyleCaret: 3
+    })
+    expect(
+      applyCharacterStyle(applyCharacterStyle(merged, 3, 3, { bold: true }), 3, 3, {
+        italic: true
+      })[0]
+    ).toMatchObject({ typingStyle: { bold: true, italic: true }, typingStyleCaret: 3 })
   })
 
   it('patches paragraph settings and reports mixed character values', () => {

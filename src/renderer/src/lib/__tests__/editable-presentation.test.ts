@@ -205,12 +205,16 @@ function mockMixedStyleTextShape(): unknown {
     textBody: {
       paragraphs: [
         {
-          properties: mockXmlNode({ attrs: { algn: 'ctr' } }),
+          properties: mockXmlNode({ attrs: { algn: 'just' } }),
           endParaRPr: missingXmlNode,
           runs: [
             {
               text: 'Bold',
-              properties: runProperties({ sz: '7200', b: '1', u: 'sng' }, 'Arial', 'FF0000')
+              properties: runProperties(
+                { sz: '7200', b: '1', u: 'sng', spc: '1000' },
+                'Arial',
+                'FF0000'
+              )
             },
             {
               text: ' italic',
@@ -1084,9 +1088,10 @@ describe('editable presentation documents', () => {
     ])
     expect(text.paragraphs).toHaveLength(2)
     expect(text.paragraphs?.[0]).toMatchObject({
-      align: 'center',
+      align: 'justify',
       lineSpacing: { kind: 'multiple', value: 1.15 }
     })
+    expect(text.paragraphs?.[0].runs[0].characterSpacing).toBeCloseTo(4 / 3)
     expect(text.paragraphs?.[0].runs.map((run) => run.text)).toEqual(['Bold', ' italic'])
   })
 

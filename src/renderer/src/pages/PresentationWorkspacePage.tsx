@@ -1909,13 +1909,19 @@ function EditableSessionDocumentView({
       if (target?.closest('[role="menu"], [role="dialog"]')) return
       const isFormControl = Boolean(target?.closest('input, select, textarea'))
       if (isFormControl) return
+      const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
+      const command = event.metaKey || event.ctrlKey
+      const isSlideClipboardCommand =
+        Boolean(target?.closest('[data-slide-option]')) &&
+        command &&
+        ['c', 'x', 'v'].includes(event.key.toLowerCase())
       const isActionControl = Boolean(
         target?.closest('button, a[href], [role="button"], [role="link"], [role="tab"]')
       )
       const isTabDelete =
         Boolean(target?.closest('[role="tab"]')) &&
         (event.key === 'Delete' || event.key === 'Backspace')
-      if (isActionControl && !isTabDelete) return
+      if (isActionControl && !isTabDelete && !isSlideClipboardCommand) return
       const isContentEditable =
         target instanceof HTMLElement &&
         (target.isContentEditable || target.getAttribute('contenteditable') === 'true')
@@ -1984,8 +1990,6 @@ function EditableSessionDocumentView({
         return
       }
 
-      const command = event.metaKey || event.ctrlKey
-      const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
       if (
         activeSlideId &&
         selectedElementIds.size > 0 &&
@@ -2011,7 +2015,9 @@ function EditableSessionDocumentView({
       }
       if (command && event.key.toLowerCase() === 'c') {
         event.preventDefault()
-        if (selectedElement) {
+        if (isSlideClipboardCommand) {
+          copySelectedSlides()
+        } else if (selectedElement) {
           setCopiedElement(selectedElement)
         } else {
           copySelectedSlides()
@@ -2019,7 +2025,9 @@ function EditableSessionDocumentView({
       }
       if (command && event.key.toLowerCase() === 'x') {
         event.preventDefault()
-        if (selectedElement) {
+        if (isSlideClipboardCommand) {
+          cutSelectedSlides()
+        } else if (selectedElement) {
           setCopiedElement(selectedElement)
           deleteElement()
         } else {
@@ -2028,7 +2036,9 @@ function EditableSessionDocumentView({
       }
       if (command && event.key.toLowerCase() === 'v') {
         event.preventDefault()
-        if (copiedElement) {
+        if (isSlideClipboardCommand) {
+          pasteSlide()
+        } else if (copiedElement) {
           pasteElement()
         } else {
           pasteSlide()
@@ -2299,7 +2309,10 @@ function EditableSessionDocumentView({
                         })
                       }}
                       onEditingElementChange={(elementId) => {
-                        if (elementId === null) commitTextDraft()
+                        if (elementId === null) {
+                          commitTextDraft()
+                          setTextSelection(null)
+                        }
                         setEditingElementId(elementId)
                       }}
                       onTextEditFinalizerChange={setTextEditorFinalizer}

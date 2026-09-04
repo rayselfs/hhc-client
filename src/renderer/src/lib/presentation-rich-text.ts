@@ -202,12 +202,19 @@ export function applyCharacterStyle(
     if (from === to) {
       const bounds = paragraphBounds(paragraphs, paragraphIndex)
       if (from >= bounds.start && from <= bounds.end) {
+        const caret = from - bounds.start
+        const typingStyle =
+          (paragraph.typingStyleCaret === caret
+            ? paragraph.typingStyle
+            : resolveTypingStyle([paragraph], caret)) ?? paragraph.typingStyle
+        if (!typingStyle) return { ...paragraph }
         return {
           ...paragraph,
           typingStyle: {
-            ...(resolveTypingStyle([paragraph], from - bounds.start) ?? paragraph.typingStyle!),
+            ...typingStyle,
             ...patch
-          }
+          },
+          typingStyleCaret: caret
         }
       }
       return { ...paragraph }
@@ -231,7 +238,7 @@ export function applyCharacterStyle(
       offset = runEnd
     }
     if (paragraphIndex < paragraphs.length - 1) offset++
-    return { ...paragraph, runs: mergeRuns(runs) }
+    return { ...paragraph, runs: mergeRuns(runs), typingStyleCaret: undefined }
   })
 }
 

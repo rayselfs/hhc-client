@@ -4,7 +4,9 @@ import type {
   EditablePresentationElement,
   EditablePresentationSlide,
   EditableTextInsertFrame,
-  EditableTextParagraph
+  EditableTextParagraph,
+  EditableTextRun,
+  EditableTextStyle
 } from '@renderer/lib/editable-presentation'
 import {
   CONTENT_HEIGHT_TEXT_PADDING_X,
@@ -1517,6 +1519,7 @@ function TextElementContent({
                 <span
                   key={runIndex}
                   data-text-run={runIndex}
+                  data-source-paragraph={paragraphIndex}
                   style={{
                     color: run.color,
                     backgroundColor: run.highlightColor ?? undefined,
@@ -1589,30 +1592,196 @@ function serializeTextContent(
       }
     ]
   }
+  let previousSourceParagraph = sourceParagraphs[0]
+  const resolvedSourceParagraphs = paragraphNodes.map((paragraphNode) => {
+    const sourceParagraphIndex = Number(paragraphNode.dataset.textParagraph)
+    const sourceParagraph =
+      (Number.isInteger(sourceParagraphIndex) && sourceParagraphIndex >= 0
+        ? sourceParagraphs[sourceParagraphIndex]
+        : undefined) ??
+      previousSourceParagraph ??
+      sourceParagraphs.at(-1)!
+    previousSourceParagraph = sourceParagraph
+    return sourceParagraph
+  })
+  const selectionNode = window.getSelection()?.anchorNode
+  const activeParagraphNode = selectionNode
+    ? paragraphNodes.find((paragraphNode) => paragraphNode.contains(selectionNode))
+    : undefined
+  const typingStyleOwners = new Map<EditableTextParagraph, HTMLElement>()
+  for (const sourceParagraph of new Set(resolvedSourceParagraphs)) {
+    if (sourceParagraph.typingStyleCaret === undefined) continue
+    const candidates = paragraphNodes.filter(
+      (_, index) => resolvedSourceParagraphs[index] === sourceParagraph
+    )
+    typingStyleOwners.set(
+      sourceParagraph,
+      (activeParagraphNode && candidates.includes(activeParagraphNode)
+        ? activeParagraphNode
+        : candidates.at(-1))!
+    )
+  }
   return paragraphNodes.map((paragraphNode, paragraphIndex) => {
-    const sourceParagraph = sourceParagraphs[paragraphIndex] ?? sourceParagraphs.at(-1)!
-    const runNodes = Array.from(paragraphNode.querySelectorAll<HTMLElement>('[data-text-run]'))
-    const runs =
-      runNodes.length > 0
-        ? runNodes.flatMap((runNode, runIndex) => {
-            const text = runNode.textContent ?? ''
-            const sourceRun = sourceParagraph.runs[runIndex] ?? sourceParagraph.runs.at(-1)
-            return text && sourceRun ? [{ ...sourceRun, text }] : []
-          })
-        : paragraphNode.textContent
-          ? [
-              {
-                text: paragraphNode.textContent,
-                ...(sourceParagraph.typingStyle ?? resolveTypingStyle([sourceParagraph], 0)!)
-              }
-            ]
-          : []
+    const sourceParagraph = resolvedSourceParagraphs[paragraphIndex]
+    const runs: EditableTextRun[] = []
+    const nodes: Array<HTMLElement | Text> = []
+    const collectNodes = (parent: Node): void => {
+      parent.childNodes.forEach((node) => {
+        if (node instanceof HTMLElement && node.matches('[data-text-run]')) nodes.push(node)
+        else if (
+          node instanceof HTMLBRElement &&
+          !(parent === paragraphNode && parent.childNodes.length === 1)
+        ) {
+          nodes.push(node)
+        } else if (node instanceof Text) nodes.push(node)
+        else collectNodes(node)
+      })
+    }
+    collectNodes(paragraphNode)
+    let typingStyleCaret =
+      typingStyleOwners.get(sourceParagraph) === paragraphNode
+        ? sourceParagraph.typingStyleCaret
+        : undefined
+    let offset = 0
+    let nextSourceRunIndex = 0
+    const removeMissingSourceRuns = (endIndex: number): void => {
+      while (nextSourceRunIndex < Math.min(endIndex, sourceParagraph.runs.length)) {
+        const edited = serializeEditedRun(
+          sourceParagraph.runs[nextSourceRunIndex],
+          '',
+          offset,
+          typingStyleCaret,
+          sourceParagraph.typingStyle
+        )
+        typingStyleCaret = edited.typingStyleCaret
+        nextSourceRunIndex++
+      }
+    }
+    for (const [nodeIndex, node] of nodes.entries()) {
+      if (node instanceof HTMLBRElement) {
+        const previousNode = nodes[nodeIndex - 1]
+        if (
+          nodeIndex === nodes.length - 1 &&
+          previousNode &&
+          getEditableNodeText(previousNode).endsWith('\n')
+        ) {
+          continue
+        }
+        const style =
+          typingStyleCaret === offset
+            ? sourceParagraph.typingStyle
+            : resolveTypingStyle([sourceParagraph], offset)
+        if (style) runs.push({ text: '\n', ...style })
+        if (typingStyleCaret !== undefined && typingStyleCaret >= offset) typingStyleCaret++
+        offset++
+        continue
+      }
+      if (node instanceof HTMLElement) {
+        const text = getEditableNodeText(node)
+        const runIndex = Number(node.dataset.textRun)
+        const runSourceParagraphIndex = Number(node.dataset.sourceParagraph)
+        const runSourceParagraph =
+          (Number.isInteger(runSourceParagraphIndex) && runSourceParagraphIndex >= 0
+            ? sourceParagraphs[runSourceParagraphIndex]
+            : undefined) ?? sourceParagraph
+        const usesCurrentSourceParagraph = runSourceParagraph === sourceParagraph
+        if (
+          usesCurrentSourceParagraph &&
+          Number.isInteger(runIndex) &&
+          runIndex >= nextSourceRunIndex
+        ) {
+          removeMissingSourceRuns(runIndex)
+        }
+        const sourceRun = runSourceParagraph.runs[runIndex] ?? runSourceParagraph.runs.at(-1)
+        if (sourceRun) {
+          const edited = serializeEditedRun(
+            sourceRun,
+            text,
+            offset,
+            usesCurrentSourceParagraph ? typingStyleCaret : undefined,
+            usesCurrentSourceParagraph ? sourceParagraph.typingStyle : undefined
+          )
+          runs.push(...edited.runs)
+          if (usesCurrentSourceParagraph) typingStyleCaret = edited.typingStyleCaret
+        }
+        if (usesCurrentSourceParagraph && Number.isInteger(runIndex) && runIndex >= 0) {
+          nextSourceRunIndex = Math.max(nextSourceRunIndex, runIndex + 1)
+        }
+        offset += text.length
+      } else {
+        const text = node.textContent ?? ''
+        const style =
+          typingStyleCaret === offset
+            ? sourceParagraph.typingStyle
+            : resolveTypingStyle([sourceParagraph], offset)
+        if (text && style) runs.push({ text, ...style })
+        if (text && typingStyleCaret !== undefined && typingStyleCaret >= offset) {
+          typingStyleCaret += text.length
+        }
+        offset += text.length
+      }
+    }
+    removeMissingSourceRuns(sourceParagraph.runs.length)
     return {
       ...sourceParagraph,
       list: runs.length === 0 ? null : sourceParagraph.list,
+      typingStyleCaret,
       runs
     }
   })
+}
+
+function getEditableNodeText(node: Node): string {
+  if (node instanceof HTMLBRElement) return '\n'
+  if (node instanceof Text) return node.textContent ?? ''
+  const text = Array.from(node.childNodes, getEditableNodeText).join('')
+  return node instanceof HTMLElement && text.endsWith('\n\n') ? text.slice(0, -1) : text
+}
+
+function serializeEditedRun(
+  source: EditableTextRun,
+  text: string,
+  runStart: number,
+  typingStyleCaret: number | undefined,
+  typingStyle: EditableTextStyle | undefined
+): { runs: EditableTextRun[]; typingStyleCaret: number | undefined } {
+  if (text === source.text) return { runs: [{ ...source }], typingStyleCaret }
+
+  let prefixLength = 0
+  while (prefixLength < source.text.length && source.text[prefixLength] === text[prefixLength]) {
+    prefixLength++
+  }
+  let suffixLength = 0
+  while (
+    suffixLength < source.text.length - prefixLength &&
+    suffixLength < text.length - prefixLength &&
+    source.text[source.text.length - 1 - suffixLength] === text[text.length - 1 - suffixLength]
+  ) {
+    suffixLength++
+  }
+
+  const insertedEnd = text.length - suffixLength
+  const insertedLength = insertedEnd - prefixLength
+  const editStart = runStart + prefixLength
+  const editEnd = editStart + source.text.length - prefixLength - suffixLength
+  let nextCaret = typingStyleCaret
+  if (typingStyleCaret !== undefined) {
+    if (typingStyleCaret > editEnd) {
+      nextCaret = typingStyleCaret + insertedLength - (editEnd - editStart)
+    } else if (typingStyleCaret >= editStart) nextCaret = editStart + insertedLength
+  }
+  if (!text) return { runs: [], typingStyleCaret: nextCaret }
+  if (!typingStyle || typingStyleCaret !== editStart || insertedLength <= 0) {
+    return { runs: [{ ...source, text }], typingStyleCaret: nextCaret }
+  }
+
+  const runs: EditableTextRun[] = []
+  if (prefixLength > 0) runs.push({ ...source, text: text.slice(0, prefixLength) })
+  if (insertedEnd > prefixLength) {
+    runs.push({ text: text.slice(prefixLength, insertedEnd), ...typingStyle })
+  }
+  if (suffixLength > 0) runs.push({ ...source, text: text.slice(insertedEnd) })
+  return { runs, typingStyleCaret: nextCaret }
 }
 
 function getListMarker(

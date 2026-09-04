@@ -436,6 +436,31 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(3)
   })
 
+  it('routes slide clipboard shortcuts while a sidebar item has focus', async () => {
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Element clipboard' })
+    const second = insertBlankEditableSlide(addElementToSlide(source, slideId, text), 1)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: second.document,
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const frame = (await screen.findAllByText('Element clipboard'))
+      .at(-1)!
+      .closest('[data-slide-element]')!
+    const slide = document.querySelectorAll<HTMLElement>('[data-slide-option]')[1]
+
+    fireEvent.click(frame)
+    fireEvent.keyDown(document, { key: 'c', code: 'KeyC', ctrlKey: true })
+    fireEvent.click(slide)
+    slide.focus()
+    fireEvent.keyDown(slide, { key: 'c', code: 'KeyC', ctrlKey: true })
+    fireEvent.keyDown(slide, { key: 'v', code: 'KeyV', ctrlKey: true })
+
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(3)
+  })
+
   it('keeps the slide clipboard while switching between open presentation tabs', async () => {
     const user = userEvent.setup()
     const firstItem = makeEditableItem()
@@ -623,6 +648,39 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(textInsert).toHaveAttribute('aria-pressed', 'true')
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
     expect(textInsert).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('formats the whole text box after its character selection leaves edit mode', async () => {
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Whole text' })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(source, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const frame = (await screen.findAllByText('Whole text'))
+      .at(-1)!
+      .closest('[data-slide-element]')!
+
+    fireEvent.click(frame)
+    fireEvent.keyDown(document, { key: 'Enter', code: 'Enter' })
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!
+    const textNode = content.firstChild!
+    const range = document.createRange()
+    range.setStart(textNode, 1)
+    range.setEnd(textNode, 4)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    fireEvent(document, new Event('selectionchange'))
+    fireEvent.keyDown(content, { key: 'Escape', code: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Bold' }))
+
+    const updated = session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    expect(updated.type === 'text' && updated.paragraphs?.[0].runs.every((run) => run.bold)).toBe(
+      true
+    )
   })
 
   it('finalizes pending text on Escape instead of discarding its active edit transaction', async () => {
