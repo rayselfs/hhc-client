@@ -3,7 +3,8 @@ import type {
   EditablePresentationDocument,
   EditablePresentationElement,
   EditablePresentationSlide,
-  EditableTextInsertFrame
+  EditableTextInsertFrame,
+  EditableTextParagraph
 } from '@renderer/lib/editable-presentation'
 import {
   CONTENT_HEIGHT_TEXT_PADDING_X,
@@ -41,8 +42,11 @@ interface EditableSlideSurfaceProps {
   ) => void
   onEditingElementChange?: (elementId: string | null) => void
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
+  onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextIndent?: (direction: -1 | 1) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
+  onCanvasContextMenu?: (event: React.MouseEvent) => void
   onTransformStart?: (elementId: string) => EditablePresentationElement | undefined
   onTransformPreview?: (
     elementId: string,
@@ -55,6 +59,12 @@ interface EditableSlideSurfaceProps {
     elementId: string,
     updates: Partial<EditablePresentationElement>
   ) => void
+}
+
+export interface EditableTextSelection {
+  elementId: string
+  start: number
+  end: number
 }
 
 type TextEditFinalizer = (() => boolean) & {
@@ -97,7 +107,7 @@ const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
 const RESIZE_HIT_TARGET_SIZE = 25
 const RESIZE_INDICATOR_HIT_SIZE = 4
-const TEXT_HANDLE_SIZE = 12
+const TEXT_HANDLE_SIZE = 10
 const IMAGE_HANDLE_SIZE = 16
 const GENERIC_HANDLE_SIZE = 20
 
@@ -120,8 +130,11 @@ export default function EditableSlideSurface({
   onMarqueeSelect,
   onEditingElementChange,
   onTextEditFinalizerChange,
+  onTextSelectionChange,
+  onTextIndent,
   onInsertText,
   onElementContextMenu,
+  onCanvasContextMenu,
   onTransformStart,
   onTransformPreview,
   onTransformCommit,
@@ -228,7 +241,8 @@ export default function EditableSlideSurface({
       updates = {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false,
-        autoSize: hasContentHeight(drag.original) ? 'content' : 'fixed'
+        autoSize:
+          hasContentHeight(drag.original) && !['n', 's'].includes(drag.handle) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'image' && drag.handle) {
       updates = calculateImageResize(
@@ -261,8 +275,11 @@ export default function EditableSlideSurface({
     handle: ResizeHandle,
     mode: 'resize' | 'crop'
   ): void => {
-    const horizontalOnly = element.type === 'text' && hasContentHeight(element)
-    const delta = getKeyboardResizeDelta(event, handle, horizontalOnly)
+    const delta = getKeyboardResizeDelta(
+      event,
+      handle,
+      element.type === 'text' && hasContentHeight(element) && handle !== 'n' && handle !== 's'
+    )
     if (!delta || !finalizeTextEdit()) return
     const original = onTransformStart ? onTransformStart(element.id) : element
     if (!original) return
@@ -276,7 +293,7 @@ export default function EditableSlideSurface({
       updates = {
         ...calculateTextResize(original, handle, delta.dx, delta.dy),
         autoWidth: false,
-        autoSize: hasContentHeight(original) ? 'content' : 'fixed'
+        autoSize: hasContentHeight(original) && !['n', 's'].includes(handle) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (original.type === 'image') {
       updates = calculateImageResize(
@@ -464,6 +481,7 @@ export default function EditableSlideSurface({
     <div
       data-slide-surface
       ref={surfaceRef}
+      tabIndex={-1}
       className={`relative aspect-video w-full overflow-visible bg-black ${
         isTextInsertMode ? 'cursor-crosshair' : ''
       } ${className ?? ''}`}
@@ -493,6 +511,7 @@ export default function EditableSlideSurface({
         }
       }}
       onDoubleClick={insertTextAtPointer}
+      onContextMenu={onCanvasContextMenu}
     >
       <div
         data-slide-content
@@ -529,6 +548,8 @@ export default function EditableSlideSurface({
               }}
               onFinishTextEdit={() => onEditingElementChange?.(null)}
               onTextEditFinalizerChange={setTextEditFinalizer}
+              onTextSelectionChange={onTextSelectionChange}
+              onTextIndent={onTextIndent}
             />
           ))}
           {marquee && (
@@ -609,7 +630,9 @@ function SlideElement({
   onUpdateElement,
   onStartTextEdit,
   onFinishTextEdit,
-  onTextEditFinalizerChange
+  onTextEditFinalizerChange,
+  onTextSelectionChange,
+  onTextIndent
 }: {
   document: EditablePresentationDocument
   slide: EditablePresentationSlide
@@ -630,6 +653,8 @@ function SlideElement({
   onStartTextEdit: () => void
   onFinishTextEdit: () => void
   onTextEditFinalizerChange: (finalize: TextEditFinalizer | null) => void
+  onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextIndent?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
     left: element.x,
@@ -652,7 +677,10 @@ function SlideElement({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      onContextMenu={onContextMenu}
+      onContextMenu={(event) => {
+        event.stopPropagation()
+        onContextMenu?.(event)
+      }}
       onClick={(event) => {
         event.stopPropagation()
         onSelect(event)
@@ -667,7 +695,9 @@ function SlideElement({
         onUpdateElement,
         onStartTextEdit,
         onFinishTextEdit,
-        onTextEditFinalizerChange
+        onTextEditFinalizerChange,
+        onTextSelectionChange,
+        onTextIndent
       )}
     </div>
   )
@@ -703,7 +733,7 @@ function SelectionChrome({
   return (
     <div
       data-selection-chrome
-      className="pointer-events-none absolute outline-solid outline-primary"
+      className="pointer-events-none absolute outline-solid"
       style={{
         left: element.x,
         top: element.y,
@@ -711,7 +741,8 @@ function SelectionChrome({
         height: element.height,
         transform: `rotate(${element.rotation}deg)`,
         outlineWidth: 1.5 / surfaceScale,
-        outlineOffset: `${2 / surfaceScale}px`
+        outlineOffset: `${2 / surfaceScale}px`,
+        outlineColor: 'var(--accent)'
       }}
       onPointerDownCapture={(event) => {
         const handle = getNearestResizeHandle(event)
@@ -753,7 +784,10 @@ function ElementHandles({
   onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
 }): React.JSX.Element {
   if (element.type === 'text') {
-    const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
+    const handles =
+      hasContentHeight(element) && element.width * surfaceScale < RESIZE_HIT_TARGET_SIZE * 3
+        ? CONTENT_TEXT_HANDLES
+        : FIXED_TEXT_HANDLES
     const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
     const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
     const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
@@ -929,7 +963,9 @@ function renderElementContent(
   ) => void,
   onStartTextEdit?: () => void,
   onFinishTextEdit?: () => void,
-  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
+  onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void,
+  onTextSelectionChange?: (selection: EditableTextSelection | null) => void,
+  onTextIndent?: (direction: -1 | 1) => void
 ): React.ReactNode {
   if (element.type === 'text') {
     return (
@@ -942,6 +978,8 @@ function renderElementContent(
         onStartTextEdit={onStartTextEdit}
         onFinishTextEdit={onFinishTextEdit}
         onTextEditFinalizerChange={onTextEditFinalizerChange}
+        onTextSelectionChange={onTextSelectionChange}
+        onTextIndent={onTextIndent}
       />
     )
   }
@@ -1036,6 +1074,13 @@ function calculateTextResize(
   const hasEast = handle.includes('e')
   const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
   if (hasContentHeight(element)) {
+    if (handle === 'n' || handle === 's') {
+      const height = Math.max(TEXT_MIN_HEIGHT, element.height + (handle === 's' ? dy : -dy))
+      return {
+        y: handle === 'n' ? element.y + (element.height - height) : element.y,
+        height
+      } as Partial<EditablePresentationElement>
+    }
     return {
       x: hasWest ? element.x + (element.width - width) : element.x,
       width
@@ -1153,7 +1198,9 @@ function TextElementContent({
   onUpdateElement,
   onStartTextEdit,
   onFinishTextEdit,
-  onTextEditFinalizerChange
+  onTextEditFinalizerChange,
+  onTextSelectionChange,
+  onTextIndent
 }: {
   element: Extract<EditablePresentationElement, { type: 'text' }>
   slideId: string
@@ -1167,6 +1214,8 @@ function TextElementContent({
   onStartTextEdit?: () => void
   onFinishTextEdit?: () => void
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
+  onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextIndent?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
   const isComposingRef = useRef(false)
@@ -1203,8 +1252,17 @@ function TextElementContent({
   const commitText = (): void => {
     const content = contentRef.current
     if (!content) return
+    if (!hasPendingTextRef.current) {
+      notifyTextEditLifecycle()
+      return
+    }
     const nextParagraphs = serializeTextContent(content, paragraphs)
     const text = getPlainText(nextParagraphs)
+    if (text === element.text && JSON.stringify(nextParagraphs) === JSON.stringify(paragraphs)) {
+      hasPendingTextRef.current = false
+      notifyTextEditLifecycle()
+      return
+    }
     onUpdateElement?.(slideId, element.id, {
       text,
       runs: nextParagraphs.flatMap((paragraph, index) =>
@@ -1335,6 +1393,25 @@ function TextElementContent({
     }
   }, [])
 
+  useEffect(() => {
+    if (!editing) return
+    const reportSelection = (): void => {
+      const content = contentRef.current
+      const selection = window.getSelection()
+      if (!content || !selection || selection.rangeCount === 0) return
+      const range = selection.getRangeAt(0)
+      if (!content.contains(range.startContainer) || !content.contains(range.endContainer)) return
+      onTextSelectionChange?.({
+        elementId: element.id,
+        start: getTextOffset(content, range.startContainer, range.startOffset),
+        end: getTextOffset(content, range.endContainer, range.endOffset)
+      })
+    }
+    window.document.addEventListener('selectionchange', reportSelection)
+    reportSelection()
+    return () => window.document.removeEventListener('selectionchange', reportSelection)
+  }, [editing, element.id, onTextSelectionChange])
+
   return (
     <div
       data-text-content
@@ -1384,6 +1461,12 @@ function TextElementContent({
         if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
         else scheduleTextCommit()
       }}
+      onKeyDown={(event) => {
+        if (!editing || event.key !== 'Tab' || !onTextIndent) return
+        event.preventDefault()
+        event.stopPropagation()
+        onTextIndent(event.shiftKey ? -1 : 1)
+      }}
       onPointerDown={(event) => {
         if (!editable) return
         cancelPendingBlur()
@@ -1405,8 +1488,6 @@ function TextElementContent({
       }}
       onBlur={(event) => {
         cancelPendingTextCommit()
-        hasPendingTextRef.current = true
-        notifyTextEditLifecycle()
         pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
         scheduleBlurCommit()
       }}
@@ -1417,6 +1498,10 @@ function TextElementContent({
             <div
               key={paragraphIndex}
               data-text-paragraph={paragraphIndex}
+              data-list-marker={getListMarker(paragraph, paragraphIndex)}
+              className={
+                paragraph.list ? 'before:mr-2 before:content-[attr(data-list-marker)]' : undefined
+              }
               style={{
                 minHeight: '1em',
                 textAlign: paragraph.align,
@@ -1462,12 +1547,37 @@ function TextElementContent({
   )
 }
 
+function getTextOffset(content: HTMLElement, node: Node, nodeOffset: number): number {
+  const paragraph =
+    node instanceof Element
+      ? node.closest<HTMLElement>('[data-text-paragraph]')
+      : node.parentElement?.closest<HTMLElement>('[data-text-paragraph]')
+  if (!paragraph || !content.contains(paragraph)) {
+    const range = window.document.createRange()
+    range.selectNodeContents(content)
+    range.setEnd(node, nodeOffset)
+    return range.toString().length
+  }
+
+  const paragraphs = Array.from(
+    content.querySelectorAll<HTMLElement>(':scope > [data-text-paragraph]')
+  )
+  const paragraphIndex = paragraphs.indexOf(paragraph)
+  const offsetBefore = paragraphs
+    .slice(0, paragraphIndex)
+    .reduce((length, item) => length + (item.textContent?.length ?? 0) + 1, 0)
+  const range = window.document.createRange()
+  range.selectNodeContents(paragraph)
+  range.setEnd(node, nodeOffset)
+  return offsetBefore + range.toString().length
+}
+
 function serializeTextContent(
   content: HTMLDivElement,
   sourceParagraphs: ReturnType<typeof normalizeTextParagraphs>
 ): ReturnType<typeof normalizeTextParagraphs> {
-  const paragraphNodes = Array.from(
-    content.querySelectorAll<HTMLElement>(':scope > [data-text-paragraph]')
+  const paragraphNodes = Array.from(content.children).filter(
+    (node): node is HTMLElement => node instanceof HTMLElement
   )
   if (paragraphNodes.length === 0) {
     const style = resolveTypingStyle(sourceParagraphs, 0)
@@ -1482,13 +1592,36 @@ function serializeTextContent(
   return paragraphNodes.map((paragraphNode, paragraphIndex) => {
     const sourceParagraph = sourceParagraphs[paragraphIndex] ?? sourceParagraphs.at(-1)!
     const runNodes = Array.from(paragraphNode.querySelectorAll<HTMLElement>('[data-text-run]'))
-    const runs = runNodes.flatMap((runNode, runIndex) => {
-      const text = runNode.textContent ?? ''
-      const sourceRun = sourceParagraph.runs[runIndex] ?? sourceParagraph.runs.at(-1)
-      return text && sourceRun ? [{ ...sourceRun, text }] : []
-    })
-    return { ...sourceParagraph, runs }
+    const runs =
+      runNodes.length > 0
+        ? runNodes.flatMap((runNode, runIndex) => {
+            const text = runNode.textContent ?? ''
+            const sourceRun = sourceParagraph.runs[runIndex] ?? sourceParagraph.runs.at(-1)
+            return text && sourceRun ? [{ ...sourceRun, text }] : []
+          })
+        : paragraphNode.textContent
+          ? [
+              {
+                text: paragraphNode.textContent,
+                ...(sourceParagraph.typingStyle ?? resolveTypingStyle([sourceParagraph], 0)!)
+              }
+            ]
+          : []
+    return {
+      ...sourceParagraph,
+      list: runs.length === 0 ? null : sourceParagraph.list,
+      runs
+    }
   })
+}
+
+function getListMarker(
+  paragraph: EditableTextParagraph,
+  paragraphIndex: number
+): string | undefined {
+  if (!paragraph.list) return undefined
+  if (paragraph.list.kind === 'bullet') return paragraph.list.char || '•'
+  return `${(paragraph.list.startAt ?? 1) + paragraphIndex}.`
 }
 
 function calculateImageResize(

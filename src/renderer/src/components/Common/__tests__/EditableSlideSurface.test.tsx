@@ -807,6 +807,69 @@ describe('EditableSlideSurface', () => {
     )
   })
 
+  it('coalesces a burst of rich-text input into one frame update', () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Start', autoSize: 'fixed' })
+
+    render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        editingElementId={text.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+    const textbox = screen.getByRole('textbox')
+    for (const value of ['O', 'On', 'One']) {
+      textbox.textContent = value
+      fireEvent.input(textbox)
+    }
+    expect(handleUpdate).not.toHaveBeenCalled()
+    act(() => flushAnimationFrame())
+
+    expect(handleUpdate).toHaveBeenCalledTimes(1)
+    expect(handleUpdate).toHaveBeenCalledWith(
+      slideId,
+      text.id,
+      expect.objectContaining({ text: 'One' })
+    )
+  })
+
+  it('reports the current character selection to ribbon commands', () => {
+    const handleSelection = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Hello',
+      autoSize: 'fixed',
+      runs: [{ ...createTextElement({ fontFamily: 'Arial' }), text: 'Hello' }]
+    })
+
+    render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        editingElementId={text.id}
+        onTextSelectionChange={handleSelection}
+      />
+    )
+    const textNode = screen.getByText('Hello').firstChild!
+    const range = window.document.createRange()
+    range.setStart(textNode, 1)
+    range.setEnd(textNode, 4)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    act(() => window.document.dispatchEvent(new Event('selectionchange')))
+
+    expect(handleSelection).toHaveBeenLastCalledWith({ elementId: text.id, start: 1, end: 4 })
+  })
+
   it('renders selected text boxes with clearly visible square resize handles', () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -832,8 +895,74 @@ describe('EditableSlideSurface', () => {
     expect(screen.queryByLabelText('Resize element')).not.toBeInTheDocument()
   })
 
+  it('restores top and bottom handles when the same content-height box becomes wide enough', () => {
+    mockSurfaceScale(1)
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Resize me', width: 60, autoSize: 'content' })
+    const narrow = addElementToSlide(document, slideId, text)
+    const { rerender } = render(
+      <EditableSlideSurface
+        document={narrow}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
+    const wide = updateElementInSlide(narrow, slideId, text.id, { width: 220 })
+    rerender(
+      <EditableSlideSurface
+        document={wide}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+      />
+    )
+
+    expect(screen.getByLabelText('Resize text box top')).toBeInTheDocument()
+    expect(screen.getByLabelText('Resize text box bottom')).toBeInTheDocument()
+  })
+
+  it('turns content-height text into a fixed frame when resizing the top handle', () => {
+    mockSurfaceScale(1)
+    const onTransformPreview = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Resize me',
+      x: 100,
+      y: 80,
+      width: 220,
+      height: 40,
+      autoSize: 'content',
+      autoWidth: false
+    })
+
+    render(
+      <EditableSlideSurface
+        document={addElementToSlide(document, slideId, text)}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={() => text}
+        onTransformPreview={onTransformPreview}
+      />
+    )
+    fireEvent.keyDown(screen.getByLabelText('Resize text box top'), {
+      key: 'ArrowUp',
+      shiftKey: true
+    })
+
+    expect(onTransformPreview).toHaveBeenCalledWith(
+      text.id,
+      expect.objectContaining({ y: 70, height: 50, autoSize: 'fixed' })
+    )
+  })
+
   it.each([0.25, 1, 2])(
-    'keeps text resize targets at 24 screen px and visual knobs at 12 px at scale %s',
+    'keeps text resize targets at 24 screen px and visual knobs at 10 px at scale %s',
     (scale) => {
       mockSurfaceScale(scale)
       const document = createBlankEditablePresentationDocument('Sunday')
@@ -865,8 +994,8 @@ describe('EditableSlideSurface', () => {
       expect(Number.parseFloat(indicator.style.width) * scale).toBe(4)
       expect(Number.parseFloat(indicator.style.height) * scale).toBe(4)
       expect(indicator).toHaveClass('pointer-events-auto')
-      expect(Number.parseFloat(visual.style.width) * scale).toBe(12)
-      expect(Number.parseFloat(visual.style.height) * scale).toBe(12)
+      expect(Number.parseFloat(visual.style.width) * scale).toBe(10)
+      expect(Number.parseFloat(visual.style.height) * scale).toBe(10)
       expect(Number.parseFloat(visual.style.borderWidth) * scale).toBe(1.5)
       expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
       expect(Number.parseFloat(chrome.style.outlineWidth) * scale).toBe(1.5)
@@ -1533,7 +1662,7 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
+    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
     const rightHandle = screen.getByLabelText('Resize text box right')
     mockElementRect(rightHandle, { left: 0, top: 0, width: 25, height: 25 })
     fireEvent.pointerDown(rightHandle, { clientX: 12.5, clientY: 12.5, pointerId: 1 })

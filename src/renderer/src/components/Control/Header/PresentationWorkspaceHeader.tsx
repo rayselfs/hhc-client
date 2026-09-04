@@ -338,31 +338,31 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
           </button>
         </div>
       ))}
-      {activeDocument?.saveStatus && (
-        <div className="relative z-10 ml-2 flex items-center gap-2 text-xs text-default-500">
-          <span role={activeDocument.saveStatus === 'error' ? 'alert' : undefined}>
-            {t(
-              `presentationWorkspace.saveStatus.${activeDocument.saveStatus}`,
-              activeDocument.saveStatus === 'dirty'
-                ? 'Unsaved'
-                : activeDocument.saveStatus === 'saving'
-                  ? 'Saving...'
-                  : activeDocument.saveStatus === 'error'
-                    ? 'Save failed'
-                    : 'Saved'
+      <div className="relative z-10 ml-auto flex items-center gap-3">
+        {activeDocument?.saveStatus && (
+          <div className="flex items-center gap-2 text-xs text-default-500">
+            <span role={activeDocument.saveStatus === 'error' ? 'alert' : undefined}>
+              {t(
+                `presentationWorkspace.saveStatus.${activeDocument.saveStatus}`,
+                activeDocument.saveStatus === 'dirty'
+                  ? 'Unsaved'
+                  : activeDocument.saveStatus === 'saving'
+                    ? 'Saving...'
+                    : activeDocument.saveStatus === 'error'
+                      ? 'Save failed'
+                      : 'Saved'
+              )}
+            </span>
+            {activeDocument.mirrorWarnings && activeDocument.mirrorWarnings.length > 0 && (
+              <span>{t('presentationWorkspace.previewWarning', 'Preview needs repair')}</span>
             )}
-          </span>
-          {activeDocument.mirrorWarnings && activeDocument.mirrorWarnings.length > 0 && (
-            <span>{t('presentationWorkspace.previewWarning', 'Preview needs repair')}</span>
-          )}
-          {activeDocument.saveStatus === 'error' && (
-            <Button size="sm" variant="tertiary" onPress={() => activeSession?.retry()}>
-              {t('presentationWorkspace.retrySave', 'Retry save')}
-            </Button>
-          )}
-        </div>
-      )}
-      <div className="relative z-10 ml-auto flex items-center">
+            {activeDocument.saveStatus === 'error' && (
+              <Button size="sm" variant="tertiary" onPress={() => activeSession?.retry()}>
+                {t('presentationWorkspace.retrySave', 'Retry save')}
+              </Button>
+            )}
+          </div>
+        )}
         <Button
           size="lg"
           isIconOnly

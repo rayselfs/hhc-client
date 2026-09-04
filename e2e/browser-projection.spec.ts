@@ -648,11 +648,10 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   await page.getByRole('button', { name: /Edit a copy|編輯副本/ }).click()
   const ribbonFrame = page.getByTestId('presentation-ribbon-frame')
   await expect(ribbonFrame).toBeVisible()
-  await page.getByRole('tab', { name: /Design|設計|设计/ }).click()
-  const formatBackgroundTrigger = ribbonFrame.getByRole('button', {
-    name: /Format Background|設定背景格式|设置背景格式/
-  })
-  await formatBackgroundTrigger.click()
+  await expect(page.getByRole('tablist')).toHaveCount(0)
+  const editableSurface = page.locator('.presentation-stage [data-slide-surface]')
+  await editableSurface.click({ button: 'right', position: { x: 20, y: 20 } })
+  await page.getByRole('menuitem', { name: /Format Background|設定背景格式|设置背景格式/ }).click()
   const inspector = page.locator('.workspace-inspector-slot')
   const inspectorDialog = page.getByRole('dialog', {
     name: /Format Background|設定背景格式|设置背景格式/
@@ -661,15 +660,14 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   await expect(inspectorDialog.locator('.workspace-overlay-close:visible')).toHaveCount(1)
   await expect(inspector.locator('.workspace-inspector-content-close:visible')).toHaveCount(0)
   await inspectorDialog.locator('.workspace-overlay-close').click()
-  await expect(formatBackgroundTrigger).toBeFocused()
 
   await page.setViewportSize({ width: 1440, height: 900 })
-  await formatBackgroundTrigger.click()
+  await editableSurface.click({ button: 'right', position: { x: 20, y: 20 } })
+  await page.getByRole('menuitem', { name: /Format Background|設定背景格式|设置背景格式/ }).click()
   await expect(inspector).toBeVisible()
   await expect(inspector.locator('.workspace-overlay-close:visible')).toHaveCount(0)
   await expect(inspector.locator('.workspace-inspector-content-close:visible')).toHaveCount(1)
   await inspector.locator('.workspace-inspector-content-close').click()
-  await expect(formatBackgroundTrigger).toBeFocused()
 
   const projectionPromise = context.waitForEvent('page')
   await page.getByRole('button', { name: /Start projection|開始投影/ }).click()

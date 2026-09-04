@@ -6,6 +6,7 @@ import type {
 } from './editable-presentation'
 
 type CharacterStylePatch = Partial<Omit<EditableTextRun, 'text'>>
+export type TextCase = 'sentence' | 'lower' | 'upper' | 'capitalize' | 'toggle'
 
 function runStyle(element: EditableTextElement, run?: EditableTextRun): EditableTextStyle {
   return {
@@ -15,10 +16,10 @@ function runStyle(element: EditableTextElement, run?: EditableTextRun): Editable
     italic: run?.italic ?? element.italic,
     underline: run?.underline ?? element.underline,
     color: run?.color ?? element.color,
-    strikethrough: run?.strikethrough ?? false,
-    baseline: run?.baseline ?? 'normal',
-    characterSpacing: run?.characterSpacing ?? 0,
-    highlightColor: run?.highlightColor ?? null
+    strikethrough: run?.strikethrough ?? element.strikethrough ?? false,
+    baseline: run?.baseline ?? element.baseline ?? 'normal',
+    characterSpacing: run?.characterSpacing ?? element.characterSpacing ?? 0,
+    highlightColor: run?.highlightColor ?? element.highlightColor ?? null
   }
 }
 
@@ -104,12 +105,24 @@ export function applyParagraphStyle(
   end: number,
   patch: Partial<Omit<EditableTextParagraph, 'runs' | 'typingStyle'>>
 ): EditableTextParagraph[] {
+  return mapSelectedParagraphs(paragraphs, start, end, (paragraph) => ({ ...paragraph, ...patch }))
+}
+
+export function mapSelectedParagraphs(
+  paragraphs: readonly EditableTextParagraph[],
+  start: number,
+  end: number,
+  update: (paragraph: EditableTextParagraph) => EditableTextParagraph
+): EditableTextParagraph[] {
   const from = Math.max(0, Math.min(start, end))
   const to = Math.max(from, Math.max(start, end))
   return paragraphs.map((paragraph, index) => {
     const bounds = paragraphBounds(paragraphs, index)
-    const selected = from === to ? from >= bounds.start && from <= bounds.end : to >= bounds.start && from <= bounds.end
-    return selected ? { ...paragraph, ...patch } : { ...paragraph }
+    const selected =
+      from === to
+        ? from >= bounds.start && from <= bounds.end
+        : to >= bounds.start && from <= bounds.end
+    return selected ? update(paragraph) : { ...paragraph }
   })
 }
 
@@ -186,6 +199,19 @@ export function applyCharacterStyle(
   const to = Math.max(from, Math.max(start, end))
   let offset = 0
   return paragraphs.map((paragraph, paragraphIndex) => {
+    if (from === to) {
+      const bounds = paragraphBounds(paragraphs, paragraphIndex)
+      if (from >= bounds.start && from <= bounds.end) {
+        return {
+          ...paragraph,
+          typingStyle: {
+            ...(resolveTypingStyle([paragraph], from - bounds.start) ?? paragraph.typingStyle!),
+            ...patch
+          }
+        }
+      }
+      return { ...paragraph }
+    }
     const runs: EditableTextRun[] = []
     for (const run of paragraph.runs) {
       const runStart = offset
@@ -225,4 +251,59 @@ export function clearCharacterFormatting(
     characterSpacing: 0,
     highlightColor: null
   })
+}
+
+export function changeTextCase(
+  paragraphs: readonly EditableTextParagraph[],
+  start: number,
+  end: number,
+  textCase: TextCase
+): EditableTextParagraph[] {
+  const from = Math.max(0, Math.min(start, end))
+  const to = Math.max(from, Math.max(start, end))
+  let offset = 0
+  let sentenceStart = true
+  return paragraphs.map((paragraph, paragraphIndex) => {
+    const runs = paragraph.runs.map((run) => {
+      const runStart = offset
+      const runEnd = runStart + run.text.length
+      const localStart = Math.max(0, from - runStart)
+      const localEnd = Math.min(run.text.length, to - runStart)
+      offset = runEnd
+      if (localStart >= localEnd) return { ...run }
+      const selected = run.text.slice(localStart, localEnd)
+      const transformed = transformCase(selected, textCase, sentenceStart)
+      sentenceStart = /[.!?]\s*$/.test(transformed)
+      return {
+        ...run,
+        text: `${run.text.slice(0, localStart)}${transformed}${run.text.slice(localEnd)}`
+      }
+    })
+    if (paragraphIndex < paragraphs.length - 1) offset++
+    return { ...paragraph, runs: mergeRuns(runs) }
+  })
+}
+
+function transformCase(text: string, textCase: TextCase, sentenceStart: boolean): string {
+  if (textCase === 'lower') return text.toLocaleLowerCase()
+  if (textCase === 'upper') return text.toLocaleUpperCase()
+  if (textCase === 'toggle')
+    return [...text]
+      .map((character) =>
+        character === character.toLocaleUpperCase()
+          ? character.toLocaleLowerCase()
+          : character.toLocaleUpperCase()
+      )
+      .join('')
+  if (textCase === 'capitalize')
+    return text.replace(
+      /(^|\s)(\p{L})/gu,
+      (_, spacing: string, letter: string) => `${spacing}${letter.toLocaleUpperCase()}`
+    )
+  const lower = text.toLocaleLowerCase()
+  const sentencePattern = sentenceStart ? /(^|[.!?]\s+)(\p{L})/gu : /([.!?]\s+)(\p{L})/gu
+  return lower.replace(
+    sentencePattern,
+    (_, prefix: string, letter: string) => `${prefix}${letter.toLocaleUpperCase()}`
+  )
 }

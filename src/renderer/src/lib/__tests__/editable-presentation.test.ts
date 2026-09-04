@@ -1091,7 +1091,17 @@ describe('editable presentation documents', () => {
   })
 
   it('preserves each imported slide theme identity and palette', () => {
-    const makeTheme = (accent1: string, font: string) => ({
+    const makeTheme = (
+      accent1: string,
+      font: string
+    ): {
+      colorScheme: Map<string, string>
+      majorFont: Record<string, string>
+      minorFont: Record<string, string>
+      fillStyles: never[]
+      lineStyles: never[]
+      effectStyles: never[]
+    } => ({
       colorScheme: new Map([
         ['dk1', '000000'],
         ['lt1', 'FFFFFF'],

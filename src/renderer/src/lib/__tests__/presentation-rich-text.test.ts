@@ -3,6 +3,7 @@ import { createTextElement, type EditableTextParagraph } from '../editable-prese
 import {
   applyCharacterStyle,
   applyParagraphStyle,
+  changeTextCase,
   clearCharacterFormatting,
   getCharacterStyleValue,
   getPlainText,
@@ -152,5 +153,13 @@ describe('presentation rich text', () => {
       characterSpacing: 0,
       highlightColor: null
     })
+  })
+
+  it('changes only the selected characters without flattening run styles', () => {
+    const paragraphs = normalizeTextParagraphs(createTextElement({ text: 'hello WORLD' }))
+
+    expect(getPlainText(changeTextCase(paragraphs, 0, 5, 'upper'))).toBe('HELLO WORLD')
+    expect(getPlainText(changeTextCase(paragraphs, 6, 11, 'lower'))).toBe('hello world')
+    expect(getPlainText(changeTextCase(paragraphs, 0, 11, 'toggle'))).toBe('HELLO world')
   })
 })

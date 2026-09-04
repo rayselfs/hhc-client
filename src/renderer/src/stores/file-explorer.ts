@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create, type Mutate, type StoreApi, type UseBoundStore } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
@@ -29,6 +29,10 @@ interface FileExplorerSearchState {
   searchQuery: string
   setSearchQuery: (query: string) => void
 }
+
+type FileExplorerSettingsStore = UseBoundStore<
+  Mutate<StoreApi<FileExplorerSettingsState>, [['zustand/persist', unknown]]>
+>
 
 const CREATED_COLUMN_WIDTH = 160
 const EXPLORER_SETTINGS_VERSION = 2
@@ -73,7 +77,7 @@ function createExplorerSettingsStore(
   persistName: string,
   defaults: { sortField: SortField; sortDir: SortDir },
   options: { version?: number; migrate?: (state: unknown) => unknown } = {}
-) {
+): FileExplorerSettingsStore {
   return create<FileExplorerSettingsState>()(
     persist(
       (set) => ({

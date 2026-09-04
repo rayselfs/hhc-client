@@ -84,7 +84,11 @@ export interface EditableTextElement extends EditableElementBase {
   bold: boolean
   italic: boolean
   underline: boolean
+  strikethrough?: boolean
+  baseline?: 'normal' | 'superscript' | 'subscript'
+  characterSpacing?: number
   color: string
+  highlightColor?: string | null
   align: EditableTextAlign
   lineHeight: number
   paragraphs?: EditableTextParagraph[]
@@ -520,12 +524,17 @@ export function createTextElement(
     opacity: input.opacity ?? 1,
     text: input.text ?? '',
     runs: input.runs,
+    paragraphs: input.paragraphs,
     fontFamily: input.fontFamily ?? DEFAULT_FONT_FAMILY,
     fontSize,
     bold: input.bold ?? false,
     italic: input.italic ?? false,
     underline: input.underline ?? false,
+    strikethrough: input.strikethrough ?? false,
+    baseline: input.baseline ?? 'normal',
+    characterSpacing: input.characterSpacing ?? 0,
     color: input.color ?? DEFAULT_FOREGROUND_COLOR,
+    highlightColor: input.highlightColor ?? null,
     align: input.align ?? 'left',
     lineHeight
   }
