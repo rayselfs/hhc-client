@@ -1075,6 +1075,61 @@ describe('editable presentation documents', () => {
         color: '#00AA00'
       }
     ])
+    expect(text.paragraphs).toHaveLength(2)
+    expect(text.paragraphs?.[0]).toMatchObject({
+      align: 'center',
+      lineSpacing: { kind: 'multiple', value: 1.15 }
+    })
+    expect(text.paragraphs?.[0].runs.map((run) => run.text)).toEqual(['Bold', ' italic'])
+  })
+
+  it('preserves each imported slide theme identity and palette', () => {
+    const makeTheme = (accent1: string, font: string) => ({
+      colorScheme: new Map([
+        ['dk1', '000000'],
+        ['lt1', 'FFFFFF'],
+        ['accent1', accent1]
+      ]),
+      majorFont: { latin: font, ea: font, cs: font },
+      minorFont: { latin: font, ea: font, cs: font },
+      fillStyles: [],
+      lineStyles: [],
+      effectStyles: []
+    })
+    const presentation = {
+      width: 1920,
+      height: 1080,
+      slides: [
+        mockSlide(0, 'layout-a' as unknown as number, mockXmlNode()),
+        mockSlide(1, 'layout-b' as unknown as number, mockXmlNode())
+      ],
+      layouts: new Map(),
+      masters: new Map(),
+      themes: new Map([
+        ['theme-a', makeTheme('112233', 'Aptos')],
+        ['theme-b', makeTheme('445566', 'Arial')]
+      ]),
+      slideToLayout: new Map([
+        [0, 'layout-a'],
+        [1, 'layout-b']
+      ]),
+      layoutToMaster: new Map([
+        ['layout-a', 'master-a'],
+        ['layout-b', 'master-b']
+      ]),
+      masterToTheme: new Map([
+        ['master-a', 'theme-a'],
+        ['master-b', 'theme-b']
+      ]),
+      media: new Map()
+    } as unknown as PresentationData
+
+    const document = convertPresentationData(makePptxFileItem(), presentation)
+
+    expect(document.slides[document.slideOrder[0]].themeId).toBe('theme-a')
+    expect(document.slides[document.slideOrder[1]].themeId).toBe('theme-b')
+    expect(document.themes?.['theme-a'].colorScheme.accent1).toBe('#112233')
+    expect(document.themes?.['theme-b'].defaultTextStyle.fontFamily).toBe('Arial')
   })
 
   it('preserves direct slide, layout, and master solid black backgrounds with centered white text', () => {

@@ -6,7 +6,7 @@ import { persistEditablePresentationCreation } from './editable-presentation-cre
 import { FOLDER_DURATION_MS, type FileItemRecord } from '@shared/types/folder'
 import type { PlaceholderInfo, PresentationData } from '@aiden0z/pptx-renderer'
 import type { SlideData, SlideNode } from '@aiden0z/pptx-renderer'
-import type { PicNodeData, ShapeNodeData } from '@aiden0z/pptx-renderer'
+import type { PicNodeData, ShapeNodeData, ThemeData } from '@aiden0z/pptx-renderer'
 
 export const EDITABLE_PRESENTATION_DOCUMENT_KIND = 'editable-presentation-document'
 
@@ -1037,6 +1037,9 @@ export function convertPresentationData(
   const slides: Record<string, EditablePresentationSlide> = {}
   const slideOrder: string[] = []
   const assets: Record<string, EditablePresentationAsset> = {}
+  const width = normalizeCanvasLength(presentation.width, DEFAULT_WIDTH)
+  const themes = convertPresentationThemes(presentation, width)
+  const defaultThemeId = Object.keys(themes)[0] ?? DEFAULT_PRESENTATION_THEME_ID
 
   for (const slide of presentation.slides) {
     const slideId = crypto.randomUUID()
@@ -1044,7 +1047,8 @@ export function convertPresentationData(
     slides[slideId] = {
       ...convertedSlide,
       id: slideId,
-      name: `Slide ${slide.index + 1}`
+      name: `Slide ${slide.index + 1}`,
+      themeId: resolveSlideThemeId(slide, presentation) ?? defaultThemeId
     }
     slideOrder.push(slideId)
   }
@@ -1054,15 +1058,55 @@ export function convertPresentationData(
     name: `${stripPresentationExtension(source.name)} Editable`,
     sourceItemId: source.id,
     sourceBlobId: getBlobId(source),
-    width: normalizeCanvasLength(presentation.width, DEFAULT_WIDTH),
+    width,
     height: normalizeCanvasLength(presentation.height, DEFAULT_HEIGHT),
     defaultSlideBackground: createDefaultSlideBackground(),
     slideOrder,
     slides,
     assets,
+    themes,
+    defaultThemeId,
     createdAt: now,
     updatedAt: now
   }
+}
+
+function convertPresentationThemes(
+  presentation: PresentationData,
+  documentWidth: number
+): Record<string, EditablePresentationTheme> {
+  const result: Record<string, EditablePresentationTheme> = {}
+  for (const [id, theme] of presentation.themes ?? []) {
+    const fallback = createDefaultPresentationTheme(documentWidth)
+    result[id] = {
+      id,
+      defaultTextStyle: {
+        ...fallback.defaultTextStyle,
+        fontFamily: theme.minorFont.latin || theme.minorFont.ea || DEFAULT_FONT_FAMILY
+      },
+      colorScheme: {
+        ...fallback.colorScheme,
+        ...Object.fromEntries(
+          [...theme.colorScheme].map(([slot, color]) => [slot, normalizeThemeColor(color)])
+        )
+      }
+    }
+  }
+  if (Object.keys(result).length === 0) {
+    const fallback = createDefaultPresentationTheme(documentWidth)
+    result[fallback.id] = fallback
+  }
+  return result
+}
+
+function normalizeThemeColor(color: string): string {
+  return color.startsWith('#') ? color : `#${color}`
+}
+
+function resolveSlideThemeId(slide: SlideData, presentation: PresentationData): string | undefined {
+  const layoutId = presentation.slideToLayout?.get(slide.index) ?? slide.layoutIndex
+  const masterId = presentation.layoutToMaster?.get(layoutId)
+  return masterId ? presentation.masterToTheme?.get(masterId) : undefined
 }
 
 function convertSlide(
@@ -1140,6 +1184,7 @@ function convertShapeNode(
 ): EditablePresentationElement[] {
   const elements: EditablePresentationElement[] = []
   const text = getShapeText(node)
+  const theme = getSlideTheme(slide, presentation)
   const shape = getEditableShapeKind(node.presetGeometry)
   const fillColor = readSrgbColor(node.fill) ?? 'transparent'
   const strokeColor = readSrgbColor(node.line) ?? '#000000'
@@ -1180,8 +1225,9 @@ function convertShapeNode(
   if (text) {
     const frame = resolveTextShapeFrame(node, slide, presentation)
     if (!frame) throw new Error(`Text placeholder frame is missing: ${node.name}`)
-    const style = resolveTextShapeStyle(node)
-    const runs = resolveTextRuns(node)
+    const style = resolveTextShapeStyle(node, theme)
+    const runs = resolveTextRuns(node, theme)
+    const paragraphs = resolveTextParagraphs(node, theme)
     elements.push({
       id: crypto.randomUUID(),
       type: 'text',
@@ -1195,6 +1241,7 @@ function convertShapeNode(
       opacity: 1,
       text,
       runs,
+      paragraphs,
       fontFamily: style.fontFamily,
       fontSize: style.fontSize,
       bold: style.bold,
@@ -1393,21 +1440,32 @@ function createTextShapeFrame(
   return { x, y, width, height }
 }
 
-function resolveTextShapeStyle(node: ShapeNodeData): TextShapeStyle {
+function getSlideTheme(slide: SlideData, presentation: PresentationData): ThemeData | undefined {
+  const themeId = resolveSlideThemeId(slide, presentation)
+  return themeId ? presentation.themes?.get(themeId) : undefined
+}
+
+function resolveTextShapeStyle(node: ShapeNodeData, theme?: ThemeData): TextShapeStyle {
   const firstParagraph = node.textBody?.paragraphs[0]
   const firstRun = firstParagraph?.runs[0]
   return resolveTextStyle(
     firstRun?.properties,
     firstParagraph?.endParaRPr,
-    firstParagraph?.properties
+    firstParagraph?.properties,
+    theme
   )
 }
 
-function resolveTextRuns(node: ShapeNodeData): EditableTextRun[] | undefined {
+function resolveTextRuns(node: ShapeNodeData, theme?: ThemeData): EditableTextRun[] | undefined {
   const runs: EditableTextRun[] = []
   for (const [paragraphIndex, paragraph] of (node.textBody?.paragraphs ?? []).entries()) {
     for (const [runIndex, run] of paragraph.runs.entries()) {
-      const style = resolveTextStyle(run.properties, paragraph.endParaRPr, paragraph.properties)
+      const style = resolveTextStyle(
+        run.properties,
+        paragraph.endParaRPr,
+        paragraph.properties,
+        theme
+      )
       runs.push({
         text: `${paragraphIndex > 0 && runIndex === 0 ? '\n' : ''}${run.text}`,
         fontFamily: style.fontFamily,
@@ -1426,10 +1484,80 @@ function resolveTextRuns(node: ShapeNodeData): EditableTextRun[] | undefined {
   return runs.filter((run) => run.text.length > 0)
 }
 
+function resolveTextParagraphs(
+  node: ShapeNodeData,
+  theme?: ThemeData
+): EditableTextParagraph[] | undefined {
+  const paragraphs = node.textBody?.paragraphs.map((paragraph) => {
+    const runs = paragraph.runs.map((run) => {
+      const style = resolveTextStyle(
+        run.properties,
+        paragraph.endParaRPr,
+        paragraph.properties,
+        theme
+      )
+      const baseline = Number(run.properties?.attr('baseline') ?? 0)
+      const spacing = Number(run.properties?.attr('spc') ?? 0)
+      return {
+        text: run.text,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        bold: style.bold,
+        italic: style.italic,
+        underline: style.underline,
+        color: style.color,
+        strikethrough: isStrikeEnabled(run.properties?.attr('strike')),
+        baseline:
+          baseline > 0
+            ? ('superscript' as const)
+            : baseline < 0
+              ? ('subscript' as const)
+              : ('normal' as const),
+        characterSpacing: fontSizeToPx(spacing),
+        highlightColor: readTextColor(run.properties?.child('highlight'), theme)
+      }
+    })
+    const properties = paragraph.properties
+    const exactPoints = properties?.child('lnSpc').child('spcPts').numAttr('val')
+    const multiple = properties?.child('lnSpc').child('spcPct').numAttr('val')
+    const bullet = properties?.child('buChar')
+    const number = properties?.child('buAutoNum')
+    const list: EditableListStyle | null = bullet?.exists()
+      ? {
+          kind: 'bullet',
+          level: paragraph.level,
+          char: bullet.attr('char') ?? '•',
+          font: properties?.child('buFont').attr('typeface')
+        }
+      : number?.exists()
+        ? {
+            kind: 'number',
+            level: paragraph.level,
+            format: number.attr('type') ?? 'arabicPeriod',
+            startAt: number.numAttr('startAt')
+          }
+        : null
+    return {
+      runs,
+      typingStyle: runs.at(-1),
+      align: normalizeTextAlign(properties?.attr('algn')),
+      lineSpacing:
+        exactPoints !== undefined
+          ? { kind: 'exact' as const, points: exactPoints / 100 }
+          : { kind: 'multiple' as const, value: multiple !== undefined ? multiple / 100000 : 1.15 },
+      list,
+      marginLeft: normalizeCanvasCoordinate(properties?.numAttr('marL')) ?? 0,
+      textIndent: normalizeCanvasCoordinate(properties?.numAttr('indent')) ?? 0
+    }
+  })
+  return paragraphs?.length ? paragraphs : undefined
+}
+
 function resolveTextStyle(
   runProperties: XmlNode | undefined,
   paragraphEndProperties: XmlNode | undefined,
-  paragraphProperties: XmlNode | undefined
+  paragraphProperties: XmlNode | undefined,
+  theme?: ThemeData
 ): TextShapeStyle {
   const fontSize = fontSizeToPx(
     runProperties?.numAttr('sz') ?? paragraphEndProperties?.numAttr('sz') ?? 3200
@@ -1437,16 +1565,16 @@ function resolveTextStyle(
 
   return {
     fontFamily:
-      readFontFamily(runProperties) ??
-      readFontFamily(paragraphEndProperties) ??
+      readFontFamily(runProperties, theme) ??
+      readFontFamily(paragraphEndProperties, theme) ??
       DEFAULT_FONT_FAMILY,
     fontSize,
     bold: isXmlTrue(runProperties?.attr('b') ?? paragraphEndProperties?.attr('b')),
     italic: isXmlTrue(runProperties?.attr('i') ?? paragraphEndProperties?.attr('i')),
     underline: isUnderlineEnabled(runProperties?.attr('u') ?? paragraphEndProperties?.attr('u')),
     color:
-      readSrgbColor(runProperties) ??
-      readSrgbColor(paragraphEndProperties) ??
+      readTextColor(runProperties, theme) ??
+      readTextColor(paragraphEndProperties, theme) ??
       DEFAULT_FOREGROUND_COLOR,
     align: normalizeTextAlign(paragraphProperties?.attr('algn')),
     lineHeight: 1.15
@@ -1479,8 +1607,35 @@ function isUnderlineEnabled(value: string | undefined): boolean {
   return Boolean(value && value !== 'none')
 }
 
-function readFontFamily(node: XmlNode | undefined): string | null {
-  return node?.child('latin').attr('typeface') ?? node?.child('ea').attr('typeface') ?? null
+function isStrikeEnabled(value: string | undefined): boolean {
+  return Boolean(value && value !== 'noStrike')
+}
+
+function readFontFamily(node: XmlNode | undefined, theme?: ThemeData): string | null {
+  const value = node?.child('latin').attr('typeface') ?? node?.child('ea').attr('typeface')
+  if (!value) return null
+  if (value.startsWith('+mj')) return theme?.majorFont.latin || theme?.majorFont.ea || null
+  if (value.startsWith('+mn')) return theme?.minorFont.latin || theme?.minorFont.ea || null
+  return value
+}
+
+function readTextColor(node: XmlNode | undefined, theme?: ThemeData): string | null {
+  const direct = readSrgbColor(node)
+  if (direct) return direct
+  const scheme = node?.child('solidFill').child('schemeClr')
+  const slot = scheme?.attr('val')
+  const base = slot ? theme?.colorScheme.get(slot) : undefined
+  if (!base || !scheme) return null
+  const tint = scheme.child('tint').numAttr('val')
+  const shade = scheme.child('shade').numAttr('val')
+  const luminance = scheme.child('lumMod').numAttr('val')
+  const offset = scheme.child('lumOff').numAttr('val')
+  let color = normalizeThemeColor(base)
+  if (tint !== undefined) color = applyBrightness(color, 100 - tint / 1000)
+  if (shade !== undefined) color = applyBrightness(color, shade / 1000 - 100)
+  if (luminance !== undefined) color = applyBrightness(color, luminance / 1000 - 100)
+  if (offset !== undefined) color = applyBrightness(color, offset / 1000)
+  return color
 }
 
 function readSrgbColor(
