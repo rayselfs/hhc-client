@@ -115,7 +115,6 @@ interface AppAPI {
 }
 
 interface UpdateAPI {
-  checkForUpdates: () => Promise<{ updateAvailable: boolean; version?: string }>
   installDownloaded: () => Promise<void>
   downloadMacInstaller: () => Promise<void>
   onStatusChanged: (

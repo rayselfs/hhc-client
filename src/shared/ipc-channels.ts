@@ -261,7 +261,6 @@ export interface IpcInvokeMap {
   'app:relaunch': { args: []; result: void }
   'app:confirm-close': { args: []; result: { closing: boolean } }
   'app:clear-user-data': { args: []; result: void }
-  'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
   'update:install-downloaded': { args: []; result: void }
   'update:download-mac-installer': { args: []; result: void }
   'speech:saveKey': { args: [string, string]; result: void }

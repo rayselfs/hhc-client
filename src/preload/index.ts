@@ -96,7 +96,6 @@ const appApi = {
 }
 
 const updateApi = {
-  checkForUpdates: () => typedInvoke('update:check'),
   installDownloaded: () => typedInvoke('update:install-downloaded'),
   downloadMacInstaller: () => typedInvoke('update:download-mac-installer'),
   onStatusChanged: (callback: (...data: IpcMainToRendererMap['update:status-changed']) => void) =>
