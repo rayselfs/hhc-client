@@ -1,0 +1,228 @@
+import type {
+  EditableTextElement,
+  EditableTextParagraph,
+  EditableTextRun,
+  EditableTextStyle
+} from './editable-presentation'
+
+type CharacterStylePatch = Partial<Omit<EditableTextRun, 'text'>>
+
+function runStyle(element: EditableTextElement, run?: EditableTextRun): EditableTextStyle {
+  return {
+    fontFamily: run?.fontFamily ?? element.fontFamily,
+    fontSize: run?.fontSize ?? element.fontSize,
+    bold: run?.bold ?? element.bold,
+    italic: run?.italic ?? element.italic,
+    underline: run?.underline ?? element.underline,
+    color: run?.color ?? element.color,
+    strikethrough: run?.strikethrough ?? false,
+    baseline: run?.baseline ?? 'normal',
+    characterSpacing: run?.characterSpacing ?? 0,
+    highlightColor: run?.highlightColor ?? null
+  }
+}
+
+function paragraphFor(element: EditableTextElement): EditableTextParagraph {
+  return {
+    runs: [],
+    typingStyle: runStyle(element),
+    align: element.align,
+    lineSpacing: { kind: 'multiple', value: element.lineHeight },
+    list: null,
+    marginLeft: 0,
+    textIndent: 0
+  }
+}
+
+function sameStyle(left: EditableTextRun, right: EditableTextRun): boolean {
+  return (
+    left.fontFamily === right.fontFamily &&
+    left.fontSize === right.fontSize &&
+    left.bold === right.bold &&
+    left.italic === right.italic &&
+    left.underline === right.underline &&
+    left.color === right.color &&
+    left.strikethrough === right.strikethrough &&
+    left.baseline === right.baseline &&
+    left.characterSpacing === right.characterSpacing &&
+    left.highlightColor === right.highlightColor
+  )
+}
+
+function mergeRuns(runs: EditableTextRun[]): EditableTextRun[] {
+  const merged: EditableTextRun[] = []
+  for (const run of runs) {
+    if (!run.text) continue
+    const previous = merged.at(-1)
+    if (previous && sameStyle(previous, run)) previous.text += run.text
+    else merged.push({ ...run })
+  }
+  return merged
+}
+
+export function normalizeTextParagraphs(element: EditableTextElement): EditableTextParagraph[] {
+  if (element.paragraphs?.length) {
+    return element.paragraphs.map((paragraph) => ({
+      ...paragraph,
+      typingStyle: paragraph.typingStyle ?? runStyle(element, paragraph.runs[0]),
+      runs: mergeRuns(paragraph.runs.map((run) => ({ ...run, ...runStyle(element, run) })))
+    }))
+  }
+
+  const paragraphs = [paragraphFor(element)]
+  const sourceRuns = element.runs?.length
+    ? element.runs
+    : [{ text: element.text, ...runStyle(element) }]
+  for (const sourceRun of sourceRuns) {
+    const parts = sourceRun.text.split('\n')
+    for (const [index, text] of parts.entries()) {
+      if (index > 0) paragraphs.push(paragraphFor(element))
+      if (text) paragraphs.at(-1)?.runs.push({ text, ...runStyle(element, sourceRun) })
+    }
+  }
+  for (const paragraph of paragraphs) paragraph.runs = mergeRuns(paragraph.runs)
+  return paragraphs
+}
+
+function paragraphBounds(
+  paragraphs: readonly EditableTextParagraph[],
+  index: number
+): { start: number; end: number } {
+  let start = 0
+  for (let current = 0; current < index; current++) {
+    start += paragraphs[current].runs.reduce((length, run) => length + run.text.length, 0) + 1
+  }
+  return {
+    start,
+    end: start + paragraphs[index].runs.reduce((length, run) => length + run.text.length, 0)
+  }
+}
+
+export function applyParagraphStyle(
+  paragraphs: readonly EditableTextParagraph[],
+  start: number,
+  end: number,
+  patch: Partial<Omit<EditableTextParagraph, 'runs' | 'typingStyle'>>
+): EditableTextParagraph[] {
+  const from = Math.max(0, Math.min(start, end))
+  const to = Math.max(from, Math.max(start, end))
+  return paragraphs.map((paragraph, index) => {
+    const bounds = paragraphBounds(paragraphs, index)
+    const selected = from === to ? from >= bounds.start && from <= bounds.end : to >= bounds.start && from <= bounds.end
+    return selected ? { ...paragraph, ...patch } : { ...paragraph }
+  })
+}
+
+export function resolveTypingStyle(
+  paragraphs: readonly EditableTextParagraph[],
+  caret: number
+): EditableTextStyle | undefined {
+  let offset = 0
+  for (const paragraph of paragraphs) {
+    for (const run of paragraph.runs) {
+      const end = offset + run.text.length
+      if (caret <= end) return { ...runStyleFromRun(run) }
+      offset = end
+    }
+    if (caret === offset || !paragraph.runs.length) return paragraph.typingStyle
+    offset++
+  }
+  const paragraph = paragraphs.at(-1)
+  const run = paragraph?.runs.at(-1)
+  return run ? runStyleFromRun(run) : paragraph?.typingStyle
+}
+
+function runStyleFromRun(run: EditableTextRun): EditableTextStyle {
+  return {
+    fontFamily: run.fontFamily,
+    fontSize: run.fontSize,
+    bold: run.bold,
+    italic: run.italic,
+    underline: run.underline,
+    strikethrough: run.strikethrough ?? false,
+    baseline: run.baseline ?? 'normal',
+    characterSpacing: run.characterSpacing ?? 0,
+    color: run.color,
+    highlightColor: run.highlightColor ?? null
+  }
+}
+
+export function getCharacterStyleValue<K extends keyof EditableTextStyle>(
+  paragraphs: readonly EditableTextParagraph[],
+  start: number,
+  end: number,
+  key: K
+): EditableTextStyle[K] | 'mixed' | undefined {
+  const from = Math.max(0, Math.min(start, end))
+  const to = Math.max(from, Math.max(start, end))
+  let offset = 0
+  let value: EditableTextStyle[K] | undefined
+  for (const paragraph of paragraphs) {
+    for (const run of paragraph.runs) {
+      const runEnd = offset + run.text.length
+      if (Math.max(offset, from) < Math.min(runEnd, to)) {
+        const next = runStyleFromRun(run)[key]
+        if (value !== undefined && value !== next) return 'mixed'
+        value = next
+      }
+      offset = runEnd
+    }
+    offset++
+  }
+  return value
+}
+
+export function getPlainText(paragraphs: readonly EditableTextParagraph[]): string {
+  return paragraphs.map((paragraph) => paragraph.runs.map((run) => run.text).join('')).join('\n')
+}
+
+export function applyCharacterStyle(
+  paragraphs: readonly EditableTextParagraph[],
+  start: number,
+  end: number,
+  patch: CharacterStylePatch
+): EditableTextParagraph[] {
+  const from = Math.max(0, Math.min(start, end))
+  const to = Math.max(from, Math.max(start, end))
+  let offset = 0
+  return paragraphs.map((paragraph, paragraphIndex) => {
+    const runs: EditableTextRun[] = []
+    for (const run of paragraph.runs) {
+      const runStart = offset
+      const runEnd = runStart + run.text.length
+      const selectedStart = Math.max(runStart, from)
+      const selectedEnd = Math.min(runEnd, to)
+      if (selectedStart <= runStart && selectedEnd >= runEnd) runs.push({ ...run, ...patch })
+      else if (selectedStart < selectedEnd) {
+        const localStart = selectedStart - runStart
+        const localEnd = selectedEnd - runStart
+        runs.push(
+          { ...run, text: run.text.slice(0, localStart) },
+          { ...run, ...patch, text: run.text.slice(localStart, localEnd) },
+          { ...run, text: run.text.slice(localEnd) }
+        )
+      } else runs.push({ ...run })
+      offset = runEnd
+    }
+    if (paragraphIndex < paragraphs.length - 1) offset++
+    return { ...paragraph, runs: mergeRuns(runs) }
+  })
+}
+
+export function clearCharacterFormatting(
+  paragraphs: readonly EditableTextParagraph[],
+  start: number,
+  end: number,
+  defaults: Pick<EditableTextRun, 'fontFamily' | 'fontSize' | 'color'>
+): EditableTextParagraph[] {
+  return applyCharacterStyle(paragraphs, start, end, {
+    ...defaults,
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    baseline: 'normal',
+    characterSpacing: 0,
+    highlightColor: null
+  })
+}

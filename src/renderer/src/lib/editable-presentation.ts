@@ -11,7 +11,7 @@ import type { PicNodeData, ShapeNodeData } from '@aiden0z/pptx-renderer'
 export const EDITABLE_PRESENTATION_DOCUMENT_KIND = 'editable-presentation-document'
 
 export type EditablePresentationElementType = 'text' | 'image' | 'shape' | 'line' | 'locked'
-export type EditableTextAlign = 'left' | 'center' | 'right'
+export type EditableTextAlign = 'left' | 'center' | 'right' | 'justify'
 export type EditableShapeKind = 'rectangle' | 'ellipse'
 export type EditableGradientDirection = 'left-right' | 'top-bottom' | 'diagonal'
 export type EditableGradientType = 'linear'
@@ -86,6 +86,7 @@ export interface EditableTextElement extends EditableElementBase {
   color: string
   align: EditableTextAlign
   lineHeight: number
+  paragraphs?: EditableTextParagraph[]
 }
 
 export interface EditableTextRun {
@@ -96,6 +97,67 @@ export interface EditableTextRun {
   italic: boolean
   underline: boolean
   color: string
+  strikethrough?: boolean
+  baseline?: 'normal' | 'superscript' | 'subscript'
+  characterSpacing?: number
+  highlightColor?: string | null
+}
+
+export type EditableLineSpacing =
+  | { kind: 'multiple'; value: number }
+  | { kind: 'exact'; points: number }
+
+export type EditableListStyle =
+  | { kind: 'bullet'; level: number; char: string; font?: string }
+  | {
+      kind: 'number'
+      level: number
+      format: string
+      startAt?: number
+      sequenceId?: string
+    }
+
+export interface EditableTextParagraph {
+  runs: EditableTextRun[]
+  typingStyle?: EditableTextStyle
+  align: EditableTextAlign
+  lineSpacing: EditableLineSpacing
+  list: EditableListStyle | null
+  marginLeft: number
+  textIndent: number
+}
+
+export interface EditableTextStyle {
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  strikethrough: boolean
+  baseline: 'normal' | 'superscript' | 'subscript'
+  characterSpacing: number
+  color: string
+  highlightColor: string | null
+}
+
+export type EditableThemeColorSlot =
+  | 'dk1'
+  | 'dk2'
+  | 'lt1'
+  | 'lt2'
+  | 'accent1'
+  | 'accent2'
+  | 'accent3'
+  | 'accent4'
+  | 'accent5'
+  | 'accent6'
+  | 'hlink'
+  | 'folHlink'
+
+export interface EditablePresentationTheme {
+  id: string
+  defaultTextStyle: EditableTextStyle
+  colorScheme: Record<EditableThemeColorSlot, string>
 }
 
 export interface EditableImageElement extends EditableElementBase {
@@ -140,6 +202,7 @@ export interface EditablePresentationSlide {
   elementOrder: string[]
   elements: Record<string, EditablePresentationElement>
   notes: string
+  themeId?: string
 }
 
 export interface EditablePresentationDocument {
@@ -153,6 +216,8 @@ export interface EditablePresentationDocument {
   slideOrder: string[]
   slides: Record<string, EditablePresentationSlide>
   assets: Record<string, EditablePresentationAsset>
+  themes?: Record<string, EditablePresentationTheme>
+  defaultThemeId?: string
   createdAt: number
   updatedAt: number
 }
@@ -169,6 +234,7 @@ const DEFAULT_HEIGHT = 1080
 const DEFAULT_FONT_FAMILY = 'Inter Variable'
 export const DEFAULT_SLIDE_BACKGROUND_COLOR = '#ffffff'
 const DEFAULT_FOREGROUND_COLOR = '#111827'
+export const DEFAULT_PRESENTATION_THEME_ID = 'office-default'
 export type EditableTextAutoSize = 'content' | 'fixed'
 
 export function hasContentHeight(
@@ -179,7 +245,7 @@ export function hasContentHeight(
   )
 }
 
-export const INSERTED_TEXT_FONT_SIZE_POINTS = 18
+export const INSERTED_TEXT_FONT_SIZE_POINTS = 24
 export const INSERTED_TEXT_CLICK_SIZE = { width: 24, height: 32 } as const
 export const INSERTED_TEXT_DRAG_MIN_SIZE = { width: 80, height: 40 } as const
 export const CONTENT_HEIGHT_TEXT_PADDING_X = 8
@@ -196,6 +262,40 @@ export function presentationPointsToCanvasPx(points: number, documentWidth: numb
 
 export function presentationCanvasPxToPoints(px: number, documentWidth: number): number {
   return (px * POWERPOINT_STANDARD_WIDTH_POINTS) / documentWidth
+}
+
+export function createDefaultPresentationTheme(
+  documentWidth = DEFAULT_WIDTH
+): EditablePresentationTheme {
+  return {
+    id: DEFAULT_PRESENTATION_THEME_ID,
+    defaultTextStyle: {
+      fontFamily: DEFAULT_FONT_FAMILY,
+      fontSize: presentationPointsToCanvasPx(INSERTED_TEXT_FONT_SIZE_POINTS, documentWidth),
+      bold: false,
+      italic: false,
+      underline: false,
+      strikethrough: false,
+      baseline: 'normal',
+      characterSpacing: 0,
+      color: DEFAULT_FOREGROUND_COLOR,
+      highlightColor: null
+    },
+    colorScheme: {
+      dk1: '#000000',
+      dk2: '#44546a',
+      lt1: '#ffffff',
+      lt2: '#e7e6e6',
+      accent1: '#4472c4',
+      accent2: '#ed7d31',
+      accent3: '#a5a5a5',
+      accent4: '#ffc000',
+      accent5: '#5b9bd5',
+      accent6: '#70ad47',
+      hlink: '#0563c1',
+      folHlink: '#954f72'
+    }
+  }
 }
 
 type XmlNode = ShapeNodeData['source']
@@ -368,6 +468,7 @@ export function createBlankEditablePresentationDocument(
 ): EditablePresentationDocument {
   const slideId = crypto.randomUUID()
   const now = Date.now()
+  const theme = createDefaultPresentationTheme()
   return {
     id,
     name,
@@ -382,10 +483,13 @@ export function createBlankEditablePresentationDocument(
         background: createDefaultSlideBackground(),
         elementOrder: [],
         elements: {},
-        notes: ''
+        notes: '',
+        themeId: theme.id
       }
     },
     assets: {},
+    themes: { [theme.id]: theme },
+    defaultThemeId: theme.id,
     createdAt: now,
     updatedAt: now
   }
@@ -1645,13 +1749,18 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
   ) {
     throw new Error('Invalid editable presentation document')
   }
+  const fallbackTheme = createDefaultPresentationTheme(parsed.width)
+  const themes = parsed.themes ?? { [fallbackTheme.id]: fallbackTheme }
+  const defaultThemeId = parsed.defaultThemeId ?? fallbackTheme.id
+  if (!themes[defaultThemeId]) themes[defaultThemeId] = fallbackTheme
   const slides: Record<string, EditablePresentationSlide> = {}
   for (const [slideId, slide] of Object.entries(
     parsed.slides as Record<string, EditablePresentationSlide>
   )) {
     slides[slideId] = {
       ...slide,
-      background: normalizeSlideBackground(slide.background)
+      background: normalizeSlideBackground(slide.background),
+      themeId: slide.themeId ?? defaultThemeId
     }
   }
   return {
@@ -1667,6 +1776,8 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
     slideOrder: parsed.slideOrder,
     slides,
     assets: parsed.assets ?? {},
+    themes,
+    defaultThemeId,
     createdAt: parsed.createdAt ?? Date.now(),
     updatedAt: parsed.updatedAt ?? Date.now()
   }

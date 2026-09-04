@@ -17,6 +17,7 @@ import {
   createEditablePresentation,
   createImageElement,
   createTextElement,
+  DEFAULT_PRESENTATION_THEME_ID,
   convertPresentationData,
   duplicateEditableSlide,
   duplicateEditableSlides,
@@ -318,6 +319,13 @@ describe('editable presentation documents', () => {
       transparency: 0
     })
     expect(document.slides[slideId].elementOrder).toEqual([])
+    expect(document.defaultThemeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(document.slides[slideId].themeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(document.themes?.[DEFAULT_PRESENTATION_THEME_ID].defaultTextStyle).toMatchObject({
+      fontFamily: 'Inter Variable',
+      fontSize: 48,
+      color: '#111827'
+    })
   })
 
   it('adds blank slides with the same white default background', () => {
@@ -521,7 +529,7 @@ describe('editable presentation documents', () => {
       autoSize: 'content',
       width: 24
     })
-    expect(presentationCanvasPxToPoints(text.fontSize, 1920)).toBe(18)
+    expect(presentationCanvasPxToPoints(text.fontSize, 1920)).toBe(24)
     expect(text.height).toBeGreaterThanOrEqual(Math.ceil(text.fontSize * text.lineHeight))
 
     expect(createTextElement({ text: 'Imported text', width: 360 })).toMatchObject({
@@ -727,6 +735,27 @@ describe('editable presentation documents', () => {
     expect(
       loadedContentHeightText.type === 'text' ? loadedContentHeightText.autoWidth : undefined
     ).toBeUndefined()
+  })
+
+  it('adds the default theme when loading a legacy document', async () => {
+    const document = createBlankEditablePresentationDocument('Legacy theme')
+    const slideId = document.slideOrder[0]
+    delete document.themes
+    delete document.defaultThemeId
+    delete document.slides[slideId].themeId
+    const source = { id: 'deck-legacy-theme', url: 'blob:deck-legacy-theme', name: 'Legacy theme' }
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'deck-legacy-theme',
+      blob: createStoredBlob(JSON.stringify(document)),
+      revision: 1
+    })
+
+    const loaded = await loadEditablePresentation(source)
+
+    expect(loaded.defaultThemeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(loaded.slides[slideId].themeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(loaded.themes?.[DEFAULT_PRESENTATION_THEME_ID]).toBeDefined()
   })
 
   it('reuses parsed documents by source revision and invalidates on revision change', async () => {

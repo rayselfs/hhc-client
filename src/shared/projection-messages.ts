@@ -53,7 +53,7 @@ type EditableProjectionTextElement = EditableProjectionElementBase & {
   italic: boolean
   underline: boolean
   color: string
-  align: 'left' | 'center' | 'right'
+  align: 'left' | 'center' | 'right' | 'justify'
   lineHeight: number
 }
 
