@@ -57,6 +57,15 @@ export default function UserMenu({
   const accountLabel =
     status === 'authenticated' && session ? session.displayName : t('userMenu.guest')
 
+  const avatarInitials =
+    accountLabel
+      .split('@')[0]
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || '?'
+
   const handleCloseApp = async (): Promise<void> => {
     const confirmed = await confirm({
       status: 'danger',
@@ -120,7 +129,7 @@ export default function UserMenu({
                 <Avatar.Image src={session.avatarUrl} alt={accountLabel} />
               ) : null}
               <Avatar.Fallback>
-                <CircleUser />
+                {status === 'authenticated' && session ? avatarInitials : <CircleUser />}
               </Avatar.Fallback>
             </Avatar.Root>
             {isExpanded && <span>{accountLabel}</span>}
