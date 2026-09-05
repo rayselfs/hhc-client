@@ -297,6 +297,7 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
   let meetingLookupRunning = false
   let meetingInterval: number | undefined
   let hhcDueAt = Number.POSITIVE_INFINITY
+  let hhcAuthGeneration = options.getHhcAuthGeneration?.() ?? 0
 
   const meetingDelay = (normalDelay: number): number => {
     const now = Date.now()
@@ -314,7 +315,15 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
   }
 
   const discoverMeetings = async (): Promise<void> => {
-    if (!meetingWindows || stopped || meetingLookupRunning) return
+    if (stopped) return
+    const generation = options.getHhcAuthGeneration?.() ?? 0
+    if (generation !== hhcAuthGeneration) {
+      hhcAuthGeneration = generation
+      knownWindows = []
+      if (hhcRunning) hhcPending = true
+      else scheduleHhc(0)
+    }
+    if (!meetingWindows || meetingLookupRunning) return
     meetingLookupRunning = true
     try {
       const windows = await meetingWindows.list()
@@ -368,6 +377,11 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
   }
 
   const runHhc = async (): Promise<void> => {
+    const generation = options.getHhcAuthGeneration?.() ?? 0
+    if (generation !== hhcAuthGeneration) {
+      hhcAuthGeneration = generation
+      knownWindows = []
+    }
     hhcRunning = true
     void discoverMeetings()
     const result = await refreshAllHhcFolders(options).catch(() => {
@@ -405,6 +419,19 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
     else scheduleHhc(0)
   })
 
+  const resumeHhc = (): void => {
+    if (stopped) return
+    void discoverMeetings()
+    if (hhcRunning) hhcPending = true
+    else scheduleHhc(0)
+  }
+  const onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') resumeHhc()
+  }
+  window.addEventListener('online', resumeHhc)
+  window.addEventListener('focus', resumeHhc)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
   if (meetingWindows) {
     meetingInterval = window.setInterval(() => {
       void discoverMeetings()
@@ -416,6 +443,9 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
   return () => {
     stopped = true
     unsubscribeOfflinePolicy()
+    window.removeEventListener('online', resumeHhc)
+    window.removeEventListener('focus', resumeHhc)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     if (meetingInterval !== undefined) window.clearInterval(meetingInterval)
     if (localInterval !== undefined) window.clearInterval(localInterval)
     if (oneDriveTimeout !== undefined) window.clearTimeout(oneDriveTimeout)
