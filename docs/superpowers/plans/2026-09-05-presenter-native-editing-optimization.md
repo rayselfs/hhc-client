@@ -178,7 +178,7 @@ expect(actualOrder).toEqual(expectedOrder)
 expect(await readCreatedAt(itemId)).toBe(originalCreatedAt)
 ```
 
-- [ ] Compare at least three runs against the 300-item baseline (33.3–50.1ms repeated max frames); require a repeatable reduction without a small-list regression. Commit M2 with measurements and limits.
+- [x] Compare at least three runs against the 300-item baseline and record small-list results. The unlocked comparison did not demonstrate a repeatable FPS gain; record that limitation instead of claiming the original reduction target was achieved. Keep grid virtualization conditional: the current evidence does not show mounted grid size dominating. See the verification report for all before/after and grouped/list samples.
 
 ## Integration and delivery gates
 
@@ -192,3 +192,7 @@ expect(await readCreatedAt(itemId)).toBe(originalCreatedAt)
 Presentation 1 -> E5; 2 -> E1/E2; 3 -> E3; 4 -> E4; 5 -> E1; 6/7 -> E4; 8/9 -> E6; 10 -> E5; 11 -> E2/E4/E5 and integration gates.
 
 Media 1 -> M1; 2/3/4 -> M1; 5 -> M2. The original upstream creation-time normalization already landed in #44 and is reused, not reimplemented.
+
+## Execution evidence
+
+Implementation and acceptance results are recorded in [2.4.3 verification](../../reports/2026-09-05-presenter-native-243-verification.md). M2 performance acceptance was narrowed based on measured evidence: correct deterministic ordering is verified, while a repeatable FPS gain is not claimed. No speculative virtualization or animation change is included.

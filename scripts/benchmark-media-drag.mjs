@@ -10,6 +10,7 @@ const executablePath = process.argv[2]
 const output = process.argv[3]
 if (!executablePath || !output)
   throw new Error('Usage: node scripts/benchmark-media-drag.mjs <executable> <output.json>')
+const mode = process.argv[4] ?? 'grid'
 const samples = []
 for (const count of [30, 300]) {
   const profile = await mkdtemp(join(tmpdir(), 'presenter-drag-'))
@@ -51,7 +52,9 @@ for (const count of [30, 300]) {
           type: 'file',
           parentId: 'file-root',
           sortIndex: index,
-          createdAt: Date.parse('2026-09-04T10:00:00Z'),
+          createdAt: Date.parse(
+            index < count / 2 ? '2026-09-04T10:00:00Z' : '2026-09-03T10:00:00Z'
+          ),
           expiresAt: null,
           mimeType: 'image/png',
           size: blob.size,
@@ -93,11 +96,24 @@ for (const count of [30, 300]) {
       (count) => document.querySelectorAll('[data-file-item] img').length >= count,
       count
     )
+    if (mode.includes('group')) {
+      await page.getByRole('button', { name: 'Sort', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Group', exact: true }).hover()
+      await page.getByRole('menuitem', { name: 'Date', exact: true }).click()
+    }
+    if (mode.includes('list')) {
+      await page.getByRole('button', { name: 'View', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'List', exact: true }).click()
+    }
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].focus())
+    await page.waitForTimeout(350)
     for (let run = 0; run < 3; run++) {
       const cards = page.locator('[data-file-item][role="button"]')
-      const expectedOrder = await cards.evaluateAll((nodes) =>
-        nodes.map((node) => node.getAttribute('data-item-id'))
+      const expectedOrder = await page.evaluate(
+        (count) =>
+          JSON.parse(localStorage.getItem('hhc-file-explorer-custom-order') ?? '{}').state
+            ?.orders?.['file-root'] ?? Array.from({ length: count }, (_, index) => `drag-${index}`),
+        count
       )
       const [moved] = expectedOrder.splice(0, 1)
       expectedOrder.splice(3, 0, moved)
@@ -149,7 +165,9 @@ for (const count of [30, 300]) {
       if (!result.order?.length || result.order.length !== count)
         throw new Error('Drag did not persist an order')
       deepStrictEqual(result.order, expectedOrder, 'Stored order must match the requested drag')
-      samples.push({ count, run: run + 1, ...result })
+      samples.push({ mode, count, run: run + 1, ...result })
+      // Let the drop animation settle before starting the next independent sample.
+      await page.waitForTimeout(350)
     }
   } finally {
     await app.close()

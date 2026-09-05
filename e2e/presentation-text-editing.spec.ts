@@ -289,3 +289,19 @@ test('slide shortcuts and native clipboard events share scope without double pas
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
   await expect(slides).toHaveCount(3)
 })
+
+test('formatting after a soft line break preserves the exact selected word', async ({ page }) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('first')
+  await textBox.press('Shift+Enter')
+  await textBox.pressSequentially('abcde plain')
+  await textBox.press('Home')
+  for (let index = 0; index < 5; index++) await textBox.press('Shift+ArrowRight')
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('abcde')
+  await page.getByRole('button', { name: 'Bold', exact: true }).click()
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('abcde')
+  await expect(textBox.locator('[data-text-run]').filter({ hasText: /^abcde$/ })).toHaveCSS(
+    'font-weight',
+    '700'
+  )
+})

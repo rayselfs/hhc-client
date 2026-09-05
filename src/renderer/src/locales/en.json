@@ -598,7 +598,13 @@
       "syncing": "Syncing",
       "warning": "Sync warning",
       "error": "Sync error",
-      "ok": "Sync OK"
+      "ok": "Sync OK",
+      "lastSync": "Last sync: {{value}}",
+      "downloading": "Downloading: {{value}}",
+      "queued": "Queued: {{value}}",
+      "failed": "Failed: {{value}}",
+      "nextRetry": "Next retry: {{value}}",
+      "unknown": "Unknown"
     },
     "group": {
       "title": "Group",

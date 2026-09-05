@@ -27,14 +27,14 @@ Execute the native editing/media plan after LINE Phase 1. Async upload Phase 2+ 
 - 128 focused tests and 10 browser tests passed. Font search, 13 point size, selection preservation and undo covered.
 - PWA precache stayed within the original 5 MiB limit by reusing Popover rather than adding ComboBox runtime code.
 - Intermediate lint found synchronous derived-state effects; fixed with derived font input/fit zoom values and verified affected browser tests and lint.
-- Actual installed font discovery and final native font/geometry smoke remain integration gates.
+- Native CUA on the 2.4.3 unpacked app found Microsoft Sans Serif through the actual local-font picker and applied it while preserving selected Chinese text. After blur and a single click, Bold and Center both read enabled. A custom 13 point size applied successfully.
 
 ## E4 text-box lifecycle and geometry
 
 - New empty text creation remains a session draft. A true exit cancels it with no ghost undo entry; formatting popups do not discard it. First meaningful input establishes the box.
 - Content-height boxes retain horizontal-only sizing, including rotated coordinates. Imported fixed-height frames retain manual height.
 - Neutral outline, white square handles, pointer/keyboard rotation using the transform session.
-- 79 focused tests and 13 browser tests passed. Lint/typecheck passed; final native geometry smoke remains pending.
+- 79 focused tests and 13 browser tests passed. Lint/typecheck passed; the same geometry/rotation regression passed against packaged Electron. The existing imported fixed-height QA box correctly retained eight handles.
 
 ## E5 slide commands
 
@@ -67,15 +67,47 @@ Execute the native editing/media plan after LINE Phase 1. Async upload Phase 2+ 
 - Combined node refs depend on the actual stable setter functions. List/grid use verticalListSortingStrategy/rectSortingStrategy respectively. Folder center is a move target; edges are sortable insertion targets. Cancel clears drag state.
 - Reproducible benchmark: scripts/benchmark-media-drag.mjs, isolated packaged profiles, 30/300 image fixtures with loaded thumbnails, three drags per count, persisted order asserted.
 - Initial pre-change sample: 30 items had 79 geometry reads per run; 300 had 619. Frame p50 was 16.7 ms. The 300-item p95 values were 17.5/17.4/17.6 ms and maxima 33.4/33.7/17.6 ms. The 30-item maxima were 116.7/50.3/50.0 ms, demonstrating scheduling variability.
-- The Mac subsequently locked. Do not claim a repeatable speed improvement from these numbers: repeat both before/after in an unlocked foreground session, including grouped/list cases. Grid virtualization remains contingent on that measurement.
+- After the user unlocked the Mac, foreground grid comparison completed with exact persisted order checks. Before/after p95 stayed approximately 17.3–17.6 ms and geometry reads remained 79/619. The after sample had one 250 ms cold first-drag maximum; the 300-item maxima remained around 33 ms. This does not establish a repeatable speed gain. Additional list/group samples are recorded below; grid virtualization remains contingent on evidence.
 
 ## Latest local checks
 
 - Lint, typecheck, desktop build, web build and macOS packaged-runtime checks passed before candidate version preparation.
 - Browser editing/media checks: 15 passed; responsive/zoom/touch checks: 4 passed.
 - Final editor boundary unit check: 122 passed. Final translation/grouping unit check: 13 passed.
-- CI will rerun the complete suite on the committed candidate. Native unlocked acceptance remains pending.
+- PR CI Quality Gates 33963896194 and preview deployment 33963896239 passed on b58f8d9a. Manual packaging validation 33963909309 passed on macOS and Windows, including packaged runtime and projection smoke; its release job was intentionally skipped.
+- The latest local 2.4.3 unpacked macOS build passed runtime verification and all 15 editing regressions through a temporary Electron fixture using the same browser test bodies. Font enumeration in that regression remains mocked; actual installed font discovery is checked separately.
+- Manual browser menus were checked in English, Traditional Chinese and Simplified Chinese: shapes, slide clipboard, grouping and all view sizes.
+- A final source audit found untranslated sync health detail tooltips; added all six labels to every locale and the required-key check.
 
 ## Delivery status
 
-No CI, merge, or 2.4.3 release has been performed for this optimization branch yet. Implementation and automated checks have progressed through M2, but unlocked native font/geometry/projection smoke and the final drag comparison remain acceptance gates. Earlier intermediate packages retain version 2.4.2 and use isolated QA data. The source now prepares candidate version 2.4.3; no release tag is created. Async upload Phase 2+ remains outside this task.
+Draft PR #47 has passed CI and both platform packaging checks. No merge or 2.4.3 release has been performed yet. Implementation and automated checks have progressed through M2, and unlocked native font/geometry/projection, offline reopen and the final drag comparison are now recorded below. Earlier intermediate packages retain version 2.4.2 and use isolated QA data. The source now prepares candidate version 2.4.3; no release tag is created. Async upload Phase 2+ remains outside this task.
+
+## Unlocked native acceptance
+
+- Reopened the existing isolated QA deck after app restart; original Chinese text persisted.
+- Native font search returned Microsoft Sans Serif without a mock. Applied it, bold, center, and 13 point size; selection and toolbar states remained correct.
+- Opened actual projection: control and projection window DOM both contained the same Chinese text, Microsoft Sans Serif, 26 px rendered run size (13 point model size) and weight 700.
+- Emulated offline networking in the isolated app, reloaded, reopened the deck, and asserted original text plus bold/center enabled and font-size 13. Restored networking afterward.
+- macOS and Windows CI packaged projection/recovery smoke passed in workflow 33963909309.
+
+## Foreground drag matrix
+
+All six samples per row (30/300 items, three runs each) asserted the exact full persisted order. The harness waits for menu/drop transitions between independent samples.
+
+| Mode         | Count | Layout reads | p95 ms    | Max ms (three runs) |
+| ------------ | ----: | ------------ | --------- | ------------------- |
+| Grid before  |    30 | 79           | 17.5–17.6 | 17.7/49.0/17.6      |
+| Grid before  |   300 | 619          | 17.5–17.6 | 33.4/33.3/17.8      |
+| Grid after   |    30 | 79           | 17.5–17.6 | 250.0/17.7/33.3     |
+| Grid after   |   300 | 619          | 17.3–17.6 | 32.8/33.4/33.4      |
+| List before  |    30 | 75           | 18.5–18.6 | 18.7/33.9/18.8      |
+| List before  |   300 | 75           | 18.3–18.6 | 33.4/18.6/18.7      |
+| List after   |    30 | 75           | 17.3–17.6 | 133.4/17.7/17.7     |
+| List after   |   300 | 75           | 17.5–17.6 | 33.3/33.3/17.7      |
+| Grouped list |    30 | 71           | 18.3–18.6 | 48.2/50.0/18.6      |
+| Grouped list |   300 | 73           | 18.4–18.6 | 18.6/18.6/33.3      |
+| Grouped grid |    30 | 79           | 18.4–18.6 | 133.7/33.3/50.0     |
+| Grouped grid |   300 | 619          | 18.5–18.6 | 34.0/18.6/33.3      |
+
+The measured p50 remained about 16.7 ms. Neither the repeated 300-item grid samples nor geometry reads demonstrate a repeatable gain from the small DnD changes. Cold first-drag spikes also occurred on 30-item samples, so the data does not support diagnosing mounted grid size as the cause. No grid virtualizer or speculative animation change was added. M2 delivers correct insertion strategy, stable refs and explicit folder-center targets; this release makes no FPS improvement claim. Further performance work requires a reproducible slow interaction trace rather than increasing scope on noisy maxima.

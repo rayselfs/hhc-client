@@ -598,7 +598,13 @@
       "syncing": "同步中",
       "warning": "同步警告",
       "error": "同步錯誤",
-      "ok": "同步正常"
+      "ok": "同步正常",
+      "lastSync": "上次同步: {{value}}",
+      "downloading": "下載中: {{value}}",
+      "queued": "排隊中: {{value}}",
+      "failed": "失敗: {{value}}",
+      "nextRetry": "下次重試: {{value}}",
+      "unknown": "未知"
     },
     "group": {
       "title": "分組",

@@ -51,7 +51,10 @@ describe('translations', () => {
         'presentationWorkspace.insertBeforeSlide',
         'presentationWorkspace.notes',
         'presentationWorkspace.handleDirection.nw',
-        'fileExplorer.syncHealth.syncing'
+        'fileExplorer.syncHealth.syncing',
+        'fileExplorer.syncHealth.lastSync',
+        'fileExplorer.syncHealth.nextRetry',
+        'fileExplorer.syncHealth.unknown'
       ]) {
         expect(i18n.getResource(lng, 'translation', key)).toEqual(expect.any(String))
       }

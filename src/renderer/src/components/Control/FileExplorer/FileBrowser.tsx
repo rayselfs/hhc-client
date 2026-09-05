@@ -27,6 +27,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Folder, Upload } from 'lucide-react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useNavigate } from 'react-router-dom'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
@@ -114,15 +115,23 @@ interface SyncItemViewState {
   downloadTotalBytes?: number
 }
 
-function formatSyncFolderHealthTooltip(health: SyncFolderHealth): string {
+function formatSyncFolderHealthTooltip(health: SyncFolderHealth, t: TFunction): string {
   const parts = [
-    `Last sync: ${health.lastSyncedAt ? new Date(health.lastSyncedAt).toLocaleString() : 'Unknown'}`,
-    `Downloading: ${health.downloadingCount}`,
-    `Queued: ${health.queuedCount}`,
-    `Failed: ${health.failedCount}`
+    t('fileExplorer.syncHealth.lastSync', {
+      value: health.lastSyncedAt
+        ? new Date(health.lastSyncedAt).toLocaleString()
+        : t('fileExplorer.syncHealth.unknown')
+    }),
+    t('fileExplorer.syncHealth.downloading', { value: health.downloadingCount }),
+    t('fileExplorer.syncHealth.queued', { value: health.queuedCount }),
+    t('fileExplorer.syncHealth.failed', { value: health.failedCount })
   ]
   if (health.nextRetryAt) {
-    parts.push(`Next retry: ${new Date(health.nextRetryAt).toLocaleString()}`)
+    parts.push(
+      t('fileExplorer.syncHealth.nextRetry', {
+        value: new Date(health.nextRetryAt).toLocaleString()
+      })
+    )
   }
   return parts.join('\n')
 }
@@ -224,6 +233,7 @@ function DragOverlayContent({
   isFolder: boolean
   mimeType?: string
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div className="rounded-lg bg-default-100 px-3 py-2 text-sm text-foreground shadow-lg ring-1 ring-border flex items-center gap-2">
       <div className="flex-shrink-0">
@@ -233,7 +243,7 @@ function DragOverlayContent({
           <div className="text-danger">{getFileIcon(mimeType, false, 16)}</div>
         )}
       </div>
-      {count > 1 ? `${count} items` : name}
+      {count > 1 ? t('fileExplorer.status.itemCount', { count }) : name}
     </div>
   )
 }
@@ -571,7 +581,7 @@ export function FileBrowser({
         buildFolderViewItem(folder, {
           health: syncFolderHealthById[folder.id],
           healthTooltip: syncFolderHealthById[folder.id]
-            ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id])
+            ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id], t)
             : undefined,
           syncState: syncStates[folder.id]
         })
@@ -605,7 +615,8 @@ export function FileBrowser({
       thumbnails,
       syncStates,
       mediaJobStates,
-      unsupportedMediaIds
+      unsupportedMediaIds,
+      t
     ]
   )
 
