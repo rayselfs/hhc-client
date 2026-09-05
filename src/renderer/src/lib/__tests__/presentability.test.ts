@@ -164,3 +164,28 @@ describe('getProjectionPlaylist', () => {
     ])
   })
 })
+
+it('limits a grouped playlist to the requested local calendar day', () => {
+  const image: FileItemRecord = {
+    id: 'a',
+    name: 'a',
+    type: 'file',
+    parentId: 'root',
+    sortIndex: 0,
+    createdAt: Date.parse('2026-09-03T15:59:59Z'),
+    expiresAt: null,
+    size: 1,
+    url: 'blob:a',
+    mimeType: 'image/png'
+  }
+  const b = { ...image, id: 'b', createdAt: Date.parse('2026-09-03T16:00:00Z') }
+  const c = { ...b, id: 'c' }
+  expect(getProjectionPlaylist([image, b, c], c, 'web', 'Asia/Taipei').map((i) => i.id)).toEqual([
+    'b',
+    'c'
+  ])
+  expect(
+    getProjectionPlaylist([image, b, c], undefined, 'web', 'Asia/Taipei').map((i) => i.id)
+  ).toEqual(['a'])
+  expect(getProjectionPlaylist([image, b, c], c, 'web').map((i) => i.id)).toEqual(['a', 'b', 'c'])
+})

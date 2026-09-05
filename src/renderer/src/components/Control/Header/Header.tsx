@@ -1,3 +1,4 @@
+import { useSettingsStore } from '@renderer/stores/settings'
 import { useCurrentFolderDisplay } from '@renderer/stores/file-explorer'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -29,7 +30,7 @@ import {
   useFavoritesExplorerSettings,
   useTrashExplorerSettings
 } from '@renderer/stores/file-explorer'
-import { getProjectionPlaylist } from '@renderer/lib/presentability'
+import { getExplorerProjectionPlaylist } from '@renderer/lib/file-explorer-projection'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import {
@@ -77,12 +78,13 @@ export default function Header(): React.JSX.Element {
   const showFavoritesControls = isFavoritesRoute(location.pathname)
   const showTrashControls = isTrashRoute(location.pathname)
   const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
+  const timezone = useSettingsStore((state) => state.timezone)
   const presentableItems = useMemo(
     () =>
-      getProjectionPlaylist(
+      getExplorerProjectionPlaylist(
         fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
       ),
-    [currentFolderId, fileItems]
+    [currentFolderId, fileItems, sortField, sortDir, groupMode, timezone]
   )
   const projectionHeaderState = getProjectionHeaderState({
     pathname: location.pathname,

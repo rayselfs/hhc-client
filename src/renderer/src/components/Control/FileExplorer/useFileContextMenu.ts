@@ -8,7 +8,8 @@ import { createFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
 import type { UseFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { getProjectionPlaylist, isPresentable } from '@renderer/lib/presentability'
+import { isPresentable } from '@renderer/lib/presentability'
+import { getExplorerProjectionPlaylist } from '@renderer/lib/file-explorer-projection'
 import { presentMediaItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import {
   isFileItem,
@@ -29,13 +30,13 @@ export type {
 const useBaseFileContextMenu = createFolderContextMenu({ i18nPrefix: 'fileExplorer.contextMenu' })
 
 function project(
-  items: Parameters<typeof getProjectionPlaylist>[0],
+  items: Parameters<typeof getExplorerProjectionPlaylist>[0],
   requestedItem: FileItemRecord | undefined,
   t: (key: string) => string,
   navigate: (path: string) => void,
   ensureProjectionOpen: ReturnType<typeof useProjection>['ensureProjectionOpen']
 ): void {
-  const playlist = getProjectionPlaylist(items, requestedItem)
+  const playlist = getExplorerProjectionPlaylist(items, requestedItem)
   if (playlist.length === 0) return
   const startIndex = requestedItem
     ? playlist.findIndex((entry) => entry.id === requestedItem.id)
@@ -102,7 +103,7 @@ function getFolderProjectActions(
 ): ContextMenuEntry[] {
   const { toggleFavorite, getItems } = useFileExplorerStore.getState()
   const items = getItems(folder.id)
-  const playlist = getProjectionPlaylist(items)
+  const playlist = getExplorerProjectionPlaylist(items)
   const isFavorited = folder.isFavorited ?? false
   const actions: ContextMenuEntry[] = []
 
