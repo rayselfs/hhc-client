@@ -44,6 +44,25 @@ interface PresentationDraft {
   preview: EditablePresentationDocument
 }
 
+function hasSameCover(a: EditablePresentationDocument, b: EditablePresentationDocument): boolean {
+  const id = a.slideOrder[0]
+  if (id !== b.slideOrder[0] || a.width !== b.width || a.height !== b.height) return false
+  const before = a.slides[id]
+  const after = b.slides[id]
+  if (!before || !after) return before === after
+  if (
+    before.background !== after.background ||
+    before.elementOrder.length !== after.elementOrder.length
+  )
+    return false
+  return before.elementOrder.every((elementId, index) => {
+    if (elementId !== after.elementOrder[index]) return false
+    const element = before.elements[elementId]
+    if (element !== after.elements[elementId]) return false
+    return !('assetId' in element) || a.assets[element.assetId] === b.assets[element.assetId]
+  })
+}
+
 export function createPresentationEditorSession(options: {
   initialDocument: EditablePresentationDocument
   initialRevision?: number
@@ -56,7 +75,8 @@ export function createPresentationEditorSession(options: {
     future: []
   }
   let draft: PresentationDraft | null = null
-  let thumbnailRevision = 0
+  let thumbnailDocument = options.initialDocument
+  let thumbnailRevision = options.initialRevision ?? 0
   let thumbnailInFlightRevision: number | null = null
   let thumbnailFailedRevision: number | null = null
   let thumbnailWarning = false
@@ -108,6 +128,13 @@ export function createPresentationEditorSession(options: {
 
     const revision = save.persistedRevision
     const document = history.present
+    if (hasSameCover(thumbnailDocument, document)) {
+      thumbnailRevision = revision
+      thumbnailWarning = false
+      thumbnailFailedRevision = null
+      emit()
+      return
+    }
     const runGeneration = thumbnailGeneration
     thumbnailInFlightRevision = revision
     let refresh: Promise<void>
@@ -119,6 +146,7 @@ export function createPresentationEditorSession(options: {
     void refresh.then(
       () => {
         if (disposed || runGeneration !== thumbnailGeneration) return
+        thumbnailDocument = document
         thumbnailRevision = Math.max(thumbnailRevision, revision)
         if (thumbnailFailedRevision === revision) thumbnailFailedRevision = null
         thumbnailWarning = coordinator.getState().scheduledRevision > thumbnailRevision
@@ -223,7 +251,7 @@ export function createPresentationEditorSession(options: {
             (key === 'width' || key === 'height') &&
             Number.isFinite(value) &&
             value > 0 &&
-            element[key] !== value
+            Math.abs(element[key] - value) >= 1
         )
       )
       if (!Object.keys(dimensions).length) return
@@ -286,15 +314,12 @@ export function createPresentationEditorSession(options: {
           present: coordinator.getLastPersistedDocument(),
           future: []
         }
-        thumbnailGeneration += 1
-        thumbnailInFlightRevision = null
         thumbnailFailedRevision = null
-        thumbnailWarning = false
-        thumbnailRevision = coordinator.getState().persistedRevision
       } finally {
         suppressCoordinatorNotifications = false
       }
       emit()
+      maybeRefreshThumbnail()
     },
     dispose: () => {
       if (disposed) return

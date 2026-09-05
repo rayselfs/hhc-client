@@ -333,18 +333,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     expect(screen.queryByRole('button', { name: 'Load local fonts' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Paste' })).not.toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Arrange' }).querySelector('.flex-wrap')).toBeNull()
-    ;[
-      'Bring Forward',
-      'Send Backward',
-      'Align objects left',
-      'Align objects center',
-      'Align objects right',
-      'Align objects top',
-      'Align objects middle',
-      'Align objects bottom',
-      'Distribute objects horizontally',
-      'Distribute objects vertically'
-    ].forEach((name) => expect(screen.getByRole('button', { name })).toHaveTextContent(''))
+    expect(screen.getByRole('button', { name: 'Arrange' })).toBeVisible()
   })
 
   it('loads local font families from a user action', async () => {

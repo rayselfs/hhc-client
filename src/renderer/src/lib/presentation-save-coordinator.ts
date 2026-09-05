@@ -45,7 +45,7 @@ export function createPresentationSaveCoordinator(
   initialDocument: EditablePresentationDocument,
   persist: PersistPresentationRevision,
   initialRevision = 0,
-  debounceMs = 250
+  debounceMs = 1000
 ): PresentationSaveCoordinator {
   let state: PresentationSaveState = {
     status: 'saved',
@@ -56,6 +56,8 @@ export function createPresentationSaveCoordinator(
   }
   let nextRevision = initialRevision
   let pendingRequest: PresentationSaveRequest | null = null
+  let pendingSince: number | null = null
+  let lastScheduledAt = 0
   let latestRequest: PresentationSaveRequest | null = null
   let inFlight: Promise<void> | null = null
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -82,7 +84,9 @@ export function createPresentationSaveCoordinator(
     const request = pendingRequest
     if (!request) return Promise.resolve()
 
+    clearDebounce()
     pendingRequest = null
+    pendingSince = null
     const runGeneration = generation
     publish({ ...state, status: 'saving', error: null })
 
@@ -124,7 +128,7 @@ export function createPresentationSaveCoordinator(
         lastError === null &&
         pendingRequest !== null
       ) {
-        void runPending()
+        armDebounce()
       }
     })
     return operation
@@ -132,11 +136,13 @@ export function createPresentationSaveCoordinator(
 
   const armDebounce = (): void => {
     clearDebounce()
-    if (inFlight) return
+    if (inFlight || pendingSince === null) return
+    const now = Date.now()
+    const delay = Math.max(0, Math.min(lastScheduledAt + debounceMs, pendingSince + 5000) - now)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
       void runPending()
-    }, debounceMs)
+    }, delay)
   }
 
   const schedule = (document: EditablePresentationDocument, catalogName?: string): number => {
@@ -147,6 +153,8 @@ export function createPresentationSaveCoordinator(
       catalogName
     }
     latestRequest = request
+    lastScheduledAt = Date.now()
+    pendingSince ??= lastScheduledAt
     pendingRequest = request
     lastError = null
     publish({
@@ -169,6 +177,7 @@ export function createPresentationSaveCoordinator(
       }
       if (lastError && !pendingRequest) break
     }
+    clearDebounce()
     if (state.persistedRevision !== state.scheduledRevision) {
       throw lastError ?? new Error('Latest presentation revision was not persisted')
     }
@@ -183,6 +192,7 @@ export function createPresentationSaveCoordinator(
     }
     clearDebounce()
     pendingRequest = latestRequest
+    pendingSince = Date.now()
     lastError = null
     publish({ ...state, status: 'dirty', error: null })
     void runPending()
@@ -191,6 +201,7 @@ export function createPresentationSaveCoordinator(
   const discard = async (): Promise<void> => {
     clearDebounce()
     pendingRequest = null
+    pendingSince = null
     const activeWrite = inFlight
     if (activeWrite) await activeWrite
     pendingRequest = null

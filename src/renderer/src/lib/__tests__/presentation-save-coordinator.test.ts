@@ -50,7 +50,7 @@ describe('presentation save coordinator', () => {
     const coordinator = createPresentationSaveCoordinator(initialDocument, persist)
 
     coordinator.schedule({ ...initialDocument, name: 'Changed' })
-    await vi.advanceTimersByTimeAsync(249)
+    await vi.advanceTimersByTimeAsync(999)
     expect(persist).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(1)
@@ -58,6 +58,20 @@ describe('presentation save coordinator', () => {
 
     expect(persist).toHaveBeenCalledTimes(1)
     expect(coordinator.getState().status).toBe('saved')
+  })
+
+  it('persists continuous edits at the five-second deadline', async () => {
+    const persist = vi
+      .fn<PersistPresentationRevision>()
+      .mockImplementation(async (request) => ({ revision: request.revision, mirrorWarnings: [] }))
+    const coordinator = createPresentationSaveCoordinator(initialDocument, persist)
+    for (let index = 0; index < 10; index++) {
+      coordinator.schedule({ ...initialDocument, name: `Edit ${index}` })
+      await vi.advanceTimersByTimeAsync(500)
+    }
+    expect(persist).toHaveBeenCalledTimes(1)
+    expect(persist.mock.calls[0][0].document.name).toBe('Edit 9')
+    coordinator.dispose()
   })
 
   it('serializes writes and keeps only the newest pending revision', async () => {
@@ -71,7 +85,7 @@ describe('presentation save coordinator', () => {
     const coordinator = createPresentationSaveCoordinator(initialDocument, persist)
 
     coordinator.schedule({ ...initialDocument, name: 'One' })
-    await vi.advanceTimersByTimeAsync(250)
+    await vi.advanceTimersByTimeAsync(1000)
     coordinator.schedule({ ...initialDocument, name: 'Two' })
     coordinator.schedule({ ...initialDocument, name: 'Three' })
 
@@ -86,6 +100,26 @@ describe('presentation save coordinator', () => {
       scheduledRevision: 3,
       persistedRevision: 3
     })
+  })
+
+  it('keeps the trailing delay for changes made during an in-flight write', async () => {
+    const write = deferred<{ revision: number; mirrorWarnings: [] }>()
+    const persist = vi
+      .fn<PersistPresentationRevision>()
+      .mockReturnValueOnce(write.promise)
+      .mockImplementation(async (request) => ({ revision: request.revision, mirrorWarnings: [] }))
+    const coordinator = createPresentationSaveCoordinator(initialDocument, persist)
+    coordinator.schedule({ ...initialDocument, name: 'First' })
+    await vi.advanceTimersByTimeAsync(1000)
+    for (let index = 0; index < 20; index++)
+      coordinator.schedule({ ...initialDocument, name: `Pending ${index}` })
+    write.resolve({ revision: 1, mirrorWarnings: [] })
+    await vi.advanceTimersByTimeAsync(999)
+    expect(persist).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(persist).toHaveBeenCalledTimes(2)
+    expect(persist.mock.calls[1][0].document.name).toBe('Pending 19')
+    coordinator.dispose()
   })
 
   it('flushes the newest revision without waiting for debounce', async () => {
@@ -157,7 +191,7 @@ describe('presentation save coordinator', () => {
     const changed = { ...initialDocument, name: 'Already writing' }
 
     coordinator.schedule(changed)
-    await vi.advanceTimersByTimeAsync(250)
+    await vi.advanceTimersByTimeAsync(1000)
     let discarded = false
     const discard = coordinator.discard().then(() => {
       discarded = true
@@ -228,7 +262,7 @@ describe('presentation save coordinator', () => {
     coordinator.subscribe(listener)
 
     coordinator.schedule({ ...initialDocument, name: 'Writing' })
-    await vi.advanceTimersByTimeAsync(250)
+    await vi.advanceTimersByTimeAsync(1000)
     expect(listener).toHaveBeenCalledTimes(2)
 
     coordinator.dispose()

@@ -630,6 +630,7 @@ function EditableSessionDocumentView({
   const imageInputRef = useRef<HTMLInputElement>(null)
   const canvasViewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const textDraftStartedAtRef = useRef<number | null>(null)
   const textCommitTimerRef = useRef<number | null>(null)
   const textEditorFinalizerRef = useRef<TextEditFinalizer | null>(null)
   const pendingZoomAnchorRef = useRef<{
@@ -793,11 +794,16 @@ function EditableSessionDocumentView({
     [session]
   )
 
-  const clearTextCommitTimer = (): void => {
+  const onTextLayoutChange = useCallback<
+    NonNullable<React.ComponentProps<typeof EditableSlideSurface>['onTextLayoutChange']>
+  >((slideId, elementId, size) => session.reflowText(slideId, elementId, size), [session])
+
+  const clearTextCommitTimer = useCallback((resetDeadline = true): void => {
+    if (resetDeadline) textDraftStartedAtRef.current = null
     if (textCommitTimerRef.current === null) return
     window.clearTimeout(textCommitTimerRef.current)
     textCommitTimerRef.current = null
-  }
+  }, [])
 
   const commitTextDraft = (): void => {
     clearTextCommitTimer()
@@ -856,37 +862,47 @@ function EditableSessionDocumentView({
     return () => viewport.removeEventListener('wheel', handleWheel)
   }, [zoomPercent])
 
-  const previewTextElement = (
-    slideId: string,
-    elementId: string,
-    updates: Partial<EditablePresentationElement>
-  ): void => {
-    const preview = session.getSnapshot().renderedDocument
-    if (
-      newEmptyTextRef.current === elementId &&
-      'text' in updates &&
-      updates.text?.replace(/[\u200b\ufeff]/g, '').trim()
-    ) {
-      newEmptyTextRef.current = null
-    }
-    const current = preview.slides[slideId]?.elements[elementId]
-    if (
-      current &&
-      Object.entries(updates).every(
-        ([key, value]) => current[key as keyof typeof current] === value
-      )
-    ) {
-      return
-    }
-    if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
-    session.previewDraft(updateElementInSlide(preview, slideId, elementId, updates))
-    clearTextCommitTimer()
-    if (newEmptyTextRef.current === elementId) return
-    textCommitTimerRef.current = window.setTimeout(() => {
-      textCommitTimerRef.current = null
-      if (session.getSnapshot().draftKind === 'text') session.commitDraft()
-    }, 750)
-  }
+  const previewTextElement = useCallback(
+    (slideId: string, elementId: string, updates: Partial<EditablePresentationElement>): void => {
+      const preview = session.getSnapshot().renderedDocument
+      if (
+        newEmptyTextRef.current === elementId &&
+        'text' in updates &&
+        updates.text?.replace(/[\u200b\ufeff]/g, '').trim()
+      ) {
+        newEmptyTextRef.current = null
+      }
+      const current = preview.slides[slideId]?.elements[elementId]
+      if (
+        current &&
+        Object.entries(updates).every(
+          ([key, value]) => current[key as keyof typeof current] === value
+        )
+      ) {
+        return
+      }
+      textDraftStartedAtRef.current ??= Date.now()
+      if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
+      session.previewDraft(updateElementInSlide(preview, slideId, elementId, updates))
+      clearTextCommitTimer(false)
+      if (newEmptyTextRef.current === elementId) return
+      if (
+        Date.now() - (textDraftStartedAtRef.current ?? Date.now()) >= 4000 &&
+        !textEditorFinalizerRef.current?.isComposing?.()
+      ) {
+        session.commitDraft()
+        textDraftStartedAtRef.current = null
+        return
+      }
+      textCommitTimerRef.current = window.setTimeout(() => {
+        textCommitTimerRef.current = null
+        if (textEditorFinalizerRef.current?.isComposing?.()) return
+        textDraftStartedAtRef.current = null
+        if (session.getSnapshot().draftKind === 'text') session.commitDraft()
+      }, 750)
+    },
+    [session, clearTextCommitTimer]
+  )
 
   const selectElement = (
     elementId: string | null,
@@ -1121,6 +1137,13 @@ function EditableSessionDocumentView({
               id: 'cut-slide',
               label: t('common.cut', 'Cut'),
               onAction: () => cutSelectedSlides(contextSlideIds)
+            },
+            {
+              id: 'delete-slide',
+              label: t('common.delete', 'Delete'),
+              variant: 'danger' as const,
+              disabled: contextSlideIds.length >= document.slideOrder.length,
+              onAction: () => deleteSlide(contextSlideIds)
             }
           ]
     showMenu(
@@ -1195,15 +1218,13 @@ function EditableSessionDocumentView({
     setCopiedElement(null)
   }
 
-  const deleteSlide = (): void => {
+  const deleteSlide = (slideIds = getSelectedSlideIds()): void => {
     if (!document || document.slideOrder.length <= 1) return
     if (!finalizeTextEditor()) return
     const currentDocument = session.getSnapshot().renderedDocument
-    const removingIds = currentDocument.slideOrder.filter((slideId) =>
-      selectedSlideIds.has(slideId)
-    )
+    const removingIds = currentDocument.slideOrder.filter((slideId) => slideIds.includes(slideId))
     if (removingIds.length === 0 && activeSlideId) removingIds.push(activeSlideId)
-    if (removingIds.length === 0) return
+    if (removingIds.length === 0 || removingIds.length >= currentDocument.slideOrder.length) return
     const nextDocument = removeEditableSlides(currentDocument, removingIds)
     const nextIndex = Math.min(activeSlideIndex, Math.max(0, nextDocument.slideOrder.length - 1))
     const nextSlideId = nextDocument.slideOrder[nextIndex]
@@ -1995,7 +2016,7 @@ function EditableSessionDocumentView({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented) return
+      if (event.defaultPrevented || event.isComposing) return
       const target = event.target instanceof Element ? event.target : null
       if (target?.closest('[role="menu"], [role="dialog"]')) return
       const isFormControl = Boolean(target?.closest('input, select, textarea'))
@@ -2008,7 +2029,8 @@ function EditableSessionDocumentView({
         target?.closest('button, a[href], [role="button"], [role="link"], [role="tab"]')
       )
       const isTabDelete =
-        Boolean(target?.closest('[role="tab"]')) &&
+        isSlideSidebar &&
+        Boolean(target?.closest('[data-slide-option]')) &&
         (event.key === 'Delete' || event.key === 'Backspace')
       if (isActionControl && !isTabDelete && !isSlideClipboardCommand) return
       const isContentEditable =
@@ -2094,7 +2116,7 @@ function EditableSessionDocumentView({
         ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
       ) {
         event.preventDefault()
-        const amount = event.shiftKey ? 10 : 1
+        const amount = event.altKey ? 1 : event.shiftKey ? 10 : 5
         const dx = event.key === 'ArrowLeft' ? -amount : event.key === 'ArrowRight' ? amount : 0
         const dy = event.key === 'ArrowUp' ? -amount : event.key === 'ArrowDown' ? amount : 0
         commitDocument((current) =>
@@ -2121,12 +2143,12 @@ function EditableSessionDocumentView({
         if (handleClipboardCommand(action, target)) event.preventDefault()
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        if (selectedElementId) {
-          event.preventDefault()
-          deleteElement()
-        } else if (isSlideSidebar && document && document.slideOrder.length > 1) {
+        if (isSlideSidebar) {
           event.preventDefault()
           deleteSlide()
+        } else if (selectedElementId) {
+          event.preventDefault()
+          deleteElement()
         }
       }
     }
@@ -2223,7 +2245,20 @@ function EditableSessionDocumentView({
                     selectedSlideIds.size === 0
                       ? index === activeSlideIndex
                       : selectedSlideIds.has(slideId)
-                  const outline = getSlideBackgroundOutline(document.slides[slideId].background)
+                  const slide = document.slides[slideId]
+                  const hasBackdropImage = slide.elementOrder.some((id) => {
+                    const element = slide.elements[id]
+                    return (
+                      (element.type === 'image' || element.type === 'locked') &&
+                      element.x <= 0 &&
+                      element.y <= 0 &&
+                      element.x + element.width >= document.width &&
+                      element.y + element.height >= document.height
+                    )
+                  })
+                  const outline = hasBackdropImage
+                    ? 'mixed'
+                    : getSlideBackgroundOutline(slide.background)
                   return (
                     <React.Fragment key={slideId}>
                       <button
@@ -2414,9 +2449,7 @@ function EditableSessionDocumentView({
                       }}
                       onTextEditFinalizerChange={setTextEditorFinalizer}
                       onTextSelectionChange={setTextSelection}
-                      onTextLayoutChange={(slideId, elementId, size) =>
-                        session.reflowText(slideId, elementId, size)
-                      }
+                      onTextLayoutChange={onTextLayoutChange}
                       onTextIndent={changeSelectedTextIndent}
                       onInsertText={addTextElement}
                       onElementContextMenu={showElementContextMenu}

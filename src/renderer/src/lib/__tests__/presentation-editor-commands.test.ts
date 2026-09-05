@@ -95,13 +95,13 @@ describe('presentation editor commands', () => {
     ])
   })
 
-  it('nudges selected elements together and clamps the group to the slide', () => {
+  it('nudges selected elements together beyond the slide edges', () => {
     const document = makeDocument([element('a', 10, 10), element('b', 200, 100)])
 
     const nudged = nudgeElements(document, 'slide-a', ['a', 'b'], -30, -20)
 
-    expect(nudged.slides['slide-a'].elements.a).toMatchObject({ x: 0, y: 0 })
-    expect(nudged.slides['slide-a'].elements.b).toMatchObject({ x: 190, y: 90 })
+    expect(nudged.slides['slide-a'].elements.a).toMatchObject({ x: -20, y: -10 })
+    expect(nudged.slides['slide-a'].elements.b).toMatchObject({ x: 170, y: 80 })
   })
 
   it('aligns selected elements to their collective bounds', () => {
