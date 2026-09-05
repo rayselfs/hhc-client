@@ -149,7 +149,8 @@ const folderItem: FolderRecord = {
   expiresAt: null
 }
 
-vi.mock('@renderer/stores/file-explorer', () => {
+vi.mock('@renderer/stores/file-explorer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@renderer/stores/file-explorer')>()
   const store = (selector?: (state: Record<string, unknown>) => unknown): unknown => {
     const state = {
       currentFolderId: 'file-root',
@@ -165,11 +166,13 @@ vi.mock('@renderer/stores/file-explorer', () => {
     return selector ? selector(state) : state
   }
   store.getState = () => ({
+    folders: {},
     updateItem,
     updateFolder,
     getItems: () => [fileItem]
   })
   return {
+    ...actual,
     FILE_EXPLORER_ROOT_ID: 'file-root',
     useCurrentFolderDisplay: () => ({
       sortField: 'createdAt',
@@ -184,16 +187,19 @@ vi.mock('@renderer/stores/file-explorer', () => {
       selector({ orders: {}, setOrder: vi.fn() }),
     useFileExplorerSearch: (selector: (state: Record<string, unknown>) => unknown) =>
       selector({ searchQuery: '', setSearchQuery: vi.fn() }),
-    useFileExplorerSettings: (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({
-        viewMode,
-        sortField: 'createdAt',
-        sortDir: 'none',
-        setSortDir: vi.fn(),
-        setSortFieldAndDir: vi.fn(),
-        colWidths: { created: 112, size: 80, kind: 96 },
-        setColWidths: vi.fn()
-      }),
+    useFileExplorerSettings: Object.assign(
+      (selector: (state: Record<string, unknown>) => unknown) =>
+        selector({
+          viewMode,
+          sortField: 'createdAt',
+          sortDir: 'none',
+          setSortDir: vi.fn(),
+          setSortFieldAndDir: vi.fn(),
+          colWidths: { created: 112, size: 80, kind: 96 },
+          setColWidths: vi.fn()
+        }),
+      { getState: actual.useFileExplorerSettings.getState }
+    ),
     useFileExplorerStore: store
   }
 })

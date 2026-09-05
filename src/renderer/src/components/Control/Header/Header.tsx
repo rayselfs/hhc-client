@@ -3,7 +3,7 @@ import { useCurrentFolderDisplay } from '@renderer/stores/file-explorer'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
@@ -25,6 +25,7 @@ import {
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
 import {
+  useFileExplorerCustomOrder,
   useFileExplorerStore,
   useFileExplorerSettings,
   useFavoritesExplorerSettings,
@@ -78,13 +79,10 @@ export default function Header(): React.JSX.Element {
   const showFavoritesControls = isFavoritesRoute(location.pathname)
   const showTrashControls = isTrashRoute(location.pathname)
   const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
-  const timezone = useSettingsStore((state) => state.timezone)
-  const presentableItems = useMemo(
-    () =>
-      getExplorerProjectionPlaylist(
-        fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
-      ),
-    [currentFolderId, fileItems, sortField, sortDir, groupMode, timezone]
+  useSettingsStore((state) => state.timezone)
+  useFileExplorerCustomOrder((state) => state.orders[currentFolderId])
+  const presentableItems = getExplorerProjectionPlaylist(
+    fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
   )
   const projectionHeaderState = getProjectionHeaderState({
     pathname: location.pathname,

@@ -14,9 +14,14 @@ function dismissOutsideMenu(event: MouseEvent): void {
   )
   const menu = menus.at(-1)
   if (!menu || !(event.target instanceof Node) || menu.element.contains(event.target)) return
+  menu.close()
+  if (
+    event.target instanceof Element &&
+    event.target.closest('input, textarea, [contenteditable="true"]')
+  )
+    return
   event.preventDefault()
   event.stopImmediatePropagation()
-  menu.close()
 }
 
 function useRightClickDismiss(props: {
@@ -44,14 +49,20 @@ function useRightClickDismiss(props: {
   return ref
 }
 
-function DropdownPopover(props: ComponentProps<typeof BaseDropdown.Popover>): React.JSX.Element {
-  const ref = useRightClickDismiss(props)
-  return <BaseDropdown.Popover {...props} ref={mergeRefs(ref, props.ref)} />
+function DropdownPopover({
+  ref: forwardedRef,
+  ...props
+}: ComponentProps<typeof BaseDropdown.Popover>): React.JSX.Element {
+  const ref = useRightClickDismiss({ isOpen: props.isOpen, onOpenChange: props.onOpenChange })
+  return <BaseDropdown.Popover {...props} ref={mergeRefs(ref, forwardedRef)} />
 }
 
-function PopoverContent(props: ComponentProps<typeof BasePopover.Content>): React.JSX.Element {
-  const ref = useRightClickDismiss(props)
-  return <BasePopover.Content {...props} ref={mergeRefs(ref, props.ref)} />
+function PopoverContent({
+  ref: forwardedRef,
+  ...props
+}: ComponentProps<typeof BasePopover.Content>): React.JSX.Element {
+  const ref = useRightClickDismiss({ isOpen: props.isOpen, onOpenChange: props.onOpenChange })
+  return <BasePopover.Content {...props} ref={mergeRefs(ref, forwardedRef)} />
 }
 
 export const Dropdown = Object.assign(

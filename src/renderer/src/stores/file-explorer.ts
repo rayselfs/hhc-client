@@ -60,7 +60,9 @@ function migrateExplorerSettings(state: unknown): unknown {
         id,
         {
           ...display,
-          groupSortDir: display.groupSortDir ?? (display.sortDir === 'asc' ? 'asc' : 'desc')
+          groupSortDir:
+            display.groupSortDir ??
+            (display.groupMode !== 'none' && display.sortDir === 'asc' ? 'asc' : 'desc')
         }
       ])
     )
