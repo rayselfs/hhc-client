@@ -36,6 +36,7 @@ import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import EditableSlideSurface, {
+  type TextEditFinalizer,
   type EditableTextSelection
 } from '@renderer/components/Common/EditableSlideSurface'
 import PresentationHomeRibbon from '@renderer/components/Control/Presentation/PresentationHomeRibbon'
@@ -136,7 +137,6 @@ const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC 
 const FONT_SIZES = [
   8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96
 ]
-const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
 const PRESENTATION_CANVAS_WIDTH = 1024
 const PRESENTATION_VIEWPORT_PADDING = 64
 const NATIVE_CONTROL_CLASS =
@@ -625,9 +625,7 @@ function EditableSessionDocumentView({
   const canvasViewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
-  const textEditorFinalizerRef = useRef<
-    ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean }) | null
-  >(null)
+  const textEditorFinalizerRef = useRef<TextEditFinalizer | null>(null)
   const pendingZoomAnchorRef = useRef<{
     clientX: number
     clientY: number
@@ -667,11 +665,7 @@ function EditableSessionDocumentView({
     []
   )
   const setTextEditorFinalizer = useCallback(
-    (
-      finalize:
-        | ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean })
-        | null
-    ): void => {
+    (finalize: TextEditFinalizer | null): void => {
       textEditorFinalizerRef.current = finalize
       registry.notifyEditorLifecycle?.(deck.itemId)
     },
@@ -875,13 +869,6 @@ function EditableSessionDocumentView({
       textCommitTimerRef.current = null
       if (session.getSnapshot().draftKind === 'text') session.commitDraft()
     }, 750)
-  }
-
-  const updateSelectedElement = (updates: Partial<EditablePresentationElement>): void => {
-    if (!document || !activeSlideId || !selectedElementId) return
-    commitDocument((current) =>
-      updateElementInSlide(current, activeSlideId, selectedElementId, updates)
-    )
   }
 
   const selectElement = (
@@ -1348,9 +1335,19 @@ function EditableSessionDocumentView({
   )
 
   const updateSelectedTextElement = (
-    updates: Partial<Extract<EditablePresentationElement, { type: 'text' }>>
+    change:
+      | Partial<Extract<EditablePresentationElement, { type: 'text' }>>
+      | ((
+          element: Extract<EditablePresentationElement, { type: 'text' }>
+        ) => Partial<Extract<EditablePresentationElement, { type: 'text' }>>)
   ): void => {
-    if (!selectedTextElement) return
+    if (!activeSlideId || !selectedElementId) return
+    if (textEditorFinalizerRef.current?.flush?.() === false) return
+    commitTextDraft()
+    const current = session.getSnapshot().renderedDocument
+    const element = current.slides[activeSlideId]?.elements[selectedElementId]
+    if (element?.type !== 'text') return
+    let updates = typeof change === 'function' ? change(element) : change
     if (!updates.paragraphs) {
       const characterPatch = Object.fromEntries(
         (
@@ -1368,14 +1365,9 @@ function EditableSessionDocumentView({
           ] as const
         ).flatMap((key) => (updates[key] === undefined ? [] : [[key, updates[key]]]))
       ) as Partial<EditableTextStyle>
-      let paragraphs = normalizeTextParagraphs(selectedTextElement)
+      let paragraphs = normalizeTextParagraphs(element)
       if (Object.keys(characterPatch).length > 0) {
-        paragraphs = applyCharacterStyle(
-          paragraphs,
-          0,
-          selectedTextElement.text.length,
-          characterPatch
-        )
+        paragraphs = applyCharacterStyle(paragraphs, 0, element.text.length, characterPatch)
       }
       if (updates.align !== undefined || updates.lineHeight !== undefined) {
         paragraphs = paragraphs.map((paragraph) => ({
@@ -1398,28 +1390,84 @@ function EditableSessionDocumentView({
         )
       }
     }
-    updateSelectedElement(updates as Partial<EditablePresentationElement>)
+    session.commit(updateElementInSlide(current, activeSlideId, element.id, updates))
   }
 
-  const changeSelectedTextIndent = (direction: -1 | 1): void => {
+  const finishFormatting = (): void => {
+    window.requestAnimationFrame(() => {
+      const focused = window.document.activeElement
+      if (focused?.closest('[data-ribbon-surface], [data-presentation-text-tool]')) {
+        textEditorFinalizerRef.current?.restoreSelection?.()
+      }
+    })
+  }
+
+  const getTextCommandRange = (
+    element: Extract<EditablePresentationElement, { type: 'text' }>
+  ): { start: number; end: number } => {
+    const selection = textEditorFinalizerRef.current?.getSelection?.() ?? textSelection
+    return selection?.elementId === element.id ? selection : { start: 0, end: element.text.length }
+  }
+
+  const patchCharacterStyle = (patch: Partial<EditableTextStyle>): void => {
+    updateSelectedTextElement((element) => {
+      const range = getTextCommandRange(element)
+      const paragraphs = applyCharacterStyle(
+        normalizeTextParagraphs(element),
+        range.start,
+        range.end,
+        patch
+      )
+      return {
+        ...patch,
+        paragraphs,
+        runs: flattenTextParagraphs(paragraphs)
+      }
+    })
+  }
+  const patchParagraphs = (
+    update: (paragraph: EditableTextParagraph) => EditableTextParagraph
+  ): void => {
+    updateSelectedTextElement((element) => {
+      const range = getTextCommandRange(element)
+      const paragraphs = mapSelectedParagraphs(
+        normalizeTextParagraphs(element),
+        range.start,
+        range.end,
+        update
+      )
+      return {
+        paragraphs,
+        runs: flattenTextParagraphs(paragraphs),
+        align: paragraphs[0]?.align ?? element.align,
+        lineHeight:
+          paragraphs[0]?.lineSpacing.kind === 'multiple'
+            ? paragraphs[0].lineSpacing.value
+            : element.lineHeight
+      }
+    })
+  }
+
+  const toggleCharacterStyle = (key: 'bold' | 'italic' | 'underline'): void => {
     if (!selectedTextElement) return
-    const range =
-      textSelection?.elementId === selectedTextElement.id
-        ? textSelection
-        : { start: 0, end: selectedTextElement.text.length }
-    const paragraphs = mapSelectedParagraphs(
+    const range = getTextCommandRange(selectedTextElement)
+    const value = getCharacterStyleValue(
       normalizeTextParagraphs(selectedTextElement),
       range.start,
       range.end,
-      (paragraph) => ({
-        ...paragraph,
-        marginLeft: Math.max(0, paragraph.marginLeft + direction * 32),
-        list: paragraph.list
-          ? { ...paragraph.list, level: Math.max(0, paragraph.list.level + direction) }
-          : null
-      })
+      key
     )
-    updateSelectedTextElement({ paragraphs, runs: flattenTextParagraphs(paragraphs) })
+    patchCharacterStyle({ [key]: value !== true })
+  }
+
+  const changeSelectedTextIndent = (direction: -1 | 1): void => {
+    patchParagraphs((paragraph) => ({
+      ...paragraph,
+      marginLeft: Math.max(0, paragraph.marginLeft + direction * 32),
+      list: paragraph.list
+        ? { ...paragraph.list, level: Math.max(0, paragraph.list.level + direction) }
+        : null
+    }))
   }
 
   const loadLocalFonts = async (): Promise<void> => {
@@ -1448,27 +1496,6 @@ function EditableSessionDocumentView({
   const openLineSpacingOptions = (): void => {
     setLineSpacingDraft(selectedTextElement?.lineHeight ?? 1.15)
     setIsLineSpacingOptionsOpen(true)
-  }
-
-  const showLineSpacingMenu = (event: React.MouseEvent): void => {
-    showMenu(
-      [
-        ...LINE_SPACING_VALUES.map((value) => ({
-          id: `line-spacing-${value}`,
-          label: String(value),
-          disabled: !selectedTextElement,
-          onAction: () => updateSelectedTextElement({ lineHeight: value })
-        })),
-        'separator',
-        {
-          id: 'line-spacing-options',
-          label: t('presentationWorkspace.lineSpacingOptions', 'Line Spacing Options...'),
-          disabled: !selectedTextElement,
-          onAction: openLineSpacingOptions
-        }
-      ],
-      event
-    )
   }
 
   const showShapeMenu = (event: React.MouseEvent): void => {
@@ -1528,61 +1555,45 @@ function EditableSessionDocumentView({
         : selectedTextElement
           ? { start: 0, end: selectedTextElement.text.length }
           : null
+    const characterValue = <K extends keyof EditableTextStyle>(
+      key: K,
+      fallback: EditableTextStyle[K]
+    ): EditableTextStyle[K] | 'mixed' => {
+      if (!selectedParagraphs || !selectedRange) return fallback
+      return (
+        getCharacterStyleValue(selectedParagraphs, selectedRange.start, selectedRange.end, key) ??
+        fallback
+      )
+    }
     const toggleState = (
       key: 'bold' | 'italic' | 'underline' | 'strikethrough',
       fallback: boolean
-    ): boolean | 'mixed' => {
-      if (!selectedParagraphs || !selectedRange) return fallback
-      const value = getCharacterStyleValue(
+    ): boolean | 'mixed' => characterValue(key, fallback)
+    const touchedParagraphs: EditableTextParagraph[] = []
+    if (selectedParagraphs && selectedRange) {
+      mapSelectedParagraphs(
         selectedParagraphs,
         selectedRange.start,
         selectedRange.end,
-        key
+        (paragraph) => {
+          touchedParagraphs.push(paragraph)
+          return paragraph
+        }
       )
-      return value === 'mixed' ? 'mixed' : (value ?? fallback)
     }
-    const patchCharacterStyle = (patch: Partial<EditableTextStyle>): void => {
-      if (!selectedTextElement) return
-      const range =
-        textSelection?.elementId === selectedTextElement.id
-          ? textSelection
-          : { start: 0, end: selectedTextElement.text.length }
-      const paragraphs = applyCharacterStyle(
-        normalizeTextParagraphs(selectedTextElement),
-        range.start,
-        range.end,
-        patch
-      )
-      updateSelectedTextElement({
-        ...patch,
-        paragraphs,
-        runs: flattenTextParagraphs(paragraphs)
-      })
+    const alignment = touchedParagraphs.every(
+      (paragraph) => paragraph.align === touchedParagraphs[0]?.align
+    )
+      ? (touchedParagraphs[0]?.align ?? 'left')
+      : 'mixed'
+    const listState = (kind: 'bullet' | 'number'): boolean | 'mixed' => {
+      const values = touchedParagraphs.map((paragraph) => paragraph.list?.kind === kind)
+      return values.every((value) => value === values[0]) ? (values[0] ?? false) : 'mixed'
     }
-    const patchParagraphs = (
-      update: (paragraph: EditableTextParagraph) => EditableTextParagraph
-    ): void => {
-      if (!selectedTextElement) return
-      const range =
-        textSelection?.elementId === selectedTextElement.id
-          ? textSelection
-          : { start: 0, end: selectedTextElement.text.length }
-      const paragraphs = mapSelectedParagraphs(
-        normalizeTextParagraphs(selectedTextElement),
-        range.start,
-        range.end,
-        update
-      )
-      updateSelectedTextElement({
-        paragraphs,
-        runs: flattenTextParagraphs(paragraphs),
-        align: paragraphs[0]?.align ?? selectedTextElement.align,
-        lineHeight:
-          paragraphs[0]?.lineSpacing.kind === 'multiple'
-            ? paragraphs[0].lineSpacing.value
-            : selectedTextElement.lineHeight
-      })
-    }
+    const selectedFontSize = characterValue(
+      'fontSize',
+      selectedTextElement?.fontSize ?? activeTheme.defaultTextStyle.fontSize
+    )
     const changeFontSize = (direction: -1 | 1): void => {
       if (!selectedTextElement || !document) return
       const currentPoints = presentationCanvasPxToPoints(
@@ -1596,22 +1607,20 @@ function EditableSessionDocumentView({
       })
     }
     const clearTextFormatting = (): void => {
-      if (!selectedTextElement) return
-      const defaults = activeTheme.defaultTextStyle
-      const range =
-        textSelection?.elementId === selectedTextElement.id
-          ? textSelection
-          : { start: 0, end: selectedTextElement.text.length }
-      const paragraphs = clearCharacterFormatting(
-        normalizeTextParagraphs(selectedTextElement),
-        range.start,
-        range.end,
-        defaults
-      )
-      updateSelectedTextElement({
-        ...defaults,
-        paragraphs,
-        runs: flattenTextParagraphs(paragraphs)
+      updateSelectedTextElement((element) => {
+        const defaults = activeTheme.defaultTextStyle
+        const range = getTextCommandRange(element)
+        const paragraphs = clearCharacterFormatting(
+          normalizeTextParagraphs(element),
+          range.start,
+          range.end,
+          defaults
+        )
+        return {
+          ...defaults,
+          paragraphs,
+          runs: flattenTextParagraphs(paragraphs)
+        }
       })
     }
 
@@ -1631,50 +1640,74 @@ function EditableSessionDocumentView({
 
         <PresentationHomeRibbon
           disabled={textDisabled}
+          onFinishFormatting={finishFormatting}
           fontFamilies={fontFamilies}
-          fontFamily={selectedTextElement?.fontFamily ?? activeTheme.defaultTextStyle.fontFamily}
+          fontFamily={characterValue(
+            'fontFamily',
+            selectedTextElement?.fontFamily ?? activeTheme.defaultTextStyle.fontFamily
+          )}
           fontSize={
-            selectedTextElement
-              ? presentationCanvasPxToPoints(selectedTextElement.fontSize, document.width)
-              : INSERTED_TEXT_FONT_SIZE_POINTS
+            selectedFontSize === 'mixed'
+              ? 'mixed'
+              : presentationCanvasPxToPoints(selectedFontSize, document.width)
           }
           bold={toggleState('bold', Boolean(selectedTextElement?.bold))}
           italic={toggleState('italic', Boolean(selectedTextElement?.italic))}
           underline={toggleState('underline', Boolean(selectedTextElement?.underline))}
           strikethrough={toggleState('strikethrough', Boolean(selectedTextElement?.strikethrough))}
-          baseline={selectedTextElement?.baseline ?? 'normal'}
-          color={selectedTextElement?.color ?? activeTheme.defaultTextStyle.color}
-          highlightColor={selectedTextElement?.highlightColor ?? null}
-          align={selectedTextElement?.align ?? 'left'}
+          baseline={characterValue('baseline', selectedTextElement?.baseline ?? 'normal')}
+          color={characterValue(
+            'color',
+            selectedTextElement?.color ?? activeTheme.defaultTextStyle.color
+          )}
+          highlightColor={characterValue(
+            'highlightColor',
+            selectedTextElement?.highlightColor ?? null
+          )}
+          align={alignment}
+          bullets={listState('bullet')}
+          numbering={listState('number')}
+          characterSpacing={characterValue(
+            'characterSpacing',
+            selectedTextElement?.characterSpacing ?? 0
+          )}
+          lineSpacing={
+            touchedParagraphs.every(
+              (paragraph) =>
+                JSON.stringify(paragraph.lineSpacing) ===
+                JSON.stringify(touchedParagraphs[0]?.lineSpacing)
+            ) && touchedParagraphs[0]?.lineSpacing.kind === 'multiple'
+              ? touchedParagraphs[0].lineSpacing.value
+              : 'mixed'
+          }
           theme={activeTheme}
           onFontAccess={loadLocalFontsOnFirstGesture}
           onFontFamilyChange={(fontFamily) => patchCharacterStyle({ fontFamily })}
-          onFontSizeChange={(fontSize) =>
+          onFontSizeChange={(fontSize) => {
+            if (!Number.isFinite(fontSize) || fontSize <= 0) return
             patchCharacterStyle({
               fontSize: presentationPointsToCanvasPx(fontSize, document.width)
             })
-          }
+          }}
           onGrowFont={() => changeFontSize(1)}
           onShrinkFont={() => changeFontSize(-1)}
           onCharacterStyle={patchCharacterStyle}
           onChangeCase={(textCase) => {
-            if (!selectedTextElement) return
-            const range =
-              textSelection?.elementId === selectedTextElement.id
-                ? textSelection
-                : { start: 0, end: selectedTextElement.text.length }
-            const paragraphs = changeTextCase(
-              normalizeTextParagraphs(selectedTextElement),
-              range.start,
-              range.end,
-              textCase
-            )
-            updateSelectedTextElement({
-              text: paragraphs
-                .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-                .join('\n'),
-              paragraphs,
-              runs: flattenTextParagraphs(paragraphs)
+            updateSelectedTextElement((element) => {
+              const range = getTextCommandRange(element)
+              const paragraphs = changeTextCase(
+                normalizeTextParagraphs(element),
+                range.start,
+                range.end,
+                textCase
+              )
+              return {
+                text: paragraphs
+                  .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
+                  .join('\n'),
+                paragraphs,
+                runs: flattenTextParagraphs(paragraphs)
+              }
             })
           }}
           onReset={clearTextFormatting}
@@ -1683,7 +1716,7 @@ function EditableSessionDocumentView({
             patchParagraphs((paragraph) => ({
               ...paragraph,
               list:
-                char === undefined && paragraph.list?.kind === 'bullet'
+                char === undefined && listState('bullet') === true
                   ? null
                   : { kind: 'bullet', level: paragraph.list?.level ?? 0, char: char ?? '•' }
             }))
@@ -1692,7 +1725,7 @@ function EditableSessionDocumentView({
             patchParagraphs((paragraph) => ({
               ...paragraph,
               list:
-                format === undefined && paragraph.list?.kind === 'number'
+                format === undefined && listState('number') === true
                   ? null
                   : {
                       kind: 'number',
@@ -1718,7 +1751,13 @@ function EditableSessionDocumentView({
               list: paragraph.list ? { ...paragraph.list, level: paragraph.list.level + 1 } : null
             }))
           }
-          onLineSpacing={showLineSpacingMenu}
+          onLineSpacing={openLineSpacingOptions}
+          onLineSpacingValue={(value) =>
+            patchParagraphs((paragraph) => ({
+              ...paragraph,
+              lineSpacing: { kind: 'multiple', value }
+            }))
+          }
           onAutoWidth={() =>
             updateSelectedTextElement({
               autoWidth: !selectedTextElement?.autoWidth,
@@ -1873,9 +1912,7 @@ function EditableSessionDocumentView({
         config: SHORTCUTS.PRESENTATION.BOLD,
         description: t('presentationWorkspace.bold', 'Bold'),
         handler: () => {
-          if (!editingElementId && selectedTextElement) {
-            updateSelectedTextElement({ bold: !selectedTextElement.bold })
-          }
+          toggleCharacterStyle('bold')
         }
       },
       {
@@ -1883,9 +1920,7 @@ function EditableSessionDocumentView({
         config: SHORTCUTS.PRESENTATION.ITALIC,
         description: t('presentationWorkspace.italic', 'Italic'),
         handler: () => {
-          if (!editingElementId && selectedTextElement) {
-            updateSelectedTextElement({ italic: !selectedTextElement.italic })
-          }
+          toggleCharacterStyle('italic')
         }
       },
       {
@@ -1893,9 +1928,7 @@ function EditableSessionDocumentView({
         config: SHORTCUTS.PRESENTATION.UNDERLINE,
         description: t('presentationWorkspace.underline', 'Underline'),
         handler: () => {
-          if (!editingElementId && selectedTextElement) {
-            updateSelectedTextElement({ underline: !selectedTextElement.underline })
-          }
+          toggleCharacterStyle('underline')
         }
       }
     ],
@@ -1925,6 +1958,15 @@ function EditableSessionDocumentView({
       const isContentEditable =
         target instanceof HTMLElement &&
         (target.isContentEditable || target.getAttribute('contenteditable') === 'true')
+      if (isContentEditable && command && !event.altKey && !event.shiftKey && !event.isComposing) {
+        const styleKey = { b: 'bold', i: 'italic', u: 'underline' } as const
+        const key = event.key.toLowerCase()
+        if (key === 'b' || key === 'i' || key === 'u') {
+          event.preventDefault()
+          toggleCharacterStyle(styleKey[key])
+          return
+        }
+      }
       if (isContentEditable && event.key !== 'Escape') return
 
       if (event.key === 'Escape') {
@@ -2543,7 +2585,10 @@ function EditableSessionDocumentView({
             0.5,
             Math.min(4, Number.isFinite(lineSpacingDraft) ? lineSpacingDraft : 1.15)
           )
-          updateSelectedTextElement({ lineHeight: nextLineHeight })
+          patchParagraphs((paragraph) => ({
+            ...paragraph,
+            lineSpacing: { kind: 'multiple', value: nextLineHeight }
+          }))
           setIsLineSpacingOptionsOpen(false)
         }}
       />
@@ -2569,7 +2614,7 @@ function LineSpacingOptionsDialog({
   return (
     <AlertDialog.Backdrop isOpen={isOpen} isDismissable onOpenChange={(open) => !open && onClose()}>
       <AlertDialog.Container size="sm">
-        <AlertDialog.Dialog className="p-5">
+        <AlertDialog.Dialog data-presentation-text-tool className="p-5">
           <AlertDialog.Header>
             <AlertDialog.Heading>
               {t('presentationWorkspace.lineSpacingOptions', 'Line Spacing Options')}

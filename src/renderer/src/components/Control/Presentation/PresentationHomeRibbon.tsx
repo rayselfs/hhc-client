@@ -1,3 +1,5 @@
+import { Button as AriaButton } from 'react-aria-components'
+import { useState } from 'react'
 import {
   AlignCenter,
   AlignJustify,
@@ -36,17 +38,18 @@ type ToggleState = boolean | 'mixed'
 
 interface PresentationHomeRibbonProps {
   disabled: boolean
+  onFinishFormatting?: () => void
   fontFamilies: string[]
   fontFamily: string
-  fontSize: number
+  fontSize: number | 'mixed'
   bold: ToggleState
   italic: ToggleState
   underline: ToggleState
   strikethrough: ToggleState
-  baseline: EditableTextStyle['baseline']
+  baseline: EditableTextStyle['baseline'] | 'mixed'
   color: string
   highlightColor: string | null
-  align: EditableTextAlign
+  align: EditableTextAlign | 'mixed'
   theme: EditablePresentationTheme
   onFontFamilyChange: (value: string) => void
   onFontAccess?: () => void
@@ -61,7 +64,12 @@ interface PresentationHomeRibbonProps {
   onNumbering: (format?: string) => void
   onDecreaseIndent: () => void
   onIncreaseIndent: () => void
-  onLineSpacing: (event: React.MouseEvent) => void
+  onLineSpacing: () => void
+  onLineSpacingValue?: (value: number) => void
+  lineSpacing?: number | 'mixed'
+  characterSpacing?: number | 'mixed'
+  bullets?: ToggleState
+  numbering?: ToggleState
   onAutoWidth: () => void
 }
 
@@ -106,6 +114,9 @@ export default function PresentationHomeRibbon(
           onFocus={props.onFontAccess}
           onChange={(event) => props.onFontFamilyChange(event.currentTarget.value)}
         >
+          {props.fontFamily === 'mixed' && (
+            <option value="mixed">{t('presentationWorkspace.mixed', 'Mixed')}</option>
+          )}
           {props.fontFamilies.map((font) => (
             <option key={font} value={font}>
               {font}
@@ -119,6 +130,9 @@ export default function PresentationHomeRibbon(
           value={props.fontSize}
           onChange={(event) => props.onFontSizeChange(Number(event.currentTarget.value))}
         >
+          {props.fontSize === 'mixed' && (
+            <option value="mixed">{t('presentationWorkspace.mixed', 'Mixed')}</option>
+          )}
           {[
             8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80,
             88, 96
@@ -146,9 +160,11 @@ export default function PresentationHomeRibbon(
         )}
         <span className="mx-1 h-6 w-px bg-divider" />
         <SplitFormattingMenu
+          onFinishFormatting={props.onFinishFormatting}
           label={t('presentationWorkspace.bullets', 'Bullets')}
           icon={<List size={18} />}
           disabled={props.disabled}
+          active={props.bullets}
           onAction={() => props.onBullets()}
           items={['•', '◦', '▪'].map((char) => ({
             id: char,
@@ -157,9 +173,11 @@ export default function PresentationHomeRibbon(
           }))}
         />
         <SplitFormattingMenu
+          onFinishFormatting={props.onFinishFormatting}
           label={t('presentationWorkspace.numbering', 'Numbering')}
           icon={<ListOrdered size={18} />}
           disabled={props.disabled}
+          active={props.numbering}
           onAction={() => props.onNumbering()}
           items={[
             ['arabicPeriod', '1. 2. 3.'],
@@ -181,17 +199,25 @@ export default function PresentationHomeRibbon(
           <IndentIncrease size={18} />,
           props.onIncreaseIndent
         )}
-        <button
-          type="button"
-          className={CONTROL}
+        <FormattingMenu
+          label={t('presentationWorkspace.lineSpacing', 'Line spacing')}
+          icon={<WrapText size={18} />}
           disabled={props.disabled}
-          aria-label={t('presentationWorkspace.lineSpacing', 'Line spacing')}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={props.onLineSpacing}
-        >
-          <WrapText size={18} />
-          <ChevronDown size={11} />
-        </button>
+          onFinishFormatting={props.onFinishFormatting}
+          items={[
+            ...[1, 1.15, 1.5, 2].map((value) => ({
+              id: String(value),
+              label: String(value),
+              active: props.lineSpacing === value,
+              action: () => props.onLineSpacingValue?.(value)
+            })),
+            {
+              id: 'options',
+              label: t('presentationWorkspace.lineSpacingOptions', 'Line Spacing Options...'),
+              action: props.onLineSpacing
+            }
+          ]}
+        />
       </div>
       <div className="flex items-center gap-1">
         {iconButton(
@@ -225,7 +251,7 @@ export default function PresentationHomeRibbon(
             props.onCharacterStyle({
               baseline: props.baseline === 'superscript' ? 'normal' : 'superscript'
             }),
-          props.baseline === 'superscript'
+          props.baseline === 'mixed' ? 'mixed' : props.baseline === 'superscript'
         )}
         {iconButton(
           t('presentationWorkspace.subscript', 'Subscript'),
@@ -234,9 +260,10 @@ export default function PresentationHomeRibbon(
             props.onCharacterStyle({
               baseline: props.baseline === 'subscript' ? 'normal' : 'subscript'
             }),
-          props.baseline === 'subscript'
+          props.baseline === 'mixed' ? 'mixed' : props.baseline === 'subscript'
         )}
         <FormattingMenu
+          onFinishFormatting={props.onFinishFormatting}
           label={t('presentationWorkspace.characterSpacing', 'Character spacing')}
           icon={<span className="text-sm">AV↔</span>}
           disabled={props.disabled}
@@ -248,10 +275,12 @@ export default function PresentationHomeRibbon(
           ].map(([id, label, value]) => ({
             id: String(id),
             label: String(label),
+            active: props.characterSpacing === Number(value),
             action: () => props.onCharacterStyle({ characterSpacing: Number(value) })
           }))}
         />
         <FormattingMenu
+          onFinishFormatting={props.onFinishFormatting}
           label={t('presentationWorkspace.changeCase', 'Change case')}
           icon={<CaseSensitive size={19} />}
           disabled={props.disabled}
@@ -269,6 +298,7 @@ export default function PresentationHomeRibbon(
         />
         <span className="mx-1 h-6 w-px bg-divider" />
         <PresentationColorPalette
+          onFinishFormatting={props.onFinishFormatting}
           kind="highlight"
           value={props.highlightColor}
           theme={props.theme}
@@ -276,6 +306,7 @@ export default function PresentationHomeRibbon(
           onChange={(highlightColor) => props.onCharacterStyle({ highlightColor })}
         />
         <PresentationColorPalette
+          onFinishFormatting={props.onFinishFormatting}
           kind="font"
           value={props.color}
           theme={props.theme}
@@ -295,7 +326,7 @@ export default function PresentationHomeRibbon(
             t(`presentationWorkspace.align.${align}`, label),
             <Icon size={18} />,
             () => props.onAlign(align),
-            props.align === align,
+            props.align === 'mixed' ? 'mixed' : props.align === align,
             align
           )
         )}
@@ -313,33 +344,41 @@ function FormattingMenu({
   label,
   icon,
   disabled,
+  onFinishFormatting,
   items
 }: {
   label: string
   icon: React.ReactNode
   disabled: boolean
-  items: Array<{ id: string; label: string; action: () => void }>
+  onFinishFormatting?: () => void
+  items: Array<{ id: string; label: string; active?: ToggleState; action: () => void }>
 }): React.JSX.Element {
+  const [isOpen, setIsOpen] = useState(false)
+  const changeOpen = (open: boolean): void => {
+    setIsOpen(open)
+    if (!open) onFinishFormatting?.()
+  }
   return (
-    <Popover>
-      <button
-        type="button"
-        className={CONTROL}
-        disabled={disabled}
-        aria-label={label}
-        onMouseDown={(event) => event.preventDefault()}
-      >
+    <Popover isOpen={isOpen} onOpenChange={changeOpen}>
+      <AriaButton type="button" className={CONTROL} isDisabled={disabled} aria-label={label}>
         {icon}
         <ChevronDown size={11} />
-      </button>
-      <Popover.Content className="rounded-lg border border-divider bg-content1 p-1 shadow-xl">
+      </AriaButton>
+      <Popover.Content
+        data-presentation-text-tool
+        className="rounded-lg border border-divider bg-content1 p-1 shadow-xl"
+      >
         <Popover.Dialog className="grid min-w-44 gap-0.5">
           {items.map((item) => (
             <button
               key={item.id}
+              aria-pressed={item.active}
               type="button"
               className="rounded-md px-3 py-1.5 text-left text-sm hover:bg-content2 focus-visible:outline-2 focus-visible:outline-primary"
-              onClick={item.action}
+              onClick={() => {
+                item.action()
+                changeOpen(false)
+              }}
             >
               {item.label}
             </button>
@@ -355,19 +394,29 @@ function SplitFormattingMenu({
   icon,
   disabled,
   onAction,
+  active,
+  onFinishFormatting,
   items
 }: {
   label: string
   icon: React.ReactNode
   disabled: boolean
+  active?: ToggleState
   onAction: () => void
-  items: Array<{ id: string; label: string; action: () => void }>
+  onFinishFormatting?: () => void
+  items: Array<{ id: string; label: string; active?: ToggleState; action: () => void }>
 }): React.JSX.Element {
+  const [isOpen, setIsOpen] = useState(false)
+  const changeOpen = (open: boolean): void => {
+    setIsOpen(open)
+    if (!open) onFinishFormatting?.()
+  }
   return (
     <div className="flex h-7 items-center">
       <button
         type="button"
-        className={`${CONTROL} rounded-r-none`}
+        className={`${CONTROL} rounded-r-none ${active === true ? ACTIVE : ''}`}
+        aria-pressed={active}
         disabled={disabled}
         aria-label={label}
         onMouseDown={(event) => event.preventDefault()}
@@ -375,24 +424,29 @@ function SplitFormattingMenu({
       >
         {icon}
       </button>
-      <Popover>
-        <button
+      <Popover isOpen={isOpen} onOpenChange={changeOpen}>
+        <AriaButton
           type="button"
           className={`${CONTROL} min-w-4 rounded-l-none px-0`}
-          disabled={disabled}
+          isDisabled={disabled}
           aria-label={`${label} menu`}
-          onMouseDown={(event) => event.preventDefault()}
         >
           <ChevronDown size={11} />
-        </button>
-        <Popover.Content className="rounded-lg border border-divider bg-content1 p-1 shadow-xl">
+        </AriaButton>
+        <Popover.Content
+          data-presentation-text-tool
+          className="rounded-lg border border-divider bg-content1 p-1 shadow-xl"
+        >
           <Popover.Dialog className="flex gap-1">
             {items.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 className="min-w-14 rounded-md border border-divider px-3 py-2 text-sm hover:bg-content2 focus-visible:outline-2 focus-visible:outline-primary"
-                onClick={item.action}
+                onClick={() => {
+                  item.action()
+                  changeOpen(false)
+                }}
               >
                 {item.label}
               </button>

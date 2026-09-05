@@ -70,7 +70,10 @@ export interface EditableTextSelection {
   end: number
 }
 
-type TextEditFinalizer = (() => boolean) & {
+export type TextEditFinalizer = (() => boolean) & {
+  flush?: () => boolean
+  restoreSelection?: () => void
+  getSelection?: () => EditableTextSelection | null
   hasUnsafeWork?: () => boolean
   isComposing?: () => boolean
 }
@@ -1224,6 +1227,7 @@ function TextElementContent({
   const isComposingRef = useRef(false)
   const editingRef = useRef(editing)
   const finalizeTextEditRef = useRef<() => boolean>(() => true)
+  const flushTextRef = useRef<() => boolean>(() => true)
   const initializedEditingElementRef = useRef<string | null>(null)
   const blurFrameRef = useRef<number | null>(null)
   const textFrameRef = useRef<number | null>(null)
@@ -1237,6 +1241,7 @@ function TextElementContent({
   const [template] = useState(() => window.document.createElement('div'))
   const domParagraphsRef = useRef(paragraphs)
   const domModelRef = useRef<string | null>(null)
+  const retainedSelectionRef = useRef<{ anchor: number; focus: number } | null>(null)
 
   const notifyTextEditLifecycle = useCallback((): void => {
     onTextEditFinalizerChange?.(registeredFinalizerRef.current)
@@ -1269,7 +1274,10 @@ function TextElementContent({
       notifyTextEditLifecycle()
       return
     }
-    if (!domParagraphsRef.current.some((paragraph) => paragraph.typingStyleCaret !== undefined)) {
+    if (
+      nextParagraphs.length === domParagraphsRef.current.length &&
+      !domParagraphsRef.current.some((paragraph) => paragraph.typingStyleCaret !== undefined)
+    ) {
       domModelRef.current = JSON.stringify(nextParagraphs)
     }
     onUpdateElement?.(slideId, element.id, {
@@ -1311,7 +1319,11 @@ function TextElementContent({
       blurFrameRef.current = null
       const content = contentRef.current
       if (!editingRef.current || !content) return
-      if (window.document.activeElement === content) {
+      const active = window.document.activeElement
+      if (
+        active === content ||
+        active?.closest('[data-ribbon-surface], [data-presentation-text-tool]')
+      ) {
         pendingBlurTextRef.current = null
         settlePendingText()
         return
@@ -1345,6 +1357,12 @@ function TextElementContent({
   }, [editing])
 
   useLayoutEffect(() => {
+    flushTextRef.current = (): boolean => {
+      if (isComposingRef.current) return false
+      cancelPendingTextCommit()
+      commitText()
+      return true
+    }
     finalizeTextEditRef.current = (): boolean => {
       if (!editingRef.current) return true
       if (isComposingRef.current) return false
@@ -1366,6 +1384,26 @@ function TextElementContent({
   useLayoutEffect(() => {
     if (!editing) return
     const finalize: TextEditFinalizer = () => finalizeTextEditRef.current()
+    finalize.getSelection = () => {
+      const content = contentRef.current
+      const selection = content
+        ? (readTextSelection(content) ?? retainedSelectionRef.current)
+        : null
+      return selection
+        ? {
+            elementId: element.id,
+            start: Math.min(selection.anchor, selection.focus),
+            end: Math.max(selection.anchor, selection.focus)
+          }
+        : null
+    }
+    finalize.restoreSelection = () => {
+      const content = contentRef.current
+      if (!content || !editingRef.current) return
+      content.focus({ preventScroll: true })
+      if (retainedSelectionRef.current) restoreTextSelection(content, retainedSelectionRef.current)
+    }
+    finalize.flush = () => flushTextRef.current()
     finalize.hasUnsafeWork = () => hasPendingTextRef.current
     finalize.isComposing = () => isComposingRef.current
     registeredFinalizerRef.current = finalize
@@ -1376,23 +1414,29 @@ function TextElementContent({
         notifyTextEditLifecycle()
       }
     }
-  }, [editing, notifyTextEditLifecycle])
+  }, [editing, element.id, notifyTextEditLifecycle])
 
   useLayoutEffect(() => {
     if (!editing) {
       domModelRef.current = null
+      retainedSelectionRef.current = null
       return
     }
     const content = contentRef.current
     if (!content || isComposingRef.current) return
     const model = JSON.stringify(paragraphs)
     if (domModelRef.current === model) return
-    const selection = readTextSelection(content)
+    const selection = readTextSelection(content) ?? retainedSelectionRef.current
     // React owns the detached template; only this owner writes the browser-editable subtree.
     content.replaceChildren(...Array.from(template.childNodes, (node) => node.cloneNode(true)))
     domParagraphsRef.current = paragraphs
     domModelRef.current = model
-    if (selection) restoreTextSelection(content, selection)
+    if (selection) {
+      const focused = window.document.activeElement
+      restoreTextSelection(content, selection)
+      if (focused instanceof HTMLElement && focused !== content)
+        focused.focus({ preventScroll: true })
+    }
   }, [editing, paragraphs, template])
 
   useLayoutEffect(() => {
@@ -1427,6 +1471,7 @@ function TextElementContent({
       if (!content || !selection || selection.rangeCount === 0) return
       const range = selection.getRangeAt(0)
       if (!content.contains(range.startContainer) || !content.contains(range.endContainer)) return
+      retainedSelectionRef.current = readTextSelection(content)
       onTextSelectionChange?.({
         elementId: element.id,
         start: getTextOffset(content, range.startContainer, range.startOffset),
@@ -1437,6 +1482,39 @@ function TextElementContent({
     reportSelection()
     return () => window.document.removeEventListener('selectionchange', reportSelection)
   }, [editing, element.id, onTextSelectionChange])
+
+  useEffect(() => {
+    if (!editing || typeof Highlight === 'undefined' || !CSS.highlights) return
+    const updateHighlight = (): void => {
+      const content = contentRef.current
+      const selected = retainedSelectionRef.current
+      CSS.highlights.delete('presenter-text-selection')
+      if (
+        !content ||
+        !selected ||
+        window.document.activeElement === content ||
+        selected.anchor === selected.focus
+      )
+        return
+      const points = getTextSelectionPoints(content, selected)
+      const range = window.document.createRange()
+      const [start, end] =
+        selected.anchor < selected.focus
+          ? [points.anchor, points.focus]
+          : [points.focus, points.anchor]
+      range.setStart(start.node, start.offset)
+      range.setEnd(end.node, end.offset)
+      CSS.highlights.set('presenter-text-selection', new Highlight(range))
+    }
+    window.document.addEventListener('focusin', updateHighlight)
+    window.document.addEventListener('selectionchange', updateHighlight)
+    updateHighlight()
+    return () => {
+      window.document.removeEventListener('focusin', updateHighlight)
+      window.document.removeEventListener('selectionchange', updateHighlight)
+      CSS.highlights.delete('presenter-text-selection')
+    }
+  }, [editing, paragraphs])
 
   const renderedText =
     !hasRichText && !editing
@@ -1545,7 +1623,37 @@ function TextElementContent({
           else scheduleTextCommit()
         }}
         onKeyDown={(event) => {
-          if (!editing || event.key !== 'Tab' || !onTextIndent) return
+          if (!editing || isComposingRef.current || event.nativeEvent.isComposing) return
+          if (event.key === 'Enter' && !event.shiftKey) {
+            const content = contentRef.current
+            const selection = window.getSelection()
+            if (content && selection?.isCollapsed && selection.anchorNode) {
+              const index = Array.from(content.children).findIndex((node) =>
+                node.contains(selection.anchorNode)
+              )
+              const currentParagraphs = serializeTextContent(content, domParagraphsRef.current)
+              const paragraph = currentParagraphs[index]
+              if (
+                paragraph?.list &&
+                !getPlainText([paragraph])
+                  .replace(/[\u200b\ufeff]/g, '')
+                  .trim()
+              ) {
+                event.preventDefault()
+                cancelPendingTextCommit()
+                hasPendingTextRef.current = false
+                const nextParagraphs = currentParagraphs.map((item, itemIndex) =>
+                  itemIndex === index ? { ...item, list: null, marginLeft: 0, textIndent: 0 } : item
+                )
+                onUpdateElement?.(slideId, element.id, {
+                  text: getPlainText(nextParagraphs),
+                  paragraphs: nextParagraphs
+                })
+                return
+              }
+            }
+          }
+          if (event.key !== 'Tab' || !onTextIndent) return
           event.preventDefault()
           event.stopPropagation()
           onTextIndent(event.shiftKey ? -1 : 1)
@@ -1598,10 +1706,10 @@ function readTextSelection(content: HTMLElement): { anchor: number; focus: numbe
   }
 }
 
-function restoreTextSelection(
+function getTextSelectionPoints(
   content: HTMLElement,
   selection: { anchor: number; focus: number }
-): void {
+): { anchor: { node: Node; offset: number }; focus: { node: Node; offset: number } } {
   const locate = (position: number): { node: Node; offset: number } => {
     let remaining = Math.max(0, position)
     const paragraphs = Array.from(content.children)
@@ -1629,8 +1737,14 @@ function restoreTextSelection(
     }
     return { node: content, offset: 0 }
   }
-  const anchor = locate(selection.anchor)
-  const focus = locate(selection.focus)
+  return { anchor: locate(selection.anchor), focus: locate(selection.focus) }
+}
+
+function restoreTextSelection(
+  content: HTMLElement,
+  selection: { anchor: number; focus: number }
+): void {
+  const { anchor, focus } = getTextSelectionPoints(content, selection)
   window.getSelection()?.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset)
 }
 

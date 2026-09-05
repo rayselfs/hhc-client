@@ -79,3 +79,115 @@ test('a single click resumes editing after clicking outside the text box', async
     await expect(content).toHaveText(`中文測試 abc${'x'.repeat(attempt + 1)}`)
   }
 })
+
+test('formatting preserves the five selected characters and derives caret bold state', async ({
+  page
+}) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('abcde plain', { delay: 40 })
+  await textBox.press('Home')
+  for (let index = 0; index < 5; index++) await textBox.press('Shift+ArrowRight')
+  const bold = page.getByRole('button', { name: /^(Bold|粗體|加粗)$/ })
+  await bold.click()
+  await expect(textBox).toBeFocused()
+  await expect(bold).toHaveAttribute('aria-pressed', 'true')
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('abcde')
+  await textBox.press('ArrowRight')
+  await expect(bold).toHaveAttribute('aria-pressed', 'true')
+  await textBox.press('ArrowRight')
+  await expect(bold).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('keyboard formatting uses the same selected range as the toolbar', async ({ page }) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('abcde plain', { delay: 40 })
+  await textBox.press('Home')
+  for (let index = 0; index < 5; index++) await textBox.press('Shift+ArrowRight')
+  await textBox.press('ControlOrMeta+B')
+  await expect(page.getByRole('button', { name: /^(Bold|粗體|加粗)$/ })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('abcde')
+  await textBox.press('ControlOrMeta+I')
+  await expect(page.getByRole('button', { name: /^(Italic|斜體|斜体)$/ })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await expect(textBox).toHaveText('abcde plain')
+})
+
+test('a formatting popup retains the range and returns focus after applying', async ({ page }) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('abcde plain', { delay: 40 })
+  await textBox.press('Home')
+  for (let index = 0; index < 5; index++) await textBox.press('Shift+ArrowRight')
+  await page.getByRole('button', { name: 'Change case', exact: true }).click()
+  await page.getByRole('button', { name: 'UPPERCASE', exact: true }).click()
+  await expect(textBox).toBeFocused()
+  await expect(textBox).toHaveText('ABCDE plain')
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('ABCDE')
+})
+
+test('formatting preserves a backward selection', async ({ page }) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('abcde', { delay: 40 })
+  for (let index = 0; index < 5; index++) await textBox.press('Shift+ArrowLeft')
+  await page.getByRole('button', { name: 'Bold', exact: true }).click()
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('abcde')
+  await textBox.press('Shift+ArrowRight')
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('bcde')
+})
+
+test('paragraph alignment and list state follow the caret and an empty list exits on Enter', async ({
+  page
+}) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('First', { delay: 40 })
+  await page.getByRole('button', { name: 'Center', exact: true }).click()
+  await page.getByRole('button', { name: 'Bullets', exact: true }).click()
+  await textBox.press('Enter')
+  await expect(page.getByRole('button', { name: 'Bullets', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await textBox.press('Enter')
+  await expect(page.getByRole('button', { name: 'Bullets', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false'
+  )
+  await expect(page.getByRole('button', { name: 'Center', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await textBox.pressSequentially('Second')
+  await page.getByRole('button', { name: 'Align left', exact: true }).click()
+  await textBox.press('ArrowUp')
+  await textBox.press('Home')
+  await expect(page.getByRole('button', { name: 'Center', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await expect(page.getByRole('button', { name: 'Bullets', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+})
+
+test('undo and redo keep formatting separate from typing', async ({ page }) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('abcde', { delay: 40 })
+  await textBox.press('ControlOrMeta+A')
+  const bold = page.getByRole('button', { name: 'Bold', exact: true })
+  await bold.click()
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  const content = page.locator('.presentation-stage [data-text-content]')
+  await content.click()
+  await textBox.press('ControlOrMeta+A')
+  await expect(textBox).toHaveText('abcde')
+  await expect(bold).toHaveAttribute('aria-pressed', 'false')
+  await page.getByRole('button', { name: 'Redo', exact: true }).click()
+  await content.click()
+  await textBox.press('ControlOrMeta+A')
+  await expect(bold).toHaveAttribute('aria-pressed', 'true')
+})

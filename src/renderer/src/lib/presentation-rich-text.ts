@@ -121,7 +121,7 @@ export function mapSelectedParagraphs(
     const selected =
       from === to
         ? from >= bounds.start && from <= bounds.end
-        : to >= bounds.start && from <= bounds.end
+        : to > bounds.start && from <= bounds.end
     return selected ? update(paragraph) : { ...paragraph }
   })
 }
@@ -132,12 +132,15 @@ export function resolveTypingStyle(
 ): EditableTextStyle | undefined {
   let offset = 0
   for (const paragraph of paragraphs) {
+    if (paragraph.typingStyleCaret === caret - offset && paragraph.typingStyle) {
+      return paragraph.typingStyle
+    }
     for (const run of paragraph.runs) {
       const end = offset + run.text.length
       if (caret <= end) return { ...runStyleFromRun(run) }
       offset = end
     }
-    if (caret === offset || !paragraph.runs.length) return paragraph.typingStyle
+    if (caret === offset) return paragraph.typingStyle
     offset++
   }
   const paragraph = paragraphs.at(-1)
@@ -168,6 +171,7 @@ export function getCharacterStyleValue<K extends keyof EditableTextStyle>(
 ): EditableTextStyle[K] | 'mixed' | undefined {
   const from = Math.max(0, Math.min(start, end))
   const to = Math.max(from, Math.max(start, end))
+  if (from === to) return resolveTypingStyle(paragraphs, from)?.[key]
   let offset = 0
   let value: EditableTextStyle[K] | undefined
   for (const paragraph of paragraphs) {

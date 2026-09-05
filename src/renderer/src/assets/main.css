@@ -401,3 +401,7 @@ body {
     box-shadow: 12px 0 32px rgb(0 0 0 / 25%);
   }
 }
+
+::highlight(presenter-text-selection) {
+  background-color: rgb(90 155 240 / 35%);
+}
