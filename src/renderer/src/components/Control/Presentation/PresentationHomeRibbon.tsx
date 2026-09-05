@@ -33,8 +33,9 @@ import PresentationColorPalette from './PresentationColorPalette'
 import type { TextCase } from '@renderer/lib/presentation-rich-text'
 
 const CONTROL =
-  'inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-transparent px-1.5 text-default-500 hover:border-divider hover:bg-content2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-30'
-const ACTIVE = 'border-primary bg-primary text-white hover:bg-primary/90 hover:text-white'
+  'inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-transparent px-1.5 text-muted hover:border-separator hover:bg-surface-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-30 disabled:cursor-not-allowed aria-[pressed=mixed]:border-accent aria-[pressed=mixed]:border-dashed aria-[pressed=mixed]:bg-accent/20'
+const ACTIVE =
+  'aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-foreground'
 type ToggleState = boolean | 'mixed'
 
 interface PresentationHomeRibbonProps {
@@ -107,7 +108,7 @@ export default function PresentationHomeRibbon(
       role="group"
       aria-label={t('presentationWorkspace.textFormatting', 'Text formatting')}
       data-testid="presentation-ribbon-group"
-      className="grid h-full w-[720px] shrink-0 grid-rows-2 gap-1 border-r border-divider px-2 py-1"
+      className="grid h-full w-max shrink-0 grid-rows-2 gap-1 border-r border-separator px-2 py-1"
     >
       <div className="flex items-center gap-1">
         <FontFamilyPicker {...props} />
@@ -127,13 +128,13 @@ export default function PresentationHomeRibbon(
           <span className="text-sm">A⌄</span>,
           props.onShrinkFont
         )}
-        <span className="mx-1 h-6 w-px bg-divider" />
+        <span className="mx-1 h-6 w-px bg-separator" />
         {iconButton(
           t('presentationWorkspace.clearFormatting', 'Clear formatting'),
           <Eraser size={18} />,
           props.onReset
         )}
-        <span className="mx-1 h-6 w-px bg-divider" />
+        <span className="mx-1 h-6 w-px bg-separator" />
         <SplitFormattingMenu
           onFinishFormatting={props.onFinishFormatting}
           label={t('presentationWorkspace.bullets', 'Bullets')}
@@ -271,7 +272,7 @@ export default function PresentationHomeRibbon(
             action: () => props.onChangeCase(textCase as TextCase)
           }))}
         />
-        <span className="mx-1 h-6 w-px bg-divider" />
+        <span className="mx-1 h-6 w-px bg-separator" />
         <PresentationColorPalette
           onFinishFormatting={props.onFinishFormatting}
           kind="highlight"
@@ -288,7 +289,7 @@ export default function PresentationHomeRibbon(
           disabled={props.disabled}
           onChange={(color) => color && props.onCharacterStyle({ color })}
         />
-        <span className="mx-1 h-6 w-px bg-divider" />
+        <span className="mx-1 h-6 w-px bg-separator" />
         {(
           [
             ['left', 'Align Left', AlignLeft],
@@ -341,7 +342,7 @@ function FormattingMenu({
       </AriaButton>
       <Popover.Content
         data-presentation-text-tool
-        className="rounded-lg border border-divider bg-content1 p-1 shadow-xl"
+        className="rounded-lg border border-separator bg-surface p-1 shadow-xl"
       >
         <Popover.Dialog className="grid min-w-44 gap-0.5">
           {items.map((item) => (
@@ -349,7 +350,7 @@ function FormattingMenu({
               key={item.id}
               aria-pressed={item.active}
               type="button"
-              className="rounded-md px-3 py-1.5 text-left text-sm hover:bg-content2 focus-visible:outline-2 focus-visible:outline-primary"
+              className="rounded-md px-3 py-1.5 text-left text-sm hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-accent"
               onClick={() => {
                 item.action()
                 changeOpen(false)
@@ -411,14 +412,14 @@ function SplitFormattingMenu({
         </AriaButton>
         <Popover.Content
           data-presentation-text-tool
-          className="rounded-lg border border-divider bg-content1 p-1 shadow-xl"
+          className="rounded-lg border border-separator bg-surface p-1 shadow-xl"
         >
           <Popover.Dialog className="flex gap-1">
             {items.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                className="min-w-14 rounded-md border border-divider px-3 py-2 text-sm hover:bg-content2 focus-visible:outline-2 focus-visible:outline-primary"
+                className="min-w-14 rounded-md border border-separator px-3 py-2 text-sm hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => {
                   item.action()
                   changeOpen(false)
@@ -457,7 +458,7 @@ function FontSizeInput({
   return (
     <input
       aria-label={t('presentationWorkspace.fontSize', 'Font size')}
-      className="h-7 w-16 rounded-md border border-divider bg-content2 px-2 text-sm"
+      className="h-7 w-16 rounded-md border border-separator bg-surface-secondary px-2 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
       inputMode="decimal"
       disabled={disabled}
       value={draft}
@@ -495,7 +496,7 @@ function FontFamilyPicker(props: PresentationHomeRibbonProps): React.JSX.Element
     <Popover isOpen={isOpen} onOpenChange={changeOpen}>
       <AriaButton
         aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
-        className="flex h-7 w-44 items-center justify-between gap-2 rounded-md border border-divider bg-content2 px-2 text-sm"
+        className="flex h-7 w-44 items-center justify-between gap-2 rounded-md border border-separator bg-surface-secondary px-2 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
         isDisabled={props.disabled}
       >
         <span className="truncate">
@@ -507,13 +508,13 @@ function FontFamilyPicker(props: PresentationHomeRibbonProps): React.JSX.Element
       </AriaButton>
       <Popover.Content
         data-presentation-text-tool
-        className="w-80 rounded-lg border border-divider bg-content1 p-0 shadow-xl"
+        className="w-80 rounded-lg border border-separator bg-surface p-0 shadow-xl"
       >
         <Popover.Dialog className="p-2">
           <input
             aria-label={t('presentationWorkspace.searchFonts', 'Search fonts')}
             placeholder={t('presentationWorkspace.searchFonts', 'Search fonts')}
-            className="mb-2 h-8 w-full rounded border border-divider bg-content2 px-2 text-sm"
+            className="mb-2 h-8 w-full rounded border border-separator bg-surface-secondary px-2 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}

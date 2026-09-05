@@ -62,6 +62,7 @@ import {
   DEFAULT_GRADIENT_BACKGROUND,
   duplicateElementInSlide,
   getSlideBackgroundPrimaryColor,
+  getSlideBackgroundOutline,
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
   INSERTED_TEXT_FONT_SIZE_POINTS,
@@ -146,14 +147,12 @@ const FONT_SIZES = [
 const PRESENTATION_CANVAS_WIDTH = 1024
 const PRESENTATION_VIEWPORT_PADDING = 64
 const NATIVE_CONTROL_CLASS =
-  'presentation-native-control h-7 rounded-md border border-divider bg-content2 px-2 text-sm text-foreground outline-none'
+  'presentation-native-control h-7 rounded-md border border-separator bg-surface-secondary px-2 text-sm text-foreground outline-none'
 const RANGE_CLASS = 'presentation-range w-full'
-const RIBBON_ICON_BUTTON_CLASS =
-  'inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-transparent px-1.5 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
 const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
-  'border-primary bg-primary text-white shadow-inner hover:border-primary hover:bg-primary/90 hover:text-white'
+  'border-accent bg-accent text-white shadow-inner hover:border-accent hover:bg-accent/90 hover:text-white'
 const RIBBON_COMMAND_BUTTON_CLASS =
-  'inline-flex h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs text-default-500 transition-colors hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 disabled:cursor-not-allowed disabled:opacity-30'
+  'inline-flex h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs text-muted transition-colors hover:bg-surface-secondary/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent/50 disabled:cursor-not-allowed disabled:opacity-30'
 
 const flattenTextParagraphs = (
   paragraphs: EditableTextParagraph[]
@@ -179,7 +178,7 @@ function RibbonGroup({
       role="group"
       aria-label={label}
       data-testid="presentation-ribbon-group"
-      className={`flex h-full shrink-0 flex-col border-r border-divider px-2 py-1 last:border-r-0 ${className}`}
+      className={`flex h-full shrink-0 flex-col border-r border-separator px-2 py-1 last:border-r-0 ${className}`}
     >
       <div className="min-h-0 flex-1">{children}</div>
     </section>
@@ -238,7 +237,7 @@ function SlideThumbnail({
 
   return (
     <button
-      className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2"
+      className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-muted transition-colors hover:bg-surface-secondary"
       onClick={onSelect}
     >
       <span
@@ -253,7 +252,7 @@ function SlideThumbnail({
       <span
         ref={containerRef}
         className={`flex h-[81px] w-36 items-center justify-center overflow-hidden border bg-white shadow-sm ${
-          active ? 'border-primary ring-2 ring-primary/40' : 'border-transparent'
+          active ? 'border-accent ring-2 ring-accent/40' : 'border-transparent'
         }`}
       />
     </button>
@@ -467,7 +466,7 @@ export function PptxDocumentView({
       navigatorLabel={t('presentationWorkspace.slides', 'Slides')}
       className="bg-background"
       navigator={
-        <NavigatorRail className="h-full overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3">
+        <NavigatorRail className="h-full overflow-y-auto border-r border-separator bg-surface/40 px-2 py-3">
           <div className="space-y-2">
             {viewer &&
               slideIndexes.map((index) => (
@@ -484,7 +483,7 @@ export function PptxDocumentView({
       }
       stage={
         <StageViewport className="h-full bg-[#111217]">
-          <div className="flex h-16 shrink-0 items-center justify-between border-b border-divider bg-content1/80 px-4">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-separator bg-surface/80 px-4">
             <div>
               <p className="text-sm font-semibold text-foreground">{deck.name}</p>
               <p className="text-xs text-default-400">
@@ -1654,7 +1653,7 @@ function EditableSessionDocumentView({
     return (
       <div
         data-ribbon-surface
-        className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
+        className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-separator bg-surface/95"
       >
         <RibbonGroup label={t('presentationWorkspace.slides', 'Slides')} className="w-20">
           <div className="flex h-full items-center justify-center">
@@ -1836,68 +1835,69 @@ function EditableSessionDocumentView({
           </div>
         </RibbonGroup>
 
-        <RibbonGroup
-          label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
-          className="w-44"
-        >
-          <div data-ribbon-no-wrap className="grid h-full grid-cols-5 grid-rows-2 gap-1">
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled={!selectedElement}
-              onClick={() => selectedElement && reorderElement(selectedElement.id, 'bring-forward')}
-              aria-label={t('presentationWorkspace.bringForward', 'Bring Forward')}
-            >
-              <BringToFront size={17} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled={!selectedElement}
-              onClick={() => selectedElement && reorderElement(selectedElement.id, 'send-backward')}
-              aria-label={t('presentationWorkspace.sendBackward', 'Send Backward')}
-            >
-              <SendToBack size={17} />
-            </button>
-            {(
-              [
-                ['left', AlignHorizontalJustifyStart, 'Align objects left'],
-                ['center', AlignHorizontalJustifyCenter, 'Align objects center'],
-                ['right', AlignHorizontalJustifyEnd, 'Align objects right'],
-                ['top', AlignVerticalJustifyStart, 'Align objects top'],
-                ['middle', AlignVerticalJustifyCenter, 'Align objects middle'],
-                ['bottom', AlignVerticalJustifyEnd, 'Align objects bottom']
-              ] as const
-            ).map(([alignment, Icon, fallback]) => (
-              <button
-                key={alignment}
-                type="button"
-                className={RIBBON_ICON_BUTTON_CLASS}
-                disabled={selectedElementIds.size < 2}
-                onClick={() => applyElementAlignment(alignment)}
-                aria-label={t(`presentationWorkspace.objectAlign.${alignment}`, fallback)}
-              >
-                <Icon size={19} />
-              </button>
-            ))}
-            {(
-              [
-                ['horizontal', AlignHorizontalSpaceAround, 'Distribute objects horizontally'],
-                ['vertical', AlignVerticalSpaceAround, 'Distribute objects vertically']
-              ] as const
-            ).map(([direction, Icon, fallback]) => (
-              <button
-                key={direction}
-                type="button"
-                className={RIBBON_ICON_BUTTON_CLASS}
-                disabled={selectedElementIds.size < 3}
-                onClick={() => applyElementDistribution(direction)}
-                aria-label={t(`presentationWorkspace.distribute.${direction}`, fallback)}
-              >
-                <Icon size={19} />
-              </button>
-            ))}
-          </div>
+        <RibbonGroup label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}>
+          <button
+            type="button"
+            className={RIBBON_COMMAND_BUTTON_CLASS}
+            aria-haspopup="menu"
+            title={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
+            onClick={(event) =>
+              showMenu(
+                [
+                  {
+                    id: 'bring-forward',
+                    label: t('presentationWorkspace.bringForward'),
+                    icon: <BringToFront size={17} />,
+                    disabled: !selectedElement,
+                    onAction: () =>
+                      selectedElement && reorderElement(selectedElement.id, 'bring-forward')
+                  },
+                  {
+                    id: 'send-backward',
+                    label: t('presentationWorkspace.sendBackward'),
+                    icon: <SendToBack size={17} />,
+                    disabled: !selectedElement,
+                    onAction: () =>
+                      selectedElement && reorderElement(selectedElement.id, 'send-backward')
+                  },
+                  'separator',
+                  ...(
+                    [
+                      ['left', AlignHorizontalJustifyStart],
+                      ['center', AlignHorizontalJustifyCenter],
+                      ['right', AlignHorizontalJustifyEnd],
+                      ['top', AlignVerticalJustifyStart],
+                      ['middle', AlignVerticalJustifyCenter],
+                      ['bottom', AlignVerticalJustifyEnd]
+                    ] as const
+                  ).map(([alignment, Icon]) => ({
+                    id: alignment,
+                    label: t(`presentationWorkspace.objectAlign.${alignment}`),
+                    icon: <Icon size={17} />,
+                    disabled: selectedElementIds.size < 2,
+                    onAction: () => applyElementAlignment(alignment)
+                  })),
+                  'separator',
+                  ...(
+                    [
+                      ['horizontal', AlignHorizontalSpaceAround],
+                      ['vertical', AlignVerticalSpaceAround]
+                    ] as const
+                  ).map(([direction, Icon]) => ({
+                    id: direction,
+                    label: t(`presentationWorkspace.distribute.${direction}`),
+                    icon: <Icon size={17} />,
+                    disabled: selectedElementIds.size < 3,
+                    onAction: () => applyElementDistribution(direction)
+                  }))
+                ],
+                event
+              )
+            }
+          >
+            <BringToFront size={18} />
+            {t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
+          </button>
         </RibbonGroup>
       </div>
     )
@@ -2214,7 +2214,7 @@ function EditableSessionDocumentView({
               data-slide-sidebar
               role="listbox"
               aria-multiselectable="true"
-              className="presentation-slide-rail relative min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
+              className="presentation-slide-rail relative min-h-0 overflow-y-auto border-r border-separator bg-surface/40 px-2 py-3"
               onContextMenu={showSlideSidebarMenu}
             >
               <div className="space-y-1" role="presentation">
@@ -2223,6 +2223,7 @@ function EditableSessionDocumentView({
                     selectedSlideIds.size === 0
                       ? index === activeSlideIndex
                       : selectedSlideIds.has(slideId)
+                  const outline = getSlideBackgroundOutline(document.slides[slideId].background)
                   return (
                     <React.Fragment key={slideId}>
                       <button
@@ -2246,8 +2247,8 @@ function EditableSessionDocumentView({
                         <span
                           className={`w-full rounded-full ${
                             insertionIndex === index
-                              ? 'h-[2px] animate-pulse bg-[#f59e0b]'
-                              : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
+                              ? 'h-[2px] presentation-insertion-line bg-[#f59e0b]'
+                              : 'h-px bg-transparent group-focus-visible:bg-[#f59e0b]/70'
                           }`}
                         />
                       </button>
@@ -2257,7 +2258,7 @@ function EditableSessionDocumentView({
                         data-slide-index={index}
                         role="option"
                         aria-selected={isSelected}
-                        className="flex w-full gap-2 rounded-md px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-500"
+                        className="flex w-full gap-2 rounded-md px-1 py-2 text-left text-muted transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-500"
                         onClick={(event) => selectSlide(index, event)}
                         onDragStart={(event) => {
                           const ids = selectedSlideIds.has(slideId)
@@ -2301,13 +2302,9 @@ function EditableSessionDocumentView({
                           {index + 1}
                         </span>
                         <span
-                          className={`relative flex aspect-video w-full min-w-0 overflow-hidden border bg-black shadow-sm ${
-                            isSelected
-                              ? 'border-primary ring-2 ring-primary/60'
-                              : index === activeSlideIndex
-                                ? 'border-primary ring-2 ring-primary/40'
-                                : 'border-transparent'
-                          }`}
+                          className={`relative flex aspect-video w-full min-w-0 overflow-hidden border bg-black shadow-sm ${`${outline === 'dark' ? 'border-neutral-500' : 'border-white'} ${
+                            isSelected ? 'ring-2 ring-[#f59e0b]' : ''
+                          } ${outline === 'mixed' ? 'outline outline-1 outline-neutral-600' : ''}`}`}
                         >
                           <EditableSlideThumbnail document={document} slideId={slideId} />
                           {index === projectedSlideIndex && (
@@ -2351,15 +2348,15 @@ function EditableSessionDocumentView({
                   <span
                     className={`w-full rounded-full ${
                       insertionIndex === document.slideOrder.length
-                        ? 'h-[2px] animate-pulse bg-[#f59e0b]'
-                        : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
+                        ? 'h-[2px] presentation-insertion-line bg-[#f59e0b]'
+                        : 'h-px bg-transparent group-focus-visible:bg-[#f59e0b]/70'
                     }`}
                   />
                 </button>
               </div>
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 w-1 cursor-col-resize bg-transparent hover:bg-primary/50 focus-visible:bg-primary"
+                className="absolute inset-y-0 right-0 w-1 cursor-col-resize bg-transparent hover:bg-accent/50 focus-visible:bg-accent"
                 onPointerDown={startRailResize}
                 aria-label={t('presentationWorkspace.resizeSlideRail', 'Resize slide rail')}
               />
@@ -2483,13 +2480,13 @@ function EditableSessionDocumentView({
                     />
                     {snapGuides.vertical !== undefined && (
                       <span
-                        className="pointer-events-none absolute inset-y-0 w-px bg-primary"
+                        className="pointer-events-none absolute inset-y-0 w-px bg-accent"
                         style={{ left: `${(snapGuides.vertical / document.width) * 100}%` }}
                       />
                     )}
                     {snapGuides.horizontal !== undefined && (
                       <span
-                        className="pointer-events-none absolute inset-x-0 h-px bg-primary"
+                        className="pointer-events-none absolute inset-x-0 h-px bg-accent"
                         style={{ top: `${(snapGuides.horizontal / document.height) * 100}%` }}
                       />
                     )}
@@ -2500,12 +2497,12 @@ function EditableSessionDocumentView({
                 <section
                   id="presentation-notes-region"
                   aria-label={t('presentationWorkspace.notes', 'Notes')}
-                  className="border-t border-divider bg-content1/95 px-4 py-2 text-xs text-default-500"
+                  className="border-t border-separator bg-surface/95 px-4 py-2 text-xs text-muted"
                 >
                   <label>
                     <span className="sr-only">{t('presentationWorkspace.notes', 'Notes')}</span>
                     <textarea
-                      className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
+                      className="h-20 w-full resize-none rounded-lg border border-separator bg-surface-secondary p-2 text-sm text-foreground outline-none focus:border-accent"
                       value={notesDraft}
                       onChange={(event) => {
                         if (!activeSlideId) return
@@ -2540,7 +2537,7 @@ function EditableSessionDocumentView({
               )}
               <div
                 data-testid="presentation-status-bar"
-                className="flex h-8 items-center gap-3 border-t border-divider bg-content1 px-3 text-xs text-default-500"
+                className="flex h-8 items-center gap-3 border-t border-separator bg-surface px-3 text-xs text-muted"
               >
                 <span>
                   {t('presentationWorkspace.slide', 'Slide')} {activeSlideIndex + 1} /{' '}
@@ -2594,7 +2591,7 @@ function EditableSessionDocumentView({
                   />
                   <button
                     type="button"
-                    className="w-11 rounded px-1 text-right tabular-nums hover:bg-content2"
+                    className="w-11 rounded px-1 text-right tabular-nums hover:bg-surface-secondary"
                     onClick={() => setCustomZoom(100)}
                     aria-label={t('presentationWorkspace.resetZoom', 'Reset zoom')}
                   >
@@ -2683,7 +2680,7 @@ function LineSpacingOptionsDialog({
           </AlertDialog.Header>
           <AlertDialog.Body>
             <div className="space-y-4">
-              <label className="block text-sm text-default-500">
+              <label className="block text-sm text-muted">
                 <span>{t('presentationWorkspace.lineSpacing', 'Line spacing')}</span>
                 <input
                   className={`mt-2 h-10 w-full ${NATIVE_CONTROL_CLASS}`}
@@ -2817,8 +2814,8 @@ function FormatBackgroundPanel({
   }
 
   return (
-    <aside className="flex min-h-0 flex-col border-l border-divider bg-content1/80">
-      <div className="flex items-center justify-between border-b border-divider px-4 py-3">
+    <aside className="flex min-h-0 flex-col border-l border-separator bg-surface/80">
+      <div className="flex items-center justify-between border-b border-separator px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">
           {t('presentationWorkspace.formatBackground', 'Format Background')}
         </h2>
@@ -2835,11 +2832,11 @@ function FormatBackgroundPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
-        <div role="radiogroup" className="space-y-2 text-sm text-default-500">
+        <div role="radiogroup" className="space-y-2 text-sm text-muted">
           {(['solid', 'gradient'] as const).map((type) => (
             <label
               key={type}
-              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-content2"
+              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-secondary"
             >
               <input
                 type="radio"
@@ -2855,7 +2852,7 @@ function FormatBackgroundPanel({
         </div>
 
         {fillType === 'solid' ? (
-          <div className="space-y-4 text-sm text-default-500">
+          <div className="space-y-4 text-sm text-muted">
             <label className="flex items-center justify-between gap-3">
               <span>{t('presentationWorkspace.fillColor', 'Color')}</span>
               <input
@@ -2879,7 +2876,7 @@ function FormatBackgroundPanel({
             />
           </div>
         ) : (
-          <div className="space-y-4 text-sm text-default-500">
+          <div className="space-y-4 text-sm text-muted">
             <label className="block">
               <span>{t('presentationWorkspace.gradientType', 'Type')}</span>
               <select className={`mt-2 h-9 w-full ${NATIVE_CONTROL_CLASS}`} value="linear" disabled>
@@ -2942,7 +2939,7 @@ function FormatBackgroundPanel({
                     key={`${stop.color}-${stop.position}-${index}`}
                     type="button"
                     className={`h-7 flex-1 rounded border ${
-                      selectedStopIndex === index ? 'border-primary' : 'border-divider'
+                      selectedStopIndex === index ? 'border-accent' : 'border-separator'
                     }`}
                     style={{ backgroundColor: stop.color }}
                     onClick={() => setSelectedStopIndex(index)}
@@ -2952,7 +2949,7 @@ function FormatBackgroundPanel({
               </div>
             </div>
             {selectedStop && (
-              <div className="space-y-4 rounded-xl border border-divider bg-content2/50 p-3">
+              <div className="space-y-4 rounded-xl border border-separator bg-surface-secondary/50 p-3">
                 <label className="flex items-center justify-between gap-3">
                   <span>{t('presentationWorkspace.fillColor', 'Color')}</span>
                   <input
@@ -2992,7 +2989,7 @@ function FormatBackgroundPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-t border-divider p-4">
+      <div className="grid grid-cols-2 gap-2 border-t border-separator p-4">
         <Button variant="primary" onPress={onApplyToAll}>
           {t('presentationWorkspace.applyToAll', 'Apply to All')}
         </Button>

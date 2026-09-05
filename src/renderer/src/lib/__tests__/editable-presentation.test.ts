@@ -24,6 +24,7 @@ import {
   duplicateElementInSlide,
   generateEditablePresentationThumbnail,
   getSlideBackgroundCss,
+  getSlideBackgroundOutline,
   insertBlankEditableSlide,
   loadEditablePresentation,
   loadEditablePresentationSnapshot,
@@ -1193,4 +1194,24 @@ describe('editable presentation documents', () => {
       })
     }
   })
+})
+
+it('chooses thumbnail outlines from the composited slide background', () => {
+  expect(getSlideBackgroundOutline({ type: 'solid', color: '#ffffff', transparency: 0 })).toBe(
+    'dark'
+  )
+  expect(getSlideBackgroundOutline({ type: 'solid', color: '#000000', transparency: 0 })).toBe(
+    'light'
+  )
+  expect(getSlideBackgroundOutline({ type: 'solid', color: '#000000', transparency: 100 })).toBe(
+    'dark'
+  )
+  expect(
+    getSlideBackgroundOutline({
+      type: 'gradient',
+      from: '#000000',
+      to: '#ffffff',
+      direction: 'left-right'
+    })
+  ).toBe('mixed')
 })

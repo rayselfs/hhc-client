@@ -70,7 +70,7 @@ export default function PresentationColorPalette({
     <div className="flex h-7 items-center">
       <button
         type="button"
-        className="relative inline-flex h-7 w-7 items-center justify-center rounded-l-md text-default-500 hover:bg-content2 disabled:opacity-30"
+        className="relative inline-flex h-7 w-7 items-center justify-center rounded-l-md text-muted hover:bg-surface-secondary disabled:opacity-30"
         disabled={disabled}
         aria-label={
           isFont
@@ -99,20 +99,20 @@ export default function PresentationColorPalette({
               ? t('presentationWorkspace.fontColorMenu', 'Font color menu')
               : t('presentationWorkspace.textHighlightMenu', 'Text highlight color menu')
           }
-          className="inline-flex h-7 w-4 items-center justify-center rounded-r-md text-default-500 hover:bg-content2 disabled:opacity-30"
+          className="inline-flex h-7 w-4 items-center justify-center rounded-r-md text-muted hover:bg-surface-secondary disabled:opacity-30"
           isDisabled={disabled}
         >
           <ChevronDown size={12} />
         </AriaButton>
         <Popover.Content
           data-presentation-text-tool
-          className="w-[396px] rounded-lg border border-divider bg-content1 p-0 shadow-xl"
+          className="w-[396px] rounded-lg border border-separator bg-surface p-0 shadow-xl"
         >
           <Popover.Dialog className="p-2">
             {!isFont && (
               <button
                 type="button"
-                className="mb-2 h-9 w-full border border-divider text-sm hover:bg-content2 focus-visible:outline-2 focus-visible:outline-primary"
+                className="mb-2 h-9 w-full border border-separator text-sm hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => chooseColor(null)}
               >
                 {t('presentationWorkspace.noColor', 'No Color')}
@@ -128,8 +128,8 @@ export default function PresentationColorPalette({
                 <button
                   key={`${color}-${index}`}
                   type="button"
-                  className={`rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-primary ${
-                    value?.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-primary' : ''
+                  className={`rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-accent ${
+                    value?.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-accent' : ''
                   }`}
                   aria-label={`${
                     isFont
@@ -157,7 +157,7 @@ export default function PresentationColorPalette({
                     <button
                       key={color}
                       type="button"
-                      className="rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-primary"
+                      className="rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-accent"
                       aria-label={`${t('presentationWorkspace.fontColor', 'Font color')} ${color}`}
                       onClick={() => chooseColor(color)}
                     >
@@ -169,7 +169,7 @@ export default function PresentationColorPalette({
                     </button>
                   ))}
                 </div>
-                <label className="mt-3 flex cursor-pointer items-center gap-2 border-t border-divider pt-3 text-sm">
+                <label className="mt-3 flex cursor-pointer items-center gap-2 border-t border-separator pt-3 text-sm">
                   <input
                     type="color"
                     className="size-7"
