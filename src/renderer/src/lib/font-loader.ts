@@ -16,3 +16,9 @@ export async function loadLanguageFont(language: string): Promise<void> {
     console.error(`Failed to load font for ${normalizedLanguage}:`, error)
   }
 }
+
+export async function loadPresentationFont(family: string): Promise<void> {
+  if (family === 'Noto Sans TC Variable') await loadLanguageFont('zh-TW')
+  if (family === 'Noto Sans SC Variable') await loadLanguageFont('zh-CN')
+  await document.fonts?.load(`16px ${JSON.stringify(family)}`)
+}

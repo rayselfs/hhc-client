@@ -106,7 +106,13 @@ import {
   type ElementDistribution
 } from '@renderer/lib/presentation-editor-commands'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
-import { mergeFontFamilies, queryLocalFontFamiliesOnce } from '@renderer/lib/local-fonts'
+import {
+  getDocumentFontFamilies,
+  mergeFontFamilies,
+  queryLocalFontFamiliesOnce,
+  supportsLocalFontAccess
+} from '@renderer/lib/local-fonts'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
@@ -645,7 +651,11 @@ function EditableSessionDocumentView({
   const [textSelection, setTextSelection] = useState<EditableTextSelection | null>(null)
   const [isTextInsertMode, setIsTextInsertMode] = useState(false)
   const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([])
-  const [, setIsLoadingLocalFonts] = useState(false)
+  const [localFontStatus, setLocalFontStatus] = useState<
+    'idle' | 'loading' | 'ready' | 'failed' | 'unsupported'
+  >('idle')
+  const recentFonts = useSettingsStore((state) => state.recentPresentationFonts)
+  const rememberFont = useSettingsStore((state) => state.rememberPresentationFont)
   const hasRequestedLocalFontsRef = useRef(false)
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
@@ -1324,14 +1334,10 @@ function EditableSessionDocumentView({
   }
 
   const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
+  const documentFonts = useMemo(() => getDocumentFontFamilies(document), [document])
   const fontFamilies = useMemo(
-    () =>
-      mergeFontFamilies(
-        FONT_FAMILIES,
-        selectedTextElement ? [selectedTextElement.fontFamily] : [],
-        localFontFamilies
-      ),
-    [localFontFamilies, selectedTextElement]
+    () => mergeFontFamilies(recentFonts, documentFonts, FONT_FAMILIES, localFontFamilies),
+    [recentFonts, documentFonts, localFontFamilies]
   )
 
   const updateSelectedTextElement = (
@@ -1471,19 +1477,23 @@ function EditableSessionDocumentView({
   }
 
   const loadLocalFonts = async (): Promise<void> => {
-    setIsLoadingLocalFonts(true)
+    if (!supportsLocalFontAccess()) {
+      setLocalFontStatus('unsupported')
+      return
+    }
+    setLocalFontStatus('loading')
     try {
       setLocalFontFamilies(await queryLocalFontFamiliesOnce())
+      setLocalFontStatus('ready')
     } catch {
       hasRequestedLocalFontsRef.current = false
+      setLocalFontStatus('failed')
       toast.warning(
         t(
           'presentationWorkspace.localFontsLoadFailed',
           'Unable to load local fonts. Check the font access permission.'
         )
       )
-    } finally {
-      setIsLoadingLocalFonts(false)
     }
   }
 
@@ -1642,6 +1652,10 @@ function EditableSessionDocumentView({
           disabled={textDisabled}
           onFinishFormatting={finishFormatting}
           fontFamilies={fontFamilies}
+          documentFonts={documentFonts}
+          recentFonts={recentFonts}
+          localFonts={localFontFamilies}
+          localFontStatus={localFontStatus}
           fontFamily={characterValue(
             'fontFamily',
             selectedTextElement?.fontFamily ?? activeTheme.defaultTextStyle.fontFamily
@@ -1682,7 +1696,10 @@ function EditableSessionDocumentView({
           }
           theme={activeTheme}
           onFontAccess={loadLocalFontsOnFirstGesture}
-          onFontFamilyChange={(fontFamily) => patchCharacterStyle({ fontFamily })}
+          onFontFamilyChange={(fontFamily) => {
+            patchCharacterStyle({ fontFamily })
+            rememberFont(fontFamily)
+          }}
           onFontSizeChange={(fontSize) => {
             if (!Number.isFinite(fontSize) || fontSize <= 0) return
             patchCharacterStyle({
@@ -2359,6 +2376,9 @@ function EditableSessionDocumentView({
                       }}
                       onTextEditFinalizerChange={setTextEditorFinalizer}
                       onTextSelectionChange={setTextSelection}
+                      onTextLayoutChange={(slideId, elementId, size) =>
+                        session.reflowText(slideId, elementId, size)
+                      }
                       onTextIndent={changeSelectedTextIndent}
                       onInsertText={addTextElement}
                       onElementContextMenu={showElementContextMenu}

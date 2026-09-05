@@ -724,7 +724,15 @@
     "distribute": {
       "horizontal": "水平等距分布对象",
       "vertical": "垂直等距分布对象"
-    }
+    },
+    "mixed": "混合",
+    "searchFonts": "搜索字体",
+    "fontsLoading": "正在加载本机字体…",
+    "fontsUnsupported": "此环境无法列出已安装的字体。",
+    "fontsRetry": "重新加载本机字体",
+    "fontsRecent": "最近使用",
+    "fontsDocument": "此演示文稿",
+    "fontMissing": "未安装 · 使用替代字体"
   },
   "projection": {
     "startButton": "开始投影",

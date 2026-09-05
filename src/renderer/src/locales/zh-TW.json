@@ -724,7 +724,15 @@
     "distribute": {
       "horizontal": "水平等距分散物件",
       "vertical": "垂直等距分散物件"
-    }
+    },
+    "mixed": "混合",
+    "searchFonts": "搜尋字型",
+    "fontsLoading": "正在載入本機字型…",
+    "fontsUnsupported": "此環境無法列出已安裝的字型。",
+    "fontsRetry": "重新載入本機字型",
+    "fontsRecent": "最近使用",
+    "fontsDocument": "此簡報",
+    "fontMissing": "未安裝 · 使用替代字型"
   },
   "projection": {
     "startButton": "開始投影",

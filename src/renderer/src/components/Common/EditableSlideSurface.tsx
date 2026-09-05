@@ -1,3 +1,4 @@
+import { loadPresentationFont } from '@renderer/lib/font-loader'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
@@ -46,6 +47,11 @@ interface EditableSlideSurfaceProps {
   onEditingElementChange?: (elementId: string | null) => void
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void
   onTextIndent?: (direction: -1 | 1) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
@@ -137,6 +143,7 @@ export default function EditableSlideSurface({
   onEditingElementChange,
   onTextEditFinalizerChange,
   onTextSelectionChange,
+  onTextLayoutChange,
   onTextIndent,
   onInsertText,
   onElementContextMenu,
@@ -555,6 +562,7 @@ export default function EditableSlideSurface({
               onFinishTextEdit={() => onEditingElementChange?.(null)}
               onTextEditFinalizerChange={setTextEditFinalizer}
               onTextSelectionChange={onTextSelectionChange}
+              onTextLayoutChange={onTextLayoutChange}
               onTextIndent={onTextIndent}
             />
           ))}
@@ -638,6 +646,7 @@ function SlideElement({
   onFinishTextEdit,
   onTextEditFinalizerChange,
   onTextSelectionChange,
+  onTextLayoutChange,
   onTextIndent
 }: {
   document: EditablePresentationDocument
@@ -660,6 +669,11 @@ function SlideElement({
   onFinishTextEdit: () => void
   onTextEditFinalizerChange: (finalize: TextEditFinalizer | null) => void
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void
   onTextIndent?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
@@ -703,6 +717,7 @@ function SlideElement({
         onFinishTextEdit,
         onTextEditFinalizerChange,
         onTextSelectionChange,
+        onTextLayoutChange,
         onTextIndent
       )}
     </div>
@@ -971,6 +986,11 @@ function renderElementContent(
   onFinishTextEdit?: () => void,
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void,
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void,
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void,
   onTextIndent?: (direction: -1 | 1) => void
 ): React.ReactNode {
   if (element.type === 'text') {
@@ -985,6 +1005,7 @@ function renderElementContent(
         onFinishTextEdit={onFinishTextEdit}
         onTextEditFinalizerChange={onTextEditFinalizerChange}
         onTextSelectionChange={onTextSelectionChange}
+        onTextLayoutChange={onTextLayoutChange}
         onTextIndent={onTextIndent}
       />
     )
@@ -1139,8 +1160,8 @@ function measureAutoSizedTextElement(
   text: string
 ): Partial<EditablePresentationElement> {
   if (!source || !window.document.body) return {}
-  const measure = source.cloneNode(false) as HTMLDivElement
-  measure.textContent = text || ' '
+  const measure = source.cloneNode(true) as HTMLDivElement
+  if (!measure.childNodes.length) measure.textContent = text || ' '
   Object.assign(measure.style, {
     position: 'absolute',
     left: '-10000px',
@@ -1206,6 +1227,7 @@ function TextElementContent({
   onFinishTextEdit,
   onTextEditFinalizerChange,
   onTextSelectionChange,
+  onTextLayoutChange,
   onTextIndent
 }: {
   element: Extract<EditablePresentationElement, { type: 'text' }>
@@ -1221,6 +1243,11 @@ function TextElementContent({
   onFinishTextEdit?: () => void
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void
   onTextIndent?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
@@ -1242,6 +1269,24 @@ function TextElementContent({
   const domParagraphsRef = useRef(paragraphs)
   const domModelRef = useRef<string | null>(null)
   const retainedSelectionRef = useRef<{ anchor: number; focus: number } | null>(null)
+
+  const fontKey = JSON.stringify([
+    ...new Set([
+      element.fontFamily,
+      ...paragraphs.flatMap((paragraph) => paragraph.runs.map((run) => run.fontFamily))
+    ])
+  ])
+  const [loadedFontKey, setLoadedFontKey] = useState('')
+  useEffect(() => {
+    let active = true
+    const families: string[] = JSON.parse(fontKey)
+    void Promise.allSettled(families.map(loadPresentationFont)).then(() => {
+      if (active) setLoadedFontKey(fontKey)
+    })
+    return () => {
+      active = false
+    }
+  }, [fontKey])
 
   const notifyTextEditLifecycle = useCallback((): void => {
     onTextEditFinalizerChange?.(registeredFinalizerRef.current)
@@ -1386,9 +1431,10 @@ function TextElementContent({
     const finalize: TextEditFinalizer = () => finalizeTextEditRef.current()
     finalize.getSelection = () => {
       const content = contentRef.current
-      const selection = content
-        ? (readTextSelection(content) ?? retainedSelectionRef.current)
-        : null
+      const selection =
+        content && window.document.activeElement === content
+          ? (readTextSelection(content) ?? retainedSelectionRef.current)
+          : retainedSelectionRef.current
       return selection
         ? {
             elementId: element.id,
@@ -1426,7 +1472,10 @@ function TextElementContent({
     if (!content || isComposingRef.current) return
     const model = JSON.stringify(paragraphs)
     if (domModelRef.current === model) return
-    const selection = readTextSelection(content) ?? retainedSelectionRef.current
+    const selection =
+      window.document.activeElement === content
+        ? (readTextSelection(content) ?? retainedSelectionRef.current)
+        : retainedSelectionRef.current
     // React owns the detached template; only this owner writes the browser-editable subtree.
     content.replaceChildren(...Array.from(template.childNodes, (node) => node.cloneNode(true)))
     domParagraphsRef.current = paragraphs
@@ -1438,6 +1487,18 @@ function TextElementContent({
         focused.focus({ preventScroll: true })
     }
   }, [editing, paragraphs, template])
+
+  useLayoutEffect(() => {
+    if (
+      !editable ||
+      !hasContentHeight(element) ||
+      loadedFontKey !== fontKey ||
+      isComposingRef.current
+    )
+      return
+    const updates = measureAutoSizedTextElement(contentRef.current, element, element.text)
+    if (Object.keys(updates).length) onTextLayoutChange?.(slideId, element.id, updates)
+  }, [editable, element, fontKey, loadedFontKey, onTextLayoutChange, slideId])
 
   useLayoutEffect(() => {
     if (!editing || element.locked) return
@@ -1468,7 +1529,13 @@ function TextElementContent({
     const reportSelection = (): void => {
       const content = contentRef.current
       const selection = window.getSelection()
-      if (!content || !selection || selection.rangeCount === 0) return
+      if (
+        !content ||
+        window.document.activeElement !== content ||
+        !selection ||
+        selection.rangeCount === 0
+      )
+        return
       const range = selection.getRangeAt(0)
       if (!content.contains(range.startContainer) || !content.contains(range.endContainer)) return
       retainedSelectionRef.current = readTextSelection(content)
@@ -1680,6 +1747,8 @@ function TextElementContent({
           }
         }}
         onBlur={(event) => {
+          retainedSelectionRef.current =
+            readTextSelection(event.currentTarget) ?? retainedSelectionRef.current
           cancelPendingTextCommit()
           pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
           scheduleBlurCommit()

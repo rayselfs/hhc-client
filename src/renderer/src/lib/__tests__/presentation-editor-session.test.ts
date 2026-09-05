@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createBlankEditablePresentationDocument } from '../editable-presentation'
+import {
+  addElementToSlide,
+  createTextElement,
+  updateElementInSlide,
+  createBlankEditablePresentationDocument
+} from '../editable-presentation'
 import {
   createPresentationEditorSession,
   type PresentationEditorSession
@@ -56,6 +61,31 @@ describe('presentation editor session', () => {
     sessions.push(session)
     return session
   }
+
+  it('reflows derived text geometry without adding an undo entry or clearing redo', () => {
+    const session = createSession()
+    const slideId = initialDocument.slideOrder[0]
+    const element = createTextElement({ text: 'Hello' })
+    session.commit(addElementToSlide(initialDocument, slideId, element))
+    session.commit(
+      updateElementInSlide(session.getSnapshot().renderedDocument, slideId, element.id, {
+        bold: true
+      })
+    )
+    const undoCount = session.getSnapshot().history.past.length
+    session.reflowText(slideId, element.id, { height: 90 })
+    expect(session.getSnapshot().history.past).toHaveLength(undoCount)
+    session.undo()
+    expect(
+      session.getSnapshot().renderedDocument.slides[slideId].elements[element.id]
+    ).toMatchObject({ bold: false })
+    session.reflowText(slideId, element.id, { height: 70 })
+    expect(session.getSnapshot().history.future).toHaveLength(1)
+    session.redo()
+    expect(
+      session.getSnapshot().renderedDocument.slides[slideId].elements[element.id]
+    ).toMatchObject({ bold: true, height: 90 })
+  })
 
   it('continues scheduling after the persisted revision', () => {
     const session = createSession({ initialRevision: 4 })

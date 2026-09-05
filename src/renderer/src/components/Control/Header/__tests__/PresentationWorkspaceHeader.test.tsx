@@ -161,6 +161,7 @@ function createFakeSession(item: FileItemRecord): PresentationEditorSession {
     getSnapshot: () => snapshot,
     subscribe: () => () => undefined,
     commit: vi.fn(),
+    reflowText: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     beginDraft: vi.fn(),

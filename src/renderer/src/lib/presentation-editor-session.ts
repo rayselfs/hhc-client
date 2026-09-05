@@ -1,3 +1,4 @@
+import { updateElementInSlide } from './editable-presentation'
 import type { EditablePresentationDocument } from './editable-presentation'
 import {
   commitPresentationDocument,
@@ -24,6 +25,7 @@ export interface PresentationEditorSession {
   getSnapshot(): PresentationSessionSnapshot
   subscribe(listener: () => void): () => void
   commit(next: EditablePresentationDocument): void
+  reflowText(slideId: string, elementId: string, size: { width?: number; height?: number }): void
   undo(): void
   redo(): void
   beginDraft(kind: PresentationDraftKind): void
@@ -211,6 +213,29 @@ export function createPresentationEditorSession(options: {
       return () => listeners.delete(listener)
     },
     commit,
+    reflowText: (slideId, elementId, size) => {
+      const current = draft?.preview ?? history.present
+      const element = current.slides[slideId]?.elements[elementId]
+      if (element?.type !== 'text') return
+      const dimensions = Object.fromEntries(
+        Object.entries(size).filter(
+          ([key, value]) =>
+            (key === 'width' || key === 'height') &&
+            Number.isFinite(value) &&
+            value > 0 &&
+            element[key] !== value
+        )
+      )
+      if (!Object.keys(dimensions).length) return
+      const next = updateElementInSlide(current, slideId, elementId, dimensions)
+      if (draft) {
+        draft = { ...draft, preview: next }
+        emit()
+      } else {
+        history = { ...history, present: next }
+        schedule(next)
+      }
+    },
     undo: () => moveHistory(undoPresentationDocument),
     redo: () => moveHistory(redoPresentationDocument),
     beginDraft: (kind) => {

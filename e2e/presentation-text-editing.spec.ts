@@ -191,3 +191,34 @@ test('undo and redo keep formatting separate from typing', async ({ page }) => {
   await textBox.press('ControlOrMeta+A')
   await expect(bold).toHaveAttribute('aria-pressed', 'true')
 })
+
+test('font search and a custom 13 point size preserve the selected text', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'queryLocalFonts', {
+      value: async () => [{ family: 'Arial' }, { family: 'Microsoft Sans Serif' }],
+      configurable: true
+    })
+  })
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('abcde plain', { delay: 40 })
+  await textBox.press('Home')
+  for (let index = 0; index < 5; index++) await textBox.press('Shift+ArrowRight')
+  const font = page.getByRole('button', { name: 'Font family', exact: true })
+  await font.click()
+  const search = page.getByRole('textbox', { name: 'Search fonts', exact: true })
+  await search.fill('Arial')
+  await page.getByRole('option', { name: /Arial/ }).click()
+  await expect(textBox).toBeFocused()
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('abcde')
+  await expect(textBox.locator('[data-text-run]').first()).toHaveCSS('font-family', 'Arial')
+  const size = page.getByRole('textbox', { name: 'Font size', exact: true })
+  await size.fill('13')
+  await size.press('Enter')
+  await expect(textBox).toBeFocused()
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('abcde')
+  await expect(size).toHaveValue('13')
+  await font.click()
+  await search.fill('Microsoft')
+  await expect(page.getByRole('option', { name: /Microsoft Sans Serif/ })).toBeVisible()
+  await search.press('Escape')
+})

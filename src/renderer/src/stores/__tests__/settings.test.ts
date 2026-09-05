@@ -99,7 +99,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(12)
+    expect(parsed.version).toBe(13)
 
     vi.unstubAllGlobals()
   })
@@ -136,7 +136,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(12)
+    expect(parsed.version).toBe(13)
 
     vi.unstubAllGlobals()
   })
@@ -243,7 +243,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(12)
+    expect(parsed.version).toBe(13)
 
     vi.unstubAllGlobals()
   })
@@ -352,7 +352,7 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(12)
+    expect(parsed.version).toBe(13)
 
     vi.unstubAllGlobals()
   })
@@ -412,7 +412,7 @@ describe('speech settings', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.speech.azure.region).toBe('japaneast')
-    expect(parsed.version).toBe(12)
+    expect(parsed.version).toBe(13)
 
     vi.unstubAllGlobals()
   })
@@ -557,5 +557,20 @@ describe('AZURE_REGION_OPTIONS', () => {
     const values = AZURE_REGION_OPTIONS.map((r) => r.value)
     const uniqueValues = new Set(values)
     expect(uniqueValues.size).toBe(values.length)
+  })
+})
+
+describe('recent presentation fonts', () => {
+  it('normalizes and bounds the persisted recent font list', () => {
+    expect(
+      normalizeSettingsState({ recentPresentationFonts: ['Arial', null, ' Arial ', ''] })
+        .recentPresentationFonts
+    ).toEqual(['Arial'])
+    useSettingsStore.setState({ recentPresentationFonts: [] })
+    for (let i = 0; i < 10; i++) useSettingsStore.getState().rememberPresentationFont(`Font ${i}`)
+    useSettingsStore.getState().rememberPresentationFont('Font 5')
+    expect(useSettingsStore.getState().recentPresentationFonts).toHaveLength(8)
+    expect(useSettingsStore.getState().recentPresentationFonts[0]).toBe('Font 5')
+    expect(normalizeSettingsState({}).recentPresentationFonts).toEqual([])
   })
 })

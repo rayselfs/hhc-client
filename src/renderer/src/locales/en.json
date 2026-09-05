@@ -724,7 +724,15 @@
     "distribute": {
       "horizontal": "Distribute objects horizontally",
       "vertical": "Distribute objects vertically"
-    }
+    },
+    "mixed": "Mixed",
+    "searchFonts": "Search fonts",
+    "fontsLoading": "Loading local fonts…",
+    "fontsUnsupported": "This environment cannot list installed fonts.",
+    "fontsRetry": "Retry local fonts",
+    "fontsRecent": "Recent",
+    "fontsDocument": "Document",
+    "fontMissing": "Unavailable · using fallback"
   },
   "projection": {
     "startButton": "Start projection",

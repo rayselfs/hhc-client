@@ -1,3 +1,4 @@
+import type { EditablePresentationDocument } from './editable-presentation'
 interface LocalFontData {
   family: string
 }
@@ -41,4 +42,23 @@ export function mergeFontFamilies(...groups: Array<readonly string[]>): string[]
         .filter(Boolean)
     )
   ]
+}
+
+export function getDocumentFontFamilies(document: EditablePresentationDocument): string[] {
+  return mergeFontFamilies(
+    ...Object.values(document.slides).flatMap((slide) =>
+      Object.values(slide.elements).flatMap((element) =>
+        element.type !== 'text'
+          ? []
+          : [
+              [element.fontFamily],
+              element.runs?.map((run) => run.fontFamily) ?? [],
+              element.paragraphs?.flatMap((paragraph) => [
+                ...(paragraph.typingStyle ? [paragraph.typingStyle.fontFamily] : []),
+                ...paragraph.runs.map((run) => run.fontFamily)
+              ]) ?? []
+            ]
+      )
+    )
+  )
 }

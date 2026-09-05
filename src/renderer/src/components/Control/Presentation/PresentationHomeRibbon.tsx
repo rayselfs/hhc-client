@@ -1,5 +1,6 @@
 import { Button as AriaButton } from 'react-aria-components'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ListBox } from '@heroui/react/list-box'
 import {
   AlignCenter,
   AlignJustify,
@@ -40,6 +41,10 @@ interface PresentationHomeRibbonProps {
   disabled: boolean
   onFinishFormatting?: () => void
   fontFamilies: string[]
+  documentFonts?: string[]
+  recentFonts?: string[]
+  localFonts?: string[]
+  localFontStatus?: 'idle' | 'loading' | 'ready' | 'failed' | 'unsupported'
   fontFamily: string
   fontSize: number | 'mixed'
   bold: ToggleState
@@ -105,43 +110,13 @@ export default function PresentationHomeRibbon(
       className="grid h-full w-[720px] shrink-0 grid-rows-2 gap-1 border-r border-divider px-2 py-1"
     >
       <div className="flex items-center gap-1">
-        <select
-          aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
-          className="h-7 min-w-44 rounded-md border border-divider bg-content2 px-2 text-sm"
-          disabled={props.disabled}
-          value={props.fontFamily}
-          onPointerDown={props.onFontAccess}
-          onFocus={props.onFontAccess}
-          onChange={(event) => props.onFontFamilyChange(event.currentTarget.value)}
-        >
-          {props.fontFamily === 'mixed' && (
-            <option value="mixed">{t('presentationWorkspace.mixed', 'Mixed')}</option>
-          )}
-          {props.fontFamilies.map((font) => (
-            <option key={font} value={font}>
-              {font}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label={t('presentationWorkspace.fontSize', 'Font size')}
-          className="h-7 w-16 rounded-md border border-divider bg-content2 px-2 text-sm"
-          disabled={props.disabled}
+        <FontFamilyPicker {...props} />
+        <FontSizeInput
           value={props.fontSize}
-          onChange={(event) => props.onFontSizeChange(Number(event.currentTarget.value))}
-        >
-          {props.fontSize === 'mixed' && (
-            <option value="mixed">{t('presentationWorkspace.mixed', 'Mixed')}</option>
-          )}
-          {[
-            8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80,
-            88, 96
-          ].map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
+          disabled={props.disabled}
+          onChange={props.onFontSizeChange}
+          onFinish={props.onFinishFormatting}
+        />
         {iconButton(
           t('presentationWorkspace.increaseFontSize', 'Increase font size'),
           <span className="text-lg">A⌃</span>,
@@ -455,5 +430,173 @@ function SplitFormattingMenu({
         </Popover.Content>
       </Popover>
     </div>
+  )
+}
+
+function FontSizeInput({
+  value,
+  disabled,
+  onChange,
+  onFinish
+}: {
+  value: number | 'mixed'
+  disabled: boolean
+  onChange: (value: number) => void
+  onFinish?: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const label = value === 'mixed' ? '' : String(Math.round(value * 100) / 100)
+  const [draft, setDraft] = useState(label)
+  useEffect(() => setDraft(label), [label])
+  const apply = (): void => {
+    const size = Number(draft)
+    if (Number.isFinite(size) && size > 0 && size !== value) onChange(size)
+    else setDraft(label)
+  }
+  return (
+    <input
+      aria-label={t('presentationWorkspace.fontSize', 'Font size')}
+      className="h-7 w-16 rounded-md border border-divider bg-content2 px-2 text-sm"
+      inputMode="decimal"
+      disabled={disabled}
+      value={draft}
+      placeholder={t('presentationWorkspace.mixed', 'Mixed')}
+      onChange={(event) => setDraft(event.currentTarget.value)}
+      onBlur={apply}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          apply()
+          onFinish?.()
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setDraft(label)
+          onFinish?.()
+        }
+      }}
+    />
+  )
+}
+
+function FontFamilyPicker(props: PresentationHomeRibbonProps): React.JSX.Element {
+  const { t } = useTranslation()
+  const [isOpen, setIsOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const changeOpen = (open: boolean): void => {
+    setIsOpen(open)
+    if (open) {
+      setQuery('')
+      props.onFontAccess?.()
+    } else props.onFinishFormatting?.()
+  }
+  return (
+    <Popover isOpen={isOpen} onOpenChange={changeOpen}>
+      <AriaButton
+        aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
+        className="flex h-7 w-44 items-center justify-between gap-2 rounded-md border border-divider bg-content2 px-2 text-sm"
+        isDisabled={props.disabled}
+      >
+        <span className="truncate">
+          {props.fontFamily === 'mixed'
+            ? t('presentationWorkspace.mixed', 'Mixed')
+            : props.fontFamily}
+        </span>
+        <ChevronDown size={12} />
+      </AriaButton>
+      <Popover.Content
+        data-presentation-text-tool
+        className="w-80 rounded-lg border border-divider bg-content1 p-0 shadow-xl"
+      >
+        <Popover.Dialog className="p-2">
+          <input
+            aria-label={t('presentationWorkspace.searchFonts', 'Search fonts')}
+            placeholder={t('presentationWorkspace.searchFonts', 'Search fonts')}
+            className="mb-2 h-8 w-full rounded border border-divider bg-content2 px-2 text-sm"
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault()
+                event.currentTarget
+                  .closest('[role="dialog"]')
+                  ?.querySelector<HTMLElement>('[role="option"]')
+                  ?.focus()
+              }
+            }}
+          />
+          {props.localFontStatus === 'loading' && (
+            <p role="status" className="px-3 py-2 text-xs text-muted">
+              {t('presentationWorkspace.fontsLoading', 'Loading local fonts…')}
+            </p>
+          )}
+          {props.localFontStatus === 'unsupported' && (
+            <p className="px-3 py-2 text-xs text-muted">
+              {t(
+                'presentationWorkspace.fontsUnsupported',
+                'This environment cannot list installed fonts.'
+              )}
+            </p>
+          )}
+          {props.localFontStatus === 'failed' && (
+            <button
+              type="button"
+              className="px-3 py-2 text-sm underline"
+              onClick={props.onFontAccess}
+            >
+              {t('presentationWorkspace.fontsRetry', 'Retry local fonts')}
+            </button>
+          )}
+
+          <ListBox
+            aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
+            className="max-h-64 overflow-auto"
+            selectionMode="single"
+            selectedKeys={new Set(props.fontFamily === 'mixed' ? [] : [props.fontFamily])}
+            onSelectionChange={(keys) => {
+              if (keys === 'all') return
+              const font = keys.values().next().value
+              if (typeof font === 'string') {
+                props.onFontFamilyChange(font)
+                changeOpen(false)
+              }
+            }}
+          >
+            {props.fontFamilies
+              .filter((font) => font.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+              .map((font) => {
+                const bundled = [
+                  'Inter Variable',
+                  'Noto Sans TC Variable',
+                  'Noto Sans SC Variable'
+                ].includes(font)
+                const missing =
+                  props.localFontStatus === 'ready' && !bundled && !props.localFonts?.includes(font)
+                const category = props.recentFonts?.includes(font)
+                  ? t('presentationWorkspace.fontsRecent', 'Recent')
+                  : props.documentFonts?.includes(font)
+                    ? t('presentationWorkspace.fontsDocument', 'Document')
+                    : ''
+                return (
+                  <ListBox.Item
+                    key={font}
+                    id={font}
+                    textValue={font}
+                    className="flex items-center justify-between gap-4"
+                  >
+                    <span style={{ fontFamily: JSON.stringify(font) }}>{font}</span>
+                    <span className="text-xs text-muted">
+                      {missing
+                        ? t('presentationWorkspace.fontMissing', 'Unavailable · using fallback')
+                        : category}
+                    </span>
+                  </ListBox.Item>
+                )
+              })}
+          </ListBox>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
   )
 }

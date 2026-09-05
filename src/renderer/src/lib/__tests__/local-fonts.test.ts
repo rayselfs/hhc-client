@@ -1,7 +1,29 @@
+import {
+  addElementToSlide,
+  createTextElement,
+  createBlankEditablePresentationDocument
+} from '../editable-presentation'
 import { describe, expect, it, vi } from 'vitest'
-import { mergeFontFamilies, queryLocalFontFamilies, supportsLocalFontAccess } from '../local-fonts'
+import {
+  getDocumentFontFamilies,
+  mergeFontFamilies,
+  queryLocalFontFamilies,
+  supportsLocalFontAccess
+} from '../local-fonts'
 
 describe('local fonts', () => {
+  it('includes document run fonts even when they differ from the box default', () => {
+    const document = createBlankEditablePresentationDocument('Fonts')
+    const element = createTextElement({
+      text: 'Hello',
+      fontFamily: 'Arial',
+      runs: [{ ...createTextElement(), text: 'Hello', fontFamily: 'Unavailable Family' }]
+    })
+    expect(
+      getDocumentFontFamilies(addElementToSlide(document, document.slideOrder[0], element))
+    ).toEqual(['Arial', 'Unavailable Family'])
+  })
+
   it('reports unsupported environments without querying', async () => {
     expect(supportsLocalFontAccess({})).toBe(false)
     await expect(queryLocalFontFamilies({})).resolves.toEqual([])

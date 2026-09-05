@@ -85,6 +85,8 @@ vi.mock('@renderer/stores/settings', () => ({
   useSettingsStore: vi.fn((selector) => {
     const store = {
       timezone: 'Asia/Taipei',
+      recentPresentationFonts: [],
+      rememberPresentationFont: vi.fn(),
       hardwareAcceleration: true,
       reminderMode: 'subtract' as const,
       setReminderMode: vi.fn(),
@@ -353,6 +355,8 @@ describe('PreferencesDialog', () => {
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
       const store = {
         timezone: 'Asia/Taipei',
+        recentPresentationFonts: [],
+        rememberPresentationFont: vi.fn(),
         hardwareAcceleration: true,
         setTimezone,
         setHardwareAcceleration: vi.fn(),
@@ -462,6 +466,8 @@ describe('PreferencesDialog', () => {
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
       const store = {
         timezone: 'Asia/Taipei',
+        recentPresentationFonts: [],
+        rememberPresentationFont: vi.fn(),
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
@@ -523,6 +529,8 @@ describe('PreferencesDialog', () => {
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
       const store = {
         timezone: 'Asia/Taipei',
+        recentPresentationFonts: [],
+        rememberPresentationFont: vi.fn(),
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
@@ -581,6 +589,8 @@ describe('PreferencesDialog', () => {
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
       const store = {
         timezone: 'Asia/Taipei',
+        recentPresentationFonts: [],
+        rememberPresentationFont: vi.fn(),
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
@@ -637,6 +647,8 @@ describe('PreferencesDialog', () => {
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
       const store = {
         timezone: 'Asia/Taipei',
+        recentPresentationFonts: [],
+        rememberPresentationFont: vi.fn(),
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
@@ -693,6 +705,8 @@ describe('PreferencesDialog', () => {
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
       const store = {
         timezone: 'Asia/Taipei',
+        recentPresentationFonts: [],
+        rememberPresentationFont: vi.fn(),
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
