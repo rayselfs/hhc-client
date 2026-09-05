@@ -222,3 +222,41 @@ test('font search and a custom 13 point size preserve the selected text', async 
   await expect(page.getByRole('option', { name: /Microsoft Sans Serif/ })).toBeVisible()
   await search.press('Escape')
 })
+
+test('an abandoned new text box is removed without leaving undo history', async ({ page }) => {
+  await createTextBox(page)
+  await page.getByRole('button', { name: 'Font family', exact: true }).click()
+  await expect(page.locator('.presentation-stage [data-slide-element]')).toHaveCount(1)
+  await page.getByRole('textbox', { name: 'Search fonts', exact: true }).press('Escape')
+  await page
+    .locator('.presentation-stage [data-slide-surface]')
+    .click({ position: { x: 500, y: 250 } })
+  await expect(page.locator('.presentation-stage [data-slide-element]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled()
+})
+
+test('deleting previously entered text keeps the existing box', async ({ page }) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('Keep this box', { delay: 40 })
+  await textBox.press('ControlOrMeta+A')
+  await textBox.press('Backspace')
+  await page
+    .locator('.presentation-stage [data-slide-surface]')
+    .click({ position: { x: 500, y: 250 } })
+  await expect(page.locator('.presentation-stage [data-slide-element]')).toHaveCount(1)
+})
+
+test('content-height text has horizontal handles and an undoable rotation handle', async ({
+  page
+}) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('Rotate me', { delay: 40 })
+  await expect(page.getByRole('button', { name: 'Resize text box top', exact: true })).toHaveCount(
+    0
+  )
+  await page.getByRole('button', { name: 'Rotate object', exact: true }).press('Shift+ArrowRight')
+  const element = page.locator('.presentation-stage [data-slide-element]')
+  await expect(element).toHaveAttribute('style', /rotate\(15deg\)/)
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(element).toHaveAttribute('style', /rotate\(0deg\)/)
+})

@@ -640,6 +640,7 @@ function EditableSessionDocumentView({
     nextZoom: number
   } | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const newEmptyTextRef = useRef<string | null>(null)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(() => new Set())
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
   const [selectedSlideIds, setSelectedSlideIds] = useState<Set<string>>(() => new Set())
@@ -800,6 +801,7 @@ function EditableSessionDocumentView({
 
   const commitTextDraft = (): void => {
     clearTextCommitTimer()
+    if (newEmptyTextRef.current) return
     if (session.getSnapshot().draftKind === 'text') session.commitDraft()
   }
 
@@ -860,6 +862,13 @@ function EditableSessionDocumentView({
     updates: Partial<EditablePresentationElement>
   ): void => {
     const preview = session.getSnapshot().renderedDocument
+    if (
+      newEmptyTextRef.current === elementId &&
+      'text' in updates &&
+      updates.text?.replace(/[\u200b\ufeff]/g, '').trim()
+    ) {
+      newEmptyTextRef.current = null
+    }
     const current = preview.slides[slideId]?.elements[elementId]
     if (
       current &&
@@ -872,6 +881,7 @@ function EditableSessionDocumentView({
     if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
     session.previewDraft(updateElementInSlide(preview, slideId, elementId, updates))
     clearTextCommitTimer()
+    if (newEmptyTextRef.current === elementId) return
     textCommitTimerRef.current = window.setTimeout(() => {
       textCommitTimerRef.current = null
       if (session.getSnapshot().draftKind === 'text') session.commitDraft()
@@ -1004,8 +1014,11 @@ function EditableSessionDocumentView({
       fontSize,
       text: ''
     })
-    session.commit(addElementToSlide(currentDocument, activeSlideId, element))
+    newEmptyTextRef.current = element.id
+    session.beginDraft('text')
+    session.previewDraft(addElementToSlide(currentDocument, activeSlideId, element))
     setSelectedElementId(element.id)
+    setSelectedElementIds(new Set([element.id]))
     setEditingElementId(element.id)
     setIsTextInsertMode(false)
   }
@@ -1393,7 +1406,9 @@ function EditableSessionDocumentView({
         )
       }
     }
-    session.commit(updateElementInSlide(current, activeSlideId, element.id, updates))
+    const next = updateElementInSlide(current, activeSlideId, element.id, updates)
+    if (newEmptyTextRef.current === element.id) session.previewDraft(next)
+    else session.commit(next)
   }
 
   const finishFormatting = (): void => {
@@ -2366,6 +2381,13 @@ function EditableSessionDocumentView({
                       }}
                       onEditingElementChange={(elementId) => {
                         if (elementId === null) {
+                          if (newEmptyTextRef.current) {
+                            newEmptyTextRef.current = null
+                            clearTextCommitTimer()
+                            session.cancelDraft()
+                            setSelectedElementId(null)
+                            setSelectedElementIds(new Set())
+                          }
                           commitTextDraft()
                           setTextSelection(null)
                         }

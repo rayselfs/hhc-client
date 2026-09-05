@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { loadPresentationFont } from '@renderer/lib/font-loader'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -86,8 +87,9 @@ export type TextEditFinalizer = (() => boolean) & {
 
 interface DragState {
   elementId: string
-  mode: 'move' | 'resize' | 'crop'
+  mode: 'move' | 'resize' | 'crop' | 'rotate'
   handle?: ResizeHandle
+  rotationOrigin?: { x: number; y: number; angle: number }
   startX: number
   startY: number
   original: EditablePresentationElement
@@ -229,7 +231,17 @@ export default function EditableSlideSurface({
       startX: event.clientX,
       startY: event.clientY,
       original,
-      hasPersistedChanges: false
+      hasPersistedChanges: false,
+      rotationOrigin: rect
+        ? {
+            x: rect.left + (original.x + original.width / 2) / scaleRef.current.x,
+            y: rect.top + (original.y + original.height / 2) / scaleRef.current.y,
+            angle: Math.atan2(
+              event.clientY - rect.top - (original.y + original.height / 2) / scaleRef.current.y,
+              event.clientX - rect.left - (original.x + original.width / 2) / scaleRef.current.x
+            )
+          }
+        : undefined
     }
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
@@ -241,7 +253,15 @@ export default function EditableSlideSurface({
     const dx = (event.clientX - drag.startX) * scaleRef.current.x
     const dy = (event.clientY - drag.startY) * scaleRef.current.y
     let updates: Partial<EditablePresentationElement>
-    if (drag.mode === 'move') {
+    if (drag.mode === 'rotate' && drag.rotationOrigin) {
+      const origin = drag.rotationOrigin
+      const angle = Math.atan2(event.clientY - origin.y, event.clientX - origin.x)
+      const degrees = drag.original.rotation + ((angle - origin.angle) * 180) / Math.PI
+      const rotation = event.shiftKey
+        ? Math.round(degrees / 15) * 15
+        : Math.round(degrees * 100) / 100
+      updates = { rotation: ((rotation % 360) + 360) % 360 }
+    } else if (drag.mode === 'move') {
       updates = {
         x: Math.max(0, drag.original.x + dx),
         y: Math.max(0, drag.original.y + dy)
@@ -254,8 +274,7 @@ export default function EditableSlideSurface({
       updates = {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false,
-        autoSize:
-          hasContentHeight(drag.original) && !['n', 's'].includes(drag.handle) ? 'content' : 'fixed'
+        autoSize: hasContentHeight(drag.original) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'image' && drag.handle) {
       updates = calculateImageResize(
@@ -291,7 +310,7 @@ export default function EditableSlideSurface({
     const delta = getKeyboardResizeDelta(
       event,
       handle,
-      element.type === 'text' && hasContentHeight(element) && handle !== 'n' && handle !== 's'
+      element.type === 'text' && hasContentHeight(element)
     )
     if (!delta || !finalizeTextEdit()) return
     const original = onTransformStart ? onTransformStart(element.id) : element
@@ -304,9 +323,16 @@ export default function EditableSlideSurface({
       } as Partial<EditablePresentationElement>
     } else if (original.type === 'text') {
       updates = {
-        ...calculateTextResize(original, handle, delta.dx, delta.dy),
+        ...calculateTextResize(
+          original,
+          handle,
+          delta.dx * Math.cos((original.rotation * Math.PI) / 180) -
+            delta.dy * Math.sin((original.rotation * Math.PI) / 180),
+          delta.dx * Math.sin((original.rotation * Math.PI) / 180) +
+            delta.dy * Math.cos((original.rotation * Math.PI) / 180)
+        ),
         autoWidth: false,
-        autoSize: hasContentHeight(original) && !['n', 's'].includes(handle) ? 'content' : 'fixed'
+        autoSize: hasContentHeight(original) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (original.type === 'image') {
       updates = calculateImageResize(
@@ -601,6 +627,20 @@ export default function EditableSlideSurface({
               cropMode={element.id === cropElementId}
               surfaceScale={surfaceScale}
               showHandles={editable && element.id === selectedElementId && !element.locked}
+              onRotatePointerDown={(event) => startDrag(event, element, 'rotate')}
+              onRotateKeyDown={(event) => {
+                if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || !finalizeTextEdit()) return
+                event.preventDefault()
+                event.stopPropagation()
+                const original = onTransformStart ? onTransformStart(element.id) : element
+                if (!original) return
+                const delta = (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 15 : 1)
+                const updates = { rotation: (original.rotation + delta + 360) % 360 }
+                if (onTransformPreview) {
+                  onTransformPreview(element.id, updates)
+                  onTransformCommit?.()
+                } else onUpdateElement?.(slideId, element.id, updates)
+              }}
               onMovePointerDown={(event) => startDrag(event, element, 'move')}
               onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
               onCropPointerDown={(event, handle) => startDrag(event, element, 'crop', handle)}
@@ -729,6 +769,8 @@ function SelectionChrome({
   cropMode,
   surfaceScale,
   showHandles,
+  onRotatePointerDown,
+  onRotateKeyDown,
   onMovePointerDown,
   onResizePointerDown,
   onCropPointerDown,
@@ -742,6 +784,8 @@ function SelectionChrome({
   cropMode: boolean
   surfaceScale: number
   showHandles: boolean
+  onRotatePointerDown: (event: React.PointerEvent) => void
+  onRotateKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void
   onMovePointerDown: (event: React.PointerEvent) => void
   onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
@@ -751,6 +795,7 @@ function SelectionChrome({
   onPointerUp: (event: React.PointerEvent) => void
   onPointerCancel: (event: React.PointerEvent) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div
       data-selection-chrome
@@ -761,9 +806,9 @@ function SelectionChrome({
         width: element.width,
         height: element.height,
         transform: `rotate(${element.rotation}deg)`,
-        outlineWidth: 1.5 / surfaceScale,
+        outlineWidth: 1 / surfaceScale,
         outlineOffset: `${2 / surfaceScale}px`,
-        outlineColor: 'var(--accent)'
+        outlineColor: '#737373'
       }}
       onPointerDownCapture={(event) => {
         const handle = getNearestResizeHandle(event)
@@ -775,6 +820,39 @@ function SelectionChrome({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     >
+      {showHandles && !cropMode && (
+        <>
+          <span
+            aria-hidden="true"
+            className="absolute bg-neutral-500"
+            style={{
+              left: '50%',
+              top: -24 / surfaceScale,
+              width: 1 / surfaceScale,
+              height: 24 / surfaceScale
+            }}
+          />
+          <button
+            type="button"
+            data-rotation-handle
+            aria-label={t('presentationWorkspace.rotateObject', 'Rotate object')}
+            className="pointer-events-auto absolute flex cursor-grab items-center justify-center rounded-full border border-neutral-500 bg-white text-neutral-600 shadow-sm"
+            style={{
+              left: '50%',
+              top: -34 / surfaceScale,
+              width: 20 / surfaceScale,
+              height: 20 / surfaceScale,
+              fontSize: 17 / surfaceScale,
+              transform: 'translateX(-50%)',
+              touchAction: 'none'
+            }}
+            onPointerDown={onRotatePointerDown}
+            onKeyDown={onRotateKeyDown}
+          >
+            ↻
+          </button>
+        </>
+      )}
       {showHandles && (
         <ElementHandles
           element={element}
@@ -805,15 +883,12 @@ function ElementHandles({
   onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
 }): React.JSX.Element {
   if (element.type === 'text') {
-    const handles =
-      hasContentHeight(element) && element.width * surfaceScale < RESIZE_HIT_TARGET_SIZE * 3
-        ? CONTENT_TEXT_HANDLES
-        : FIXED_TEXT_HANDLES
+    const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
     const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
     const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
     const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
     const handleSize = TEXT_HANDLE_SIZE / surfaceScale
-    const borderWidth = 1.5 / surfaceScale
+    const borderWidth = 1 / surfaceScale
     return (
       <>
         {(['top', 'right', 'bottom', 'left'] as const).map((edge) => (
@@ -847,7 +922,7 @@ function ElementHandles({
             key={`resize-text-${handle}`}
             type="button"
             data-resize-handle={handle}
-            className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-[2px]`}
+            className={`${hasContentHeight(element) ? 'cursor-ew-resize' : getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center`}
             aria-label={`Resize text box ${handleToLabel(handle)}`}
             style={{
               ...getTextHandlePositionStyle(handle, hitTargetSize),
@@ -870,7 +945,7 @@ function ElementHandles({
             >
               <span
                 data-resize-handle-visual
-                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border-neutral-500 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
                 style={{ width: handleSize, height: handleSize, borderWidth }}
               />
             </span>
@@ -1097,33 +1172,39 @@ function calculateTextResize(
   dx: number,
   dy: number
 ): Partial<EditablePresentationElement> {
+  const radians = (element.rotation * Math.PI) / 180
+  const localX = dx * Math.cos(radians) + dy * Math.sin(radians)
+  const localY = -dx * Math.sin(radians) + dy * Math.cos(radians)
   const hasWest = handle.includes('w')
   const hasEast = handle.includes('e')
-  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
-  if (hasContentHeight(element)) {
-    if (handle === 'n' || handle === 's') {
-      const height = Math.max(TEXT_MIN_HEIGHT, element.height + (handle === 's' ? dy : -dy))
-      return {
-        y: handle === 'n' ? element.y + (element.height - height) : element.y,
-        height
-      } as Partial<EditablePresentationElement>
-    }
-    return {
-      x: hasWest ? element.x + (element.width - width) : element.x,
-      width
-    } as Partial<EditablePresentationElement>
-  }
-
   const hasNorth = handle.includes('n')
   const hasSouth = handle.includes('s')
-  const height = Math.max(TEXT_MIN_HEIGHT, element.height + (hasSouth ? dy : hasNorth ? -dy : 0))
-
+  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? localX : hasWest ? -localX : 0))
+  const height = hasContentHeight(element)
+    ? element.height
+    : Math.max(TEXT_MIN_HEIGHT, element.height + (hasSouth ? localY : hasNorth ? -localY : 0))
+  const centerX = ((width - element.width) / 2) * (hasWest ? -1 : 1)
+  const centerY = ((height - element.height) / 2) * (hasNorth ? -1 : 1)
   return {
-    x: hasWest ? element.x + (element.width - width) : element.x,
-    y: hasNorth ? element.y + (element.height - height) : element.y,
+    x:
+      element.x +
+      element.width / 2 +
+      centerX * Math.cos(radians) -
+      centerY * Math.sin(radians) -
+      width / 2,
+    ...(hasContentHeight(element) && element.rotation === 0
+      ? {}
+      : {
+          y:
+            element.y +
+            element.height / 2 +
+            centerX * Math.sin(radians) +
+            centerY * Math.cos(radians) -
+            height / 2
+        }),
     width,
-    height
-  } as Partial<EditablePresentationElement>
+    ...(hasContentHeight(element) ? {} : { height })
+  }
 }
 
 function hasElementPatchChanges(

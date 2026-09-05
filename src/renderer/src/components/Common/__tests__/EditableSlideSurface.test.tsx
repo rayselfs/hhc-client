@@ -1389,7 +1389,7 @@ describe('EditableSlideSurface', () => {
 
     expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     const topLeft = screen.getByLabelText('Resize text box top left')
-    expect(topLeft).toHaveClass('rounded-[2px]')
+    expect(topLeft).toHaveClass('cursor-ew-resize')
     expect(withinResizeHandleVisual(topLeft)).toHaveClass('bg-white')
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
@@ -1397,7 +1397,7 @@ describe('EditableSlideSurface', () => {
     expect(screen.queryByLabelText('Resize element')).not.toBeInTheDocument()
   })
 
-  it('restores top and bottom handles when the same content-height box becomes wide enough', () => {
+  it('keeps content-height boxes horizontal-only at every width', () => {
     mockSurfaceScale(1)
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -1423,11 +1423,11 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    expect(screen.getByLabelText('Resize text box top')).toBeInTheDocument()
-    expect(screen.getByLabelText('Resize text box bottom')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Resize text box bottom')).not.toBeInTheDocument()
   })
 
-  it('turns content-height text into a fixed frame when resizing the top handle', () => {
+  it('preserves manual height resizing for imported fixed frames', () => {
     mockSurfaceScale(1)
     const onTransformPreview = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -1438,7 +1438,7 @@ describe('EditableSlideSurface', () => {
       y: 80,
       width: 220,
       height: 40,
-      autoSize: 'content',
+      autoSize: 'fixed',
       autoWidth: false
     })
 
@@ -1498,9 +1498,9 @@ describe('EditableSlideSurface', () => {
       expect(indicator).toHaveClass('pointer-events-auto')
       expect(Number.parseFloat(visual.style.width) * scale).toBe(10)
       expect(Number.parseFloat(visual.style.height) * scale).toBe(10)
-      expect(Number.parseFloat(visual.style.borderWidth) * scale).toBe(1.5)
+      expect(Number.parseFloat(visual.style.borderWidth) * scale).toBe(1)
       expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
-      expect(Number.parseFloat(chrome.style.outlineWidth) * scale).toBe(1.5)
+      expect(Number.parseFloat(chrome.style.outlineWidth) * scale).toBe(1)
     }
   )
 
@@ -2164,7 +2164,7 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
+    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     const rightHandle = screen.getByLabelText('Resize text box right')
     mockElementRect(rightHandle, { left: 0, top: 0, width: 25, height: 25 })
     fireEvent.pointerDown(rightHandle, { clientX: 12.5, clientY: 12.5, pointerId: 1 })
