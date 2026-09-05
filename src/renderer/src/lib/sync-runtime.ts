@@ -11,7 +11,7 @@ import {
   type HhcLineCloudAuth
 } from './cloud-provider'
 import { listProviderConnectionsByType, type ProviderConnectionRecord } from './sync-db'
-import type { MeetingWindowsApi } from './meeting-windows-api'
+import type { MeetingWindowsApi, MediaSyncWindow } from './meeting-windows-api'
 
 const LOCAL_SYNC_POLL_MS = 3_000
 const ONEDRIVE_IDLE_REFRESH_MS = 60_000
@@ -293,6 +293,42 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
   let hhcRunning = false
   let hhcPending = false
   const meetingWindows = options.meetingWindows
+  let knownWindows: MediaSyncWindow[] = []
+  let meetingLookupRunning = false
+  let meetingInterval: number | undefined
+  let hhcDueAt = Number.POSITIVE_INFINITY
+
+  const meetingDelay = (normalDelay: number): number => {
+    const now = Date.now()
+    if (
+      knownWindows.some(
+        (value) => Date.parse(value.startsAt) <= now && now < Date.parse(value.endsAt)
+      )
+    ) {
+      return Math.min(normalDelay, HHC_MEETING_REFRESH_MS)
+    }
+    const nextStart = Math.min(
+      ...knownWindows.map((value) => Date.parse(value.startsAt)).filter((start) => start > now)
+    )
+    return Math.min(normalDelay, nextStart - now)
+  }
+
+  const discoverMeetings = async (): Promise<void> => {
+    if (!meetingWindows || stopped || meetingLookupRunning) return
+    meetingLookupRunning = true
+    try {
+      const windows = await meetingWindows.list()
+      if (!stopped) knownWindows = windows
+    } catch {
+      if (!stopped) knownWindows = []
+    } finally {
+      meetingLookupRunning = false
+    }
+    if (!stopped && !hhcRunning) {
+      const delay = meetingDelay(HHC_IDLE_REFRESH_MS)
+      if (Date.now() + delay < hhcDueAt) scheduleHhc(delay)
+    }
+  }
 
   const scheduleOneDrive = (delay: number): void => {
     if (stopped) return
@@ -322,7 +358,10 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
 
   const scheduleHhc = (delay: number): void => {
     if (stopped) return
+    if (hhcTimeout !== undefined) window.clearTimeout(hhcTimeout)
+    hhcDueAt = Date.now() + delay
     hhcTimeout = window.setTimeout(() => {
+      hhcDueAt = Number.POSITIVE_INFINITY
       hhcTimeout = undefined
       void runHhc()
     }, delay)
@@ -330,28 +369,22 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
 
   const runHhc = async (): Promise<void> => {
     hhcRunning = true
-    const now = Date.now()
-    const [windows, result] = await Promise.all([
-      meetingWindows?.list(now).catch(() => []) ?? Promise.resolve([]),
-      refreshAllHhcFolders(options).catch(() => {
-        console.warn('[sync] Failed to enumerate HHC LINE roots')
-        return { summaries: [] as CloudRefreshSummary[], retrySoon: true }
-      })
-    ])
-    const activeMeeting = windows.some(
-      (value) => Date.parse(value.startsAt) <= now && now < Date.parse(value.endsAt)
-    )
+    void discoverMeetings()
+    const result = await refreshAllHhcFolders(options).catch(() => {
+      console.warn('[sync] Failed to enumerate HHC LINE roots')
+      return { summaries: [] as CloudRefreshSummary[], retrySoon: true }
+    })
     hhcRunning = false
     if (hhcPending) {
       hhcPending = false
       scheduleHhc(0)
     } else {
       scheduleHhc(
-        activeMeeting
-          ? HHC_MEETING_REFRESH_MS
-          : result.retrySoon
+        meetingDelay(
+          result.retrySoon
             ? HHC_ACTIVE_REFRESH_MS
             : Math.min(HHC_IDLE_REFRESH_MS, getNextCloudDelay(result.summaries))
+        )
       )
     }
   }
@@ -372,12 +405,18 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
     else scheduleHhc(0)
   })
 
+  if (meetingWindows) {
+    meetingInterval = window.setInterval(() => {
+      void discoverMeetings()
+    }, HHC_ACTIVE_REFRESH_MS)
+  }
   void runOneDrive()
   void runHhc()
 
   return () => {
     stopped = true
     unsubscribeOfflinePolicy()
+    if (meetingInterval !== undefined) window.clearInterval(meetingInterval)
     if (localInterval !== undefined) window.clearInterval(localInterval)
     if (oneDriveTimeout !== undefined) window.clearTimeout(oneDriveTimeout)
     if (hhcTimeout !== undefined) window.clearTimeout(hhcTimeout)
