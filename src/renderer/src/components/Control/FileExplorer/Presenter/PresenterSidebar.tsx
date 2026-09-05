@@ -1,12 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react'
-import { toast } from '@heroui/react/toast'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
-import {
-  resolveMediaProjectionAction,
-  type MediaProjectionActionResult
-} from '@renderer/stores/media-projection'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import NextItemPreview from './Preview/NextItemPreview'
 
@@ -28,16 +23,17 @@ function debounce<Args extends unknown[]>(
 
 interface PresenterSidebarProps {
   previewCache: Record<string, string | null>
+  onNext: () => void
 }
 
 export default function PresenterSidebar({
-  previewCache
+  previewCache,
+  onNext
 }: PresenterSidebarProps): React.JSX.Element {
   const { t } = useTranslation()
   const nextItem = useMediaProjectionStore((s) => s.nextItem())
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
   const updateNotes = useMediaProjectionStore((s) => s.updateNotes)
-  const next = useMediaProjectionStore((s) => s.next)
 
   const [notes, setNotes] = useState(currentItem?.notes ?? '')
   const [notesFontSize, setNotesFontSize] = useState(() =>
@@ -72,15 +68,6 @@ export default function PresenterSidebar({
     }
   }
 
-  const goNext = async (): Promise<void> => {
-    if (
-      (await resolveMediaProjectionAction(next() as MediaProjectionActionResult)).status ===
-      'blocked'
-    ) {
-      toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
-    }
-  }
-
   return (
     <div className="flex flex-col h-full bg-surface">
       <div className="shrink-0">
@@ -90,7 +77,7 @@ export default function PresenterSidebar({
         <div className="px-4 pb-4">
           <div
             className="relative aspect-video bg-surface-secondary rounded-2xl overflow-hidden cursor-default"
-            onClick={() => void goNext()}
+            onClick={onNext}
           >
             {nextItem === null && (
               <span className="absolute inset-0 flex items-center justify-center text-foreground/50 text-base">

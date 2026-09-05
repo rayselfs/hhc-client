@@ -173,6 +173,7 @@ function findShortcutByConfig(config: { code: string; metaOrCtrl?: boolean }): S
 beforeEach(() => {
   vi.clearAllMocks()
   mockShortcuts.length = 0
+  storeState.isEnded = false
   storeState.showGrid = false
   storeState.zoomLevel = 1
   storeState.currentItem = () => storeState.currentFile
@@ -206,6 +207,15 @@ describe('MediaPresenter video keyboard behavior', () => {
 
     expect(mockNext).toHaveBeenCalledOnce()
     expect(mockPrev).toHaveBeenCalledOnce()
+  })
+
+  it('reports blocked shared navigation as a save failure', async () => {
+    mockNext.mockResolvedValueOnce({ status: 'blocked' })
+    render(<MediaPresenter onExit={mockExit} />)
+    findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(mockToastDanger).toHaveBeenCalledOnce()
   })
 
   it('does not show a save failure toast when keyboard navigation is superseded', async () => {
@@ -352,4 +362,12 @@ describe('MediaPresenter video keyboard behavior', () => {
     expect(mockExit).toHaveBeenCalledOnce()
     expect(mockEndSession).not.toHaveBeenCalled()
   })
+})
+
+it('exits the projection session when advancing from its end screen', () => {
+  storeState.isEnded = true
+  render(<MediaPresenter onExit={mockExit} />)
+  findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
+  expect(mockExit).toHaveBeenCalledOnce()
+  expect(mockNext).not.toHaveBeenCalled()
 })

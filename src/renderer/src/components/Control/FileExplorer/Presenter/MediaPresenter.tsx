@@ -87,6 +87,11 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
     [t]
   )
 
+  const advance = (): void => {
+    if (useMediaProjectionStore.getState().isEnded) onExit()
+    else void navigate(next)
+  }
+
   useEffect(() => {
     const timerStatus = useTimerRuntimeStore.getState().status
     if (timerStatus === 'running') {
@@ -121,10 +126,10 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
       {
         config: SHORTCUTS.MEDIA.NEXT_SLIDE,
         handler: () => {
-          void navigate(next)
+          advance()
         }
       },
-      { config: SHORTCUTS.MEDIA.NEXT_SLIDE_ALT, handler: () => void navigate(next) },
+      { config: SHORTCUTS.MEDIA.NEXT_SLIDE_ALT, handler: advance },
       {
         config: SHORTCUTS.MEDIA.PREV_SLIDE,
         handler: () => {
@@ -217,18 +222,19 @@ export default function MediaPresenter({ onExit }: MediaPresenterProps): React.J
               <MediaPreview
                 currentItem={currentItem}
                 descriptor={descriptor}
+                onNext={advance}
                 isEnded={isEnded}
                 onExit={onExit}
               />
               <MediaToolbar onToggleGrid={toggleGridWithMediaPause} />
               <div className="flex-1" />
-              <PresenterNavigation />
+              <PresenterNavigation onNext={advance} />
             </div>
 
             <GlassDivider vertical />
 
             <div className="flex-2 lg:flex-1 min-w-0 h-full">
-              <PresenterSidebar previewCache={coverThumbnails} />
+              <PresenterSidebar previewCache={coverThumbnails} onNext={advance} />
             </div>
           </div>
 

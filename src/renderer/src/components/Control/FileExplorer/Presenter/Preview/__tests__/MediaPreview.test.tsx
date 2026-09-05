@@ -1,21 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import MediaPreview from '../MediaPreview'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
-
-const toastMocks = vi.hoisted(() => ({ danger: vi.fn() }))
-
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void
-  return {
-    promise: new Promise<T>((done) => {
-      resolve = done
-    }),
-    resolve
-  }
-}
-
-vi.mock('@heroui/react/toast', () => ({ toast: toastMocks }))
+import type { MediaTypeDescriptor } from '@renderer/lib/presenter-registry'
 
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
@@ -23,56 +9,26 @@ vi.mock('react-i18next', () => ({
 }))
 
 describe('MediaPreview', () => {
-  const originalNext = useMediaProjectionStore.getState().next
-
-  afterEach(() => {
-    useMediaProjectionStore.setState({ next: originalNext } as never)
-    vi.clearAllMocks()
-  })
   it('delegates an end-screen click to the workspace close transaction', () => {
     const onExit = vi.fn()
-    render(<MediaPreview currentItem={null} descriptor={null} isEnded onExit={onExit} />)
-
+    render(
+      <MediaPreview onNext={vi.fn()} currentItem={null} descriptor={null} isEnded onExit={onExit} />
+    )
     fireEvent.click(screen.getByText('presenter.endOfSlides'))
-
     expect(onExit).toHaveBeenCalledOnce()
   })
 
-  it('shows the existing save failure toast only when click-to-advance is blocked', async () => {
-    useMediaProjectionStore.setState({ next: vi.fn(async () => ({ status: 'blocked' })) } as never)
+  it('routes preview clicks through the shared next action', () => {
+    const onNext = vi.fn()
     render(
       <MediaPreview
+        onNext={onNext}
         currentItem={null}
-        descriptor={{ clickToAdvance: true } as never}
+        descriptor={{ clickToAdvance: true } as MediaTypeDescriptor}
         onExit={vi.fn()}
       />
     )
-
     fireEvent.click(screen.getByText('presenter.noMediaSelected'))
-
-    await waitFor(() => expect(toastMocks.danger).toHaveBeenCalledOnce())
-  })
-
-  it('keeps superseded click-to-advance quiet', async () => {
-    const pending = deferred<{ status: 'superseded' }>()
-    useMediaProjectionStore.setState({
-      next: vi.fn(() => pending.promise)
-    } as never)
-    render(
-      <MediaPreview
-        currentItem={null}
-        descriptor={{ clickToAdvance: true } as never}
-        onExit={vi.fn()}
-      />
-    )
-
-    fireEvent.click(screen.getByText('presenter.noMediaSelected'))
-
-    await act(async () => {
-      pending.resolve({ status: 'superseded' })
-      await pending.promise
-      await Promise.resolve()
-    })
-    expect(toastMocks.danger).not.toHaveBeenCalled()
+    expect(onNext).toHaveBeenCalledOnce()
   })
 })
