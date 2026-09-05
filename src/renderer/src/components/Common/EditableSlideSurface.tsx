@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   EditablePresentationDocument,
   EditablePresentationElement,
@@ -1233,6 +1234,9 @@ function TextElementContent({
   const contentHeight = hasContentHeight(element)
   const paragraphs = useMemo(() => normalizeTextParagraphs(element), [element])
   const hasRichText = Boolean(element.paragraphs?.length || element.runs?.length)
+  const [template] = useState(() => window.document.createElement('div'))
+  const domParagraphsRef = useRef(paragraphs)
+  const domModelRef = useRef<string | null>(null)
 
   const notifyTextEditLifecycle = useCallback((): void => {
     onTextEditFinalizerChange?.(registeredFinalizerRef.current)
@@ -1258,12 +1262,15 @@ function TextElementContent({
       notifyTextEditLifecycle()
       return
     }
-    const nextParagraphs = serializeTextContent(content, paragraphs)
+    const nextParagraphs = serializeTextContent(content, domParagraphsRef.current)
     const text = getPlainText(nextParagraphs)
     if (text === element.text && JSON.stringify(nextParagraphs) === JSON.stringify(paragraphs)) {
       hasPendingTextRef.current = false
       notifyTextEditLifecycle()
       return
+    }
+    if (!domParagraphsRef.current.some((paragraph) => paragraph.typingStyleCaret !== undefined)) {
+      domModelRef.current = JSON.stringify(nextParagraphs)
     }
     onUpdateElement?.(slideId, element.id, {
       text,
@@ -1372,6 +1379,23 @@ function TextElementContent({
   }, [editing, notifyTextEditLifecycle])
 
   useLayoutEffect(() => {
+    if (!editing) {
+      domModelRef.current = null
+      return
+    }
+    const content = contentRef.current
+    if (!content || isComposingRef.current) return
+    const model = JSON.stringify(paragraphs)
+    if (domModelRef.current === model) return
+    const selection = readTextSelection(content)
+    // React owns the detached template; only this owner writes the browser-editable subtree.
+    content.replaceChildren(...Array.from(template.childNodes, (node) => node.cloneNode(true)))
+    domParagraphsRef.current = paragraphs
+    domModelRef.current = model
+    if (selection) restoreTextSelection(content, selection)
+  }, [editing, paragraphs, template])
+
+  useLayoutEffect(() => {
     if (!editing || element.locked) return
     const content = contentRef.current
     if (!content) return
@@ -1414,140 +1438,200 @@ function TextElementContent({
     return () => window.document.removeEventListener('selectionchange', reportSelection)
   }, [editing, element.id, onTextSelectionChange])
 
+  const renderedText =
+    !hasRichText && !editing
+      ? element.text
+      : paragraphs.map((paragraph, paragraphIndex) => (
+          <div
+            key={paragraphIndex}
+            data-text-paragraph={paragraphIndex}
+            data-list-marker={getListMarker(paragraph, paragraphIndex)}
+            className={
+              paragraph.list ? 'before:mr-2 before:content-[attr(data-list-marker)]' : undefined
+            }
+            style={{
+              minHeight: '1em',
+              textAlign: paragraph.align,
+              lineHeight:
+                paragraph.lineSpacing.kind === 'multiple'
+                  ? paragraph.lineSpacing.value
+                  : `${paragraph.lineSpacing.points}pt`,
+              marginLeft: paragraph.marginLeft,
+              textIndent: paragraph.textIndent
+            }}
+          >
+            {paragraph.runs.map((run, runIndex) => (
+              <span
+                key={runIndex}
+                data-text-run={runIndex}
+                data-source-paragraph={paragraphIndex}
+                style={{
+                  color: run.color,
+                  backgroundColor: run.highlightColor ?? undefined,
+                  fontFamily: run.fontFamily,
+                  fontSize: `${run.fontSize}px`,
+                  fontWeight: run.bold ? 700 : 400,
+                  fontStyle: run.italic ? 'italic' : 'normal',
+                  textDecoration:
+                    [run.underline && 'underline', run.strikethrough && 'line-through']
+                      .filter(Boolean)
+                      .join(' ') || 'none',
+                  verticalAlign:
+                    run.baseline === 'superscript'
+                      ? 'super'
+                      : run.baseline === 'subscript'
+                        ? 'sub'
+                        : 'baseline',
+                  letterSpacing: run.characterSpacing ? `${run.characterSpacing}px` : undefined
+                }}
+              >
+                {run.text}
+              </span>
+            ))}
+            {paragraph.runs.length === 0 ? <br /> : null}
+          </div>
+        ))
+
   return (
-    <div
-      data-text-content
-      ref={contentRef}
-      role="textbox"
-      className={`h-full w-full whitespace-pre-wrap break-words outline-none ${
-        editable ? 'cursor-text' : ''
-      }`}
-      contentEditable={editing && !element.locked}
-      suppressContentEditableWarning
-      style={{
-        color: element.color,
-        fontFamily: element.fontFamily,
-        fontSize: `${element.fontSize}px`,
-        fontWeight: element.bold ? 700 : 400,
-        fontStyle: element.italic ? 'italic' : 'normal',
-        textDecoration: element.underline ? 'underline' : 'none',
-        textAlign: element.align,
-        lineHeight: element.lineHeight,
-        boxSizing: contentHeight ? 'border-box' : undefined,
-        padding: contentHeight
-          ? `${CONTENT_HEIGHT_TEXT_PADDING_Y}px ${CONTENT_HEIGHT_TEXT_PADDING_X}px`
-          : undefined,
-        width: editing && element.autoWidth === true ? 'max-content' : undefined,
-        minWidth: editing && element.autoWidth === true ? '100%' : undefined,
-        height: editing && element.autoWidth === true ? 'auto' : undefined,
-        whiteSpace: editing && element.autoWidth === true ? 'pre' : 'pre-wrap',
-        overflowWrap: editing && element.autoWidth === true ? 'normal' : 'break-word'
-      }}
-      onInput={() => {
-        if (!editing) return
-        hasPendingTextRef.current = true
-        notifyTextEditLifecycle()
-        if (isComposingRef.current) return
-        scheduleTextCommit()
-      }}
-      onCompositionStart={() => {
-        isComposingRef.current = true
-        hasPendingTextRef.current = true
-        notifyTextEditLifecycle()
-        cancelPendingTextCommit()
-      }}
-      onCompositionEnd={() => {
-        isComposingRef.current = false
-        notifyTextEditLifecycle()
-        if (!editing) return
-        if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
-        else scheduleTextCommit()
-      }}
-      onKeyDown={(event) => {
-        if (!editing || event.key !== 'Tab' || !onTextIndent) return
-        event.preventDefault()
-        event.stopPropagation()
-        onTextIndent(event.shiftKey ? -1 : 1)
-      }}
-      onPointerDown={(event) => {
-        if (!editable) return
-        cancelPendingBlur()
-        event.stopPropagation()
-        if (!editing && !element.locked) {
-          pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
-          onStartTextEdit?.()
-        }
-      }}
-      onClick={(event) => {
-        if (!editable) return
-        event.stopPropagation()
-        if (element.locked) return
-        cancelPendingBlur()
-        if (!editing) {
-          pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
-          onStartTextEdit?.()
-        }
-      }}
-      onBlur={(event) => {
-        cancelPendingTextCommit()
-        pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
-        scheduleBlurCommit()
-      }}
-    >
-      {!hasRichText
-        ? element.text
-        : paragraphs.map((paragraph, paragraphIndex) => (
-            <div
-              key={paragraphIndex}
-              data-text-paragraph={paragraphIndex}
-              data-list-marker={getListMarker(paragraph, paragraphIndex)}
-              className={
-                paragraph.list ? 'before:mr-2 before:content-[attr(data-list-marker)]' : undefined
-              }
-              style={{
-                minHeight: '1em',
-                textAlign: paragraph.align,
-                lineHeight:
-                  paragraph.lineSpacing.kind === 'multiple'
-                    ? paragraph.lineSpacing.value
-                    : `${paragraph.lineSpacing.points}pt`,
-                marginLeft: paragraph.marginLeft,
-                textIndent: paragraph.textIndent
-              }}
-            >
-              {paragraph.runs.map((run, runIndex) => (
-                <span
-                  key={runIndex}
-                  data-text-run={runIndex}
-                  data-source-paragraph={paragraphIndex}
-                  style={{
-                    color: run.color,
-                    backgroundColor: run.highlightColor ?? undefined,
-                    fontFamily: run.fontFamily,
-                    fontSize: `${run.fontSize}px`,
-                    fontWeight: run.bold ? 700 : 400,
-                    fontStyle: run.italic ? 'italic' : 'normal',
-                    textDecoration:
-                      [run.underline && 'underline', run.strikethrough && 'line-through']
-                        .filter(Boolean)
-                        .join(' ') || 'none',
-                    verticalAlign:
-                      run.baseline === 'superscript'
-                        ? 'super'
-                        : run.baseline === 'subscript'
-                          ? 'sub'
-                          : 'baseline',
-                    letterSpacing: run.characterSpacing ? `${run.characterSpacing}px` : undefined
-                  }}
-                >
-                  {run.text}
-                </span>
-              ))}
-              {paragraph.runs.length === 0 ? <br /> : null}
-            </div>
-          ))}
-    </div>
+    <>
+      {editing ? createPortal(renderedText, template) : null}
+      <div
+        key={editing ? 'editing' : 'preview'}
+        data-text-content
+        ref={contentRef}
+        role="textbox"
+        className={`h-full w-full whitespace-pre-wrap break-words outline-none ${
+          editable ? 'cursor-text' : ''
+        }`}
+        contentEditable={editing && !element.locked}
+        suppressContentEditableWarning
+        style={{
+          color: element.color,
+          fontFamily: element.fontFamily,
+          fontSize: `${element.fontSize}px`,
+          fontWeight: element.bold ? 700 : 400,
+          fontStyle: element.italic ? 'italic' : 'normal',
+          textDecoration: element.underline ? 'underline' : 'none',
+          textAlign: element.align,
+          lineHeight: element.lineHeight,
+          boxSizing: contentHeight ? 'border-box' : undefined,
+          padding: contentHeight
+            ? `${CONTENT_HEIGHT_TEXT_PADDING_Y}px ${CONTENT_HEIGHT_TEXT_PADDING_X}px`
+            : undefined,
+          width: editing && element.autoWidth === true ? 'max-content' : undefined,
+          minWidth: editing && element.autoWidth === true ? '100%' : undefined,
+          height: editing && element.autoWidth === true ? 'auto' : undefined,
+          whiteSpace: editing && element.autoWidth === true ? 'pre' : 'pre-wrap',
+          overflowWrap: editing && element.autoWidth === true ? 'normal' : 'break-word'
+        }}
+        onInput={() => {
+          if (!editing) return
+          hasPendingTextRef.current = true
+          notifyTextEditLifecycle()
+          if (isComposingRef.current) return
+          scheduleTextCommit()
+        }}
+        onCompositionStart={() => {
+          isComposingRef.current = true
+          hasPendingTextRef.current = true
+          notifyTextEditLifecycle()
+          cancelPendingTextCommit()
+        }}
+        onCompositionEnd={() => {
+          isComposingRef.current = false
+          notifyTextEditLifecycle()
+          if (!editing) return
+          if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
+          else scheduleTextCommit()
+        }}
+        onKeyDown={(event) => {
+          if (!editing || event.key !== 'Tab' || !onTextIndent) return
+          event.preventDefault()
+          event.stopPropagation()
+          onTextIndent(event.shiftKey ? -1 : 1)
+        }}
+        onPointerDown={(event) => {
+          if (!editable) return
+          cancelPendingBlur()
+          event.stopPropagation()
+          if (!editing && !element.locked) {
+            // The preview is replaced below; do not let the browser focus that detached target.
+            event.preventDefault()
+            pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
+            onStartTextEdit?.()
+          }
+        }}
+        onClick={(event) => {
+          if (!editable) return
+          event.stopPropagation()
+          if (element.locked) return
+          cancelPendingBlur()
+          if (!editing) {
+            pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
+            onStartTextEdit?.()
+          }
+        }}
+        onBlur={(event) => {
+          cancelPendingTextCommit()
+          pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
+          scheduleBlurCommit()
+        }}
+      >
+        {editing ? null : renderedText}
+      </div>
+    </>
   )
+}
+
+function readTextSelection(content: HTMLElement): { anchor: number; focus: number } | null {
+  const selection = window.getSelection()
+  if (
+    !selection?.anchorNode ||
+    !selection.focusNode ||
+    !content.contains(selection.anchorNode) ||
+    !content.contains(selection.focusNode)
+  )
+    return null
+  return {
+    anchor: getTextOffset(content, selection.anchorNode, selection.anchorOffset),
+    focus: getTextOffset(content, selection.focusNode, selection.focusOffset)
+  }
+}
+
+function restoreTextSelection(
+  content: HTMLElement,
+  selection: { anchor: number; focus: number }
+): void {
+  const locate = (position: number): { node: Node; offset: number } => {
+    let remaining = Math.max(0, position)
+    const paragraphs = Array.from(content.children)
+    for (const [index, paragraph] of paragraphs.entries()) {
+      const length = getEditableNodeText(paragraph).length
+      if (remaining <= length || index === paragraphs.length - 1) {
+        const walker = window.document.createTreeWalker(
+          paragraph,
+          NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
+        )
+        let node: Node | null
+        while ((node = walker.nextNode())) {
+          if (node instanceof Text) {
+            if (remaining <= node.length) return { node, offset: remaining }
+            remaining -= node.length
+          } else if (node instanceof HTMLBRElement) {
+            if (remaining === 0)
+              return { node: paragraph, offset: Array.from(paragraph.childNodes).indexOf(node) }
+            remaining--
+          }
+        }
+        return { node: paragraph, offset: paragraph.childNodes.length }
+      }
+      remaining -= length + 1
+    }
+    return { node: content, offset: 0 }
+  }
+  const anchor = locate(selection.anchor)
+  const focus = locate(selection.focus)
+  window.getSelection()?.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset)
 }
 
 function getTextOffset(content: HTMLElement, node: Node, nodeOffset: number): number {

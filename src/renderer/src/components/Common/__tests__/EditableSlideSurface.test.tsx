@@ -82,10 +82,11 @@ describe('EditableSlideSurface', () => {
 
     render(<EditableSurfaceHarness document={withText} slideId={slideId} />)
 
-    const textBox = screen.getByText('Edit me')
+    let textBox = screen.getByText('Edit me')
     expect(textBox).not.toHaveAttribute('contenteditable', 'true')
 
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
 
     expect(textBox).toHaveAttribute('contenteditable', 'true')
   })
@@ -109,8 +110,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByText('Hi')
+    let textBox = screen.getByText('Hi')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Longer title'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
@@ -156,8 +158,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'LongEnglishTokenThatWraps'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
@@ -186,8 +189,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     fireEvent.compositionStart(textBox)
     textBox.textContent = 'ㄓ'
     fireEvent.input(textBox)
@@ -229,8 +233,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'provisional'
     fireEvent.input(textBox)
     fireEvent.compositionStart(textBox)
@@ -267,8 +272,9 @@ describe('EditableSlideSurface', () => {
       </>
     )
 
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
 
     expect(textBox).toHaveAttribute('contenteditable', 'true')
     expect(globalThis.document.activeElement).toBe(textBox)
@@ -305,17 +311,19 @@ describe('EditableSlideSurface', () => {
       </>
     )
 
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     expect(textBox).toHaveAttribute('contenteditable', 'true')
 
     textBox.textContent = 'Confirmed'
+    fireEvent.input(textBox)
     act(() => {
       screen.getByRole('button', { name: 'Confirm target' }).focus()
       fireEvent.blur(textBox)
     })
 
-    expect(textBox).not.toHaveAttribute('contenteditable', 'true')
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('contenteditable', 'true')
     fireEvent.pointerDown(screen.getByText('Confirmed'), { clientX: 40, clientY: 20, pointerId: 2 })
 
     expect(screen.getByRole('textbox')).toHaveAttribute('contenteditable', 'true')
@@ -337,8 +345,9 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Final text'
     globalThis.document.body.focus()
     fireEvent.blur(textBox)
@@ -683,8 +692,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByText('Hi')
+    let textBox = screen.getByText('Hi')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Longer title'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
@@ -744,8 +754,9 @@ describe('EditableSlideSurface', () => {
       fontWeight: '700',
       color: '#ff0000'
     })
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Edited'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
