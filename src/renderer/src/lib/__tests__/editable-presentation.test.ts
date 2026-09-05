@@ -398,7 +398,17 @@ describe('editable presentation documents', () => {
         { color: '#2563eb', position: 100, transparency: 20, brightness: 15 }
       ]
     })
-    expect(reset.slides[firstSlideId].background).toEqual(applied.slides[firstSlideId].background)
+    expect(reset.slides[firstSlideId].background).toEqual({
+      type: 'solid',
+      color: '#ffffff',
+      transparency: 0
+    })
+    const added = addBlankEditableSlide(reset)
+    expect(added.slides[added.slideOrder[2]].background).toEqual(applied.defaultSlideBackground)
+    const resetAll = applySlideBackgroundToAllSlides(reset, reset.slides[firstSlideId].background)
+    expect(addBlankEditableSlide(resetAll).defaultSlideBackground).toEqual(
+      reset.slides[firstSlideId].background
+    )
     expect(reset.slides[secondSlideId].background).toEqual(applied.slides[secondSlideId].background)
   })
 

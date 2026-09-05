@@ -949,11 +949,7 @@ export function resetSlideBackground(
   document: EditablePresentationDocument,
   slideId: string
 ): EditablePresentationDocument {
-  return updateSlideBackground(
-    document,
-    slideId,
-    document.defaultSlideBackground ?? createDefaultSlideBackground()
-  )
+  return updateSlideBackground(document, slideId, createDefaultSlideBackground())
 }
 
 export function updateSlideNotes(
