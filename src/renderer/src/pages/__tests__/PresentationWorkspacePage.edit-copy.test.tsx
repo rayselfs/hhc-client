@@ -320,7 +320,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     expect(fontRows).toHaveLength(2)
     const firstRow = fontRows?.[0]
     const secondRow = fontRows?.[1]
-    const familySelect = screen.getByLabelText('Font family')
+    const familySelect = screen.getByRole('button', { name: 'Font family' })
     const sizeSelect = screen.getByLabelText('Font size')
     expect(firstRow).toContainElement(familySelect)
     expect(firstRow).toContainElement(sizeSelect!)
@@ -378,7 +378,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     renderEditableDeck(sourceItem)
     expect(queryLocalFonts).not.toHaveBeenCalled()
     fireEvent.click((await screen.findAllByText('Font target')).at(-1)!)
-    fireEvent.pointerDown(screen.getByLabelText('Font family'))
+    fireEvent.click(screen.getByRole('button', { name: 'Font family' }))
 
     expect(await screen.findAllByRole('option', { name: 'BiauKaiTC' })).toHaveLength(1)
     expect(screen.getAllByRole('option', { name: 'Songti TC' })).toHaveLength(1)
@@ -416,10 +416,10 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     renderEditableDeck(sourceItem)
     const textBoxes = await screen.findAllByRole('textbox')
     fireEvent.click(textBoxes.at(-1)!)
-    fireEvent.pointerDown(screen.getByLabelText('Font family'))
+    fireEvent.click(screen.getByRole('button', { name: 'Font family' }))
 
-    expect(await screen.findByRole('option', { name: 'PMingLiU' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Font family')).toHaveValue('PMingLiU')
+    expect(await screen.findByRole('option', { name: /^PMingLiU/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Font family' })).toHaveTextContent('PMingLiU')
 
     Reflect.deleteProperty(window, 'queryLocalFonts')
   })
@@ -440,6 +440,6 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
 
     renderEditableDeck(sourceItem)
 
-    expect(await screen.findByRole('combobox', { name: accessibleName })).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: accessibleName })).toBeInTheDocument()
   })
 })

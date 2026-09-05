@@ -129,7 +129,7 @@ export default function PresenterSidebar({
                 return v
               })
             }
-            aria-label="Increase font size"
+            aria-label={t('presentationWorkspace.increaseFontSize')}
           >
             A+
           </Button>
@@ -144,7 +144,7 @@ export default function PresenterSidebar({
                 return v
               })
             }
-            aria-label="Decrease font size"
+            aria-label={t('presentationWorkspace.decreaseFontSize')}
           >
             A-
           </Button>

@@ -36,6 +36,7 @@ import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import EditableSlideSurface, {
+  type TextEditFinalizer,
   type EditableTextSelection
 } from '@renderer/components/Common/EditableSlideSurface'
 import PresentationHomeRibbon from '@renderer/components/Control/Presentation/PresentationHomeRibbon'
@@ -105,7 +106,13 @@ import {
   type ElementDistribution
 } from '@renderer/lib/presentation-editor-commands'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
-import { mergeFontFamilies, queryLocalFontFamiliesOnce } from '@renderer/lib/local-fonts'
+import {
+  getDocumentFontFamilies,
+  mergeFontFamilies,
+  queryLocalFontFamiliesOnce,
+  supportsLocalFontAccess
+} from '@renderer/lib/local-fonts'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
@@ -136,7 +143,6 @@ const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC 
 const FONT_SIZES = [
   8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96
 ]
-const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
 const PRESENTATION_CANVAS_WIDTH = 1024
 const PRESENTATION_VIEWPORT_PADDING = 64
 const NATIVE_CONTROL_CLASS =
@@ -529,6 +535,7 @@ function EditableDocumentView({
   slideClipboard: PresentationSlideClipboard | null
   onSlideClipboardChange: (clipboard: PresentationSlideClipboard) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const registry = usePresentationSessionRegistry()
   const session = useSyncExternalStore(
     registry.subscribe,
@@ -556,7 +563,7 @@ function EditableDocumentView({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <FileText className="text-danger" size={36} />
-        <p className="text-sm font-semibold text-danger">Failed to load presentation</p>
+        <p className="text-sm font-semibold text-danger">{t('presentationWorkspace.loadFailed')}</p>
         <p className="max-w-lg text-xs text-default-400">{error}</p>
       </div>
     )
@@ -625,9 +632,7 @@ function EditableSessionDocumentView({
   const canvasViewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const textCommitTimerRef = useRef<number | null>(null)
-  const textEditorFinalizerRef = useRef<
-    ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean }) | null
-  >(null)
+  const textEditorFinalizerRef = useRef<TextEditFinalizer | null>(null)
   const pendingZoomAnchorRef = useRef<{
     clientX: number
     clientY: number
@@ -636,6 +641,7 @@ function EditableSessionDocumentView({
     nextZoom: number
   } | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const newEmptyTextRef = useRef<string | null>(null)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(() => new Set())
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
   const [selectedSlideIds, setSelectedSlideIds] = useState<Set<string>>(() => new Set())
@@ -647,13 +653,27 @@ function EditableSessionDocumentView({
   const [textSelection, setTextSelection] = useState<EditableTextSelection | null>(null)
   const [isTextInsertMode, setIsTextInsertMode] = useState(false)
   const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([])
-  const [, setIsLoadingLocalFonts] = useState(false)
+  const [localFontStatus, setLocalFontStatus] = useState<
+    'idle' | 'loading' | 'ready' | 'failed' | 'unsupported'
+  >('idle')
+  const recentFonts = useSettingsStore((state) => state.recentPresentationFonts)
+  const rememberFont = useSettingsStore((state) => state.rememberPresentationFont)
   const hasRequestedLocalFontsRef = useRef(false)
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
   const [zoomMode, setZoomMode] = useState<ZoomMode>('fit')
-  const [zoomPercent, setZoomPercent] = useState(100)
+  const [customZoomPercent, setZoomPercent] = useState(100)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
+  const zoomPercent =
+    zoomMode === 'fit' && viewportSize.width > 0 && viewportSize.height > 0
+      ? calculateFitZoomPercent(
+          viewportSize.width,
+          viewportSize.height,
+          PRESENTATION_CANVAS_WIDTH,
+          (PRESENTATION_CANVAS_WIDTH * document.height) / document.width,
+          PRESENTATION_VIEWPORT_PADDING
+        )
+      : customZoomPercent
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
   const formatBackgroundTriggerRef = useRef<HTMLElement>(null)
@@ -667,11 +687,7 @@ function EditableSessionDocumentView({
     []
   )
   const setTextEditorFinalizer = useCallback(
-    (
-      finalize:
-        | ((() => boolean) & { hasUnsafeWork?: () => boolean; isComposing?: () => boolean })
-        | null
-    ): void => {
+    (finalize: TextEditFinalizer | null): void => {
       textEditorFinalizerRef.current = finalize
       registry.notifyEditorLifecycle?.(deck.itemId)
     },
@@ -721,19 +737,6 @@ function EditableSessionDocumentView({
     observer.observe(viewport)
     return () => observer.disconnect()
   }, [])
-
-  useEffect(() => {
-    if (zoomMode !== 'fit' || viewportSize.width <= 0 || viewportSize.height <= 0) return
-    setZoomPercent(
-      calculateFitZoomPercent(
-        viewportSize.width,
-        viewportSize.height,
-        PRESENTATION_CANVAS_WIDTH,
-        (PRESENTATION_CANVAS_WIDTH * document.height) / document.width,
-        PRESENTATION_VIEWPORT_PADDING
-      )
-    )
-  }, [document.height, document.width, viewportSize, zoomMode])
 
   useLayoutEffect(() => {
     const pending = pendingZoomAnchorRef.current
@@ -799,6 +802,7 @@ function EditableSessionDocumentView({
 
   const commitTextDraft = (): void => {
     clearTextCommitTimer()
+    if (newEmptyTextRef.current) return
     if (session.getSnapshot().draftKind === 'text') session.commitDraft()
   }
 
@@ -859,6 +863,13 @@ function EditableSessionDocumentView({
     updates: Partial<EditablePresentationElement>
   ): void => {
     const preview = session.getSnapshot().renderedDocument
+    if (
+      newEmptyTextRef.current === elementId &&
+      'text' in updates &&
+      updates.text?.replace(/[\u200b\ufeff]/g, '').trim()
+    ) {
+      newEmptyTextRef.current = null
+    }
     const current = preview.slides[slideId]?.elements[elementId]
     if (
       current &&
@@ -871,17 +882,11 @@ function EditableSessionDocumentView({
     if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
     session.previewDraft(updateElementInSlide(preview, slideId, elementId, updates))
     clearTextCommitTimer()
+    if (newEmptyTextRef.current === elementId) return
     textCommitTimerRef.current = window.setTimeout(() => {
       textCommitTimerRef.current = null
       if (session.getSnapshot().draftKind === 'text') session.commitDraft()
     }, 750)
-  }
-
-  const updateSelectedElement = (updates: Partial<EditablePresentationElement>): void => {
-    if (!document || !activeSlideId || !selectedElementId) return
-    commitDocument((current) =>
-      updateElementInSlide(current, activeSlideId, selectedElementId, updates)
-    )
   }
 
   const selectElement = (
@@ -1010,8 +1015,11 @@ function EditableSessionDocumentView({
       fontSize,
       text: ''
     })
-    session.commit(addElementToSlide(currentDocument, activeSlideId, element))
+    newEmptyTextRef.current = element.id
+    session.beginDraft('text')
+    session.previewDraft(addElementToSlide(currentDocument, activeSlideId, element))
     setSelectedElementId(element.id)
+    setSelectedElementIds(new Set([element.id]))
     setEditingElementId(element.id)
     setIsTextInsertMode(false)
   }
@@ -1167,15 +1175,19 @@ function EditableSessionDocumentView({
   const copySelectedSlides = (requestedSlideIds?: string[]): void => {
     const slideIds = requestedSlideIds ?? getSelectedSlideIds()
     if (slideIds.length === 0) return
-    onSlideClipboardChange(createSlideClipboard(document, slideIds))
+    const current = finalizeDocumentMutation()
+    if (!current) return
+    onSlideClipboardChange(createSlideClipboard(current, slideIds))
     setCopiedElement(null)
   }
 
   const cutSelectedSlides = (requestedSlideIds?: string[]): void => {
     const slideIds = requestedSlideIds ?? getSelectedSlideIds()
     if (slideIds.length === 0) return
-    onSlideClipboardChange(createSlideClipboard(document, slideIds))
-    const nextDocument = cutSlides(document, slideIds)
+    const current = finalizeDocumentMutation()
+    if (!current) return
+    onSlideClipboardChange(createSlideClipboard(current, slideIds))
+    const nextDocument = cutSlides(current, slideIds)
     session.commit(nextDocument)
     const nextSlideId =
       nextDocument.slideOrder[Math.min(activeSlideIndex, nextDocument.slideOrder.length - 1)]
@@ -1337,20 +1349,26 @@ function EditableSessionDocumentView({
   }
 
   const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
+  const documentFonts = useMemo(() => getDocumentFontFamilies(document), [document])
   const fontFamilies = useMemo(
-    () =>
-      mergeFontFamilies(
-        FONT_FAMILIES,
-        selectedTextElement ? [selectedTextElement.fontFamily] : [],
-        localFontFamilies
-      ),
-    [localFontFamilies, selectedTextElement]
+    () => mergeFontFamilies(recentFonts, documentFonts, FONT_FAMILIES, localFontFamilies),
+    [recentFonts, documentFonts, localFontFamilies]
   )
 
   const updateSelectedTextElement = (
-    updates: Partial<Extract<EditablePresentationElement, { type: 'text' }>>
+    change:
+      | Partial<Extract<EditablePresentationElement, { type: 'text' }>>
+      | ((
+          element: Extract<EditablePresentationElement, { type: 'text' }>
+        ) => Partial<Extract<EditablePresentationElement, { type: 'text' }>>)
   ): void => {
-    if (!selectedTextElement) return
+    if (!activeSlideId || !selectedElementId) return
+    if (textEditorFinalizerRef.current?.flush?.() === false) return
+    commitTextDraft()
+    const current = session.getSnapshot().renderedDocument
+    const element = current.slides[activeSlideId]?.elements[selectedElementId]
+    if (element?.type !== 'text') return
+    let updates = typeof change === 'function' ? change(element) : change
     if (!updates.paragraphs) {
       const characterPatch = Object.fromEntries(
         (
@@ -1368,14 +1386,9 @@ function EditableSessionDocumentView({
           ] as const
         ).flatMap((key) => (updates[key] === undefined ? [] : [[key, updates[key]]]))
       ) as Partial<EditableTextStyle>
-      let paragraphs = normalizeTextParagraphs(selectedTextElement)
+      let paragraphs = normalizeTextParagraphs(element)
       if (Object.keys(characterPatch).length > 0) {
-        paragraphs = applyCharacterStyle(
-          paragraphs,
-          0,
-          selectedTextElement.text.length,
-          characterPatch
-        )
+        paragraphs = applyCharacterStyle(paragraphs, 0, element.text.length, characterPatch)
       }
       if (updates.align !== undefined || updates.lineHeight !== undefined) {
         paragraphs = paragraphs.map((paragraph) => ({
@@ -1398,44 +1411,106 @@ function EditableSessionDocumentView({
         )
       }
     }
-    updateSelectedElement(updates as Partial<EditablePresentationElement>)
+    const next = updateElementInSlide(current, activeSlideId, element.id, updates)
+    if (newEmptyTextRef.current === element.id) session.previewDraft(next)
+    else session.commit(next)
   }
 
-  const changeSelectedTextIndent = (direction: -1 | 1): void => {
+  const finishFormatting = (): void => {
+    window.requestAnimationFrame(() => {
+      const focused = window.document.activeElement
+      if (focused?.closest('[data-ribbon-surface], [data-presentation-text-tool]')) {
+        textEditorFinalizerRef.current?.restoreSelection?.()
+      }
+    })
+  }
+
+  const getTextCommandRange = (
+    element: Extract<EditablePresentationElement, { type: 'text' }>
+  ): { start: number; end: number } => {
+    const selection = textEditorFinalizerRef.current?.getSelection?.() ?? textSelection
+    return selection?.elementId === element.id ? selection : { start: 0, end: element.text.length }
+  }
+
+  const patchCharacterStyle = (patch: Partial<EditableTextStyle>): void => {
+    updateSelectedTextElement((element) => {
+      const range = getTextCommandRange(element)
+      const paragraphs = applyCharacterStyle(
+        normalizeTextParagraphs(element),
+        range.start,
+        range.end,
+        patch
+      )
+      return {
+        ...patch,
+        paragraphs,
+        runs: flattenTextParagraphs(paragraphs)
+      }
+    })
+  }
+  const patchParagraphs = (
+    update: (paragraph: EditableTextParagraph) => EditableTextParagraph
+  ): void => {
+    updateSelectedTextElement((element) => {
+      const range = getTextCommandRange(element)
+      const paragraphs = mapSelectedParagraphs(
+        normalizeTextParagraphs(element),
+        range.start,
+        range.end,
+        update
+      )
+      return {
+        paragraphs,
+        runs: flattenTextParagraphs(paragraphs),
+        align: paragraphs[0]?.align ?? element.align,
+        lineHeight:
+          paragraphs[0]?.lineSpacing.kind === 'multiple'
+            ? paragraphs[0].lineSpacing.value
+            : element.lineHeight
+      }
+    })
+  }
+
+  const toggleCharacterStyle = (key: 'bold' | 'italic' | 'underline'): void => {
     if (!selectedTextElement) return
-    const range =
-      textSelection?.elementId === selectedTextElement.id
-        ? textSelection
-        : { start: 0, end: selectedTextElement.text.length }
-    const paragraphs = mapSelectedParagraphs(
+    const range = getTextCommandRange(selectedTextElement)
+    const value = getCharacterStyleValue(
       normalizeTextParagraphs(selectedTextElement),
       range.start,
       range.end,
-      (paragraph) => ({
-        ...paragraph,
-        marginLeft: Math.max(0, paragraph.marginLeft + direction * 32),
-        list: paragraph.list
-          ? { ...paragraph.list, level: Math.max(0, paragraph.list.level + direction) }
-          : null
-      })
+      key
     )
-    updateSelectedTextElement({ paragraphs, runs: flattenTextParagraphs(paragraphs) })
+    patchCharacterStyle({ [key]: value !== true })
+  }
+
+  const changeSelectedTextIndent = (direction: -1 | 1): void => {
+    patchParagraphs((paragraph) => ({
+      ...paragraph,
+      marginLeft: Math.max(0, paragraph.marginLeft + direction * 32),
+      list: paragraph.list
+        ? { ...paragraph.list, level: Math.max(0, paragraph.list.level + direction) }
+        : null
+    }))
   }
 
   const loadLocalFonts = async (): Promise<void> => {
-    setIsLoadingLocalFonts(true)
+    if (!supportsLocalFontAccess()) {
+      setLocalFontStatus('unsupported')
+      return
+    }
+    setLocalFontStatus('loading')
     try {
       setLocalFontFamilies(await queryLocalFontFamiliesOnce())
+      setLocalFontStatus('ready')
     } catch {
       hasRequestedLocalFontsRef.current = false
+      setLocalFontStatus('failed')
       toast.warning(
         t(
           'presentationWorkspace.localFontsLoadFailed',
           'Unable to load local fonts. Check the font access permission.'
         )
       )
-    } finally {
-      setIsLoadingLocalFonts(false)
     }
   }
 
@@ -1448,27 +1523,6 @@ function EditableSessionDocumentView({
   const openLineSpacingOptions = (): void => {
     setLineSpacingDraft(selectedTextElement?.lineHeight ?? 1.15)
     setIsLineSpacingOptionsOpen(true)
-  }
-
-  const showLineSpacingMenu = (event: React.MouseEvent): void => {
-    showMenu(
-      [
-        ...LINE_SPACING_VALUES.map((value) => ({
-          id: `line-spacing-${value}`,
-          label: String(value),
-          disabled: !selectedTextElement,
-          onAction: () => updateSelectedTextElement({ lineHeight: value })
-        })),
-        'separator',
-        {
-          id: 'line-spacing-options',
-          label: t('presentationWorkspace.lineSpacingOptions', 'Line Spacing Options...'),
-          disabled: !selectedTextElement,
-          onAction: openLineSpacingOptions
-        }
-      ],
-      event
-    )
   }
 
   const showShapeMenu = (event: React.MouseEvent): void => {
@@ -1528,61 +1582,45 @@ function EditableSessionDocumentView({
         : selectedTextElement
           ? { start: 0, end: selectedTextElement.text.length }
           : null
+    const characterValue = <K extends keyof EditableTextStyle>(
+      key: K,
+      fallback: EditableTextStyle[K]
+    ): EditableTextStyle[K] | 'mixed' => {
+      if (!selectedParagraphs || !selectedRange) return fallback
+      return (
+        getCharacterStyleValue(selectedParagraphs, selectedRange.start, selectedRange.end, key) ??
+        fallback
+      )
+    }
     const toggleState = (
       key: 'bold' | 'italic' | 'underline' | 'strikethrough',
       fallback: boolean
-    ): boolean | 'mixed' => {
-      if (!selectedParagraphs || !selectedRange) return fallback
-      const value = getCharacterStyleValue(
+    ): boolean | 'mixed' => characterValue(key, fallback)
+    const touchedParagraphs: EditableTextParagraph[] = []
+    if (selectedParagraphs && selectedRange) {
+      mapSelectedParagraphs(
         selectedParagraphs,
         selectedRange.start,
         selectedRange.end,
-        key
+        (paragraph) => {
+          touchedParagraphs.push(paragraph)
+          return paragraph
+        }
       )
-      return value === 'mixed' ? 'mixed' : (value ?? fallback)
     }
-    const patchCharacterStyle = (patch: Partial<EditableTextStyle>): void => {
-      if (!selectedTextElement) return
-      const range =
-        textSelection?.elementId === selectedTextElement.id
-          ? textSelection
-          : { start: 0, end: selectedTextElement.text.length }
-      const paragraphs = applyCharacterStyle(
-        normalizeTextParagraphs(selectedTextElement),
-        range.start,
-        range.end,
-        patch
-      )
-      updateSelectedTextElement({
-        ...patch,
-        paragraphs,
-        runs: flattenTextParagraphs(paragraphs)
-      })
+    const alignment = touchedParagraphs.every(
+      (paragraph) => paragraph.align === touchedParagraphs[0]?.align
+    )
+      ? (touchedParagraphs[0]?.align ?? 'left')
+      : 'mixed'
+    const listState = (kind: 'bullet' | 'number'): boolean | 'mixed' => {
+      const values = touchedParagraphs.map((paragraph) => paragraph.list?.kind === kind)
+      return values.every((value) => value === values[0]) ? (values[0] ?? false) : 'mixed'
     }
-    const patchParagraphs = (
-      update: (paragraph: EditableTextParagraph) => EditableTextParagraph
-    ): void => {
-      if (!selectedTextElement) return
-      const range =
-        textSelection?.elementId === selectedTextElement.id
-          ? textSelection
-          : { start: 0, end: selectedTextElement.text.length }
-      const paragraphs = mapSelectedParagraphs(
-        normalizeTextParagraphs(selectedTextElement),
-        range.start,
-        range.end,
-        update
-      )
-      updateSelectedTextElement({
-        paragraphs,
-        runs: flattenTextParagraphs(paragraphs),
-        align: paragraphs[0]?.align ?? selectedTextElement.align,
-        lineHeight:
-          paragraphs[0]?.lineSpacing.kind === 'multiple'
-            ? paragraphs[0].lineSpacing.value
-            : selectedTextElement.lineHeight
-      })
-    }
+    const selectedFontSize = characterValue(
+      'fontSize',
+      selectedTextElement?.fontSize ?? activeTheme.defaultTextStyle.fontSize
+    )
     const changeFontSize = (direction: -1 | 1): void => {
       if (!selectedTextElement || !document) return
       const currentPoints = presentationCanvasPxToPoints(
@@ -1596,22 +1634,20 @@ function EditableSessionDocumentView({
       })
     }
     const clearTextFormatting = (): void => {
-      if (!selectedTextElement) return
-      const defaults = activeTheme.defaultTextStyle
-      const range =
-        textSelection?.elementId === selectedTextElement.id
-          ? textSelection
-          : { start: 0, end: selectedTextElement.text.length }
-      const paragraphs = clearCharacterFormatting(
-        normalizeTextParagraphs(selectedTextElement),
-        range.start,
-        range.end,
-        defaults
-      )
-      updateSelectedTextElement({
-        ...defaults,
-        paragraphs,
-        runs: flattenTextParagraphs(paragraphs)
+      updateSelectedTextElement((element) => {
+        const defaults = activeTheme.defaultTextStyle
+        const range = getTextCommandRange(element)
+        const paragraphs = clearCharacterFormatting(
+          normalizeTextParagraphs(element),
+          range.start,
+          range.end,
+          defaults
+        )
+        return {
+          ...defaults,
+          paragraphs,
+          runs: flattenTextParagraphs(paragraphs)
+        }
       })
     }
 
@@ -1631,50 +1667,81 @@ function EditableSessionDocumentView({
 
         <PresentationHomeRibbon
           disabled={textDisabled}
+          onFinishFormatting={finishFormatting}
           fontFamilies={fontFamilies}
-          fontFamily={selectedTextElement?.fontFamily ?? activeTheme.defaultTextStyle.fontFamily}
+          documentFonts={documentFonts}
+          recentFonts={recentFonts}
+          localFonts={localFontFamilies}
+          localFontStatus={localFontStatus}
+          fontFamily={characterValue(
+            'fontFamily',
+            selectedTextElement?.fontFamily ?? activeTheme.defaultTextStyle.fontFamily
+          )}
           fontSize={
-            selectedTextElement
-              ? presentationCanvasPxToPoints(selectedTextElement.fontSize, document.width)
-              : INSERTED_TEXT_FONT_SIZE_POINTS
+            selectedFontSize === 'mixed'
+              ? 'mixed'
+              : presentationCanvasPxToPoints(selectedFontSize, document.width)
           }
           bold={toggleState('bold', Boolean(selectedTextElement?.bold))}
           italic={toggleState('italic', Boolean(selectedTextElement?.italic))}
           underline={toggleState('underline', Boolean(selectedTextElement?.underline))}
           strikethrough={toggleState('strikethrough', Boolean(selectedTextElement?.strikethrough))}
-          baseline={selectedTextElement?.baseline ?? 'normal'}
-          color={selectedTextElement?.color ?? activeTheme.defaultTextStyle.color}
-          highlightColor={selectedTextElement?.highlightColor ?? null}
-          align={selectedTextElement?.align ?? 'left'}
+          baseline={characterValue('baseline', selectedTextElement?.baseline ?? 'normal')}
+          color={characterValue(
+            'color',
+            selectedTextElement?.color ?? activeTheme.defaultTextStyle.color
+          )}
+          highlightColor={characterValue(
+            'highlightColor',
+            selectedTextElement?.highlightColor ?? null
+          )}
+          align={alignment}
+          bullets={listState('bullet')}
+          numbering={listState('number')}
+          characterSpacing={characterValue(
+            'characterSpacing',
+            selectedTextElement?.characterSpacing ?? 0
+          )}
+          lineSpacing={
+            touchedParagraphs.every(
+              (paragraph) =>
+                JSON.stringify(paragraph.lineSpacing) ===
+                JSON.stringify(touchedParagraphs[0]?.lineSpacing)
+            ) && touchedParagraphs[0]?.lineSpacing.kind === 'multiple'
+              ? touchedParagraphs[0].lineSpacing.value
+              : 'mixed'
+          }
           theme={activeTheme}
           onFontAccess={loadLocalFontsOnFirstGesture}
-          onFontFamilyChange={(fontFamily) => patchCharacterStyle({ fontFamily })}
-          onFontSizeChange={(fontSize) =>
+          onFontFamilyChange={(fontFamily) => {
+            patchCharacterStyle({ fontFamily })
+            rememberFont(fontFamily)
+          }}
+          onFontSizeChange={(fontSize) => {
+            if (!Number.isFinite(fontSize) || fontSize <= 0) return
             patchCharacterStyle({
               fontSize: presentationPointsToCanvasPx(fontSize, document.width)
             })
-          }
+          }}
           onGrowFont={() => changeFontSize(1)}
           onShrinkFont={() => changeFontSize(-1)}
           onCharacterStyle={patchCharacterStyle}
           onChangeCase={(textCase) => {
-            if (!selectedTextElement) return
-            const range =
-              textSelection?.elementId === selectedTextElement.id
-                ? textSelection
-                : { start: 0, end: selectedTextElement.text.length }
-            const paragraphs = changeTextCase(
-              normalizeTextParagraphs(selectedTextElement),
-              range.start,
-              range.end,
-              textCase
-            )
-            updateSelectedTextElement({
-              text: paragraphs
-                .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-                .join('\n'),
-              paragraphs,
-              runs: flattenTextParagraphs(paragraphs)
+            updateSelectedTextElement((element) => {
+              const range = getTextCommandRange(element)
+              const paragraphs = changeTextCase(
+                normalizeTextParagraphs(element),
+                range.start,
+                range.end,
+                textCase
+              )
+              return {
+                text: paragraphs
+                  .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
+                  .join('\n'),
+                paragraphs,
+                runs: flattenTextParagraphs(paragraphs)
+              }
             })
           }}
           onReset={clearTextFormatting}
@@ -1683,7 +1750,7 @@ function EditableSessionDocumentView({
             patchParagraphs((paragraph) => ({
               ...paragraph,
               list:
-                char === undefined && paragraph.list?.kind === 'bullet'
+                char === undefined && listState('bullet') === true
                   ? null
                   : { kind: 'bullet', level: paragraph.list?.level ?? 0, char: char ?? '•' }
             }))
@@ -1692,7 +1759,7 @@ function EditableSessionDocumentView({
             patchParagraphs((paragraph) => ({
               ...paragraph,
               list:
-                format === undefined && paragraph.list?.kind === 'number'
+                format === undefined && listState('number') === true
                   ? null
                   : {
                       kind: 'number',
@@ -1718,7 +1785,13 @@ function EditableSessionDocumentView({
               list: paragraph.list ? { ...paragraph.list, level: paragraph.list.level + 1 } : null
             }))
           }
-          onLineSpacing={showLineSpacingMenu}
+          onLineSpacing={openLineSpacingOptions}
+          onLineSpacingValue={(value) =>
+            patchParagraphs((paragraph) => ({
+              ...paragraph,
+              lineSpacing: { kind: 'multiple', value }
+            }))
+          }
           onAutoWidth={() =>
             updateSelectedTextElement({
               autoWidth: !selectedTextElement?.autoWidth,
@@ -1758,7 +1831,7 @@ function EditableSessionDocumentView({
               onClick={() => setIsTextInsertMode((enabled) => !enabled)}
             >
               <Type size={18} />
-              {t('presentationWorkspace.textBox', 'Text Box')}
+              {t('presentationWorkspace.text', 'Text')}
             </button>
           </div>
         </RibbonGroup>
@@ -1873,9 +1946,7 @@ function EditableSessionDocumentView({
         config: SHORTCUTS.PRESENTATION.BOLD,
         description: t('presentationWorkspace.bold', 'Bold'),
         handler: () => {
-          if (!editingElementId && selectedTextElement) {
-            updateSelectedTextElement({ bold: !selectedTextElement.bold })
-          }
+          toggleCharacterStyle('bold')
         }
       },
       {
@@ -1883,9 +1954,7 @@ function EditableSessionDocumentView({
         config: SHORTCUTS.PRESENTATION.ITALIC,
         description: t('presentationWorkspace.italic', 'Italic'),
         handler: () => {
-          if (!editingElementId && selectedTextElement) {
-            updateSelectedTextElement({ italic: !selectedTextElement.italic })
-          }
+          toggleCharacterStyle('italic')
         }
       },
       {
@@ -1893,14 +1962,36 @@ function EditableSessionDocumentView({
         config: SHORTCUTS.PRESENTATION.UNDERLINE,
         description: t('presentationWorkspace.underline', 'Underline'),
         handler: () => {
-          if (!editingElementId && selectedTextElement) {
-            updateSelectedTextElement({ underline: !selectedTextElement.underline })
-          }
+          toggleCharacterStyle('underline')
         }
       }
     ],
     { sectionKey: 'presentation' }
   )
+
+  const handleClipboardCommand = (
+    command: 'copy' | 'cut' | 'paste',
+    target: Element | null
+  ): boolean => {
+    if (
+      target?.closest(
+        'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]'
+      )
+    )
+      return false
+    const inSlides = Boolean(target?.closest('[data-slide-sidebar]'))
+    if (!inSlides && target !== window.document.body && !target?.closest('.presentation-stage'))
+      return false
+    if (command === 'paste') {
+      if (!inSlides && copiedElement) pasteElement()
+      else pasteSlide()
+    } else if (!inSlides && selectedElement) {
+      setCopiedElement(selectedElement)
+      if (command === 'cut') deleteElement()
+    } else if (command === 'copy') copySelectedSlides()
+    else cutSelectedSlides()
+    return true
+  }
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
@@ -1912,9 +2003,7 @@ function EditableSessionDocumentView({
       const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
       const command = event.metaKey || event.ctrlKey
       const isSlideClipboardCommand =
-        Boolean(target?.closest('[data-slide-option]')) &&
-        command &&
-        ['c', 'x', 'v'].includes(event.key.toLowerCase())
+        isSlideSidebar && command && ['c', 'x', 'v'].includes(event.key.toLowerCase())
       const isActionControl = Boolean(
         target?.closest('button, a[href], [role="button"], [role="link"], [role="tab"]')
       )
@@ -1925,6 +2014,15 @@ function EditableSessionDocumentView({
       const isContentEditable =
         target instanceof HTMLElement &&
         (target.isContentEditable || target.getAttribute('contenteditable') === 'true')
+      if (isContentEditable && command && !event.altKey && !event.shiftKey && !event.isComposing) {
+        const styleKey = { b: 'bold', i: 'italic', u: 'underline' } as const
+        const key = event.key.toLowerCase()
+        if (key === 'b' || key === 'i' || key === 'u') {
+          event.preventDefault()
+          toggleCharacterStyle(styleKey[key])
+          return
+        }
+      }
       if (isContentEditable && event.key !== 'Escape') return
 
       if (event.key === 'Escape') {
@@ -2013,36 +2111,14 @@ function EditableSessionDocumentView({
         }
         return
       }
-      if (command && event.key.toLowerCase() === 'c') {
-        event.preventDefault()
-        if (isSlideClipboardCommand) {
-          copySelectedSlides()
-        } else if (selectedElement) {
-          setCopiedElement(selectedElement)
-        } else {
-          copySelectedSlides()
-        }
-      }
-      if (command && event.key.toLowerCase() === 'x') {
-        event.preventDefault()
-        if (isSlideClipboardCommand) {
-          cutSelectedSlides()
-        } else if (selectedElement) {
-          setCopiedElement(selectedElement)
-          deleteElement()
-        } else {
-          cutSelectedSlides()
-        }
-      }
-      if (command && event.key.toLowerCase() === 'v') {
-        event.preventDefault()
-        if (isSlideClipboardCommand) {
-          pasteSlide()
-        } else if (copiedElement) {
-          pasteElement()
-        } else {
-          pasteSlide()
-        }
+      if (command && !event.altKey && ['c', 'x', 'v'].includes(event.key.toLowerCase())) {
+        const action =
+          event.key.toLowerCase() === 'c'
+            ? 'copy'
+            : event.key.toLowerCase() === 'x'
+              ? 'cut'
+              : 'paste'
+        if (handleClipboardCommand(action, target)) event.preventDefault()
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (selectedElementId) {
@@ -2055,8 +2131,25 @@ function EditableSessionDocumentView({
       }
     }
 
+    const handleClipboard = (event: ClipboardEvent): void => {
+      if (event.defaultPrevented) return
+      const target = event.target instanceof Element ? event.target : window.document.activeElement
+      if (
+        (event.type === 'copy' || event.type === 'cut' || event.type === 'paste') &&
+        handleClipboardCommand(event.type, target)
+      )
+        event.preventDefault()
+    }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('copy', handleClipboard)
+    window.addEventListener('cut', handleClipboard)
+    window.addEventListener('paste', handleClipboard)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('copy', handleClipboard)
+      window.removeEventListener('cut', handleClipboard)
+      window.removeEventListener('paste', handleClipboard)
+    }
   })
 
   if (!activeSlideId) {
@@ -2146,7 +2239,9 @@ function EditableSessionDocumentView({
                           event.preventDefault()
                           moveSelectedSlides(index)
                         }}
-                        aria-label={`Insert before slide ${index + 1}`}
+                        aria-label={t('presentationWorkspace.insertBeforeSlide', {
+                          number: index + 1
+                        })}
                       >
                         <span
                           className={`w-full rounded-full ${
@@ -2162,9 +2257,7 @@ function EditableSessionDocumentView({
                         data-slide-index={index}
                         role="option"
                         aria-selected={isSelected}
-                        className={`flex w-full gap-2 rounded-md px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-none ${
-                          isSelected ? 'bg-primary/10 ring-2 ring-primary/60' : ''
-                        }`}
+                        className="flex w-full gap-2 rounded-md px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-500"
                         onClick={(event) => selectSlide(index, event)}
                         onDragStart={(event) => {
                           const ids = selectedSlideIds.has(slideId)
@@ -2253,7 +2346,7 @@ function EditableSessionDocumentView({
                     event.preventDefault()
                     moveSelectedSlides(document.slideOrder.length)
                   }}
-                  aria-label="Insert after last slide"
+                  aria-label={t('presentationWorkspace.insertAfterLastSlide')}
                 >
                   <span
                     className={`w-full rounded-full ${
@@ -2310,6 +2403,13 @@ function EditableSessionDocumentView({
                       }}
                       onEditingElementChange={(elementId) => {
                         if (elementId === null) {
+                          if (newEmptyTextRef.current) {
+                            newEmptyTextRef.current = null
+                            clearTextCommitTimer()
+                            session.cancelDraft()
+                            setSelectedElementId(null)
+                            setSelectedElementIds(new Set())
+                          }
                           commitTextDraft()
                           setTextSelection(null)
                         }
@@ -2317,6 +2417,9 @@ function EditableSessionDocumentView({
                       }}
                       onTextEditFinalizerChange={setTextEditorFinalizer}
                       onTextSelectionChange={setTextSelection}
+                      onTextLayoutChange={(slideId, elementId, size) =>
+                        session.reflowText(slideId, elementId, size)
+                      }
                       onTextIndent={changeSelectedTextIndent}
                       onInsertText={addTextElement}
                       onElementContextMenu={showElementContextMenu}
@@ -2543,7 +2646,10 @@ function EditableSessionDocumentView({
             0.5,
             Math.min(4, Number.isFinite(lineSpacingDraft) ? lineSpacingDraft : 1.15)
           )
-          updateSelectedTextElement({ lineHeight: nextLineHeight })
+          patchParagraphs((paragraph) => ({
+            ...paragraph,
+            lineSpacing: { kind: 'multiple', value: nextLineHeight }
+          }))
           setIsLineSpacingOptionsOpen(false)
         }}
       />
@@ -2569,7 +2675,7 @@ function LineSpacingOptionsDialog({
   return (
     <AlertDialog.Backdrop isOpen={isOpen} isDismissable onOpenChange={(open) => !open && onClose()}>
       <AlertDialog.Container size="sm">
-        <AlertDialog.Dialog className="p-5">
+        <AlertDialog.Dialog data-presentation-text-tool className="p-5">
           <AlertDialog.Header>
             <AlertDialog.Heading>
               {t('presentationWorkspace.lineSpacingOptions', 'Line Spacing Options')}
@@ -2777,7 +2883,7 @@ function FormatBackgroundPanel({
             <label className="block">
               <span>{t('presentationWorkspace.gradientType', 'Type')}</span>
               <select className={`mt-2 h-9 w-full ${NATIVE_CONTROL_CLASS}`} value="linear" disabled>
-                <option value="linear">Linear</option>
+                <option value="linear">{t('presentationWorkspace.linearGradient')}</option>
               </select>
             </label>
             <label className="block">

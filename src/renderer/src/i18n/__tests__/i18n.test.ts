@@ -37,6 +37,32 @@ describe('i18n configuration', () => {
 })
 
 describe('translations', () => {
+  it('defines presentation and media commands in every locale without fallback', () => {
+    for (const lng of ['en', 'zh-TW', 'zh-CN']) {
+      for (const key of [
+        'common.copy',
+        'common.cut',
+        'common.paste',
+        'common.actionMenu',
+        'presentationWorkspace.rectangle',
+        'presentationWorkspace.ellipse',
+        'presentationWorkspace.line',
+        'presentationWorkspace.rotateObject',
+        'presentationWorkspace.insertBeforeSlide',
+        'presentationWorkspace.notes',
+        'presentationWorkspace.handleDirection.nw',
+        'fileExplorer.syncHealth.syncing',
+        'fileExplorer.syncHealth.lastSync',
+        'fileExplorer.syncHealth.nextRetry',
+        'fileExplorer.syncHealth.unknown'
+      ]) {
+        expect(i18n.getResource(lng, 'translation', key)).toEqual(expect.any(String))
+      }
+    }
+    expect(i18n.t('presentationWorkspace.text', { lng: 'zh-TW' })).toBe('文字')
+    expect(i18n.t('presentationWorkspace.text', { lng: 'zh-CN' })).toBe('文字')
+  })
+
   it('translates the product identity across all locales', () => {
     expect(i18n.t('app.name', { lng: 'en' })).toBe('HHC Presenter')
     expect(i18n.t('app.name', { lng: 'zh-TW' })).toBe('HHC 投影系統')

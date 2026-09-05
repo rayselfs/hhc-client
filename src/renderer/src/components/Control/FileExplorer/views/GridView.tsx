@@ -19,6 +19,7 @@ export interface GridViewItem {
   isFolder: boolean
   mimeType?: string
   size?: number
+  dateGroup?: string
   createdAt?: number
   thumbnailUrl?: string | null
   isSelected: boolean
@@ -78,7 +79,7 @@ function renderSyncProviderIcon(providerType?: SyncProviderType): React.ReactNod
 
 export interface GridViewProps {
   items: GridViewItem[]
-  viewMode: 'large-icon' | 'medium-icon' | 'small-icon'
+  viewMode: 'extra-large-icon' | 'large-icon' | 'medium-icon' | 'small-icon'
   onItemClick: (id: string, event: React.MouseEvent) => void
   onItemDoubleClick: (id: string, event: React.MouseEvent) => void
   onItemContextMenu: (id: string, event: React.MouseEvent) => void
@@ -108,6 +109,11 @@ export const GridView = React.memo(function GridView({
   let nameClass = ''
 
   switch (viewMode) {
+    case 'extra-large-icon':
+      gridColsClass = 'grid-cols-[repeat(auto-fill,256px)]'
+      iconSize = 160
+      nameClass = 'line-clamp-2 text-base mt-2'
+      break
     case 'large-icon':
       gridColsClass = 'grid-cols-[repeat(auto-fill,192px)]'
       iconSize = 96
@@ -141,7 +147,7 @@ export const GridView = React.memo(function GridView({
   return (
     <div className="overflow-y-auto h-full p-4">
       <div className={`grid gap-4 ${gridColsClass}`}>
-        {items.map((item) => {
+        {items.map((item, index) => {
           const isRenaming = renamingItemId === item.id
           const splitName = splitFileName(item.name)
           const content = (
@@ -166,7 +172,11 @@ export const GridView = React.memo(function GridView({
                     e.stopPropagation()
                     onItemFavoriteToggle(item.id)
                   }}
-                  aria-label={item.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={t(
+                    item.isFavorited
+                      ? 'fileExplorer.contextMenu.removeFavorite'
+                      : 'fileExplorer.contextMenu.addFavorite'
+                  )}
                 >
                   <Star
                     size={16}
@@ -223,6 +233,15 @@ export const GridView = React.memo(function GridView({
 
           return (
             <React.Fragment key={item.id}>
+              {item.dateGroup !== undefined &&
+                (index === 0 || items[index - 1].dateGroup !== item.dateGroup) && (
+                  <div
+                    data-date-group={item.dateGroup}
+                    className="col-span-full border-t border-divider pt-3 text-sm font-semibold"
+                  >
+                    {item.dateGroup || t('fileExplorer.group.unknownDate')}
+                  </div>
+                )}
               {renderItemWrapper?.(item, content) ?? content}
             </React.Fragment>
           )

@@ -112,6 +112,21 @@ describe('presentation rich text', () => {
     expect(getCharacterStyleValue(paragraphs, 0, 4, 'bold')).toBe(true)
   })
 
+  it('resolves caret styles and pending typing styles without formatting the next paragraph', () => {
+    const paragraphs = normalizeTextParagraphs(createTextElement({ text: 'abcde plain\nnext' }))
+    const bold = applyCharacterStyle(paragraphs, 0, 5, { bold: true })
+    expect(getCharacterStyleValue(bold, 0, 0, 'bold')).toBe(true)
+    expect(getCharacterStyleValue(bold, 5, 5, 'bold')).toBe(true)
+    expect(getCharacterStyleValue(bold, 6, 6, 'bold')).toBe(false)
+    const pending = applyCharacterStyle(bold, 6, 6, { bold: true, fontFamily: 'Arial' })
+    expect(getCharacterStyleValue(pending, 6, 6, 'bold')).toBe(true)
+    expect(getCharacterStyleValue(pending, 6, 6, 'fontFamily')).toBe('Arial')
+    expect(applyParagraphStyle(bold, 0, 12, { align: 'center' }).map((p) => p.align)).toEqual([
+      'center',
+      'left'
+    ])
+  })
+
   it('clears character formatting while preserving paragraph formatting', () => {
     const paragraph: EditableTextParagraph = {
       runs: [

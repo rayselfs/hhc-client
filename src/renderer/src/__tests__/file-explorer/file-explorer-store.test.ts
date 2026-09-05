@@ -75,7 +75,7 @@ describe.each([
     const options = store.persist.getOptions()
     const migrate = options.migrate
 
-    expect(options.version).toBe(2)
+    expect(options.version).toBe(3)
     await expect(
       Promise.resolve(
         migrate?.({ colWidths: { created: 112, size: 80, kind: 96 }, marker: true }, 0)

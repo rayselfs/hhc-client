@@ -9,6 +9,7 @@ export interface ViewModeToggleProps {
 }
 
 type ViewLabelKey =
+  | 'fileExplorer.view.extraLargeIcon'
   | 'fileExplorer.view.largeIcon'
   | 'fileExplorer.view.mediumIcon'
   | 'fileExplorer.view.smallIcon'
@@ -21,6 +22,11 @@ interface ViewModeOption {
 }
 
 const VIEW_MODE_OPTIONS: ViewModeOption[] = [
+  {
+    mode: 'extra-large-icon',
+    icon: <LayoutGrid size={14} />,
+    labelKey: 'fileExplorer.view.extraLargeIcon'
+  },
   { mode: 'large-icon', icon: <LayoutGrid size={14} />, labelKey: 'fileExplorer.view.largeIcon' },
   { mode: 'medium-icon', icon: <Grid2X2 size={14} />, labelKey: 'fileExplorer.view.mediumIcon' },
   { mode: 'small-icon', icon: <Grid3X3 size={14} />, labelKey: 'fileExplorer.view.smallIcon' },

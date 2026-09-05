@@ -1,4 +1,7 @@
+import { useTranslation } from 'react-i18next'
+import { loadPresentationFont } from '@renderer/lib/font-loader'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   EditablePresentationDocument,
   EditablePresentationElement,
@@ -45,6 +48,11 @@ interface EditableSlideSurfaceProps {
   onEditingElementChange?: (elementId: string | null) => void
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void
   onTextIndent?: (direction: -1 | 1) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
@@ -69,15 +77,19 @@ export interface EditableTextSelection {
   end: number
 }
 
-type TextEditFinalizer = (() => boolean) & {
+export type TextEditFinalizer = (() => boolean) & {
+  flush?: () => boolean
+  restoreSelection?: () => void
+  getSelection?: () => EditableTextSelection | null
   hasUnsafeWork?: () => boolean
   isComposing?: () => boolean
 }
 
 interface DragState {
   elementId: string
-  mode: 'move' | 'resize' | 'crop'
+  mode: 'move' | 'resize' | 'crop' | 'rotate'
   handle?: ResizeHandle
+  rotationOrigin?: { x: number; y: number; angle: number }
   startX: number
   startY: number
   original: EditablePresentationElement
@@ -133,6 +145,7 @@ export default function EditableSlideSurface({
   onEditingElementChange,
   onTextEditFinalizerChange,
   onTextSelectionChange,
+  onTextLayoutChange,
   onTextIndent,
   onInsertText,
   onElementContextMenu,
@@ -208,9 +221,9 @@ export default function EditableSlideSurface({
       }
     }
     onEditingElementChange?.(null)
-    onSelectElement?.(element.id, event)
     const original = onTransformStart ? onTransformStart(element.id) : element
     if (!original) return
+    onSelectElement?.(element.id, event)
     dragRef.current = {
       elementId: element.id,
       mode,
@@ -218,7 +231,17 @@ export default function EditableSlideSurface({
       startX: event.clientX,
       startY: event.clientY,
       original,
-      hasPersistedChanges: false
+      hasPersistedChanges: false,
+      rotationOrigin: rect
+        ? {
+            x: rect.left + (original.x + original.width / 2) / scaleRef.current.x,
+            y: rect.top + (original.y + original.height / 2) / scaleRef.current.y,
+            angle: Math.atan2(
+              event.clientY - rect.top - (original.y + original.height / 2) / scaleRef.current.y,
+              event.clientX - rect.left - (original.x + original.width / 2) / scaleRef.current.x
+            )
+          }
+        : undefined
     }
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
@@ -230,7 +253,15 @@ export default function EditableSlideSurface({
     const dx = (event.clientX - drag.startX) * scaleRef.current.x
     const dy = (event.clientY - drag.startY) * scaleRef.current.y
     let updates: Partial<EditablePresentationElement>
-    if (drag.mode === 'move') {
+    if (drag.mode === 'rotate' && drag.rotationOrigin) {
+      const origin = drag.rotationOrigin
+      const angle = Math.atan2(event.clientY - origin.y, event.clientX - origin.x)
+      const degrees = drag.original.rotation + ((angle - origin.angle) * 180) / Math.PI
+      const rotation = event.shiftKey
+        ? Math.round(degrees / 15) * 15
+        : Math.round(degrees * 100) / 100
+      updates = { rotation: ((rotation % 360) + 360) % 360 }
+    } else if (drag.mode === 'move') {
       updates = {
         x: Math.max(0, drag.original.x + dx),
         y: Math.max(0, drag.original.y + dy)
@@ -243,8 +274,7 @@ export default function EditableSlideSurface({
       updates = {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false,
-        autoSize:
-          hasContentHeight(drag.original) && !['n', 's'].includes(drag.handle) ? 'content' : 'fixed'
+        autoSize: hasContentHeight(drag.original) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'image' && drag.handle) {
       updates = calculateImageResize(
@@ -280,7 +310,7 @@ export default function EditableSlideSurface({
     const delta = getKeyboardResizeDelta(
       event,
       handle,
-      element.type === 'text' && hasContentHeight(element) && handle !== 'n' && handle !== 's'
+      element.type === 'text' && hasContentHeight(element)
     )
     if (!delta || !finalizeTextEdit()) return
     const original = onTransformStart ? onTransformStart(element.id) : element
@@ -293,9 +323,16 @@ export default function EditableSlideSurface({
       } as Partial<EditablePresentationElement>
     } else if (original.type === 'text') {
       updates = {
-        ...calculateTextResize(original, handle, delta.dx, delta.dy),
+        ...calculateTextResize(
+          original,
+          handle,
+          delta.dx * Math.cos((original.rotation * Math.PI) / 180) -
+            delta.dy * Math.sin((original.rotation * Math.PI) / 180),
+          delta.dx * Math.sin((original.rotation * Math.PI) / 180) +
+            delta.dy * Math.cos((original.rotation * Math.PI) / 180)
+        ),
         autoWidth: false,
-        autoSize: hasContentHeight(original) && !['n', 's'].includes(handle) ? 'content' : 'fixed'
+        autoSize: hasContentHeight(original) ? 'content' : 'fixed'
       } as Partial<EditablePresentationElement>
     } else if (original.type === 'image') {
       updates = calculateImageResize(
@@ -365,6 +402,8 @@ export default function EditableSlideSurface({
     if (target?.closest('[data-slide-element]')) return false
     const point = getCanvasPoint(event)
     if (!point) return false
+
+    if (!finalizeTextEdit()) return true
 
     event.preventDefault()
     event.stopPropagation()
@@ -551,6 +590,7 @@ export default function EditableSlideSurface({
               onFinishTextEdit={() => onEditingElementChange?.(null)}
               onTextEditFinalizerChange={setTextEditFinalizer}
               onTextSelectionChange={onTextSelectionChange}
+              onTextLayoutChange={onTextLayoutChange}
               onTextIndent={onTextIndent}
             />
           ))}
@@ -589,6 +629,20 @@ export default function EditableSlideSurface({
               cropMode={element.id === cropElementId}
               surfaceScale={surfaceScale}
               showHandles={editable && element.id === selectedElementId && !element.locked}
+              onRotatePointerDown={(event) => startDrag(event, element, 'rotate')}
+              onRotateKeyDown={(event) => {
+                if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || !finalizeTextEdit()) return
+                event.preventDefault()
+                event.stopPropagation()
+                const original = onTransformStart ? onTransformStart(element.id) : element
+                if (!original) return
+                const delta = (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 15 : 1)
+                const updates = { rotation: (original.rotation + delta + 360) % 360 }
+                if (onTransformPreview) {
+                  onTransformPreview(element.id, updates)
+                  onTransformCommit?.()
+                } else onUpdateElement?.(slideId, element.id, updates)
+              }}
               onMovePointerDown={(event) => startDrag(event, element, 'move')}
               onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
               onCropPointerDown={(event, handle) => startDrag(event, element, 'crop', handle)}
@@ -634,6 +688,7 @@ function SlideElement({
   onFinishTextEdit,
   onTextEditFinalizerChange,
   onTextSelectionChange,
+  onTextLayoutChange,
   onTextIndent
 }: {
   document: EditablePresentationDocument
@@ -656,6 +711,11 @@ function SlideElement({
   onFinishTextEdit: () => void
   onTextEditFinalizerChange: (finalize: TextEditFinalizer | null) => void
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void
   onTextIndent?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
@@ -699,6 +759,7 @@ function SlideElement({
         onFinishTextEdit,
         onTextEditFinalizerChange,
         onTextSelectionChange,
+        onTextLayoutChange,
         onTextIndent
       )}
     </div>
@@ -710,6 +771,8 @@ function SelectionChrome({
   cropMode,
   surfaceScale,
   showHandles,
+  onRotatePointerDown,
+  onRotateKeyDown,
   onMovePointerDown,
   onResizePointerDown,
   onCropPointerDown,
@@ -723,6 +786,8 @@ function SelectionChrome({
   cropMode: boolean
   surfaceScale: number
   showHandles: boolean
+  onRotatePointerDown: (event: React.PointerEvent) => void
+  onRotateKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void
   onMovePointerDown: (event: React.PointerEvent) => void
   onResizePointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
@@ -732,6 +797,7 @@ function SelectionChrome({
   onPointerUp: (event: React.PointerEvent) => void
   onPointerCancel: (event: React.PointerEvent) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div
       data-selection-chrome
@@ -742,9 +808,9 @@ function SelectionChrome({
         width: element.width,
         height: element.height,
         transform: `rotate(${element.rotation}deg)`,
-        outlineWidth: 1.5 / surfaceScale,
+        outlineWidth: 1 / surfaceScale,
         outlineOffset: `${2 / surfaceScale}px`,
-        outlineColor: 'var(--accent)'
+        outlineColor: '#737373'
       }}
       onPointerDownCapture={(event) => {
         const handle = getNearestResizeHandle(event)
@@ -756,6 +822,39 @@ function SelectionChrome({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     >
+      {showHandles && !cropMode && (
+        <>
+          <span
+            aria-hidden="true"
+            className="absolute bg-neutral-500"
+            style={{
+              left: '50%',
+              top: -24 / surfaceScale,
+              width: 1 / surfaceScale,
+              height: 24 / surfaceScale
+            }}
+          />
+          <button
+            type="button"
+            data-rotation-handle
+            aria-label={t('presentationWorkspace.rotateObject', 'Rotate object')}
+            className="pointer-events-auto absolute flex cursor-grab items-center justify-center rounded-full border border-neutral-500 bg-white text-neutral-600 shadow-sm"
+            style={{
+              left: '50%',
+              top: -34 / surfaceScale,
+              width: 20 / surfaceScale,
+              height: 20 / surfaceScale,
+              fontSize: 17 / surfaceScale,
+              transform: 'translateX(-50%)',
+              touchAction: 'none'
+            }}
+            onPointerDown={onRotatePointerDown}
+            onKeyDown={onRotateKeyDown}
+          >
+            ↻
+          </button>
+        </>
+      )}
       {showHandles && (
         <ElementHandles
           element={element}
@@ -785,16 +884,14 @@ function ElementHandles({
   onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   if (element.type === 'text') {
-    const handles =
-      hasContentHeight(element) && element.width * surfaceScale < RESIZE_HIT_TARGET_SIZE * 3
-        ? CONTENT_TEXT_HANDLES
-        : FIXED_TEXT_HANDLES
+    const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
     const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
     const hitTargetSize = RESIZE_HIT_TARGET_SIZE / surfaceScale
     const indicatorHitSize = RESIZE_INDICATOR_HIT_SIZE / surfaceScale
     const handleSize = TEXT_HANDLE_SIZE / surfaceScale
-    const borderWidth = 1.5 / surfaceScale
+    const borderWidth = 1 / surfaceScale
     return (
       <>
         {(['top', 'right', 'bottom', 'left'] as const).map((edge) => (
@@ -828,8 +925,10 @@ function ElementHandles({
             key={`resize-text-${handle}`}
             type="button"
             data-resize-handle={handle}
-            className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-[2px]`}
-            aria-label={`Resize text box ${handleToLabel(handle)}`}
+            className={`${hasContentHeight(element) ? 'cursor-ew-resize' : getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center`}
+            aria-label={t('presentationWorkspace.resizeTextBox', {
+              direction: t(`presentationWorkspace.handleDirection.${handle}`)
+            })}
             style={{
               ...getTextHandlePositionStyle(handle, hitTargetSize),
               zIndex: 20,
@@ -851,7 +950,7 @@ function ElementHandles({
             >
               <span
                 data-resize-handle-visual
-                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]"
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border-neutral-500 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
                 style={{ width: handleSize, height: handleSize, borderWidth }}
               />
             </span>
@@ -877,7 +976,10 @@ function ElementHandles({
             type="button"
             data-resize-handle={handle}
             className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-full`}
-            aria-label={`${cropMode ? 'Crop' : 'Resize'} image ${handleToLabel(handle)}`}
+            aria-label={t(
+              cropMode ? 'presentationWorkspace.cropImage' : 'presentationWorkspace.resizeImage',
+              { direction: t(`presentationWorkspace.handleDirection.${handle}`) }
+            )}
             style={{
               ...getTextHandlePositionStyle(handle, hitTargetSize),
               zIndex: 20,
@@ -922,7 +1024,7 @@ function ElementHandles({
       type="button"
       data-resize-handle="se"
       className="pointer-events-auto absolute flex cursor-nwse-resize items-center justify-center rounded-full"
-      aria-label="Resize element"
+      aria-label={t('presentationWorkspace.resizeElement')}
       style={{
         ...getTextHandlePositionStyle('se', hitTargetSize),
         zIndex: 20,
@@ -967,6 +1069,11 @@ function renderElementContent(
   onFinishTextEdit?: () => void,
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void,
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void,
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void,
   onTextIndent?: (direction: -1 | 1) => void
 ): React.ReactNode {
   if (element.type === 'text') {
@@ -981,6 +1088,7 @@ function renderElementContent(
         onFinishTextEdit={onFinishTextEdit}
         onTextEditFinalizerChange={onTextEditFinalizerChange}
         onTextSelectionChange={onTextSelectionChange}
+        onTextLayoutChange={onTextLayoutChange}
         onTextIndent={onTextIndent}
       />
     )
@@ -1072,33 +1180,39 @@ function calculateTextResize(
   dx: number,
   dy: number
 ): Partial<EditablePresentationElement> {
+  const radians = (element.rotation * Math.PI) / 180
+  const localX = dx * Math.cos(radians) + dy * Math.sin(radians)
+  const localY = -dx * Math.sin(radians) + dy * Math.cos(radians)
   const hasWest = handle.includes('w')
   const hasEast = handle.includes('e')
-  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
-  if (hasContentHeight(element)) {
-    if (handle === 'n' || handle === 's') {
-      const height = Math.max(TEXT_MIN_HEIGHT, element.height + (handle === 's' ? dy : -dy))
-      return {
-        y: handle === 'n' ? element.y + (element.height - height) : element.y,
-        height
-      } as Partial<EditablePresentationElement>
-    }
-    return {
-      x: hasWest ? element.x + (element.width - width) : element.x,
-      width
-    } as Partial<EditablePresentationElement>
-  }
-
   const hasNorth = handle.includes('n')
   const hasSouth = handle.includes('s')
-  const height = Math.max(TEXT_MIN_HEIGHT, element.height + (hasSouth ? dy : hasNorth ? -dy : 0))
-
+  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? localX : hasWest ? -localX : 0))
+  const height = hasContentHeight(element)
+    ? element.height
+    : Math.max(TEXT_MIN_HEIGHT, element.height + (hasSouth ? localY : hasNorth ? -localY : 0))
+  const centerX = ((width - element.width) / 2) * (hasWest ? -1 : 1)
+  const centerY = ((height - element.height) / 2) * (hasNorth ? -1 : 1)
   return {
-    x: hasWest ? element.x + (element.width - width) : element.x,
-    y: hasNorth ? element.y + (element.height - height) : element.y,
+    x:
+      element.x +
+      element.width / 2 +
+      centerX * Math.cos(radians) -
+      centerY * Math.sin(radians) -
+      width / 2,
+    ...(hasContentHeight(element) && element.rotation === 0
+      ? {}
+      : {
+          y:
+            element.y +
+            element.height / 2 +
+            centerX * Math.sin(radians) +
+            centerY * Math.cos(radians) -
+            height / 2
+        }),
     width,
-    height
-  } as Partial<EditablePresentationElement>
+    ...(hasContentHeight(element) ? {} : { height })
+  }
 }
 
 function hasElementPatchChanges(
@@ -1135,8 +1249,8 @@ function measureAutoSizedTextElement(
   text: string
 ): Partial<EditablePresentationElement> {
   if (!source || !window.document.body) return {}
-  const measure = source.cloneNode(false) as HTMLDivElement
-  measure.textContent = text || ' '
+  const measure = source.cloneNode(true) as HTMLDivElement
+  if (!measure.childNodes.length) measure.textContent = text || ' '
   Object.assign(measure.style, {
     position: 'absolute',
     left: '-10000px',
@@ -1202,6 +1316,7 @@ function TextElementContent({
   onFinishTextEdit,
   onTextEditFinalizerChange,
   onTextSelectionChange,
+  onTextLayoutChange,
   onTextIndent
 }: {
   element: Extract<EditablePresentationElement, { type: 'text' }>
@@ -1217,12 +1332,18 @@ function TextElementContent({
   onFinishTextEdit?: () => void
   onTextEditFinalizerChange?: (finalize: TextEditFinalizer | null) => void
   onTextSelectionChange?: (selection: EditableTextSelection | null) => void
+  onTextLayoutChange?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void
   onTextIndent?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
   const isComposingRef = useRef(false)
   const editingRef = useRef(editing)
   const finalizeTextEditRef = useRef<() => boolean>(() => true)
+  const flushTextRef = useRef<() => boolean>(() => true)
   const initializedEditingElementRef = useRef<string | null>(null)
   const blurFrameRef = useRef<number | null>(null)
   const textFrameRef = useRef<number | null>(null)
@@ -1233,6 +1354,28 @@ function TextElementContent({
   const contentHeight = hasContentHeight(element)
   const paragraphs = useMemo(() => normalizeTextParagraphs(element), [element])
   const hasRichText = Boolean(element.paragraphs?.length || element.runs?.length)
+  const [template] = useState(() => window.document.createElement('div'))
+  const domParagraphsRef = useRef(paragraphs)
+  const domModelRef = useRef<string | null>(null)
+  const retainedSelectionRef = useRef<{ anchor: number; focus: number } | null>(null)
+
+  const fontKey = JSON.stringify([
+    ...new Set([
+      element.fontFamily,
+      ...paragraphs.flatMap((paragraph) => paragraph.runs.map((run) => run.fontFamily))
+    ])
+  ])
+  const [loadedFontKey, setLoadedFontKey] = useState('')
+  useEffect(() => {
+    let active = true
+    const families: string[] = JSON.parse(fontKey)
+    void Promise.allSettled(families.map(loadPresentationFont)).then(() => {
+      if (active) setLoadedFontKey(fontKey)
+    })
+    return () => {
+      active = false
+    }
+  }, [fontKey])
 
   const notifyTextEditLifecycle = useCallback((): void => {
     onTextEditFinalizerChange?.(registeredFinalizerRef.current)
@@ -1258,12 +1401,18 @@ function TextElementContent({
       notifyTextEditLifecycle()
       return
     }
-    const nextParagraphs = serializeTextContent(content, paragraphs)
+    const nextParagraphs = serializeTextContent(content, domParagraphsRef.current)
     const text = getPlainText(nextParagraphs)
     if (text === element.text && JSON.stringify(nextParagraphs) === JSON.stringify(paragraphs)) {
       hasPendingTextRef.current = false
       notifyTextEditLifecycle()
       return
+    }
+    if (
+      nextParagraphs.length === domParagraphsRef.current.length &&
+      !domParagraphsRef.current.some((paragraph) => paragraph.typingStyleCaret !== undefined)
+    ) {
+      domModelRef.current = JSON.stringify(nextParagraphs)
     }
     onUpdateElement?.(slideId, element.id, {
       text,
@@ -1304,7 +1453,11 @@ function TextElementContent({
       blurFrameRef.current = null
       const content = contentRef.current
       if (!editingRef.current || !content) return
-      if (window.document.activeElement === content) {
+      const active = window.document.activeElement
+      if (
+        active === content ||
+        active?.closest('[data-ribbon-surface], [data-presentation-text-tool]')
+      ) {
         pendingBlurTextRef.current = null
         settlePendingText()
         return
@@ -1338,6 +1491,12 @@ function TextElementContent({
   }, [editing])
 
   useLayoutEffect(() => {
+    flushTextRef.current = (): boolean => {
+      if (isComposingRef.current) return false
+      cancelPendingTextCommit()
+      commitText()
+      return true
+    }
     finalizeTextEditRef.current = (): boolean => {
       if (!editingRef.current) return true
       if (isComposingRef.current) return false
@@ -1359,6 +1518,27 @@ function TextElementContent({
   useLayoutEffect(() => {
     if (!editing) return
     const finalize: TextEditFinalizer = () => finalizeTextEditRef.current()
+    finalize.getSelection = () => {
+      const content = contentRef.current
+      const selection =
+        content && window.document.activeElement === content
+          ? (readTextSelection(content) ?? retainedSelectionRef.current)
+          : retainedSelectionRef.current
+      return selection
+        ? {
+            elementId: element.id,
+            start: Math.min(selection.anchor, selection.focus),
+            end: Math.max(selection.anchor, selection.focus)
+          }
+        : null
+    }
+    finalize.restoreSelection = () => {
+      const content = contentRef.current
+      if (!content || !editingRef.current) return
+      content.focus({ preventScroll: true })
+      if (retainedSelectionRef.current) restoreTextSelection(content, retainedSelectionRef.current)
+    }
+    finalize.flush = () => flushTextRef.current()
     finalize.hasUnsafeWork = () => hasPendingTextRef.current
     finalize.isComposing = () => isComposingRef.current
     registeredFinalizerRef.current = finalize
@@ -1369,7 +1549,45 @@ function TextElementContent({
         notifyTextEditLifecycle()
       }
     }
-  }, [editing, notifyTextEditLifecycle])
+  }, [editing, element.id, notifyTextEditLifecycle])
+
+  useLayoutEffect(() => {
+    if (!editing) {
+      domModelRef.current = null
+      retainedSelectionRef.current = null
+      return
+    }
+    const content = contentRef.current
+    if (!content || isComposingRef.current) return
+    const model = JSON.stringify(paragraphs)
+    if (domModelRef.current === model) return
+    const selection =
+      window.document.activeElement === content
+        ? (readTextSelection(content) ?? retainedSelectionRef.current)
+        : retainedSelectionRef.current
+    // React owns the detached template; only this owner writes the browser-editable subtree.
+    content.replaceChildren(...Array.from(template.childNodes, (node) => node.cloneNode(true)))
+    domParagraphsRef.current = paragraphs
+    domModelRef.current = model
+    if (selection) {
+      const focused = window.document.activeElement
+      restoreTextSelection(content, selection)
+      if (focused instanceof HTMLElement && focused !== content)
+        focused.focus({ preventScroll: true })
+    }
+  }, [editing, paragraphs, template])
+
+  useLayoutEffect(() => {
+    if (
+      !editable ||
+      !hasContentHeight(element) ||
+      loadedFontKey !== fontKey ||
+      isComposingRef.current
+    )
+      return
+    const updates = measureAutoSizedTextElement(contentRef.current, element, element.text)
+    if (Object.keys(updates).length) onTextLayoutChange?.(slideId, element.id, updates)
+  }, [editable, element, fontKey, loadedFontKey, onTextLayoutChange, slideId])
 
   useLayoutEffect(() => {
     if (!editing || element.locked) return
@@ -1400,9 +1618,16 @@ function TextElementContent({
     const reportSelection = (): void => {
       const content = contentRef.current
       const selection = window.getSelection()
-      if (!content || !selection || selection.rangeCount === 0) return
+      if (
+        !content ||
+        window.document.activeElement !== content ||
+        !selection ||
+        selection.rangeCount === 0
+      )
+        return
       const range = selection.getRangeAt(0)
       if (!content.contains(range.startContainer) || !content.contains(range.endContainer)) return
+      retainedSelectionRef.current = readTextSelection(content)
       onTextSelectionChange?.({
         elementId: element.id,
         start: getTextOffset(content, range.startContainer, range.startOffset),
@@ -1414,140 +1639,271 @@ function TextElementContent({
     return () => window.document.removeEventListener('selectionchange', reportSelection)
   }, [editing, element.id, onTextSelectionChange])
 
+  useEffect(() => {
+    if (!editing || typeof Highlight === 'undefined' || !CSS.highlights) return
+    const updateHighlight = (): void => {
+      const content = contentRef.current
+      const selected = retainedSelectionRef.current
+      CSS.highlights.delete('presenter-text-selection')
+      if (
+        !content ||
+        !selected ||
+        window.document.activeElement === content ||
+        selected.anchor === selected.focus
+      )
+        return
+      const points = getTextSelectionPoints(content, selected)
+      const range = window.document.createRange()
+      const [start, end] =
+        selected.anchor < selected.focus
+          ? [points.anchor, points.focus]
+          : [points.focus, points.anchor]
+      range.setStart(start.node, start.offset)
+      range.setEnd(end.node, end.offset)
+      CSS.highlights.set('presenter-text-selection', new Highlight(range))
+    }
+    window.document.addEventListener('focusin', updateHighlight)
+    window.document.addEventListener('selectionchange', updateHighlight)
+    updateHighlight()
+    return () => {
+      window.document.removeEventListener('focusin', updateHighlight)
+      window.document.removeEventListener('selectionchange', updateHighlight)
+      CSS.highlights.delete('presenter-text-selection')
+    }
+  }, [editing, paragraphs])
+
+  const renderedText =
+    !hasRichText && !editing
+      ? element.text
+      : paragraphs.map((paragraph, paragraphIndex) => (
+          <div
+            key={paragraphIndex}
+            data-text-paragraph={paragraphIndex}
+            data-list-marker={getListMarker(paragraph, paragraphIndex)}
+            className={
+              paragraph.list ? 'before:mr-2 before:content-[attr(data-list-marker)]' : undefined
+            }
+            style={{
+              minHeight: '1em',
+              textAlign: paragraph.align,
+              lineHeight:
+                paragraph.lineSpacing.kind === 'multiple'
+                  ? paragraph.lineSpacing.value
+                  : `${paragraph.lineSpacing.points}pt`,
+              marginLeft: paragraph.marginLeft,
+              textIndent: paragraph.textIndent
+            }}
+          >
+            {paragraph.runs.map((run, runIndex) => (
+              <span
+                key={runIndex}
+                data-text-run={runIndex}
+                data-source-paragraph={paragraphIndex}
+                style={{
+                  color: run.color,
+                  backgroundColor: run.highlightColor ?? undefined,
+                  fontFamily: run.fontFamily,
+                  fontSize: `${run.fontSize}px`,
+                  fontWeight: run.bold ? 700 : 400,
+                  fontStyle: run.italic ? 'italic' : 'normal',
+                  textDecoration:
+                    [run.underline && 'underline', run.strikethrough && 'line-through']
+                      .filter(Boolean)
+                      .join(' ') || 'none',
+                  verticalAlign:
+                    run.baseline === 'superscript'
+                      ? 'super'
+                      : run.baseline === 'subscript'
+                        ? 'sub'
+                        : 'baseline',
+                  letterSpacing: run.characterSpacing ? `${run.characterSpacing}px` : undefined
+                }}
+              >
+                {run.text}
+              </span>
+            ))}
+            {paragraph.runs.length === 0 ? <br /> : null}
+          </div>
+        ))
+
   return (
-    <div
-      data-text-content
-      ref={contentRef}
-      role="textbox"
-      className={`h-full w-full whitespace-pre-wrap break-words outline-none ${
-        editable ? 'cursor-text' : ''
-      }`}
-      contentEditable={editing && !element.locked}
-      suppressContentEditableWarning
-      style={{
-        color: element.color,
-        fontFamily: element.fontFamily,
-        fontSize: `${element.fontSize}px`,
-        fontWeight: element.bold ? 700 : 400,
-        fontStyle: element.italic ? 'italic' : 'normal',
-        textDecoration: element.underline ? 'underline' : 'none',
-        textAlign: element.align,
-        lineHeight: element.lineHeight,
-        boxSizing: contentHeight ? 'border-box' : undefined,
-        padding: contentHeight
-          ? `${CONTENT_HEIGHT_TEXT_PADDING_Y}px ${CONTENT_HEIGHT_TEXT_PADDING_X}px`
-          : undefined,
-        width: editing && element.autoWidth === true ? 'max-content' : undefined,
-        minWidth: editing && element.autoWidth === true ? '100%' : undefined,
-        height: editing && element.autoWidth === true ? 'auto' : undefined,
-        whiteSpace: editing && element.autoWidth === true ? 'pre' : 'pre-wrap',
-        overflowWrap: editing && element.autoWidth === true ? 'normal' : 'break-word'
-      }}
-      onInput={() => {
-        if (!editing) return
-        hasPendingTextRef.current = true
-        notifyTextEditLifecycle()
-        if (isComposingRef.current) return
-        scheduleTextCommit()
-      }}
-      onCompositionStart={() => {
-        isComposingRef.current = true
-        hasPendingTextRef.current = true
-        notifyTextEditLifecycle()
-        cancelPendingTextCommit()
-      }}
-      onCompositionEnd={() => {
-        isComposingRef.current = false
-        notifyTextEditLifecycle()
-        if (!editing) return
-        if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
-        else scheduleTextCommit()
-      }}
-      onKeyDown={(event) => {
-        if (!editing || event.key !== 'Tab' || !onTextIndent) return
-        event.preventDefault()
-        event.stopPropagation()
-        onTextIndent(event.shiftKey ? -1 : 1)
-      }}
-      onPointerDown={(event) => {
-        if (!editable) return
-        cancelPendingBlur()
-        event.stopPropagation()
-        if (!editing && !element.locked) {
-          pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
-          onStartTextEdit?.()
-        }
-      }}
-      onClick={(event) => {
-        if (!editable) return
-        event.stopPropagation()
-        if (element.locked) return
-        cancelPendingBlur()
-        if (!editing) {
-          pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
-          onStartTextEdit?.()
-        }
-      }}
-      onBlur={(event) => {
-        cancelPendingTextCommit()
-        pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
-        scheduleBlurCommit()
-      }}
-    >
-      {!hasRichText
-        ? element.text
-        : paragraphs.map((paragraph, paragraphIndex) => (
-            <div
-              key={paragraphIndex}
-              data-text-paragraph={paragraphIndex}
-              data-list-marker={getListMarker(paragraph, paragraphIndex)}
-              className={
-                paragraph.list ? 'before:mr-2 before:content-[attr(data-list-marker)]' : undefined
+    <>
+      {editing ? createPortal(renderedText, template) : null}
+      <div
+        key={editing ? 'editing' : 'preview'}
+        data-text-content
+        ref={contentRef}
+        role="textbox"
+        className={`h-full w-full whitespace-pre-wrap break-words outline-none ${
+          editable ? 'cursor-text' : ''
+        }`}
+        contentEditable={editing && !element.locked}
+        suppressContentEditableWarning
+        style={{
+          color: element.color,
+          fontFamily: element.fontFamily,
+          fontSize: `${element.fontSize}px`,
+          fontWeight: element.bold ? 700 : 400,
+          fontStyle: element.italic ? 'italic' : 'normal',
+          textDecoration: element.underline ? 'underline' : 'none',
+          textAlign: element.align,
+          lineHeight: element.lineHeight,
+          boxSizing: contentHeight ? 'border-box' : undefined,
+          padding: contentHeight
+            ? `${CONTENT_HEIGHT_TEXT_PADDING_Y}px ${CONTENT_HEIGHT_TEXT_PADDING_X}px`
+            : undefined,
+          width: editing && element.autoWidth === true ? 'max-content' : undefined,
+          minWidth: editing && element.autoWidth === true ? '100%' : undefined,
+          height: editing && element.autoWidth === true ? 'auto' : undefined,
+          whiteSpace: editing && element.autoWidth === true ? 'pre' : 'pre-wrap',
+          overflowWrap: editing && element.autoWidth === true ? 'normal' : 'break-word'
+        }}
+        onInput={() => {
+          if (!editing) return
+          hasPendingTextRef.current = true
+          notifyTextEditLifecycle()
+          if (isComposingRef.current) return
+          scheduleTextCommit()
+        }}
+        onCompositionStart={() => {
+          isComposingRef.current = true
+          hasPendingTextRef.current = true
+          notifyTextEditLifecycle()
+          cancelPendingTextCommit()
+        }}
+        onCompositionEnd={() => {
+          isComposingRef.current = false
+          notifyTextEditLifecycle()
+          if (!editing) return
+          if (pendingBlurTextRef.current !== null) scheduleBlurCommit()
+          else scheduleTextCommit()
+        }}
+        onKeyDown={(event) => {
+          if (!editing || isComposingRef.current || event.nativeEvent.isComposing) return
+          if (event.key === 'Enter' && !event.shiftKey) {
+            const content = contentRef.current
+            const selection = window.getSelection()
+            if (content && selection?.isCollapsed && selection.anchorNode) {
+              const index = Array.from(content.children).findIndex((node) =>
+                node.contains(selection.anchorNode)
+              )
+              const currentParagraphs = serializeTextContent(content, domParagraphsRef.current)
+              const paragraph = currentParagraphs[index]
+              if (
+                paragraph?.list &&
+                !getPlainText([paragraph])
+                  .replace(/[\u200b\ufeff]/g, '')
+                  .trim()
+              ) {
+                event.preventDefault()
+                cancelPendingTextCommit()
+                hasPendingTextRef.current = false
+                const nextParagraphs = currentParagraphs.map((item, itemIndex) =>
+                  itemIndex === index ? { ...item, list: null, marginLeft: 0, textIndent: 0 } : item
+                )
+                onUpdateElement?.(slideId, element.id, {
+                  text: getPlainText(nextParagraphs),
+                  paragraphs: nextParagraphs
+                })
+                return
               }
-              style={{
-                minHeight: '1em',
-                textAlign: paragraph.align,
-                lineHeight:
-                  paragraph.lineSpacing.kind === 'multiple'
-                    ? paragraph.lineSpacing.value
-                    : `${paragraph.lineSpacing.points}pt`,
-                marginLeft: paragraph.marginLeft,
-                textIndent: paragraph.textIndent
-              }}
-            >
-              {paragraph.runs.map((run, runIndex) => (
-                <span
-                  key={runIndex}
-                  data-text-run={runIndex}
-                  data-source-paragraph={paragraphIndex}
-                  style={{
-                    color: run.color,
-                    backgroundColor: run.highlightColor ?? undefined,
-                    fontFamily: run.fontFamily,
-                    fontSize: `${run.fontSize}px`,
-                    fontWeight: run.bold ? 700 : 400,
-                    fontStyle: run.italic ? 'italic' : 'normal',
-                    textDecoration:
-                      [run.underline && 'underline', run.strikethrough && 'line-through']
-                        .filter(Boolean)
-                        .join(' ') || 'none',
-                    verticalAlign:
-                      run.baseline === 'superscript'
-                        ? 'super'
-                        : run.baseline === 'subscript'
-                          ? 'sub'
-                          : 'baseline',
-                    letterSpacing: run.characterSpacing ? `${run.characterSpacing}px` : undefined
-                  }}
-                >
-                  {run.text}
-                </span>
-              ))}
-              {paragraph.runs.length === 0 ? <br /> : null}
-            </div>
-          ))}
-    </div>
+            }
+          }
+          if (event.key !== 'Tab' || !onTextIndent) return
+          event.preventDefault()
+          event.stopPropagation()
+          onTextIndent(event.shiftKey ? -1 : 1)
+        }}
+        onPointerDown={(event) => {
+          if (!editable) return
+          cancelPendingBlur()
+          event.stopPropagation()
+          if (!editing && !element.locked) {
+            // The preview is replaced below; do not let the browser focus that detached target.
+            event.preventDefault()
+            pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
+            onStartTextEdit?.()
+          }
+        }}
+        onClick={(event) => {
+          if (!editable) return
+          event.stopPropagation()
+          if (element.locked) return
+          cancelPendingBlur()
+          if (!editing) {
+            pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
+            onStartTextEdit?.()
+          }
+        }}
+        onBlur={(event) => {
+          retainedSelectionRef.current =
+            readTextSelection(event.currentTarget) ?? retainedSelectionRef.current
+          cancelPendingTextCommit()
+          pendingBlurTextRef.current = event.currentTarget.textContent ?? ''
+          scheduleBlurCommit()
+        }}
+      >
+        {editing ? null : renderedText}
+      </div>
+    </>
   )
+}
+
+function readTextSelection(content: HTMLElement): { anchor: number; focus: number } | null {
+  const selection = window.getSelection()
+  if (
+    !selection?.anchorNode ||
+    !selection.focusNode ||
+    !content.contains(selection.anchorNode) ||
+    !content.contains(selection.focusNode)
+  )
+    return null
+  return {
+    anchor: getTextOffset(content, selection.anchorNode, selection.anchorOffset),
+    focus: getTextOffset(content, selection.focusNode, selection.focusOffset)
+  }
+}
+
+function getTextSelectionPoints(
+  content: HTMLElement,
+  selection: { anchor: number; focus: number }
+): { anchor: { node: Node; offset: number }; focus: { node: Node; offset: number } } {
+  const locate = (position: number): { node: Node; offset: number } => {
+    let remaining = Math.max(0, position)
+    const paragraphs = Array.from(content.children)
+    for (const [index, paragraph] of paragraphs.entries()) {
+      const length = getEditableNodeText(paragraph).length
+      if (remaining <= length || index === paragraphs.length - 1) {
+        const walker = window.document.createTreeWalker(
+          paragraph,
+          NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
+        )
+        let node: Node | null
+        while ((node = walker.nextNode())) {
+          if (node instanceof Text) {
+            if (remaining <= node.length) return { node, offset: remaining }
+            remaining -= node.length
+          } else if (node instanceof HTMLBRElement) {
+            if (remaining === 0)
+              return { node: paragraph, offset: Array.from(paragraph.childNodes).indexOf(node) }
+            remaining--
+          }
+        }
+        return { node: paragraph, offset: paragraph.childNodes.length }
+      }
+      remaining -= length + 1
+    }
+    return { node: content, offset: 0 }
+  }
+  return { anchor: locate(selection.anchor), focus: locate(selection.focus) }
+}
+
+function restoreTextSelection(
+  content: HTMLElement,
+  selection: { anchor: number; focus: number }
+): void {
+  const { anchor, focus } = getTextSelectionPoints(content, selection)
+  window.getSelection()?.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset)
 }
 
 function getTextOffset(content: HTMLElement, node: Node, nodeOffset: number): number {
@@ -2022,18 +2378,4 @@ function getHandleCursorClass(handle: ResizeHandle): string {
   if (handle === 'e' || handle === 'w') return 'cursor-ew-resize'
   if (handle === 'ne' || handle === 'sw') return 'cursor-nesw-resize'
   return 'cursor-nwse-resize'
-}
-
-function handleToLabel(handle: ResizeHandle): string {
-  const labels: Record<ResizeHandle, string> = {
-    n: 'top',
-    ne: 'top right',
-    e: 'right',
-    se: 'bottom right',
-    s: 'bottom',
-    sw: 'bottom left',
-    w: 'left',
-    nw: 'top left'
-  }
-  return labels[handle]
 }

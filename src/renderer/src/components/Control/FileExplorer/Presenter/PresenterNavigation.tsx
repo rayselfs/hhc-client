@@ -61,7 +61,7 @@ export default function PresenterNavigation(): React.JSX.Element {
             value={progressPercent}
             minValue={0}
             maxValue={100}
-            aria-label="progress"
+            aria-label={t('fileExplorer.presenter.progress')}
             className="w-full"
           >
             <ProgressBar.Track>

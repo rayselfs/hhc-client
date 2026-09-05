@@ -114,7 +114,28 @@ const ModalMock = Object.assign(
 )
 
 const PopoverMock = Object.assign(
-  ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  ({
+    children,
+    isOpen,
+    onOpenChange
+  }: {
+    children: React.ReactNode
+    isOpen?: boolean
+    onOpenChange?: (open: boolean) => void
+  }) => (
+    <div
+      onClickCapture={(event) => {
+        if (
+          isOpen !== undefined &&
+          event.target instanceof Element &&
+          event.target.closest('button') === event.currentTarget.querySelector('button')
+        )
+          onOpenChange?.(!isOpen)
+      }}
+    >
+      {children}
+    </div>
+  ),
   {
     Trigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Content: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

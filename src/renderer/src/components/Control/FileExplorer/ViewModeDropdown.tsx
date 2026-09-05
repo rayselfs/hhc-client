@@ -5,6 +5,7 @@ import { Dropdown, Button } from '@heroui/react'
 import type { FileExplorerViewMode } from '@shared/types/folder'
 
 type ViewLabelKey =
+  | 'fileExplorer.view.extraLargeIcon'
   | 'fileExplorer.view.largeIcon'
   | 'fileExplorer.view.mediumIcon'
   | 'fileExplorer.view.smallIcon'
@@ -17,6 +18,7 @@ interface ViewModeOption {
 }
 
 const VIEW_MODE_OPTIONS: ViewModeOption[] = [
+  { mode: 'extra-large-icon', Icon: LayoutGrid, labelKey: 'fileExplorer.view.extraLargeIcon' },
   { mode: 'large-icon', Icon: LayoutGrid, labelKey: 'fileExplorer.view.largeIcon' },
   { mode: 'medium-icon', Icon: Grid2X2, labelKey: 'fileExplorer.view.mediumIcon' },
   { mode: 'small-icon', Icon: Grid3X3, labelKey: 'fileExplorer.view.smallIcon' },
@@ -24,6 +26,7 @@ const VIEW_MODE_OPTIONS: ViewModeOption[] = [
 ]
 
 const MODE_ICON_MAP: Record<FileExplorerViewMode, React.ComponentType<{ size?: number }>> = {
+  'extra-large-icon': LayoutGrid,
   'large-icon': LayoutGrid,
   'medium-icon': Grid2X2,
   'small-icon': Grid3X3,

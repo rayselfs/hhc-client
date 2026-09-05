@@ -414,7 +414,7 @@ describe('copied media preview identity', () => {
     const { container } = render(<VideoPreview item={makeCopy('video/x-matroska', 'movie.mkv')} />)
     const video = await getLoadedVideo(container)
 
-    fireEvent.click(screen.getByLabelText('Toggle play'))
+    fireEvent.click(screen.getByLabelText('fileExplorer.presenter.togglePlay'))
     expect(video.pause).not.toHaveBeenCalled()
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pause', itemId: 'copy-id' })
 
@@ -439,7 +439,7 @@ describe('copied media preview identity', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('presenter.videoPreparing')
     expect(container.querySelector('button.absolute.inset-0.flex')).toBeNull()
-    expect(screen.queryByLabelText('Toggle play')).toBeNull()
+    expect(screen.queryByLabelText('fileExplorer.presenter.togglePlay')).toBeNull()
   })
 
   it('hides the central button after owner-confirmed playback starts', async () => {

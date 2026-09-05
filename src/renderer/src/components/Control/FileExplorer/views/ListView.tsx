@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react'
+import React, { useCallback, useMemo, useRef } from 'react'
 import { Folder, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -8,7 +8,6 @@ import { getFileIcon } from './getFileIcon'
 import type { GridViewItem } from './GridView'
 import { InlineRenameInput } from '../InlineRenameInput'
 import { splitFileName } from '@renderer/lib/file-naming'
-import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { FileItemStatus } from '../FileItemStatus'
 import { formatLocalDateTime } from '@renderer/lib/format-local-date-time'
 
@@ -86,10 +85,22 @@ export const ListView = React.memo(function ListView({
     return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
   }
 
+  const rows = useMemo(
+    () =>
+      items.flatMap(
+        (item, index): Array<GridViewItem | string> =>
+          item.dateGroup !== undefined &&
+          (index === 0 || items[index - 1].dateGroup !== item.dateGroup)
+            ? [item.dateGroup, item]
+            : [item]
+      ),
+    [items]
+  )
+
   // TanStack Virtual returns helper functions React Compiler cannot memoize safely.
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
-    count: items.length,
+    count: rows.length,
     getScrollElement: () => containerRef.current,
     estimateSize: () => 40,
     overscan: 3
@@ -171,7 +182,21 @@ export const ListView = React.memo(function ListView({
           }}
         >
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const item = items[virtualRow.index]
+            const item = rows[virtualRow.index]
+            if (typeof item === 'string')
+              return (
+                <div
+                  key={`date-${item}`}
+                  data-date-group={item}
+                  className="absolute left-0 top-0 w-full border-t border-divider px-3 py-2 text-sm font-semibold"
+                  style={{
+                    height: virtualRow.size,
+                    transform: `translateY(${virtualRow.start}px)`
+                  }}
+                >
+                  {item || t('fileExplorer.group.unknownDate')}
+                </div>
+              )
             const isRenaming = renamingItemId === item.id
             const splitName = splitFileName(item.name)
             const content = (
@@ -187,16 +212,15 @@ export const ListView = React.memo(function ListView({
               >
                 <div className="flex-shrink-0 w-6 flex items-center justify-center mr-3">
                   {item.isFolder ? (
-                    <span className="relative flex items-center justify-center">
+                    <span
+                      className="relative flex items-center justify-center"
+                      aria-label={
+                        item.syncProviderType
+                          ? t(`fileExplorer.provider.${item.syncProviderType}`)
+                          : undefined
+                      }
+                    >
                       <Folder size={20} className="text-accent" fill="currentColor" />
-                      {item.syncProviderType ? (
-                        <span className="absolute inset-0 flex items-center justify-center">
-                          <SyncProviderIcon
-                            providerType={item.syncProviderType}
-                            className="size-3.5"
-                          />
-                        </span>
-                      ) : null}
                     </span>
                   ) : (
                     <div className="text-danger">

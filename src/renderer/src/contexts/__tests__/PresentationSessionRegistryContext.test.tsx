@@ -80,6 +80,7 @@ function createFakeSession(
       return () => listeners.delete(listener)
     },
     commit: vi.fn(),
+    reflowText: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     beginDraft: vi.fn(),

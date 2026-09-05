@@ -478,10 +478,12 @@
       "largeIcon": "大圖示",
       "mediumIcon": "中圖示",
       "smallIcon": "小圖示",
-      "list": "清單"
+      "list": "清單",
+      "extraLargeIcon": "超大圖示"
     },
     "breadcrumb": {
-      "root": "首頁"
+      "root": "首頁",
+      "label": "資料夾路徑"
     },
     "fab": {
       "label": "新增",
@@ -533,7 +535,15 @@
     },
     "presenter": {
       "skippedItems": "已跳過 {{count}} 個",
-      "readinessSummary": "{{ready}} 個就緒，{{preparing}} 個準備中，{{unsupported}} 個不支援，{{missing}} 個遺失，{{failed}} 個失敗"
+      "readinessSummary": "{{ready}} 個就緒，{{preparing}} 個準備中，{{unsupported}} 個不支援，{{missing}} 個遺失，{{failed}} 個失敗",
+      "readinessIssues": "待處理項目",
+      "readinessHelp": "這些項目會保留在此播放工作階段，直到您修復或選擇略過。",
+      "noReadinessIssues": "沒有待處理項目",
+      "retryPreparation": "重試",
+      "openRecovery": "開啟修復中心",
+      "skipItem": "略過",
+      "progress": "播放進度",
+      "togglePlay": "播放或暫停"
     },
     "noProjectableFiles": "沒有可投影的檔案",
     "invalidName": "名稱無效",
@@ -583,6 +593,29 @@
       "empty": "這裡沒有可加入的資料夾。",
       "import": "加入資料夾",
       "loadFailed": "無法載入 {{provider}} 資料夾。"
+    },
+    "syncHealth": {
+      "syncing": "同步中",
+      "warning": "同步警告",
+      "error": "同步錯誤",
+      "ok": "同步正常",
+      "lastSync": "上次同步: {{value}}",
+      "downloading": "下載中: {{value}}",
+      "queued": "排隊中: {{value}}",
+      "failed": "失敗: {{value}}",
+      "nextRetry": "下次重試: {{value}}",
+      "unknown": "未知"
+    },
+    "group": {
+      "title": "分組",
+      "none": "無",
+      "date": "日期",
+      "unknownDate": "日期不明"
+    },
+    "provider": {
+      "hhc-line": "LINE",
+      "onedrive": "OneDrive",
+      "local-fs": "本地同步"
     }
   },
   "presentationWorkspace": {
@@ -724,6 +757,55 @@
     "distribute": {
       "horizontal": "水平等距分散物件",
       "vertical": "垂直等距分散物件"
+    },
+    "mixed": "混合",
+    "searchFonts": "搜尋字型",
+    "fontsLoading": "正在載入本機字型…",
+    "fontsUnsupported": "此環境無法列出已安裝的字型。",
+    "fontsRetry": "重新載入本機字型",
+    "fontsRecent": "最近使用",
+    "fontsDocument": "此簡報",
+    "fontMissing": "未安裝 · 使用替代字型",
+    "rotateObject": "旋轉物件",
+    "saveFailed": "無法儲存簡報",
+    "presentFromBeginning": "從頭開始播放",
+    "presentFromCurrent": "從目前投影片播放",
+    "readOnlyPptx": "唯讀 PPTX",
+    "editCopyConverting": "正在建立副本…",
+    "editCopy": "編輯副本",
+    "rectangle": "矩形",
+    "ellipse": "橢圓",
+    "line": "直線",
+    "duplicateElement": "複製物件",
+    "zoomIn": "放大",
+    "zoomOut": "縮小",
+    "projectedSlide": "投影中的投影片",
+    "next": "下一張",
+    "resizeSlideRail": "調整投影片側欄寬度",
+    "notes": "備忘稿",
+    "notesPlaceholder": "新增此投影片的講者備忘稿",
+    "slide": "投影片",
+    "selectedObjects": "已選取物件",
+    "projectingSlide": "正在投影投影片",
+    "toggleNotes": "顯示或隱藏備忘稿",
+    "zoom": "縮放",
+    "resetZoom": "重設縮放",
+    "insertBeforeSlide": "插入至第 {{number}} 張投影片之前",
+    "insertAfterLastSlide": "插入至最後一張投影片之後",
+    "linearGradient": "線性",
+    "resizeTextBox": "調整文字方塊大小（{{direction}}）",
+    "resizeImage": "調整圖片大小（{{direction}}）",
+    "cropImage": "裁剪圖片（{{direction}}）",
+    "resizeElement": "調整物件大小",
+    "handleDirection": {
+      "n": "上",
+      "ne": "右上",
+      "e": "右",
+      "se": "右下",
+      "s": "下",
+      "sw": "左下",
+      "w": "左",
+      "nw": "左上"
     }
   },
   "projection": {
@@ -756,7 +838,12 @@
     "hide": "隱藏",
     "delete": "刪除",
     "apiKey": "金鑰",
-    "region": "區域"
+    "region": "區域",
+    "back": "返回",
+    "copy": "複製",
+    "cut": "剪下",
+    "paste": "貼上",
+    "actionMenu": "{{label}}選單"
   },
   "authCallback": {
     "pendingTitle": "正在完成登入...",
@@ -848,7 +935,8 @@
       "settingsConfirm": "將 App 設定重設為預設值並保留使用者資料？",
       "allDataDesc": "清除所有設定、使用者資料、媒體快取與本機資料。此操作無法復原。",
       "allDataButton": "清除所有資料",
-      "allDataConfirm": "清除所有設定、使用者資料、媒體快取與本機資料？此操作無法復原。"
+      "allDataConfirm": "清除所有設定、使用者資料、媒體快取與本機資料？此操作無法復原。",
+      "clearAllDataFailed": "無法清除所有應用程式資料。"
     },
     "trash": {
       "retentionLabel": "垃圾桶保留期限",

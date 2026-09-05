@@ -477,7 +477,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       {displayedHasStarted && !displayedIsEnded && !isPreparing && (
         <button
           className="absolute inset-0 z-10 cursor-pointer"
-          aria-label="Toggle play"
+          aria-label={t('fileExplorer.presenter.togglePlay', 'Toggle play')}
           onClick={handlePlayPause}
           onMouseDown={(e) => e.stopPropagation()}
         />

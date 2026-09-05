@@ -221,6 +221,15 @@ export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
 
   return {
     timezone,
+    recentPresentationFonts: Array.isArray(state.recentPresentationFonts)
+      ? [
+          ...new Set(
+            state.recentPresentationFonts
+              .filter((font): font is string => typeof font === 'string' && font.trim().length > 0)
+              .map((font) => font.trim())
+          )
+        ].slice(0, 8)
+      : [],
     hardwareAcceleration:
       typeof state.hardwareAcceleration === 'boolean'
         ? state.hardwareAcceleration
@@ -244,6 +253,8 @@ export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
 }
 
 export interface SettingsStore {
+  recentPresentationFonts: string[]
+  rememberPresentationFont: (font: string) => void
   timezone: string
   hardwareAcceleration: boolean
   themePreference: ThemePreference
@@ -272,6 +283,7 @@ export interface SettingsStore {
 
 function getDefaultSettingsState(): Omit<
   SettingsStore,
+  | 'rememberPresentationFont'
   | 'setTimezone'
   | 'setHardwareAcceleration'
   | 'setThemePreference'
@@ -287,6 +299,7 @@ function getDefaultSettingsState(): Omit<
   | 'resetToDefaults'
 > {
   return {
+    recentPresentationFonts: [],
     timezone: DEFAULT_TIMEZONE,
     hardwareAcceleration: DEFAULT_HW_ACCEL,
     themePreference: DEFAULT_THEME_PREFERENCE,
@@ -306,6 +319,15 @@ export const useSettingsStore = create<SettingsStore>()(
     (set) => ({
       ...getDefaultSettingsState(),
 
+      rememberPresentationFont: (font) => {
+        if (!font.trim()) return
+        set((state) => ({
+          recentPresentationFonts: [
+            font.trim(),
+            ...state.recentPresentationFonts.filter((item) => item !== font.trim())
+          ].slice(0, 8)
+        }))
+      },
       setTimezone: (tz: string) => {
         set({ timezone: tz })
       },
@@ -368,7 +390,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 12,
+      version: 13,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -425,6 +447,7 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 12) {
           state.lanRemote = DEFAULT_LAN_REMOTE
         }
+        if (version < 13) state.recentPresentationFonts = []
         return normalizeSettingsState(state)
       },
       merge: (persistedState, currentState) => {
@@ -437,6 +460,7 @@ export const useSettingsStore = create<SettingsStore>()(
         }
       },
       partialize: (state) => ({
+        recentPresentationFonts: state.recentPresentationFonts,
         timezone: state.timezone,
         hardwareAcceleration: state.hardwareAcceleration,
         themePreference: state.themePreference,

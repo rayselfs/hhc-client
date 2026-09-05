@@ -82,10 +82,11 @@ describe('EditableSlideSurface', () => {
 
     render(<EditableSurfaceHarness document={withText} slideId={slideId} />)
 
-    const textBox = screen.getByText('Edit me')
+    let textBox = screen.getByText('Edit me')
     expect(textBox).not.toHaveAttribute('contenteditable', 'true')
 
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
 
     expect(textBox).toHaveAttribute('contenteditable', 'true')
   })
@@ -109,8 +110,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByText('Hi')
+    let textBox = screen.getByText('Hi')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Longer title'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
@@ -156,8 +158,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'LongEnglishTokenThatWraps'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
@@ -186,8 +189,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     fireEvent.compositionStart(textBox)
     textBox.textContent = 'ㄓ'
     fireEvent.input(textBox)
@@ -229,8 +233,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'provisional'
     fireEvent.input(textBox)
     fireEvent.compositionStart(textBox)
@@ -267,8 +272,9 @@ describe('EditableSlideSurface', () => {
       </>
     )
 
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
 
     expect(textBox).toHaveAttribute('contenteditable', 'true')
     expect(globalThis.document.activeElement).toBe(textBox)
@@ -305,17 +311,19 @@ describe('EditableSlideSurface', () => {
       </>
     )
 
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     expect(textBox).toHaveAttribute('contenteditable', 'true')
 
     textBox.textContent = 'Confirmed'
+    fireEvent.input(textBox)
     act(() => {
       screen.getByRole('button', { name: 'Confirm target' }).focus()
       fireEvent.blur(textBox)
     })
 
-    expect(textBox).not.toHaveAttribute('contenteditable', 'true')
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('contenteditable', 'true')
     fireEvent.pointerDown(screen.getByText('Confirmed'), { clientX: 40, clientY: 20, pointerId: 2 })
 
     expect(screen.getByRole('textbox')).toHaveAttribute('contenteditable', 'true')
@@ -337,8 +345,9 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Final text'
     globalThis.document.body.focus()
     fireEvent.blur(textBox)
@@ -683,8 +692,9 @@ describe('EditableSlideSurface', () => {
     )
 
     handleUpdate.mockClear()
-    const textBox = screen.getByText('Hi')
+    let textBox = screen.getByText('Hi')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Longer title'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
@@ -744,8 +754,9 @@ describe('EditableSlideSurface', () => {
       fontWeight: '700',
       color: '#ff0000'
     })
-    const textBox = screen.getByRole('textbox')
+    let textBox = screen.getByRole('textbox')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = screen.getByRole('textbox')
     textBox.textContent = 'Edited'
     fireEvent.input(textBox)
     act(() => flushAnimationFrame())
@@ -1378,7 +1389,7 @@ describe('EditableSlideSurface', () => {
 
     expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     const topLeft = screen.getByLabelText('Resize text box top left')
-    expect(topLeft).toHaveClass('rounded-[2px]')
+    expect(topLeft).toHaveClass('cursor-ew-resize')
     expect(withinResizeHandleVisual(topLeft)).toHaveClass('bg-white')
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
     expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
@@ -1386,7 +1397,7 @@ describe('EditableSlideSurface', () => {
     expect(screen.queryByLabelText('Resize element')).not.toBeInTheDocument()
   })
 
-  it('restores top and bottom handles when the same content-height box becomes wide enough', () => {
+  it('keeps content-height boxes horizontal-only at every width', () => {
     mockSurfaceScale(1)
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
@@ -1412,11 +1423,11 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    expect(screen.getByLabelText('Resize text box top')).toBeInTheDocument()
-    expect(screen.getByLabelText('Resize text box bottom')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Resize text box top')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Resize text box bottom')).not.toBeInTheDocument()
   })
 
-  it('turns content-height text into a fixed frame when resizing the top handle', () => {
+  it('preserves manual height resizing for imported fixed frames', () => {
     mockSurfaceScale(1)
     const onTransformPreview = vi.fn()
     const document = createBlankEditablePresentationDocument('Sunday')
@@ -1427,7 +1438,7 @@ describe('EditableSlideSurface', () => {
       y: 80,
       width: 220,
       height: 40,
-      autoSize: 'content',
+      autoSize: 'fixed',
       autoWidth: false
     })
 
@@ -1487,9 +1498,9 @@ describe('EditableSlideSurface', () => {
       expect(indicator).toHaveClass('pointer-events-auto')
       expect(Number.parseFloat(visual.style.width) * scale).toBe(10)
       expect(Number.parseFloat(visual.style.height) * scale).toBe(10)
-      expect(Number.parseFloat(visual.style.borderWidth) * scale).toBe(1.5)
+      expect(Number.parseFloat(visual.style.borderWidth) * scale).toBe(1)
       expect(Number.parseFloat(leftEdge.style.width) * scale).toBe(6)
-      expect(Number.parseFloat(chrome.style.outlineWidth) * scale).toBe(1.5)
+      expect(Number.parseFloat(chrome.style.outlineWidth) * scale).toBe(1)
     }
   )
 
@@ -2153,7 +2164,7 @@ describe('EditableSlideSurface', () => {
       />
     )
 
-    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(8)
+    expect(screen.getAllByLabelText(/Resize text box/)).toHaveLength(6)
     const rightHandle = screen.getByLabelText('Resize text box right')
     mockElementRect(rightHandle, { left: 0, top: 0, width: 25, height: 25 })
     fireEvent.pointerDown(rightHandle, { clientX: 12.5, clientY: 12.5, pointerId: 1 })

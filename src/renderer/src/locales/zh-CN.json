@@ -478,10 +478,12 @@
       "largeIcon": "大图标",
       "mediumIcon": "中图标",
       "smallIcon": "小图标",
-      "list": "列表"
+      "list": "列表",
+      "extraLargeIcon": "超大图标"
     },
     "breadcrumb": {
-      "root": "首页"
+      "root": "首页",
+      "label": "文件夹路径"
     },
     "fab": {
       "label": "新建",
@@ -533,7 +535,15 @@
     },
     "presenter": {
       "skippedItems": "已跳过 {{count}} 个",
-      "readinessSummary": "{{ready}} 个就绪，{{preparing}} 个准备中，{{unsupported}} 个不支持，{{missing}} 个缺失，{{failed}} 个失败"
+      "readinessSummary": "{{ready}} 个就绪，{{preparing}} 个准备中，{{unsupported}} 个不支持，{{missing}} 个缺失，{{failed}} 个失败",
+      "readinessIssues": "待处理项目",
+      "readinessHelp": "这些项目会保留在此播放会话，直到您修复或选择跳过。",
+      "noReadinessIssues": "没有待处理项目",
+      "retryPreparation": "重试",
+      "openRecovery": "打开修复中心",
+      "skipItem": "跳过",
+      "progress": "播放进度",
+      "togglePlay": "播放或暂停"
     },
     "noProjectableFiles": "没有可投影的文件",
     "invalidName": "名称无效",
@@ -583,6 +593,29 @@
       "empty": "这里没有可加入的文件夹。",
       "import": "加入文件夹",
       "loadFailed": "无法加载 {{provider}} 文件夹。"
+    },
+    "syncHealth": {
+      "syncing": "同步中",
+      "warning": "同步警告",
+      "error": "同步错误",
+      "ok": "同步正常",
+      "lastSync": "上次同步: {{value}}",
+      "downloading": "下载中: {{value}}",
+      "queued": "排队中: {{value}}",
+      "failed": "失败: {{value}}",
+      "nextRetry": "下次重试: {{value}}",
+      "unknown": "未知"
+    },
+    "group": {
+      "title": "分组",
+      "none": "无",
+      "date": "日期",
+      "unknownDate": "日期不明"
+    },
+    "provider": {
+      "hhc-line": "LINE",
+      "onedrive": "OneDrive",
+      "local-fs": "本地同步"
     }
   },
   "presentationWorkspace": {
@@ -724,6 +757,55 @@
     "distribute": {
       "horizontal": "水平等距分布对象",
       "vertical": "垂直等距分布对象"
+    },
+    "mixed": "混合",
+    "searchFonts": "搜索字体",
+    "fontsLoading": "正在加载本机字体…",
+    "fontsUnsupported": "此环境无法列出已安装的字体。",
+    "fontsRetry": "重新加载本机字体",
+    "fontsRecent": "最近使用",
+    "fontsDocument": "此演示文稿",
+    "fontMissing": "未安装 · 使用替代字体",
+    "rotateObject": "旋转对象",
+    "saveFailed": "无法保存演示文稿",
+    "presentFromBeginning": "从头开始播放",
+    "presentFromCurrent": "从当前幻灯片播放",
+    "readOnlyPptx": "只读 PPTX",
+    "editCopyConverting": "正在创建副本…",
+    "editCopy": "编辑副本",
+    "rectangle": "矩形",
+    "ellipse": "椭圆",
+    "line": "直线",
+    "duplicateElement": "复制对象",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "projectedSlide": "正在投影的幻灯片",
+    "next": "下一张",
+    "resizeSlideRail": "调整幻灯片侧栏宽度",
+    "notes": "备注",
+    "notesPlaceholder": "添加此幻灯片的演讲者备注",
+    "slide": "幻灯片",
+    "selectedObjects": "已选择对象",
+    "projectingSlide": "正在投影幻灯片",
+    "toggleNotes": "显示或隐藏备注",
+    "zoom": "缩放",
+    "resetZoom": "重置缩放",
+    "insertBeforeSlide": "插入到第 {{number}} 张幻灯片之前",
+    "insertAfterLastSlide": "插入到最后一张幻灯片之后",
+    "linearGradient": "线性",
+    "resizeTextBox": "调整文本框大小（{{direction}}）",
+    "resizeImage": "调整图片大小（{{direction}}）",
+    "cropImage": "裁剪图片（{{direction}}）",
+    "resizeElement": "调整对象大小",
+    "handleDirection": {
+      "n": "上",
+      "ne": "右上",
+      "e": "右",
+      "se": "右下",
+      "s": "下",
+      "sw": "左下",
+      "w": "左",
+      "nw": "左上"
     }
   },
   "projection": {
@@ -756,7 +838,12 @@
     "hide": "隐藏",
     "delete": "删除",
     "apiKey": "密钥",
-    "region": "区域"
+    "region": "区域",
+    "back": "返回",
+    "copy": "复制",
+    "cut": "剪切",
+    "paste": "粘贴",
+    "actionMenu": "{{label}}菜单"
   },
   "authCallback": {
     "pendingTitle": "正在完成登录...",
@@ -848,7 +935,8 @@
       "settingsConfirm": "将 App 设置重置为默认值并保留用户资料？",
       "allDataDesc": "清除所有设置、用户资料、媒体缓存与本地资料。此操作无法复原。",
       "allDataButton": "清除所有资料",
-      "allDataConfirm": "清除所有设置、用户资料、媒体缓存与本地资料？此操作无法复原。"
+      "allDataConfirm": "清除所有设置、用户资料、媒体缓存与本地资料？此操作无法复原。",
+      "clearAllDataFailed": "无法清除所有应用数据。"
     },
     "trash": {
       "retentionLabel": "垃圾桶保留期限",

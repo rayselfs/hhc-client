@@ -1,3 +1,6 @@
+import { groupItemsByDate } from '@renderer/lib/file-explorer-grouping'
+import { useSettingsStore } from '@renderer/stores/settings'
+import { useCurrentFolderDisplay } from '@renderer/stores/file-explorer'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
@@ -13,11 +16,18 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
-import { SortableContext, arrayMove, useSortable } from '@dnd-kit/sortable'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  rectSortingStrategy,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Folder, Upload } from 'lucide-react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useNavigate } from 'react-router-dom'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
@@ -105,15 +115,23 @@ interface SyncItemViewState {
   downloadTotalBytes?: number
 }
 
-function formatSyncFolderHealthTooltip(health: SyncFolderHealth): string {
+function formatSyncFolderHealthTooltip(health: SyncFolderHealth, t: TFunction): string {
   const parts = [
-    `Last sync: ${health.lastSyncedAt ? new Date(health.lastSyncedAt).toLocaleString() : 'Unknown'}`,
-    `Downloading: ${health.downloadingCount}`,
-    `Queued: ${health.queuedCount}`,
-    `Failed: ${health.failedCount}`
+    t('fileExplorer.syncHealth.lastSync', {
+      value: health.lastSyncedAt
+        ? new Date(health.lastSyncedAt).toLocaleString()
+        : t('fileExplorer.syncHealth.unknown')
+    }),
+    t('fileExplorer.syncHealth.downloading', { value: health.downloadingCount }),
+    t('fileExplorer.syncHealth.queued', { value: health.queuedCount }),
+    t('fileExplorer.syncHealth.failed', { value: health.failedCount })
   ]
   if (health.nextRetryAt) {
-    parts.push(`Next retry: ${new Date(health.nextRetryAt).toLocaleString()}`)
+    parts.push(
+      t('fileExplorer.syncHealth.nextRetry', {
+        value: new Date(health.nextRetryAt).toLocaleString()
+      })
+    )
   }
   return parts.join('\n')
 }
@@ -154,12 +172,14 @@ function SortableViewItem({
     disabled: !item.isFolder || isDraggedAway
   })
 
+  const sortableRef = sortable.setNodeRef
+  const droppableRef = droppable.setNodeRef
   const setRef = useCallback(
     (el: HTMLElement | null) => {
-      sortable.setNodeRef(el)
-      if (item.isFolder) droppable.setNodeRef(el)
+      sortableRef(el)
+      if (item.isFolder) droppableRef(el)
     },
-    [item.isFolder, sortable, droppable]
+    [item.isFolder, sortableRef, droppableRef]
   )
 
   const style: React.CSSProperties = {
@@ -213,6 +233,7 @@ function DragOverlayContent({
   isFolder: boolean
   mimeType?: string
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div className="rounded-lg bg-default-100 px-3 py-2 text-sm text-foreground shadow-lg ring-1 ring-border flex items-center gap-2">
       <div className="flex-shrink-0">
@@ -222,7 +243,7 @@ function DragOverlayContent({
           <div className="text-danger">{getFileIcon(mimeType, false, 16)}</div>
         )}
       </div>
-      {count > 1 ? `${count} items` : name}
+      {count > 1 ? t('fileExplorer.status.itemCount', { count }) : name}
     </div>
   )
 }
@@ -384,10 +405,8 @@ export function FileBrowser({
   const customOrders = useFileExplorerCustomOrder((state) => state.orders)
   const setCustomOrder = useFileExplorerCustomOrder((state) => state.setOrder)
   const viewMode = useFileExplorerSettings((state) => state.viewMode)
-  const sortField = useFileExplorerSettings((state) => state.sortField)
-  const sortDir = useFileExplorerSettings((state) => state.sortDir)
-  const setSortDir = useFileExplorerSettings((state) => state.setSortDir)
-  const setSortFieldAndDir = useFileExplorerSettings((state) => state.setSortFieldAndDir)
+  const { sortField, sortDir, setSortFieldAndDir, setSortDir, groupMode } =
+    useCurrentFolderDisplay()
   const colWidths = useFileExplorerSettings((state) => state.colWidths)
   const setColWidths = useFileExplorerSettings((state) => state.setColWidths)
   const searchQuery = useFileExplorerSearch((state) => state.searchQuery)
@@ -562,7 +581,7 @@ export function FileBrowser({
         buildFolderViewItem(folder, {
           health: syncFolderHealthById[folder.id],
           healthTooltip: syncFolderHealthById[folder.id]
-            ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id])
+            ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id], t)
             : undefined,
           syncState: syncStates[folder.id]
         })
@@ -596,11 +615,13 @@ export function FileBrowser({
       thumbnails,
       syncStates,
       mediaJobStates,
-      unsupportedMediaIds
+      unsupportedMediaIds,
+      t
     ]
   )
 
-  const sortedItems = useMemo(() => {
+  const timezone = useSettingsStore((state) => state.timezone)
+  const orderedItems = useMemo(() => {
     const foldersSubset = allItems.filter((item) => item.isFolder)
     const filesSubset = allItems.filter((item) => !item.isFolder)
     if (sortDir !== 'none') {
@@ -623,6 +644,11 @@ export function FileBrowser({
     const newFiles = filesSubset.filter((item) => !orderedIds.has(item.id))
     return [...ordered, ...newFolders, ...newFiles]
   }, [allItems, sortField, sortDir, currentFolderId, customOrders])
+
+  const sortedItems = useMemo(
+    () => (groupMode === 'date' ? groupItemsByDate(orderedItems, timezone, sortDir) : orderedItems),
+    [orderedItems, groupMode, timezone, sortDir]
+  )
 
   const sortedFileItems = useMemo(() => {
     const fileItemMap = new Map(fileItems.map((f) => [f.id, f]))
@@ -1104,6 +1130,11 @@ export function FileBrowser({
       const allSortedIds = sortedItems.map((item) => item.id)
       const oldIndex = allSortedIds.indexOf(String(active.id))
       const newIndex = allSortedIds.indexOf(String(over.id))
+      if (
+        groupMode === 'date' &&
+        sortedItems[oldIndex]?.dateGroup !== sortedItems[newIndex]?.dateGroup
+      )
+        return
       if (oldIndex !== -1 && newIndex !== -1) {
         setCustomOrder(currentFolderId, arrayMove(allSortedIds, oldIndex, newIndex))
         setSortDir('none')
@@ -1111,6 +1142,7 @@ export function FileBrowser({
     },
     [
       draggedIds,
+      groupMode,
       folderIds,
       sortedItems,
       currentFolderId,
@@ -1127,11 +1159,24 @@ export function FileBrowser({
       const data = container.data.current as FileExplorerDndData | undefined
       if (data?.type !== 'folder-dropzone') return false
       if (args.active && container.id === `drop-${String(args.active.id)}`) return false
-      return true
+      const rect = args.droppableRects.get(container.id)
+      const pointer = args.pointerCoordinates
+      if (!rect || !pointer) return false
+      return (
+        pointer.x > rect.left + rect.width * 0.25 &&
+        pointer.x < rect.right - rect.width * 0.25 &&
+        pointer.y > rect.top + rect.height * 0.25 &&
+        pointer.y < rect.bottom - rect.height * 0.25
+      )
     })
     const folderHits = pointerWithin({ ...args, droppableContainers: folderDropZones })
     if (folderHits.length > 0) return folderHits
-    return closestCenter(args)
+    return closestCenter({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (container) => container.data.current?.type !== 'folder-dropzone'
+      )
+    })
   }, [])
 
   const renderItemWrapper = useCallback(
@@ -1233,9 +1278,16 @@ export function FileBrowser({
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => {
+          setActiveId(null)
+          setDraggedIds(new Set())
+        }}
       >
         <div className="h-full" onContextMenu={handleContainerContextMenu}>
-          <SortableContext items={sortedItemsWithSelection.map((item) => item.id)}>
+          <SortableContext
+            items={allIds}
+            strategy={viewMode === 'list' ? verticalListSortingStrategy : rectSortingStrategy}
+          >
             {viewMode === 'list' ? (
               <ListView
                 items={sortedItemsWithSelection}

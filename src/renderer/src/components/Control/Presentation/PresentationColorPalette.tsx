@@ -1,3 +1,5 @@
+import { Button as AriaButton } from 'react-aria-components'
+import { useState } from 'react'
 import { Baseline, ChevronDown, Highlighter } from 'lucide-react'
 import { Popover } from '@heroui/react/popover'
 import { useTranslation } from 'react-i18next'
@@ -38,6 +40,7 @@ interface PresentationColorPaletteProps {
   value: string | null
   theme: EditablePresentationTheme
   disabled?: boolean
+  onFinishFormatting?: () => void
   onChange: (color: string | null) => void
 }
 
@@ -46,11 +49,22 @@ export default function PresentationColorPalette({
   value,
   theme,
   disabled = false,
+  onFinishFormatting,
   onChange
 }: PresentationColorPaletteProps): React.JSX.Element {
   const { t } = useTranslation()
+  const [isOpen, setIsOpen] = useState(false)
+  const changeOpen = (open: boolean): void => {
+    setIsOpen(open)
+    if (!open) onFinishFormatting?.()
+  }
+  const chooseColor = (color: string | null): void => {
+    onChange(color)
+    changeOpen(false)
+  }
   const isFont = kind === 'font'
-  const activeColor = value ?? (isFont ? theme.defaultTextStyle.color : '#ffff00')
+  const activeColor =
+    value && value !== 'mixed' ? value : isFont ? theme.defaultTextStyle.color : '#ffff00'
   const colors = isFont ? createThemeColorGrid(theme) : HIGHLIGHT_COLORS
   return (
     <div className="flex h-7 items-center">
@@ -63,16 +77,22 @@ export default function PresentationColorPalette({
             ? t('presentationWorkspace.fontColor', 'Font color')
             : t('presentationWorkspace.textHighlight', 'Text highlight color')
         }
-        onClick={() => onChange(activeColor)}
+        onClick={() => chooseColor(activeColor)}
       >
         {isFont ? <Baseline size={18} /> : <Highlighter size={18} />}
         <span
           className="absolute bottom-0.5 left-1/2 h-[3px] w-5 -translate-x-1/2"
-          style={{ backgroundColor: activeColor }}
+          style={
+            value === 'mixed'
+              ? {
+                  background: 'repeating-linear-gradient(90deg, #94a3b8 0 3px, transparent 3px 6px)'
+                }
+              : { backgroundColor: activeColor }
+          }
         />
       </button>
-      <Popover>
-        <button
+      <Popover isOpen={isOpen} onOpenChange={changeOpen}>
+        <AriaButton
           type="button"
           aria-label={
             isFont
@@ -80,17 +100,20 @@ export default function PresentationColorPalette({
               : t('presentationWorkspace.textHighlightMenu', 'Text highlight color menu')
           }
           className="inline-flex h-7 w-4 items-center justify-center rounded-r-md text-default-500 hover:bg-content2 disabled:opacity-30"
-          disabled={disabled}
+          isDisabled={disabled}
         >
           <ChevronDown size={12} />
-        </button>
-        <Popover.Content className="w-[396px] rounded-lg border border-divider bg-content1 p-0 shadow-xl">
+        </AriaButton>
+        <Popover.Content
+          data-presentation-text-tool
+          className="w-[396px] rounded-lg border border-divider bg-content1 p-0 shadow-xl"
+        >
           <Popover.Dialog className="p-2">
             {!isFont && (
               <button
                 type="button"
                 className="mb-2 h-9 w-full border border-divider text-sm hover:bg-content2 focus-visible:outline-2 focus-visible:outline-primary"
-                onClick={() => onChange(null)}
+                onClick={() => chooseColor(null)}
               >
                 {t('presentationWorkspace.noColor', 'No Color')}
               </button>
@@ -114,7 +137,7 @@ export default function PresentationColorPalette({
                       : t('presentationWorkspace.textHighlight', 'Text highlight color')
                   } ${color}`}
                   aria-pressed={value?.toLowerCase() === color.toLowerCase()}
-                  onClick={() => onChange(color)}
+                  onClick={() => chooseColor(color)}
                 >
                   <span
                     aria-hidden="true"
@@ -136,7 +159,7 @@ export default function PresentationColorPalette({
                       type="button"
                       className="rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-primary"
                       aria-label={`${t('presentationWorkspace.fontColor', 'Font color')} ${color}`}
-                      onClick={() => onChange(color)}
+                      onClick={() => chooseColor(color)}
                     >
                       <span
                         aria-hidden="true"
@@ -152,7 +175,7 @@ export default function PresentationColorPalette({
                     className="size-7"
                     aria-label={t('presentationWorkspace.moreColors', 'More Colors…')}
                     value={activeColor}
-                    onChange={(event) => onChange(event.currentTarget.value)}
+                    onChange={(event) => chooseColor(event.currentTarget.value)}
                   />
                   {t('presentationWorkspace.moreColors', 'More Colors…')}
                 </label>
