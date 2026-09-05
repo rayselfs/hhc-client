@@ -1,3 +1,4 @@
+import '@renderer/i18n'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { GridView } from '../GridView'

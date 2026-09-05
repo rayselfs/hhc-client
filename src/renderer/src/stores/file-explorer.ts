@@ -1,9 +1,10 @@
+import { useCallback } from 'react'
 import { create, type Mutate, type StoreApi, type UseBoundStore } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
-import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
+import type { FileExplorerViewMode, FileItemRecord, FolderRecord } from '@shared/types/folder'
 import {
   cleanupFileResources,
   purgeExpiredFileTrash,
@@ -12,8 +13,16 @@ import {
 
 export type SortField = 'name' | 'createdAt' | 'size' | 'kind'
 export type SortDir = 'asc' | 'desc' | 'none'
+export type GroupMode = 'none' | 'date'
+export interface FolderDisplayPreference {
+  sortField: SortField
+  sortDir: SortDir
+  groupMode: GroupMode
+}
 
 interface FileExplorerSettingsState {
+  folderDisplay: Record<string, Partial<FolderDisplayPreference>>
+  setFolderDisplay: (folderId: string, preference: Partial<FolderDisplayPreference>) => void
   viewMode: FileExplorerViewMode
   setViewMode: (mode: FileExplorerViewMode) => void
   sortField: SortField
@@ -35,7 +44,7 @@ type FileExplorerSettingsStore = UseBoundStore<
 >
 
 const CREATED_COLUMN_WIDTH = 160
-const EXPLORER_SETTINGS_VERSION = 2
+const EXPLORER_SETTINGS_VERSION = 3
 
 function migrateExplorerSettings(state: unknown): unknown {
   if (!state || typeof state !== 'object') return state
@@ -81,6 +90,14 @@ function createExplorerSettingsStore(
   return create<FileExplorerSettingsState>()(
     persist(
       (set) => ({
+        folderDisplay: {},
+        setFolderDisplay: (folderId, preference) =>
+          set((state) => ({
+            folderDisplay: {
+              ...state.folderDisplay,
+              [folderId]: { ...state.folderDisplay[folderId], ...preference }
+            }
+          })),
         viewMode: 'medium-icon',
         setViewMode: (viewMode) => set({ viewMode }),
         sortField: defaults.sortField,
@@ -97,6 +114,7 @@ function createExplorerSettingsStore(
         version: options.version ?? 0,
         ...(options.migrate ? { migrate: options.migrate } : {}),
         partialize: (state) => ({
+          folderDisplay: state.folderDisplay,
           viewMode: state.viewMode,
           sortField: state.sortField,
           sortDir: state.sortDir,
@@ -240,4 +258,63 @@ export async function permanentDeleteFolderFromStore(folderId: string): Promise<
 
 export async function purgeExpiredTrashFromStore(retentionMs: number): Promise<void> {
   removeCleanedEntriesFromStore(await purgeExpiredFileTrash(retentionMs))
+}
+
+export function resolveFolderDisplay(
+  folderId: string,
+  folders: Record<string, FolderRecord>,
+  defaults: Pick<FolderDisplayPreference, 'sortField' | 'sortDir'>,
+  override?: Partial<FolderDisplayPreference>
+): FolderDisplayPreference {
+  let folder = folders[folderId]
+  const visited = new Set<string>()
+  let isLine = false
+  while (folder && !visited.has(folder.id)) {
+    visited.add(folder.id)
+    if (folder.syncLink) {
+      isLine = folder.syncLink.providerType === 'hhc-line'
+      break
+    }
+    if (!folder.parentId) break
+    folder = folders[folder.parentId]
+  }
+  return {
+    ...defaults,
+    groupMode: 'none',
+    ...(isLine
+      ? { sortField: 'createdAt' as const, sortDir: 'desc' as const, groupMode: 'date' as const }
+      : {}),
+    ...override
+  }
+}
+
+export function useCurrentFolderDisplay(): FolderDisplayPreference & {
+  setSortFieldAndDir: (field: SortField, dir: SortDir) => void
+  setSortDir: (dir: SortDir) => void
+  setGroupMode: (mode: GroupMode) => void
+} {
+  const folderId = useFileExplorerStore((state) => state.currentFolderId)
+  const folders = useFileExplorerStore((state) => state.folders)
+  const sortField = useFileExplorerSettings((state) => state.sortField)
+  const sortDir = useFileExplorerSettings((state) => state.sortDir)
+  const override = useFileExplorerSettings((state) => state.folderDisplay[folderId])
+  const setDisplay = useFileExplorerSettings((state) => state.setFolderDisplay)
+  const setSortFieldAndDir = useCallback(
+    (field: SortField, dir: SortDir) => setDisplay(folderId, { sortField: field, sortDir: dir }),
+    [folderId, setDisplay]
+  )
+  const setSortDir = useCallback(
+    (dir: SortDir) => setDisplay(folderId, { sortDir: dir }),
+    [folderId, setDisplay]
+  )
+  const setGroupMode = useCallback(
+    (mode: GroupMode) => setDisplay(folderId, { groupMode: mode }),
+    [folderId, setDisplay]
+  )
+  return {
+    ...resolveFolderDisplay(folderId, folders, { sortField, sortDir }, override),
+    setSortFieldAndDir,
+    setSortDir,
+    setGroupMode
+  }
 }

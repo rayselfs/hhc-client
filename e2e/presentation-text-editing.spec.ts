@@ -260,3 +260,32 @@ test('content-height text has horizontal handles and an undoable rotation handle
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
   await expect(element).toHaveAttribute('style', /rotate\(0deg\)/)
 })
+
+test('slide shortcuts and native clipboard events share scope without double pasting', async ({
+  page
+}) => {
+  const textBox = await createTextBox(page)
+  await textBox.pressSequentially('Slide content', { delay: 40 })
+  const slides = page.locator('[data-slide-option]')
+  await slides.first().click()
+  await slides.first().press('ControlOrMeta+C')
+  await slides.first().press('ControlOrMeta+V')
+  await expect(slides).toHaveCount(2)
+  await slides.last().click()
+  await slides
+    .last()
+    .evaluate((node) =>
+      node.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true }))
+    )
+  await slides
+    .last()
+    .evaluate((node) =>
+      node.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true }))
+    )
+  await expect(slides).toHaveCount(3)
+  await slides.last().click()
+  await slides.last().press('ControlOrMeta+X')
+  await expect(slides).toHaveCount(2)
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(slides).toHaveCount(3)
+})

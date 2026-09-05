@@ -49,6 +49,8 @@ vi.mock('@dnd-kit/core', async () => {
 })
 
 vi.mock('@dnd-kit/sortable', () => ({
+  rectSortingStrategy: vi.fn(),
+  verticalListSortingStrategy: vi.fn(),
   SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   arrayMove: vi.fn(),
   useSortable: () => ({
@@ -169,6 +171,13 @@ vi.mock('@renderer/stores/file-explorer', () => {
   })
   return {
     FILE_EXPLORER_ROOT_ID: 'file-root',
+    useCurrentFolderDisplay: () => ({
+      sortField: 'createdAt',
+      sortDir: 'none',
+      groupMode: 'none',
+      setSortDir: vi.fn(),
+      setSortFieldAndDir: vi.fn()
+    }),
     deleteFolderFromStore: vi.fn(),
     removeFileItemFromStore: vi.fn(),
     useFileExplorerCustomOrder: (selector: (state: Record<string, unknown>) => unknown) =>

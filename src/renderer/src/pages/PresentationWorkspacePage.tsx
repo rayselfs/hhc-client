@@ -535,6 +535,7 @@ function EditableDocumentView({
   slideClipboard: PresentationSlideClipboard | null
   onSlideClipboardChange: (clipboard: PresentationSlideClipboard) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const registry = usePresentationSessionRegistry()
   const session = useSyncExternalStore(
     registry.subscribe,
@@ -562,7 +563,7 @@ function EditableDocumentView({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <FileText className="text-danger" size={36} />
-        <p className="text-sm font-semibold text-danger">Failed to load presentation</p>
+        <p className="text-sm font-semibold text-danger">{t('presentationWorkspace.loadFailed')}</p>
         <p className="max-w-lg text-xs text-default-400">{error}</p>
       </div>
     )
@@ -1174,15 +1175,19 @@ function EditableSessionDocumentView({
   const copySelectedSlides = (requestedSlideIds?: string[]): void => {
     const slideIds = requestedSlideIds ?? getSelectedSlideIds()
     if (slideIds.length === 0) return
-    onSlideClipboardChange(createSlideClipboard(document, slideIds))
+    const current = finalizeDocumentMutation()
+    if (!current) return
+    onSlideClipboardChange(createSlideClipboard(current, slideIds))
     setCopiedElement(null)
   }
 
   const cutSelectedSlides = (requestedSlideIds?: string[]): void => {
     const slideIds = requestedSlideIds ?? getSelectedSlideIds()
     if (slideIds.length === 0) return
-    onSlideClipboardChange(createSlideClipboard(document, slideIds))
-    const nextDocument = cutSlides(document, slideIds)
+    const current = finalizeDocumentMutation()
+    if (!current) return
+    onSlideClipboardChange(createSlideClipboard(current, slideIds))
+    const nextDocument = cutSlides(current, slideIds)
     session.commit(nextDocument)
     const nextSlideId =
       nextDocument.slideOrder[Math.min(activeSlideIndex, nextDocument.slideOrder.length - 1)]
@@ -1826,7 +1831,7 @@ function EditableSessionDocumentView({
               onClick={() => setIsTextInsertMode((enabled) => !enabled)}
             >
               <Type size={18} />
-              {t('presentationWorkspace.textBox', 'Text Box')}
+              {t('presentationWorkspace.text', 'Text')}
             </button>
           </div>
         </RibbonGroup>
@@ -1964,6 +1969,30 @@ function EditableSessionDocumentView({
     { sectionKey: 'presentation' }
   )
 
+  const handleClipboardCommand = (
+    command: 'copy' | 'cut' | 'paste',
+    target: Element | null
+  ): boolean => {
+    if (
+      target?.closest(
+        'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]'
+      )
+    )
+      return false
+    const inSlides = Boolean(target?.closest('[data-slide-sidebar]'))
+    if (!inSlides && target !== window.document.body && !target?.closest('.presentation-stage'))
+      return false
+    if (command === 'paste') {
+      if (!inSlides && copiedElement) pasteElement()
+      else pasteSlide()
+    } else if (!inSlides && selectedElement) {
+      setCopiedElement(selectedElement)
+      if (command === 'cut') deleteElement()
+    } else if (command === 'copy') copySelectedSlides()
+    else cutSelectedSlides()
+    return true
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.defaultPrevented) return
@@ -1974,9 +2003,7 @@ function EditableSessionDocumentView({
       const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
       const command = event.metaKey || event.ctrlKey
       const isSlideClipboardCommand =
-        Boolean(target?.closest('[data-slide-option]')) &&
-        command &&
-        ['c', 'x', 'v'].includes(event.key.toLowerCase())
+        isSlideSidebar && command && ['c', 'x', 'v'].includes(event.key.toLowerCase())
       const isActionControl = Boolean(
         target?.closest('button, a[href], [role="button"], [role="link"], [role="tab"]')
       )
@@ -2084,36 +2111,14 @@ function EditableSessionDocumentView({
         }
         return
       }
-      if (command && event.key.toLowerCase() === 'c') {
-        event.preventDefault()
-        if (isSlideClipboardCommand) {
-          copySelectedSlides()
-        } else if (selectedElement) {
-          setCopiedElement(selectedElement)
-        } else {
-          copySelectedSlides()
-        }
-      }
-      if (command && event.key.toLowerCase() === 'x') {
-        event.preventDefault()
-        if (isSlideClipboardCommand) {
-          cutSelectedSlides()
-        } else if (selectedElement) {
-          setCopiedElement(selectedElement)
-          deleteElement()
-        } else {
-          cutSelectedSlides()
-        }
-      }
-      if (command && event.key.toLowerCase() === 'v') {
-        event.preventDefault()
-        if (isSlideClipboardCommand) {
-          pasteSlide()
-        } else if (copiedElement) {
-          pasteElement()
-        } else {
-          pasteSlide()
-        }
+      if (command && !event.altKey && ['c', 'x', 'v'].includes(event.key.toLowerCase())) {
+        const action =
+          event.key.toLowerCase() === 'c'
+            ? 'copy'
+            : event.key.toLowerCase() === 'x'
+              ? 'cut'
+              : 'paste'
+        if (handleClipboardCommand(action, target)) event.preventDefault()
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (selectedElementId) {
@@ -2126,8 +2131,25 @@ function EditableSessionDocumentView({
       }
     }
 
+    const handleClipboard = (event: ClipboardEvent): void => {
+      if (event.defaultPrevented) return
+      const target = event.target instanceof Element ? event.target : window.document.activeElement
+      if (
+        (event.type === 'copy' || event.type === 'cut' || event.type === 'paste') &&
+        handleClipboardCommand(event.type, target)
+      )
+        event.preventDefault()
+    }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('copy', handleClipboard)
+    window.addEventListener('cut', handleClipboard)
+    window.addEventListener('paste', handleClipboard)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('copy', handleClipboard)
+      window.removeEventListener('cut', handleClipboard)
+      window.removeEventListener('paste', handleClipboard)
+    }
   })
 
   if (!activeSlideId) {
@@ -2217,7 +2239,9 @@ function EditableSessionDocumentView({
                           event.preventDefault()
                           moveSelectedSlides(index)
                         }}
-                        aria-label={`Insert before slide ${index + 1}`}
+                        aria-label={t('presentationWorkspace.insertBeforeSlide', {
+                          number: index + 1
+                        })}
                       >
                         <span
                           className={`w-full rounded-full ${
@@ -2233,9 +2257,7 @@ function EditableSessionDocumentView({
                         data-slide-index={index}
                         role="option"
                         aria-selected={isSelected}
-                        className={`flex w-full gap-2 rounded-md px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-none ${
-                          isSelected ? 'bg-primary/10 ring-2 ring-primary/60' : ''
-                        }`}
+                        className="flex w-full gap-2 rounded-md px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-500"
                         onClick={(event) => selectSlide(index, event)}
                         onDragStart={(event) => {
                           const ids = selectedSlideIds.has(slideId)
@@ -2324,7 +2346,7 @@ function EditableSessionDocumentView({
                     event.preventDefault()
                     moveSelectedSlides(document.slideOrder.length)
                   }}
-                  aria-label="Insert after last slide"
+                  aria-label={t('presentationWorkspace.insertAfterLastSlide')}
                 >
                   <span
                     className={`w-full rounded-full ${
@@ -2861,7 +2883,7 @@ function FormatBackgroundPanel({
             <label className="block">
               <span>{t('presentationWorkspace.gradientType', 'Type')}</span>
               <select className={`mt-2 h-9 w-full ${NATIVE_CONTROL_CLASS}`} value="linear" disabled>
-                <option value="linear">Linear</option>
+                <option value="linear">{t('presentationWorkspace.linearGradient')}</option>
               </select>
             </label>
             <label className="block">

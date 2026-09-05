@@ -30,13 +30,29 @@ export function FileItemStatus({
   if (folderHealth && folderHealth !== 'unknown') {
     const icon =
       folderHealth === 'syncing' ? (
-        <Loader2 size={14} className="animate-spin text-primary" aria-label="Syncing" />
+        <Loader2
+          size={14}
+          className="animate-spin text-primary"
+          aria-label={t('fileExplorer.syncHealth.syncing', 'Syncing')}
+        />
       ) : folderHealth === 'warning' ? (
-        <AlertTriangle size={14} className="text-warning" aria-label="Sync warning" />
+        <AlertTriangle
+          size={14}
+          className="text-warning"
+          aria-label={t('fileExplorer.syncHealth.warning')}
+        />
       ) : folderHealth === 'error' ? (
-        <XCircle size={14} className="text-danger" aria-label="Sync error" />
+        <XCircle
+          size={14}
+          className="text-danger"
+          aria-label={t('fileExplorer.syncHealth.error')}
+        />
       ) : (
-        <CheckCircle2 size={14} className="text-success" aria-label="Sync OK" />
+        <CheckCircle2
+          size={14}
+          className="text-success"
+          aria-label={t('fileExplorer.syncHealth.ok')}
+        />
       )
     return <span title={folderHealthTooltip}>{icon}</span>
   }

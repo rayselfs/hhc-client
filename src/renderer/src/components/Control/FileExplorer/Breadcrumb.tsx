@@ -18,7 +18,10 @@ export default function Breadcrumb({
   const path = getFolderPath(currentFolderId).filter((folder) => folder.parentId !== null)
 
   return (
-    <nav aria-label="breadcrumb" className="flex items-center gap-0.5 min-w-0 overflow-hidden">
+    <nav
+      aria-label={t('fileExplorer.breadcrumb.label')}
+      className="flex items-center gap-0.5 min-w-0 overflow-hidden"
+    >
       <button
         type="button"
         onClick={() => onNavigate(null)}

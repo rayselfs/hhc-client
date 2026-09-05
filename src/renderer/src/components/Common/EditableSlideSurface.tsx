@@ -221,9 +221,9 @@ export default function EditableSlideSurface({
       }
     }
     onEditingElementChange?.(null)
-    onSelectElement?.(element.id, event)
     const original = onTransformStart ? onTransformStart(element.id) : element
     if (!original) return
+    onSelectElement?.(element.id, event)
     dragRef.current = {
       elementId: element.id,
       mode,
@@ -402,6 +402,8 @@ export default function EditableSlideSurface({
     if (target?.closest('[data-slide-element]')) return false
     const point = getCanvasPoint(event)
     if (!point) return false
+
+    if (!finalizeTextEdit()) return true
 
     event.preventDefault()
     event.stopPropagation()
@@ -882,6 +884,7 @@ function ElementHandles({
   onResizeKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onCropKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, handle: ResizeHandle) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   if (element.type === 'text') {
     const handles = hasContentHeight(element) ? CONTENT_TEXT_HANDLES : FIXED_TEXT_HANDLES
     const edgeSize = TEXT_FRAME_HIT_AREA / surfaceScale
@@ -923,7 +926,9 @@ function ElementHandles({
             type="button"
             data-resize-handle={handle}
             className={`${hasContentHeight(element) ? 'cursor-ew-resize' : getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center`}
-            aria-label={`Resize text box ${handleToLabel(handle)}`}
+            aria-label={t('presentationWorkspace.resizeTextBox', {
+              direction: t(`presentationWorkspace.handleDirection.${handle}`)
+            })}
             style={{
               ...getTextHandlePositionStyle(handle, hitTargetSize),
               zIndex: 20,
@@ -971,7 +976,10 @@ function ElementHandles({
             type="button"
             data-resize-handle={handle}
             className={`${getHandleCursorClass(handle)} pointer-events-auto absolute flex items-center justify-center rounded-full`}
-            aria-label={`${cropMode ? 'Crop' : 'Resize'} image ${handleToLabel(handle)}`}
+            aria-label={t(
+              cropMode ? 'presentationWorkspace.cropImage' : 'presentationWorkspace.resizeImage',
+              { direction: t(`presentationWorkspace.handleDirection.${handle}`) }
+            )}
             style={{
               ...getTextHandlePositionStyle(handle, hitTargetSize),
               zIndex: 20,
@@ -1016,7 +1024,7 @@ function ElementHandles({
       type="button"
       data-resize-handle="se"
       className="pointer-events-auto absolute flex cursor-nwse-resize items-center justify-center rounded-full"
-      aria-label="Resize element"
+      aria-label={t('presentationWorkspace.resizeElement')}
       style={{
         ...getTextHandlePositionStyle('se', hitTargetSize),
         zIndex: 20,
@@ -2370,18 +2378,4 @@ function getHandleCursorClass(handle: ResizeHandle): string {
   if (handle === 'e' || handle === 'w') return 'cursor-ew-resize'
   if (handle === 'ne' || handle === 'sw') return 'cursor-nesw-resize'
   return 'cursor-nwse-resize'
-}
-
-function handleToLabel(handle: ResizeHandle): string {
-  const labels: Record<ResizeHandle, string> = {
-    n: 'top',
-    ne: 'top right',
-    e: 'right',
-    se: 'bottom right',
-    s: 'bottom',
-    sw: 'bottom left',
-    w: 'left',
-    nw: 'top left'
-  }
-  return labels[handle]
 }

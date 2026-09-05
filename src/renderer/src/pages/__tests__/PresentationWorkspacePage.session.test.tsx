@@ -1,3 +1,4 @@
+import i18n from '@renderer/i18n'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -139,7 +140,10 @@ vi.mock('react-i18next', async () => {
   const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next')
   return {
     ...actual,
-    useTranslation: () => ({ t: (_key: string, fallback?: string) => fallback ?? _key })
+    useTranslation: () => ({
+      t: (key: string, options?: string | Record<string, unknown>) =>
+        typeof options === 'string' ? options : i18n.t(key, { ...options, defaultValue: key })
+    })
   }
 })
 
@@ -372,7 +376,7 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(within(homeRibbon).getByRole('button', { name: 'New Slide' })).toBeEnabled()
     expect(within(homeRibbon).getByRole('button', { name: 'Picture' })).toBeEnabled()
     expect(within(homeRibbon).getByRole('button', { name: 'Shapes' })).toBeEnabled()
-    expect(within(homeRibbon).getByRole('button', { name: 'Text Box' })).toBeEnabled()
+    expect(within(homeRibbon).getByRole('button', { name: 'Text' })).toBeEnabled()
     expect(within(homeRibbon).queryAllByRole('spinbutton')).toHaveLength(0)
   })
 
@@ -620,30 +624,27 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(textFrame).not.toBeNull()
     fireEvent.click(textFrame!)
     fireEvent.keyDown(document, { code: 'Enter', key: 'Enter' })
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!
     expect(content).toHaveAttribute('contenteditable', 'true')
     expect(content).toHaveFocus()
 
     const historyLength = session.getSnapshot().history.past.length
     fireEvent.keyDown(content, { code: 'PageDown', key: 'PageDown' })
-    fireEvent.keyDown(content, { code: 'KeyB', key: 'b', ctrlKey: true })
     expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(firstSlideId)
     expect(session.getSnapshot().history.past).toHaveLength(historyLength)
-
-    fireEvent.keyDown(content, { code: 'Escape', key: 'Escape' })
-    expect(content).toHaveAttribute('contenteditable', 'false')
-    expect(content).toHaveFocus()
-    expect(screen.getByRole('button', { name: 'Bold' })).toBeEnabled()
     fireEvent.keyDown(content, { code: 'KeyB', key: 'b', ctrlKey: true })
     expect(session.getSnapshot().history.past).toHaveLength(historyLength + 1)
+    fireEvent.keyDown(content, { code: 'Escape', key: 'Escape' })
+    content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!
+    expect(content).toHaveAttribute('contenteditable', 'false')
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeEnabled()
     expect(
       session.getSnapshot().renderedDocument.slides[firstSlideId].elements[text.id]
     ).toMatchObject({ bold: true })
-
-    fireEvent.keyDown(content, { code: 'Escape', key: 'Escape' })
+    fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled()
 
-    const textInsert = screen.getByRole('button', { name: 'Text Box' })
+    const textInsert = screen.getByRole('button', { name: 'Text' })
     fireEvent.click(textInsert)
     expect(textInsert).toHaveAttribute('aria-pressed', 'true')
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
@@ -666,7 +667,7 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.click(frame)
     fireEvent.keyDown(document, { key: 'Enter', code: 'Enter' })
     const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!
-    const textNode = content.firstChild!
+    const textNode = document.createTreeWalker(content, NodeFilter.SHOW_TEXT).nextNode()!
     const range = document.createRange()
     range.setStart(textNode, 1)
     range.setEnd(textNode, 4)
@@ -694,9 +695,15 @@ describe('PresentationWorkspacePage session integration', () => {
     })
     const session = await renderWorkspaceSession()
     const historyLength = session.getSnapshot().history.past.length
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     content.textContent = 'Keep me'
     fireEvent.input(content)
     fireEvent.keyDown(content, { key: 'Escape', code: 'Escape' })
@@ -727,9 +734,15 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     fireEvent.compositionStart(content)
     content.textContent = 'Provisional'
     fireEvent.input(content)
@@ -765,9 +778,15 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     content.textContent = 'Pending navigation text'
     fireEvent.input(content)
 
@@ -796,13 +815,25 @@ describe('PresentationWorkspacePage session integration', () => {
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
     vi.useFakeTimers()
     try {
-      const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+      let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
       if (!content) throw new Error('presentation text box not found')
-      fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+      fireEvent.pointerDown(
+        document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+        { clientX: 40, clientY: 20, pointerId: 1 }
+      )
+      content = document.querySelector<HTMLElement>(
+        '.presentation-stage [data-text-content][contenteditable="true"]'
+      )!
       content.textContent = 'Refocused text'
       fireEvent.input(content)
       fireEvent.blur(content)
-      fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 2 })
+      fireEvent.pointerDown(
+        document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+        { clientX: 40, clientY: 20, pointerId: 2 }
+      )
+      content = document.querySelector<HTMLElement>(
+        '.presentation-stage [data-text-content][contenteditable="true"]'
+      )!
       act(() => flushAnimationFrame())
       await act(async () => {
         vi.advanceTimersByTime(1000)
@@ -846,9 +877,15 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     render(<RouterProvider router={router} />)
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     content.textContent = 'Navigate safely'
     fireEvent.input(content)
     Object.defineProperty(HTMLElement.prototype, 'focus', {
@@ -893,9 +930,15 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     render(<RouterProvider router={router} />)
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     fireEvent.compositionStart(content)
     content.textContent = 'Composed navigation text'
     fireEvent.input(content)
@@ -930,18 +973,30 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
-    act(() => content.blur())
+    act(() => content!.blur())
     act(() => flushAnimationFrame())
     expect(registry!.get('deck-1')!.getSnapshot().draftKind).toBeNull()
     expect(registry!.get('deck-1')!.getSnapshot().history.past).toHaveLength(0)
     expect(registry!.hasPendingEditorWork?.('deck-1')).toBe(false)
     expect(usePresentationWorkspaceStore.getState().getActiveDocument()?.canUndo).toBe(false)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled())
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     content.textContent = 'Undo target'
     fireEvent.input(content)
     const undo = screen.getByRole('button', { name: 'Undo' })
@@ -980,9 +1035,15 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     fireEvent.compositionStart(content)
     content.textContent = 'Provisional'
     fireEvent.input(content)
@@ -1015,9 +1076,15 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
     if (!content) throw new Error('presentation text box not found')
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     content.textContent = 'Projected text'
     fireEvent.input(content)
     await user.click(screen.getByRole('button', { name: 'Start projection' }))
@@ -1031,7 +1098,13 @@ describe('PresentationWorkspacePage session integration', () => {
       registry!.get('deck-1')!.getSnapshot().history.present.slides[slideId].elements[text.id]
     ).toMatchObject({ text: 'Projected text' })
 
-    fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
+    fireEvent.pointerDown(
+      document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+      { clientX: 40, clientY: 20, pointerId: 1 }
+    )
+    content = document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     fireEvent.compositionStart(content)
     content.textContent = 'Provisional'
     fireEvent.input(content)
@@ -1142,10 +1215,9 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     renderEditableWorkspaceWithText()
     fireEvent.click((await screen.findAllByRole('textbox')).at(-1)!)
-    const fontSelector = screen.getByLabelText('Font family')
+    const fontSelector = screen.getByRole('button', { name: 'Font family' })
 
-    fireEvent.pointerDown(fontSelector)
-    fireEvent.focus(fontSelector)
+    fireEvent.click(fontSelector)
 
     expect(mocks.queryLocalFontFamiliesOnce).toHaveBeenCalledOnce()
     await act(async () => resolveFonts(['PMingLiU', 'MingLiU', 'DFKai-SB', 'PMingLiU', 'DFKai-SB']))
@@ -1162,14 +1234,14 @@ describe('PresentationWorkspacePage session integration', () => {
     renderEditableWorkspaceWithText()
     fireEvent.click((await screen.findAllByRole('textbox')).at(-1)!)
 
-    fireEvent.focus(screen.getByLabelText('Font family'))
+    fireEvent.click(screen.getByRole('button', { name: 'Font family' }))
 
     await waitFor(() =>
       expect(mocks.toastWarning).toHaveBeenCalledWith(
         'Unable to load local fonts. Check the font access permission.'
       )
     )
-    fireEvent.pointerDown(screen.getByLabelText('Font family'))
+    fireEvent.click(screen.getByRole('button', { name: 'Retry local fonts' }))
 
     expect(await screen.findByRole('option', { name: 'Songti TC' })).toBeInTheDocument()
     expect(mocks.queryLocalFontFamiliesOnce).toHaveBeenCalledTimes(2)
@@ -1270,17 +1342,9 @@ describe('PresentationWorkspacePage session integration', () => {
       ?.closest('[data-slide-element]')
     expect(textElement).not.toBeNull()
     fireEvent.pointerDown(textElement!, { clientX: 10, clientY: 10 })
-    const fontSizeSelect = screen
-      .getAllByRole('combobox')
-      .find((select) => select.querySelector('option[value="72"]'))
-    expect(fontSizeSelect).toBeDefined()
-    expect(
-      Array.from(fontSizeSelect!.querySelectorAll('option'), (option) => Number(option.value))
-    ).toEqual([
-      8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96
-    ])
-
-    fireEvent.change(fontSizeSelect!, { target: { value: '72' } })
+    const fontSizeInput = screen.getByRole('textbox', { name: 'Font size' })
+    fireEvent.change(fontSizeInput, { target: { value: '72' } })
+    fireEvent.keyDown(fontSizeInput, { key: 'Enter' })
 
     await waitFor(() => {
       const updated = session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
@@ -1339,7 +1403,12 @@ describe('PresentationWorkspacePage session integration', () => {
         expect(element.autoWidth).toBe(true)
       })
 
-      fireEvent.click(screen.getByRole('button', { name: 'Text Box' }))
+      const firstContent = window.document.querySelector<HTMLElement>(
+        '.presentation-stage [contenteditable="true"]'
+      )!
+      firstContent.textContent = 'First text'
+      fireEvent.input(firstContent)
+      fireEvent.click(screen.getByRole('button', { name: 'Text' }))
       fireEvent.pointerDown(surface!, { clientX: 100, clientY: 100, pointerId: 1 })
       fireEvent.pointerUp(surface!, { clientX: 140, clientY: 120, pointerId: 1 })
 
@@ -1357,6 +1426,11 @@ describe('PresentationWorkspacePage session integration', () => {
         expect(dragged.autoWidth).toBe(false)
       })
 
+      const secondContent = window.document.querySelector<HTMLElement>(
+        '.presentation-stage [contenteditable="true"]'
+      )!
+      secondContent.textContent = 'Second text'
+      fireEvent.input(secondContent)
       const rightHandle = screen.getByLabelText('Resize text box right')
       fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 2 })
       fireEvent.pointerMove(rightHandle, { clientX: 12, clientY: 0, pointerId: 2 })
@@ -1406,9 +1480,14 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
 
-    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
     if (!textBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     textBox.textContent = 'Pending blur text'
     fireEvent.input(textBox)
     const rightHandle = await screen.findByLabelText('Resize text box right')
@@ -1454,9 +1533,14 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
 
-    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
     if (!textBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     textBox.textContent = 'Final title'
     fireEvent.input(textBox)
     const rightHandle = await screen.findByLabelText('Resize text box right')
@@ -1487,9 +1571,14 @@ describe('PresentationWorkspacePage session integration', () => {
     })
     const session = await renderWorkspaceSession()
     const initialHistoryLength = session.getSnapshot().history.past.length
-    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
     if (!textBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     const rightHandle = await screen.findByLabelText('Resize text box right')
     fireEvent.pointerDown(rightHandle, { clientX: 0, clientY: 0, pointerId: 2 })
     fireEvent.pointerMove(rightHandle, { clientX: 24, clientY: 0, pointerId: 2 })
@@ -1720,9 +1809,14 @@ describe('PresentationWorkspacePage session integration', () => {
       revision: 0
     })
     const session = await renderWorkspaceSession()
-    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
     if (!textBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     fireEvent.compositionStart(textBox)
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Shapes' }))
@@ -1748,9 +1842,14 @@ describe('PresentationWorkspacePage session integration', () => {
       revision: 0
     })
     const session = await renderWorkspaceSession()
-    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
     if (!textBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     textBox.textContent = 'Before New Slide'
     fireEvent.input(textBox)
     const newSlide = screen.getByRole('button', { name: 'New Slide' })
@@ -1767,11 +1866,14 @@ describe('PresentationWorkspacePage session integration', () => {
     await act(async () => {
       usePresentationWorkspaceStore.getState().setActiveSlideId('deck-1', slideId)
     })
-    const returnedTextBox = document.querySelector<HTMLElement>(
+    let returnedTextBox = window.document.querySelector<HTMLElement>(
       '.presentation-stage [data-text-content]'
     )
     if (!returnedTextBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(returnedTextBox, { clientX: 40, clientY: 20, pointerId: 2 })
+    returnedTextBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     returnedTextBox.textContent = 'Before Nudge'
     fireEvent.input(returnedTextBox)
     fireEvent.keyDown(document, { key: 'ArrowRight' })
@@ -1804,9 +1906,14 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const textBox = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
+    let textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content]'
+    )
     if (!textBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     textBox.textContent = 'Final before boundary'
     fireEvent.input(textBox)
 
@@ -1936,11 +2043,14 @@ describe('PresentationWorkspacePage session integration', () => {
     const { document, slideId: secondSlideId } = insertBlankEditableSlide(withText, 1)
     mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
     const session = await renderWorkspaceSession()
-    const textBox = globalThis.document.querySelector<HTMLElement>(
+    let textBox = globalThis.document.querySelector<HTMLElement>(
       '.presentation-stage [data-text-content]'
     )
     if (!textBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     textBox.textContent = 'Before switch'
     fireEvent.input(textBox)
     fireEvent.click(screen.getByRole('option', { name: '2' }))
@@ -1952,11 +2062,14 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(secondSlideId)
 
     fireEvent.click(screen.getByRole('option', { name: '1Before switch' }))
-    const returnedTextBox = globalThis.document.querySelector<HTMLElement>(
+    let returnedTextBox = globalThis.document.querySelector<HTMLElement>(
       '.presentation-stage [data-text-content]'
     )
     if (!returnedTextBox) throw new Error('presentation text box not found')
     fireEvent.pointerDown(returnedTextBox, { clientX: 40, clientY: 20, pointerId: 2 })
+    returnedTextBox = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-text-content][contenteditable="true"]'
+    )!
     returnedTextBox.textContent = 'Delete me'
     fireEvent.input(returnedTextBox)
     fireEvent.keyDown(globalThis.document, { key: 'Delete' })

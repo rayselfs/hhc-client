@@ -381,6 +381,7 @@ function SplitFormattingMenu({
   onFinishFormatting?: () => void
   items: Array<{ id: string; label: string; active?: ToggleState; action: () => void }>
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const changeOpen = (open: boolean): void => {
     setIsOpen(open)
@@ -404,7 +405,7 @@ function SplitFormattingMenu({
           type="button"
           className={`${CONTROL} min-w-4 rounded-l-none px-0`}
           isDisabled={disabled}
-          aria-label={`${label} menu`}
+          aria-label={t('common.actionMenu', { label })}
         >
           <ChevronDown size={11} />
         </AriaButton>

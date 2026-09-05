@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import '@heroui/styles';
+@import './heroui.css';
 
 /* Inter Variable — latin UI font for English */
 @font-face {

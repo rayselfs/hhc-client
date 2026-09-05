@@ -1,3 +1,4 @@
+import { useCurrentFolderDisplay } from '@renderer/stores/file-explorer'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
@@ -54,10 +55,9 @@ export default function Header(): React.JSX.Element {
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const navigateToRoot = useFileExplorerStore((state) => state.navigateToRoot)
   const viewMode = useFileExplorerSettings((state) => state.viewMode)
+  const { sortField, sortDir, setSortFieldAndDir, groupMode, setGroupMode } =
+    useCurrentFolderDisplay()
   const setViewMode = useFileExplorerSettings((state) => state.setViewMode)
-  const sortField = useFileExplorerSettings((state) => state.sortField)
-  const sortDir = useFileExplorerSettings((state) => state.sortDir)
-  const setSortFieldAndDir = useFileExplorerSettings((state) => state.setSortFieldAndDir)
 
   const favViewMode = useFavoritesExplorerSettings((state) => state.viewMode)
   const favSetViewMode = useFavoritesExplorerSettings((state) => state.setViewMode)
@@ -203,6 +203,8 @@ export default function Header(): React.JSX.Element {
             sortField={activeSortField}
             sortDir={activeSortDir}
             onSortChange={activeSetSortFieldAndDir}
+            groupMode={groupMode}
+            onGroupChange={showFilesControls ? setGroupMode : undefined}
           />
         </ButtonGroup>
         {showFilesControls && (

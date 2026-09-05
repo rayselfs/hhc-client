@@ -230,6 +230,11 @@ async function dragResizeHandle(
     ? CONTENT_HEIGHT_GEOMETRY_CHANGES[direction]
     : FIXED_GEOMETRY_CHANGES[direction]
   for (const property of ['x', 'y', 'width', 'height'] as const) {
+    // Content height may change when a width adjustment reflows the text.
+    if (horizontalOnly && property === 'height') {
+      expect(after.height).toBeGreaterThan(0)
+      continue
+    }
     if (expectedChanges[property]) {
       expect(after[property], `${direction} ${property}`).not.toBe(before[property])
     } else {
@@ -314,7 +319,6 @@ async function dragWithTouch(
 }
 
 async function expectTextInteriorAndFrameMove(page: Page, element: Locator): Promise<void> {
-  const text = element.getByText('Corner', { exact: true })
   const content = await element.boundingBox()
   expect(content).not.toBeNull()
   const contentPoint = {
@@ -333,8 +337,8 @@ async function expectTextInteriorAndFrameMove(page: Page, element: Locator): Pro
   ).toEqual({ element: true, handle: false, edge: false })
 
   await page.mouse.dblclick(contentPoint.x, contentPoint.y)
-  await expect(text).toHaveAttribute('contenteditable', 'true')
-  await expect(text).toBeFocused()
+  await expect(element.locator('[data-text-content]')).toHaveAttribute('contenteditable', 'true')
+  await expect(element.locator('[data-text-content]')).toBeFocused()
   await page.keyboard.press('Escape')
   await selectSlideElement(element)
 
@@ -524,7 +528,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const zoomSlider = page.getByRole('slider', { name: /Zoom|縮放/ })
   await expect(fit).toHaveAttribute('aria-pressed', 'true')
 
-  await page.getByRole('button', { name: /Text Box|文字方塊|文本框/ }).click()
+  await page.getByRole('button', { name: /^(Text|文字)$/ }).click()
   await page
     .locator('.presentation-stage [data-slide-surface]')
     .click({ position: { x: 160, y: 120 } })
@@ -567,7 +571,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await page.setViewportSize({ width: 1470, height: 726 })
   const stageSlot = page.locator('.workspace-stage-slot')
   const presentationStage = page.locator('.presentation-stage')
-  const notes = page.getByRole('button', { name: /Toggle Notes|切換備忘稿/ })
+  const notes = page.getByRole('button', { name: /Toggle Notes|顯示或隱藏備忘稿/ })
   const zoom = page.getByRole('button', { name: /Reset zoom|重設縮放/ })
   const ribbon = page.locator('[data-ribbon-surface]')
   const viewport = page.getByTestId('presentation-canvas-viewport')
@@ -580,7 +584,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
 
   const resizeHandle = page
     .locator('.presentation-stage')
-    .getByRole('button', { name: 'Resize text box right' })
+    .getByRole('button', { name: /Resize text box right|調整文字方塊大小（右）/ })
   for (const zoomPercent of ['25', '100', '200']) {
     await zoomSlider.fill(zoomPercent)
     const handleBox = await resizeHandle.boundingBox()
