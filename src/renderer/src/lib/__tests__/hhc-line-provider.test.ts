@@ -237,44 +237,57 @@ describe('HHC LINE read-only provider', () => {
     }
   )
 
-  it('emits one telemetry-only receipt after an always-offline commit per item version', async () => {
-    const client = api()
-    vi.mocked(client.recordSyncReceipt).mockRejectedValue(new Error('telemetry unavailable'))
-    const saveDownloadedContent = vi.fn(async () => ({
-      blobId: 'blob_1',
-      size: 7,
-      mimeType: 'image/jpeg'
-    }))
-    const provider = new HhcLineReadonlyProvider({
-      api: client,
-      getSession: vi.fn(),
-      saveDownloadedContent
-    })
-    const request = {
-      providerConnectionId: 'hhc-line:user_1',
-      rootRemoteFolderId: collection.id,
-      remoteItemId: item.id,
-      targetBlobId: 'blob_1',
-      offlinePolicy: 'always-offline' as const
+  it.each(['native', 'web'])(
+    'persists a failed %s receipt and retries from a new provider without downloading again',
+    async (mode) => {
+      const client = api()
+      if (mode === 'web') Reflect.deleteProperty(window, 'api')
+      else
+        vi.mocked(client.downloadContent).mockResolvedValue({
+          fileId: 'blob_1',
+          size: 7,
+          mimeType: 'image/jpeg'
+        })
+      vi.mocked(client.recordSyncReceipt)
+        .mockRejectedValueOnce(new TypeError('offline'))
+        .mockResolvedValue(undefined)
+      const provider = new HhcLineReadonlyProvider({ api: client, getSession: vi.fn() })
+      const request = {
+        providerConnectionId: 'hhc-line:user_1',
+        rootRemoteFolderId: collection.id,
+        remoteItemId: item.id,
+        targetBlobId: 'blob_1',
+        offlinePolicy: 'always-offline' as const
+      }
+      await expect(
+        provider.downloadContent(request, new AbortController().signal, () => true)
+      ).resolves.toMatchObject({ blobId: 'blob_1' })
+      await vi.waitFor(async () =>
+        expect(
+          (await getSyncEntryByRemoteItem(request.providerConnectionId, item.id))?.syncReceipt
+            ?.attempts
+        ).toBe(1)
+      )
+      const entry = await getSyncEntryByRemoteItem(request.providerConnectionId, item.id)
+      expect(entry?.syncReceipt).toMatchObject({ contentVersion: item.etag, state: 'pending' })
+      const now = vi.spyOn(Date, 'now').mockReturnValue(entry!.syncReceipt!.nextRetryAt)
+      try {
+        const next = new HhcLineReadonlyProvider({ api: client, getSession: vi.fn() })
+        await next.retryReceipt(request.providerConnectionId, item.id, () => true)
+        await next.retryReceipt(request.providerConnectionId, item.id, () => true)
+        expect(client.downloadContent).toHaveBeenCalledOnce()
+        expect(client.recordSyncReceipt).toHaveBeenCalledTimes(2)
+        expect(client.recordSyncReceipt).toHaveBeenLastCalledWith({
+          collectionItemId: item.id,
+          contentVersion: item.etag,
+          state: 'available-offline',
+          appVersion: '0.0.0-test'
+        })
+      } finally {
+        now.mockRestore()
+      }
     }
-
-    await expect(
-      provider.downloadContent(request, new AbortController().signal, () => true)
-    ).resolves.toMatchObject({ blobId: 'blob_1' })
-    await new HhcLineReadonlyProvider({
-      api: client,
-      getSession: vi.fn(),
-      saveDownloadedContent
-    }).downloadContent(request, new AbortController().signal, () => true)
-    await vi.waitFor(() => expect(client.recordSyncReceipt).toHaveBeenCalledOnce())
-    expect(saveDownloadedContent).toHaveBeenCalledTimes(2)
-    expect(client.recordSyncReceipt).toHaveBeenCalledWith({
-      collectionItemId: item.id,
-      contentVersion: item.etag,
-      state: 'available-offline',
-      appVersion: '0.0.0-test'
-    })
-  })
+  )
 
   it.each(['changes', 'metadata', 'source'] as const)(
     'reports %s Asset failures with the exact root scope',

@@ -632,6 +632,24 @@ async function runHhcLineFolderRefresh(
     }
     publishRootFolder(refreshedRoot)
   }
+  if (offlinePolicy === 'always-offline') {
+    for (const entry of input.existingEntries) {
+      if (
+        entry.syncReceipt?.state !== 'pending' ||
+        !entry.blobId ||
+        !existingBlobIds.has(entry.blobId)
+      )
+        continue
+      void provider.retryReceipt(
+        connectionId,
+        entry.remoteItemId,
+        () =>
+          (auth.getAuthGeneration?.() ?? 0) === authGeneration &&
+          auth.getSession()?.userId === session.userId &&
+          isHhcLineRootAuthorized(auth, connectionId, root.syncLink!.remoteFolderId)
+      )
+    }
+  }
   dispatchPlannedSyncDownloads({
     provider,
     providerConnectionId: connectionId,

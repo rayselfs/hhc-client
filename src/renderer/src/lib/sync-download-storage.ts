@@ -1,3 +1,4 @@
+import { pendingHhcSyncReceipt } from './hhc-sync-receipts'
 import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 import { SyncDownloadCancelledError } from './sync-provider'
@@ -198,6 +199,10 @@ async function saveWebDownloadedContent(
         etag: metadata.etag,
         contentHash: metadata.contentHash,
         status: 'available-offline',
+        syncReceipt:
+          maxFileSize === HHC_MAX_FILE_SIZE_WEB
+            ? pendingHhcSyncReceipt(request, metadata)
+            : undefined,
         downloadedBytes: blob.size,
         downloadTotalBytes: blob.size
       })
