@@ -10,9 +10,20 @@
 
 **Spec:** 本文件的「已確認需求與範圍」是本次對話的自足規格。先前 `2026-09-05-presenter-native-editing-optimization.md` 僅作歷史背景；本文件不重新開啟舊計劃全部範圍，衝突處以本文件及使用者後續指示為準。
 
+## Execution status — 2026-09-06
+
+- [x] Task 0: latest origin/main baseline and dedicated worktree established.
+- [x] Tasks 1–7: shared UI, grouped projection, editor states, deletion, end-screen exit, and image geometry implemented.
+- [x] Task 8: bounded/coalesced saves, selective cover invalidation, reduced text measurement and continuous-input/IME safety implemented; 10/100-slide benchmarks completed before/after, five runs each.
+- [x] Task 9: global/deck defaults and three-language labels implemented.
+- [x] Task 10 local gates: 3,107 unit tests, build/typecheck, browser UI and responsive/resize smoke, Electron actual projection-window close.
+- [ ] Remote CI, signed packages, Windows physical-device smoke, merge/release/installation: not part of the completed local-delivery evidence.
+
+The detailed lists below retain the original acceptance checklist. The [implementation and verification report](../../reports/2026-09-06-presenter-ui-editor-follow-up.md) records completed local evidence, benchmark instrumentation limits and remaining platform/delivery checks. In particular, the benchmark measures DOM text-layout passes rather than React commit count; it does not claim INP or population-level p95. Source persistence remains full-document JSON.
+
 ## Global Constraints
 
-- 本次交付是新計劃文件，尚未實作、commit、PR、merge、release 或安裝新版。
+- 使用者已授權開始實作；目前為 isolated worktree 的本機實作與驗證。PR、merge、release 與安裝新版仍是後續交付 gate。
 - 實作前讀取現行 AGENTS.md、fetch 最新 origin/main，建立該任務專用 isolated worktree / branch；不能從舊 main 或分析快照直接開工。
 - 保留所有既有 worktree、未追蹤計劃與報告；不修改不相關檔案，不直接 commit main。
 - 同時支援 Electron 與 browser；影響投影的項目必須驗證兩種 adapter，並核對 browser CSP / DevTools。
