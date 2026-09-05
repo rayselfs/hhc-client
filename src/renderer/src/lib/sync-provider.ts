@@ -36,7 +36,14 @@ export interface RemoteSyncItem {
   size?: number
   etag?: string
   contentHash?: string
+  sourceCreatedAt?: number
   deleted?: boolean
+}
+
+export function parseSourceCreatedAt(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : undefined
 }
 
 export interface SyncChangePage {

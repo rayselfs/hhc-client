@@ -1,4 +1,4 @@
-import { SyncDownloadCancelledError } from './sync-provider'
+import { parseSourceCreatedAt, SyncDownloadCancelledError } from './sync-provider'
 import type {
   ReadOnlySyncProvider,
   RemoteSyncItem,
@@ -57,6 +57,7 @@ function normalizeGraphItem(value: unknown): RemoteSyncItem | null {
   const deleted = isRecord(value.deleted)
   const kind = isRecord(value.folder) ? 'folder' : 'file'
   const hashes = file && isRecord(file.hashes) ? file.hashes : undefined
+  const sourceCreatedAt = parseSourceCreatedAt(value.createdDateTime)
 
   return {
     remoteItemId: id,
@@ -67,6 +68,7 @@ function normalizeGraphItem(value: unknown): RemoteSyncItem | null {
     size: getNumber(value.size),
     etag: getString(value.eTag) ?? getString(value.etag),
     contentHash: getString(hashes?.quickXorHash),
+    ...(sourceCreatedAt === undefined ? {} : { sourceCreatedAt }),
     deleted
   }
 }

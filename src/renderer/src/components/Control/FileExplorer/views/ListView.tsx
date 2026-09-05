@@ -10,6 +10,7 @@ import { InlineRenameInput } from '../InlineRenameInput'
 import { splitFileName } from '@renderer/lib/file-naming'
 import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { FileItemStatus } from '../FileItemStatus'
+import { formatLocalDateTime } from '@renderer/lib/format-local-date-time'
 
 export interface ListViewProps {
   items: GridViewItem[]
@@ -25,15 +26,6 @@ export interface ListViewProps {
   onRenameSubmit?: (id: string, baseName: string) => void
   onRenameCancel?: () => void
   renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
-}
-
-function formatDate(ts: number | undefined): string {
-  if (ts === undefined) return '—'
-  const d = new Date(ts)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}/${m}/${day}`
 }
 
 function formatFileSize(bytes: number | undefined): string {
@@ -251,7 +243,7 @@ export const ListView = React.memo(function ListView({
                   className="flex-shrink-0 text-sm text-default-400 pl-2"
                   style={{ width: colWidths.created }}
                 >
-                  {formatDate(item.createdAt)}
+                  {formatLocalDateTime(item.createdAt)}
                 </div>
                 <div className="w-1 flex-shrink-0" />
                 <div

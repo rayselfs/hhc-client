@@ -17,6 +17,7 @@ import {
   createEditablePresentation,
   createImageElement,
   createTextElement,
+  DEFAULT_PRESENTATION_THEME_ID,
   convertPresentationData,
   duplicateEditableSlide,
   duplicateEditableSlides,
@@ -204,12 +205,16 @@ function mockMixedStyleTextShape(): unknown {
     textBody: {
       paragraphs: [
         {
-          properties: mockXmlNode({ attrs: { algn: 'ctr' } }),
+          properties: mockXmlNode({ attrs: { algn: 'just' } }),
           endParaRPr: missingXmlNode,
           runs: [
             {
               text: 'Bold',
-              properties: runProperties({ sz: '7200', b: '1', u: 'sng' }, 'Arial', 'FF0000')
+              properties: runProperties(
+                { sz: '7200', b: '1', u: 'sng', spc: '1000' },
+                'Arial',
+                'FF0000'
+              )
             },
             {
               text: ' italic',
@@ -318,6 +323,13 @@ describe('editable presentation documents', () => {
       transparency: 0
     })
     expect(document.slides[slideId].elementOrder).toEqual([])
+    expect(document.defaultThemeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(document.slides[slideId].themeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(document.themes?.[DEFAULT_PRESENTATION_THEME_ID].defaultTextStyle).toMatchObject({
+      fontFamily: 'Inter Variable',
+      fontSize: 48,
+      color: '#111827'
+    })
   })
 
   it('adds blank slides with the same white default background', () => {
@@ -471,7 +483,7 @@ describe('editable presentation documents', () => {
     expect(svg).toContain('feDropShadow')
   })
 
-  it('renders imported text runs with their own SVG thumbnail styles', () => {
+  it('renders rich text thumbnails through browser XHTML layout', () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]
     const text = createTextElement({
@@ -484,7 +496,9 @@ describe('editable presentation documents', () => {
           bold: true,
           italic: false,
           underline: false,
-          color: '#FF0000'
+          color: '#FF0000',
+          highlightColor: '#FFFF00',
+          characterSpacing: 2
         },
         {
           text: ' small',
@@ -493,7 +507,9 @@ describe('editable presentation documents', () => {
           bold: false,
           italic: true,
           underline: true,
-          color: '#0000FF'
+          color: '#0000FF',
+          strikethrough: true,
+          baseline: 'superscript'
         }
       ]
     })
@@ -501,15 +517,18 @@ describe('editable presentation documents', () => {
       generateEditablePresentationThumbnail(addElementToSlide(document, slideId, text))
     )
 
-    expect(svg).toContain('<tspan')
-    expect(svg).toContain('font-size="72"')
-    expect(svg).toContain('font-family="Arial"')
-    expect(svg).toContain('font-weight="700"')
+    expect(svg).toContain('<foreignObject')
+    expect(svg).toContain('font-size:72px')
+    expect(svg).toContain('font-family:Arial')
+    expect(svg).toContain('font-weight:700')
     expect(svg).toContain('Large &amp;')
-    expect(svg).toContain('font-size="36"')
-    expect(svg).toContain('font-family="Calibri"')
-    expect(svg).toContain('font-style="italic"')
-    expect(svg).toContain('text-decoration="underline"')
+    expect(svg).toContain('background-color:#FFFF00')
+    expect(svg).toContain('letter-spacing:2px')
+    expect(svg).toContain('font-size:36px')
+    expect(svg).toContain('font-family:Calibri')
+    expect(svg).toContain('font-style:italic')
+    expect(svg).toContain('text-decoration:underline line-through')
+    expect(svg).toContain('vertical-align:super')
   })
 
   it('marks newly inserted text boxes as content auto-sized until a fixed width is provided', () => {
@@ -521,7 +540,7 @@ describe('editable presentation documents', () => {
       autoSize: 'content',
       width: 24
     })
-    expect(presentationCanvasPxToPoints(text.fontSize, 1920)).toBe(18)
+    expect(presentationCanvasPxToPoints(text.fontSize, 1920)).toBe(24)
     expect(text.height).toBeGreaterThanOrEqual(Math.ceil(text.fontSize * text.lineHeight))
 
     expect(createTextElement({ text: 'Imported text', width: 360 })).toMatchObject({
@@ -727,6 +746,27 @@ describe('editable presentation documents', () => {
     expect(
       loadedContentHeightText.type === 'text' ? loadedContentHeightText.autoWidth : undefined
     ).toBeUndefined()
+  })
+
+  it('adds the default theme when loading a legacy document', async () => {
+    const document = createBlankEditablePresentationDocument('Legacy theme')
+    const slideId = document.slideOrder[0]
+    delete document.themes
+    delete document.defaultThemeId
+    delete document.slides[slideId].themeId
+    const source = { id: 'deck-legacy-theme', url: 'blob:deck-legacy-theme', name: 'Legacy theme' }
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'deck-legacy-theme',
+      blob: createStoredBlob(JSON.stringify(document)),
+      revision: 1
+    })
+
+    const loaded = await loadEditablePresentation(source)
+
+    expect(loaded.defaultThemeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(loaded.slides[slideId].themeId).toBe(DEFAULT_PRESENTATION_THEME_ID)
+    expect(loaded.themes?.[DEFAULT_PRESENTATION_THEME_ID]).toBeDefined()
   })
 
   it('reuses parsed documents by source revision and invalidates on revision change', async () => {
@@ -1046,6 +1086,72 @@ describe('editable presentation documents', () => {
         color: '#00AA00'
       }
     ])
+    expect(text.paragraphs).toHaveLength(2)
+    expect(text.paragraphs?.[0]).toMatchObject({
+      align: 'justify',
+      lineSpacing: { kind: 'multiple', value: 1.15 }
+    })
+    expect(text.paragraphs?.[0].runs[0].characterSpacing).toBeCloseTo(4 / 3)
+    expect(text.paragraphs?.[0].runs.map((run) => run.text)).toEqual(['Bold', ' italic'])
+  })
+
+  it('preserves each imported slide theme identity and palette', () => {
+    const makeTheme = (
+      accent1: string,
+      font: string
+    ): {
+      colorScheme: Map<string, string>
+      majorFont: Record<string, string>
+      minorFont: Record<string, string>
+      fillStyles: never[]
+      lineStyles: never[]
+      effectStyles: never[]
+    } => ({
+      colorScheme: new Map([
+        ['dk1', '000000'],
+        ['lt1', 'FFFFFF'],
+        ['accent1', accent1]
+      ]),
+      majorFont: { latin: font, ea: font, cs: font },
+      minorFont: { latin: font, ea: font, cs: font },
+      fillStyles: [],
+      lineStyles: [],
+      effectStyles: []
+    })
+    const presentation = {
+      width: 1920,
+      height: 1080,
+      slides: [
+        mockSlide(0, 'layout-a' as unknown as number, mockXmlNode()),
+        mockSlide(1, 'layout-b' as unknown as number, mockXmlNode())
+      ],
+      layouts: new Map(),
+      masters: new Map(),
+      themes: new Map([
+        ['theme-a', makeTheme('112233', 'Aptos')],
+        ['theme-b', makeTheme('445566', 'Arial')]
+      ]),
+      slideToLayout: new Map([
+        [0, 'layout-a'],
+        [1, 'layout-b']
+      ]),
+      layoutToMaster: new Map([
+        ['layout-a', 'master-a'],
+        ['layout-b', 'master-b']
+      ]),
+      masterToTheme: new Map([
+        ['master-a', 'theme-a'],
+        ['master-b', 'theme-b']
+      ]),
+      media: new Map()
+    } as unknown as PresentationData
+
+    const document = convertPresentationData(makePptxFileItem(), presentation)
+
+    expect(document.slides[document.slideOrder[0]].themeId).toBe('theme-a')
+    expect(document.slides[document.slideOrder[1]].themeId).toBe('theme-b')
+    expect(document.themes?.['theme-a'].colorScheme.accent1).toBe('#112233')
+    expect(document.themes?.['theme-b'].defaultTextStyle.fontFamily).toBe('Arial')
   })
 
   it('preserves direct slide, layout, and master solid black backgrounds with centered white text', () => {

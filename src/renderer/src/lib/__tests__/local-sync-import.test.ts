@@ -43,14 +43,16 @@ describe('buildLocalSyncImportPlan', () => {
         remoteItemId: 'folder-a',
         parentRemoteItemId: null,
         kind: 'folder',
-        name: 'Sunday'
+        name: 'Sunday',
+        sourceCreatedAt: 200
       },
       {
         remoteItemId: 'mkv-1',
         parentRemoteItemId: 'folder-a',
         kind: 'file',
         name: 'clip.mkv',
-        size: 10
+        size: 10,
+        sourceCreatedAt: 300
       },
       {
         remoteItemId: 'avi-1',
@@ -90,6 +92,8 @@ describe('buildLocalSyncImportPlan', () => {
       offlinePolicy: 'always-offline'
     })
     expect(plan.folders).toHaveLength(2)
+    expect(plan.rootFolder.createdAt).not.toBe(200)
+    expect(plan.folders.find((folder) => folder.name === 'Sunday')?.createdAt).toBe(200)
     expect(plan.items).toHaveLength(2)
     expect(plan.items.find((item) => item.name === '.DS_Store')).toBeUndefined()
     expect(plan.items.find((item) => item.name === 'layout.psd')).toBeUndefined()
@@ -97,6 +101,7 @@ describe('buildLocalSyncImportPlan', () => {
     expect(plan.fileImports[0].itemId).toMatch(UUID_PATTERN)
     expect(plan.items.find((item) => item.name === 'clip.mkv')).toMatchObject({
       id: plan.fileImports[0].itemId,
+      createdAt: 300,
       mimeType: 'video/x-matroska',
       url: expect.stringMatching(/^blob:/)
     })

@@ -10,39 +10,24 @@ import React, {
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  AlignCenter,
   AlignHorizontalJustifyCenter,
   AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart,
   AlignHorizontalSpaceAround,
-  AlignLeft,
-  AlignRight,
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
   AlignVerticalSpaceAround,
-  Baseline,
-  Bold,
   BringToFront,
-  ChevronDown,
-  ClipboardPaste,
-  Crop,
-  Eraser,
   FileText,
   ImagePlus,
-  Italic,
-  Minus,
-  Palette,
   Plus,
   RectangleHorizontal,
-  RefreshCw,
   SendToBack,
   StickyNote,
   Type,
-  Underline,
   ZoomIn,
   ZoomOut,
-  WrapText,
   X
 } from 'lucide-react'
 import { AlertDialog } from '@heroui/react/alert-dialog'
@@ -50,7 +35,10 @@ import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
-import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
+import EditableSlideSurface, {
+  type EditableTextSelection
+} from '@renderer/components/Common/EditableSlideSurface'
+import PresentationHomeRibbon from '@renderer/components/Control/Presentation/PresentationHomeRibbon'
 import {
   InspectorPanel,
   NavigatorRail,
@@ -68,10 +56,10 @@ import {
   createLineElement,
   createShapeElement,
   createTextElement,
+  createDefaultPresentationTheme,
   convertPptxToEditablePresentation,
   DEFAULT_GRADIENT_BACKGROUND,
   duplicateElementInSlide,
-  duplicateEditableSlides,
   getSlideBackgroundPrimaryColor,
   INSERTED_TEXT_CLICK_SIZE,
   INSERTED_TEXT_DRAG_MIN_SIZE,
@@ -88,12 +76,21 @@ import {
   updateSlideBackground,
   updateSlideNotes,
   type EditableGradientDirection,
-  type EditableImageElement,
   type EditablePresentationDocument,
   type EditablePresentationElement,
   type EditableSlideBackground,
-  type EditableTextInsertFrame
+  type EditableTextInsertFrame,
+  type EditableTextParagraph,
+  type EditableTextStyle
 } from '@renderer/lib/editable-presentation'
+import {
+  applyCharacterStyle,
+  changeTextCase,
+  clearCharacterFormatting,
+  getCharacterStyleValue,
+  mapSelectedParagraphs,
+  normalizeTextParagraphs
+} from '@renderer/lib/presentation-rich-text'
 import type { HhcLineCloudAuth } from '@renderer/lib/cloud-provider'
 import { prepareHhcLinePresentationSource } from '@renderer/lib/hhc-line-connect'
 import { isMac } from '@renderer/lib/env'
@@ -108,15 +105,17 @@ import {
   type ElementDistribution
 } from '@renderer/lib/presentation-editor-commands'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
-import {
-  mergeFontFamilies,
-  queryLocalFontFamiliesOnce,
-  supportsLocalFontAccess
-} from '@renderer/lib/local-fonts'
+import { mergeFontFamilies, queryLocalFontFamiliesOnce } from '@renderer/lib/local-fonts'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
 import { calculateFitZoomPercent } from '@renderer/lib/presentation-viewport'
+import {
+  createSlideClipboard,
+  cutSlides,
+  pasteSlideClipboard,
+  type PresentationSlideClipboard
+} from '@renderer/lib/presentation-slide-clipboard'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
@@ -131,8 +130,6 @@ import { isFileItem, type FileItemRecord } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
-type RibbonTab = 'home' | 'insert' | 'design' | 'picture'
-type PresentationElementType = EditablePresentationElement['type']
 type ZoomMode = 'fit' | 'custom'
 
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
@@ -140,7 +137,6 @@ const FONT_SIZES = [
   8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96
 ]
 const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
-const BASE_RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
 const PRESENTATION_CANVAS_WIDTH = 1024
 const PRESENTATION_VIEWPORT_PADDING = 64
 const NATIVE_CONTROL_CLASS =
@@ -152,6 +148,16 @@ const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
   'border-primary bg-primary text-white shadow-inner hover:border-primary hover:bg-primary/90 hover:text-white'
 const RIBBON_COMMAND_BUTTON_CLASS =
   'inline-flex h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs text-default-500 transition-colors hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 disabled:cursor-not-allowed disabled:opacity-30'
+
+const flattenTextParagraphs = (
+  paragraphs: EditableTextParagraph[]
+): EditableTextParagraph['runs'] =>
+  paragraphs.flatMap((paragraph, paragraphIndex) =>
+    paragraph.runs.map((run, runIndex) => ({
+      ...run,
+      text: `${paragraphIndex > 0 && runIndex === 0 ? '\n' : ''}${run.text}`
+    }))
+  )
 
 function RibbonGroup({
   label,
@@ -512,18 +518,16 @@ export function PptxDocumentView({
 
 function EditableDocumentView({
   deck,
-  activeRibbon,
-  isRibbonOpen,
   isBackgroundPanelOpen,
   onBackgroundPanelOpenChange,
-  onSelectedElementTypeChange
+  slideClipboard,
+  onSlideClipboardChange
 }: {
   deck: PresentationWorkspaceDocument
-  activeRibbon: RibbonTab
-  isRibbonOpen: boolean
   isBackgroundPanelOpen: boolean
   onBackgroundPanelOpenChange: (open: boolean) => void
-  onSelectedElementTypeChange: (type: PresentationElementType | null) => void
+  slideClipboard: PresentationSlideClipboard | null
+  onSlideClipboardChange: (clipboard: PresentationSlideClipboard) => void
 }): React.JSX.Element {
   const registry = usePresentationSessionRegistry()
   const session = useSyncExternalStore(
@@ -571,11 +575,10 @@ function EditableDocumentView({
       key={deck.itemId}
       deck={deck}
       session={session}
-      activeRibbon={activeRibbon}
-      isRibbonOpen={isRibbonOpen}
       isBackgroundPanelOpen={isBackgroundPanelOpen}
       onBackgroundPanelOpenChange={onBackgroundPanelOpenChange}
-      onSelectedElementTypeChange={onSelectedElementTypeChange}
+      slideClipboard={slideClipboard}
+      onSlideClipboardChange={onSlideClipboardChange}
     />
   )
 }
@@ -583,19 +586,17 @@ function EditableDocumentView({
 function EditableSessionDocumentView({
   deck,
   session,
-  activeRibbon,
-  isRibbonOpen,
   isBackgroundPanelOpen,
   onBackgroundPanelOpenChange,
-  onSelectedElementTypeChange
+  slideClipboard,
+  onSlideClipboardChange
 }: {
   deck: PresentationWorkspaceDocument
   session: PresentationEditorSession
-  activeRibbon: RibbonTab
-  isRibbonOpen: boolean
   isBackgroundPanelOpen: boolean
   onBackgroundPanelOpenChange: (open: boolean) => void
-  onSelectedElementTypeChange: (type: PresentationElementType | null) => void
+  slideClipboard: PresentationSlideClipboard | null
+  onSlideClipboardChange: (clipboard: PresentationSlideClipboard) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const { showMenu } = useContextMenu()
@@ -637,17 +638,16 @@ function EditableSessionDocumentView({
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(() => new Set())
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
-  const [copiedSlideIds, setCopiedSlideIds] = useState<string[]>([])
   const [selectedSlideIds, setSelectedSlideIds] = useState<Set<string>>(() => new Set())
   const [selectionAnchorIndex, setSelectionAnchorIndex] = useState(0)
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null)
   const [isLineSpacingOptionsOpen, setIsLineSpacingOptionsOpen] = useState(false)
   const [lineSpacingDraft, setLineSpacingDraft] = useState(1.15)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
+  const [textSelection, setTextSelection] = useState<EditableTextSelection | null>(null)
   const [isTextInsertMode, setIsTextInsertMode] = useState(false)
-  const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
   const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([])
-  const [isLoadingLocalFonts, setIsLoadingLocalFonts] = useState(false)
+  const [, setIsLoadingLocalFonts] = useState(false)
   const hasRequestedLocalFontsRef = useRef(false)
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
@@ -655,9 +655,8 @@ function EditableSessionDocumentView({
   const [zoomPercent, setZoomPercent] = useState(100)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [isNotesOpen, setIsNotesOpen] = useState(false)
-  const [cropElementId, setCropElementId] = useState<string | null>(null)
   const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
-  const formatBackgroundTriggerRef = useRef<HTMLButtonElement>(null)
+  const formatBackgroundTriggerRef = useRef<HTMLElement>(null)
   const [snapGuides, setSnapGuides] = useState<{
     vertical?: number
     horizontal?: number
@@ -690,7 +689,6 @@ function EditableSessionDocumentView({
       ),
     [deck.itemId, finalizeTextEditor, registry]
   )
-  const pressedRibbonTimeoutRef = useRef<number | null>(null)
   const projectionPlaylist = useMediaProjectionStore((state) => state.playlist)
   const projectionIndex = useMediaProjectionStore((state) => state.currentIndex)
   const isPresenting = useMediaProjectionStore((state) => state.isPresenting)
@@ -706,9 +704,6 @@ function EditableSessionDocumentView({
 
   useEffect(
     () => () => {
-      if (pressedRibbonTimeoutRef.current !== null) {
-        window.clearTimeout(pressedRibbonTimeoutRef.current)
-      }
       if (textCommitTimerRef.current !== null) {
         window.clearTimeout(textCommitTimerRef.current)
       }
@@ -781,7 +776,6 @@ function EditableSessionDocumentView({
   const activeSlide = activeSlideId ? document.slides[activeSlideId] : null
   const selectedElement =
     activeSlide && selectedElementId ? activeSlide.elements[selectedElementId] : null
-  const selectedImageElement = selectedElement?.type === 'image' ? selectedElement : null
   const projectedItem = projectionPlaylist[projectionIndex]
   const projectedSlideIndex =
     isPresenting && projectedItem?.id === deck.itemId
@@ -796,10 +790,6 @@ function EditableSessionDocumentView({
     },
     [session]
   )
-
-  useEffect(() => {
-    onSelectedElementTypeChange(selectedElement?.type ?? null)
-  }, [onSelectedElementTypeChange, selectedElement?.type])
 
   const clearTextCommitTimer = (): void => {
     if (textCommitTimerRef.current === null) return
@@ -901,7 +891,6 @@ function EditableSessionDocumentView({
     if (!elementId) {
       setSelectedElementId(null)
       setSelectedElementIds(new Set())
-      setCropElementId(null)
       return
     }
     const additive = Boolean(event?.metaKey || event?.ctrlKey)
@@ -1099,13 +1088,51 @@ function EditableSessionDocumentView({
   }
 
   const showSlideSidebarMenu = (event: React.MouseEvent): void => {
+    const target = event.target as HTMLElement
+    const item = target.closest<HTMLElement>('[data-slide-option]')
+    const divider = target.closest<HTMLElement>('[data-slide-divider]')
+    const itemIndex = item ? Number(item.dataset.slideIndex) : null
+    const dividerIndex = divider ? Number(divider.dataset.slideIndex) : null
+    let contextSlideIds: string[] = []
+    if (itemIndex !== null && Number.isFinite(itemIndex)) {
+      const slideId = document.slideOrder[itemIndex]
+      if (slideId) {
+        contextSlideIds = selectedSlideIds.has(slideId) ? getSelectedSlideIds() : [slideId]
+        if (!selectedSlideIds.has(slideId)) selectSlide(itemIndex, event)
+      }
+    }
+    const itemCommands =
+      itemIndex === null
+        ? []
+        : [
+            {
+              id: 'copy-slide',
+              label: t('common.copy', 'Copy'),
+              onAction: () => copySelectedSlides(contextSlideIds)
+            },
+            {
+              id: 'cut-slide',
+              label: t('common.cut', 'Cut'),
+              onAction: () => cutSelectedSlides(contextSlideIds)
+            }
+          ]
     showMenu(
       [
         {
           id: 'new-slide',
           label: t('presentationWorkspace.newSlide'),
           icon: <Plus size={16} />,
-          onAction: addSlide
+          onAction: () =>
+            dividerIndex === null ? addSlide() : addSlideAfter(Math.max(-1, dividerIndex - 1))
+        },
+        'separator',
+        ...itemCommands,
+        {
+          id: 'paste-slide',
+          label: t('common.paste', 'Paste'),
+          disabled: !slideClipboard,
+          onAction: () =>
+            pasteSlide(dividerIndex ?? (itemIndex === null ? undefined : itemIndex + 1))
         }
       ],
       event
@@ -1119,13 +1146,15 @@ function EditableSessionDocumentView({
     return activeSlideId ? [activeSlideId] : []
   }
 
-  const pasteSlide = (): void => {
-    if (copiedSlideIds.length === 0 || !document) return
+  const pasteSlide = (requestedIndex?: number): void => {
+    if (!slideClipboard || !document) return
     const currentDocument = finalizeDocumentMutation()
     if (!currentDocument) return
     const targetIndex =
-      insertionIndex ?? currentDocument.slideOrder.indexOf(activeSlideId ?? '') + 1
-    const result = duplicateEditableSlides(currentDocument, copiedSlideIds, targetIndex)
+      requestedIndex ??
+      insertionIndex ??
+      currentDocument.slideOrder.indexOf(activeSlideId ?? '') + 1
+    const result = pasteSlideClipboard(currentDocument, slideClipboard, targetIndex)
     if (result.slideIds.length === 0) return
     session.commit(result.document)
     setSelectedSlideIds(new Set(result.slideIds))
@@ -1135,10 +1164,23 @@ function EditableSessionDocumentView({
     setSelectedElementIds(new Set())
   }
 
-  const copySelectedSlides = (): void => {
-    const slideIds = getSelectedSlideIds()
+  const copySelectedSlides = (requestedSlideIds?: string[]): void => {
+    const slideIds = requestedSlideIds ?? getSelectedSlideIds()
     if (slideIds.length === 0) return
-    setCopiedSlideIds(slideIds)
+    onSlideClipboardChange(createSlideClipboard(document, slideIds))
+    setCopiedElement(null)
+  }
+
+  const cutSelectedSlides = (requestedSlideIds?: string[]): void => {
+    const slideIds = requestedSlideIds ?? getSelectedSlideIds()
+    if (slideIds.length === 0) return
+    onSlideClipboardChange(createSlideClipboard(document, slideIds))
+    const nextDocument = cutSlides(document, slideIds)
+    session.commit(nextDocument)
+    const nextSlideId =
+      nextDocument.slideOrder[Math.min(activeSlideIndex, nextDocument.slideOrder.length - 1)]
+    activateSlide(nextSlideId)
+    setSelectedSlideIds(new Set(nextSlideId ? [nextSlideId] : []))
     setCopiedElement(null)
   }
 
@@ -1210,8 +1252,10 @@ function EditableSessionDocumentView({
     event: React.MouseEvent,
     element: EditablePresentationElement
   ): void => {
-    setSelectedElementId(element.id)
-    setSelectedElementIds(new Set([element.id]))
+    if (!selectedElementIds.has(element.id)) {
+      setSelectedElementId(element.id)
+      setSelectedElementIds(new Set([element.id]))
+    }
     showMenu(
       [
         {
@@ -1234,6 +1278,25 @@ function EditableSessionDocumentView({
           id: 'send-to-back',
           label: t('presentationWorkspace.sendToBack', 'Send to Back'),
           onAction: () => reorderElement(element.id, 'send-to-back')
+        }
+      ],
+      event
+    )
+  }
+
+  const showCanvasContextMenu = (event: React.MouseEvent): void => {
+    const surface = event.currentTarget as HTMLElement
+    surface.focus({ preventScroll: true })
+    formatBackgroundTriggerRef.current = surface
+    showMenu(
+      [
+        {
+          id: 'format-background',
+          label: t('presentationWorkspace.formatBackground', 'Format Background'),
+          onAction: () => {
+            onBackgroundPanelOpenChange(true)
+            setCompactOverlay('inspector')
+          }
         }
       ],
       event
@@ -1288,7 +1351,75 @@ function EditableSessionDocumentView({
     updates: Partial<Extract<EditablePresentationElement, { type: 'text' }>>
   ): void => {
     if (!selectedTextElement) return
+    if (!updates.paragraphs) {
+      const characterPatch = Object.fromEntries(
+        (
+          [
+            'fontFamily',
+            'fontSize',
+            'bold',
+            'italic',
+            'underline',
+            'strikethrough',
+            'baseline',
+            'characterSpacing',
+            'color',
+            'highlightColor'
+          ] as const
+        ).flatMap((key) => (updates[key] === undefined ? [] : [[key, updates[key]]]))
+      ) as Partial<EditableTextStyle>
+      let paragraphs = normalizeTextParagraphs(selectedTextElement)
+      if (Object.keys(characterPatch).length > 0) {
+        paragraphs = applyCharacterStyle(
+          paragraphs,
+          0,
+          selectedTextElement.text.length,
+          characterPatch
+        )
+      }
+      if (updates.align !== undefined || updates.lineHeight !== undefined) {
+        paragraphs = paragraphs.map((paragraph) => ({
+          ...paragraph,
+          align: updates.align ?? paragraph.align,
+          lineSpacing:
+            updates.lineHeight === undefined
+              ? paragraph.lineSpacing
+              : { kind: 'multiple', value: updates.lineHeight }
+        }))
+      }
+      updates = {
+        ...updates,
+        paragraphs,
+        runs: paragraphs.flatMap((paragraph, paragraphIndex) =>
+          paragraph.runs.map((run, runIndex) => ({
+            ...run,
+            text: `${paragraphIndex > 0 && runIndex === 0 ? '\n' : ''}${run.text}`
+          }))
+        )
+      }
+    }
     updateSelectedElement(updates as Partial<EditablePresentationElement>)
+  }
+
+  const changeSelectedTextIndent = (direction: -1 | 1): void => {
+    if (!selectedTextElement) return
+    const range =
+      textSelection?.elementId === selectedTextElement.id
+        ? textSelection
+        : { start: 0, end: selectedTextElement.text.length }
+    const paragraphs = mapSelectedParagraphs(
+      normalizeTextParagraphs(selectedTextElement),
+      range.start,
+      range.end,
+      (paragraph) => ({
+        ...paragraph,
+        marginLeft: Math.max(0, paragraph.marginLeft + direction * 32),
+        list: paragraph.list
+          ? { ...paragraph.list, level: Math.max(0, paragraph.list.level + direction) }
+          : null
+      })
+    )
+    updateSelectedTextElement({ paragraphs, runs: flattenTextParagraphs(paragraphs) })
   }
 
   const loadLocalFonts = async (): Promise<void> => {
@@ -1296,6 +1427,7 @@ function EditableSessionDocumentView({
     try {
       setLocalFontFamilies(await queryLocalFontFamiliesOnce())
     } catch {
+      hasRequestedLocalFontsRef.current = false
       toast.warning(
         t(
           'presentationWorkspace.localFontsLoadFailed',
@@ -1311,13 +1443,6 @@ function EditableSessionDocumentView({
     if (hasRequestedLocalFontsRef.current) return
     hasRequestedLocalFontsRef.current = true
     void loadLocalFonts()
-  }
-
-  const updateSelectedImageElement = (
-    updates: Partial<Extract<EditablePresentationElement, { type: 'image' }>>
-  ): void => {
-    if (!selectedImageElement) return
-    updateSelectedElement(updates as Partial<EditablePresentationElement>)
   }
 
   const openLineSpacingOptions = (): void => {
@@ -1374,17 +1499,6 @@ function EditableSessionDocumentView({
     setSelectedSlideIds(new Set([activeSlideId]))
   }
 
-  const flashRibbonAction = (actionId: string): void => {
-    setPressedRibbonAction(actionId)
-    if (pressedRibbonTimeoutRef.current !== null) {
-      window.clearTimeout(pressedRibbonTimeoutRef.current)
-    }
-    pressedRibbonTimeoutRef.current = window.setTimeout(() => {
-      setPressedRibbonAction((current) => (current === actionId ? null : current))
-      pressedRibbonTimeoutRef.current = null
-    }, 140)
-  }
-
   const startRailResize = (event: React.PointerEvent): void => {
     event.preventDefault()
     const startX = event.clientX
@@ -1401,225 +1515,103 @@ function EditableSessionDocumentView({
   }
 
   const renderRibbon = (): React.JSX.Element => {
-    if (activeRibbon === 'picture') {
-      return (
-        <div
-          data-ribbon-surface
-          className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
-        >
-          <RibbonGroup
-            label={t('presentationWorkspace.ribbonGroups.adjust', 'Adjust')}
-            className="w-[600px]"
-          >
-            <div className="grid h-full grid-cols-[220px_100px_110px_110px] items-center gap-2">
-              <ControlSlider
-                label={t('presentationWorkspace.transparency', 'Transparency')}
-                value={
-                  selectedImageElement ? Math.round((1 - selectedImageElement.opacity) * 100) : 0
-                }
-                min={0}
-                max={100}
-                suffix="%"
-                onChange={(value) => updateSelectedImageElement({ opacity: 1 - value / 100 })}
-              />
-              <label className="flex items-center gap-2 text-default-500">
-                <span>{t('presentationWorkspace.borderColor', 'Border')}</span>
-                <input
-                  className="h-7 w-10 rounded-md bg-transparent"
-                  type="color"
-                  disabled={!selectedImageElement}
-                  value={selectedImageElement?.borderColor ?? '#ffffff'}
-                  onChange={(event) =>
-                    updateSelectedImageElement({ borderColor: event.currentTarget.value })
-                  }
-                />
-              </label>
-              <label className="flex items-center gap-2 text-default-500">
-                <span>{t('presentationWorkspace.borderWidth', 'Width')}</span>
-                <select
-                  className={`w-16 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-                  disabled={!selectedImageElement}
-                  value={selectedImageElement?.borderWidth ?? 0}
-                  onChange={(event) =>
-                    updateSelectedImageElement({ borderWidth: Number(event.currentTarget.value) })
-                  }
-                >
-                  {[0, 1, 2, 4, 6, 8].map((width) => (
-                    <option key={width} value={width}>
-                      {width}px
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center gap-2 text-default-500">
-                <span>{t('presentationWorkspace.shadow', 'Shadow')}</span>
-                <select
-                  className={`w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-                  disabled={!selectedImageElement}
-                  value={selectedImageElement?.shadow ?? 'none'}
-                  onChange={(event) =>
-                    updateSelectedImageElement({
-                      shadow: event.currentTarget.value as EditableImageElement['shadow']
-                    })
-                  }
-                >
-                  <option value="none">{t('presentationWorkspace.shadowNone', 'None')}</option>
-                  <option value="soft">{t('presentationWorkspace.shadowSoft', 'Soft')}</option>
-                  <option value="medium">
-                    {t('presentationWorkspace.shadowMedium', 'Medium')}
-                  </option>
-                </select>
-              </label>
-            </div>
-          </RibbonGroup>
-          <RibbonGroup
-            label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
-            className="w-40"
-          >
-            <div className="grid h-full grid-rows-2 gap-1">
-              <Button
-                size="sm"
-                variant="tertiary"
-                isDisabled={!selectedImageElement}
-                onPress={() =>
-                  selectedImageElement && reorderElement(selectedImageElement.id, 'bring-forward')
-                }
-              >
-                {t('presentationWorkspace.bringForward', 'Bring Forward')}
-              </Button>
-              <Button
-                size="sm"
-                variant="tertiary"
-                isDisabled={!selectedImageElement}
-                onPress={() =>
-                  selectedImageElement && reorderElement(selectedImageElement.id, 'send-backward')
-                }
-              >
-                {t('presentationWorkspace.sendBackward', 'Send Backward')}
-              </Button>
-            </div>
-          </RibbonGroup>
-          <RibbonGroup
-            label={t('presentationWorkspace.ribbonGroups.size', 'Size')}
-            className="w-24"
-          >
-            <div className="flex h-full items-center justify-center">
-              <Button
-                size="sm"
-                variant={cropElementId === selectedImageElement?.id ? 'primary' : 'tertiary'}
-                isDisabled={!selectedImageElement}
-                onPress={() =>
-                  setCropElementId((current) =>
-                    current === selectedImageElement?.id ? null : (selectedImageElement?.id ?? null)
-                  )
-                }
-              >
-                <Crop size={16} />
-                {t('presentationWorkspace.crop', 'Crop')}
-              </Button>
-            </div>
-          </RibbonGroup>
-        </div>
-      )
-    }
-
-    if (activeRibbon === 'insert') {
-      return (
-        <div
-          data-ribbon-surface
-          className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
-        >
-          <RibbonGroup
-            label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
-            className="w-[400px]"
-          >
-            <div className="flex h-full items-center gap-1 [&>button]:h-14 [&>button]:min-w-16 [&>button]:flex-col [&>button]:gap-1">
-              <Button
-                size="sm"
-                variant={isTextInsertMode ? 'primary' : 'tertiary'}
-                onPress={() => setIsTextInsertMode((enabled) => !enabled)}
-              >
-                <Type size={18} />
-                {t('presentationWorkspace.text', 'Text')}
-              </Button>
-              <Button size="sm" variant="tertiary" onPress={() => imageInputRef.current?.click()}>
-                <ImagePlus size={18} />
-                {t('presentationWorkspace.image', 'Image')}
-              </Button>
-              <Button size="sm" variant="tertiary" onPress={() => addShape('rectangle')}>
-                <RectangleHorizontal size={18} />
-                {t('presentationWorkspace.rectangle', 'Rectangle')}
-              </Button>
-              <Button size="sm" variant="tertiary" onPress={() => addShape('ellipse')}>
-                <span className="size-[18px] rounded-full border-2 border-current" />
-                {t('presentationWorkspace.ellipse', 'Ellipse')}
-              </Button>
-              <Button size="sm" variant="tertiary" onPress={addLine}>
-                <Minus size={18} />
-                {t('presentationWorkspace.line', 'Line')}
-              </Button>
-            </div>
-          </RibbonGroup>
-        </div>
-      )
-    }
-
-    if (activeRibbon === 'design') {
-      return (
-        <div
-          data-ribbon-surface
-          className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
-        >
-          <RibbonGroup
-            label={t('presentationWorkspace.ribbonGroups.background', 'Background')}
-            className="w-48"
-          >
-            <div className="flex h-full items-center justify-center">
-              <Button
-                ref={formatBackgroundTriggerRef}
-                size="sm"
-                variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
-                isDisabled={!activeSlide}
-                onPress={() => {
-                  onBackgroundPanelOpenChange(true)
-                  setCompactOverlay('inspector')
-                }}
-              >
-                <Palette size={16} />
-                {t('presentationWorkspace.formatBackground', 'Format Background')}
-              </Button>
-            </div>
-          </RibbonGroup>
-        </div>
-      )
-    }
-
     const textDisabled = !selectedTextElement
-    const textButtonClass = (active = false, actionId?: string): string =>
-      `${RIBBON_ICON_BUTTON_CLASS} ${
-        active || (actionId !== undefined && pressedRibbonAction === actionId)
-          ? RIBBON_ICON_BUTTON_ACTIVE_CLASS
-          : ''
-      }`
-    const changeFontSize = (delta: number): void => {
+    const activeTheme =
+      document.themes?.[activeSlide?.themeId ?? document.defaultThemeId ?? ''] ??
+      createDefaultPresentationTheme(document.width)
+    const selectedParagraphs = selectedTextElement
+      ? normalizeTextParagraphs(selectedTextElement)
+      : null
+    const selectedRange =
+      selectedTextElement && textSelection?.elementId === selectedTextElement.id
+        ? textSelection
+        : selectedTextElement
+          ? { start: 0, end: selectedTextElement.text.length }
+          : null
+    const toggleState = (
+      key: 'bold' | 'italic' | 'underline' | 'strikethrough',
+      fallback: boolean
+    ): boolean | 'mixed' => {
+      if (!selectedParagraphs || !selectedRange) return fallback
+      const value = getCharacterStyleValue(
+        selectedParagraphs,
+        selectedRange.start,
+        selectedRange.end,
+        key
+      )
+      return value === 'mixed' ? 'mixed' : (value ?? fallback)
+    }
+    const patchCharacterStyle = (patch: Partial<EditableTextStyle>): void => {
+      if (!selectedTextElement) return
+      const range =
+        textSelection?.elementId === selectedTextElement.id
+          ? textSelection
+          : { start: 0, end: selectedTextElement.text.length }
+      const paragraphs = applyCharacterStyle(
+        normalizeTextParagraphs(selectedTextElement),
+        range.start,
+        range.end,
+        patch
+      )
+      updateSelectedTextElement({
+        ...patch,
+        paragraphs,
+        runs: flattenTextParagraphs(paragraphs)
+      })
+    }
+    const patchParagraphs = (
+      update: (paragraph: EditableTextParagraph) => EditableTextParagraph
+    ): void => {
+      if (!selectedTextElement) return
+      const range =
+        textSelection?.elementId === selectedTextElement.id
+          ? textSelection
+          : { start: 0, end: selectedTextElement.text.length }
+      const paragraphs = mapSelectedParagraphs(
+        normalizeTextParagraphs(selectedTextElement),
+        range.start,
+        range.end,
+        update
+      )
+      updateSelectedTextElement({
+        paragraphs,
+        runs: flattenTextParagraphs(paragraphs),
+        align: paragraphs[0]?.align ?? selectedTextElement.align,
+        lineHeight:
+          paragraphs[0]?.lineSpacing.kind === 'multiple'
+            ? paragraphs[0].lineSpacing.value
+            : selectedTextElement.lineHeight
+      })
+    }
+    const changeFontSize = (direction: -1 | 1): void => {
       if (!selectedTextElement || !document) return
       const currentPoints = presentationCanvasPxToPoints(
         selectedTextElement.fontSize,
         document.width
       )
-      const nextPoints = Math.max(6, Math.min(240, currentPoints + delta))
-      updateSelectedTextElement({
-        fontSize: presentationPointsToCanvasPx(nextPoints, document.width)
+      const currentIndex = FONT_SIZES.findIndex((size) => size >= currentPoints)
+      const nextIndex = Math.max(0, Math.min(FONT_SIZES.length - 1, currentIndex + direction))
+      patchCharacterStyle({
+        fontSize: presentationPointsToCanvasPx(FONT_SIZES[nextIndex], document.width)
       })
     }
     const clearTextFormatting = (): void => {
+      if (!selectedTextElement) return
+      const defaults = activeTheme.defaultTextStyle
+      const range =
+        textSelection?.elementId === selectedTextElement.id
+          ? textSelection
+          : { start: 0, end: selectedTextElement.text.length }
+      const paragraphs = clearCharacterFormatting(
+        normalizeTextParagraphs(selectedTextElement),
+        range.start,
+        range.end,
+        defaults
+      )
       updateSelectedTextElement({
-        bold: false,
-        italic: false,
-        underline: false,
-        color: '#111827',
-        align: 'left',
-        lineHeight: 1.15
+        ...defaults,
+        paragraphs,
+        runs: flattenTextParagraphs(paragraphs)
       })
     }
 
@@ -1628,20 +1620,6 @@ function EditableSessionDocumentView({
         data-ribbon-surface
         className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
       >
-        <RibbonGroup label={t('presentationWorkspace.clipboard', 'Clipboard')} className="w-16">
-          <div className="flex h-full items-center justify-center">
-            <button
-              type="button"
-              className={RIBBON_COMMAND_BUTTON_CLASS}
-              disabled={!copiedElement && copiedSlideIds.length === 0}
-              onClick={() => (copiedElement ? pasteElement() : pasteSlide())}
-            >
-              <ClipboardPaste size={18} />
-              {t('presentationWorkspace.pasteElement', 'Paste')}
-            </button>
-          </div>
-        </RibbonGroup>
-
         <RibbonGroup label={t('presentationWorkspace.slides', 'Slides')} className="w-20">
           <div className="flex h-full items-center justify-center">
             <button type="button" className={RIBBON_COMMAND_BUTTON_CLASS} onClick={addSlide}>
@@ -1651,209 +1629,103 @@ function EditableSessionDocumentView({
           </div>
         </RibbonGroup>
 
-        <RibbonGroup
-          label={t('presentationWorkspace.ribbonGroups.font', 'Font')}
-          className="w-[376px]"
-        >
-          <div className="grid h-full grid-rows-2 gap-1">
-            <div className="flex items-center gap-1">
-              <select
-                aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
-                className={`min-w-32 flex-1 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-                disabled={textDisabled}
-                value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
-                onPointerDown={loadLocalFontsOnFirstGesture}
-                onFocus={loadLocalFontsOnFirstGesture}
-                onChange={(event) =>
-                  updateSelectedTextElement({
-                    fontFamily: event.currentTarget.value
-                  })
-                }
-              >
-                {fontFamilies.map((fontFamily) => (
-                  <option key={fontFamily} value={fontFamily}>
-                    {fontFamily}
-                  </option>
-                ))}
-              </select>
-              {supportsLocalFontAccess() && (
-                <button
-                  type="button"
-                  className={RIBBON_ICON_BUTTON_CLASS}
-                  disabled={isLoadingLocalFonts}
-                  onClick={() => void loadLocalFonts()}
-                  aria-label={t('presentationWorkspace.loadLocalFonts', 'Load local fonts')}
-                >
-                  <RefreshCw className={`size-4 ${isLoadingLocalFonts ? 'animate-spin' : ''}`} />
-                </button>
-              )}
-              <select
-                aria-label={t('presentationWorkspace.fontSize', 'Font size')}
-                className={`w-14 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-                disabled={textDisabled}
-                value={
-                  selectedTextElement && document
-                    ? presentationCanvasPxToPoints(selectedTextElement.fontSize, document.width)
-                    : 44
-                }
-                onChange={(event) =>
-                  updateSelectedTextElement({
-                    fontSize: presentationPointsToCanvasPx(
-                      Number(event.currentTarget.value),
-                      document?.width ?? 1920
-                    )
-                  })
-                }
-              >
-                {FONT_SIZES.map((fontSize) => (
-                  <option key={fontSize} value={fontSize}>
-                    {fontSize}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className={textButtonClass(false, 'increase-font-size')}
-                disabled={textDisabled}
-                onClick={() => {
-                  flashRibbonAction('increase-font-size')
-                  changeFontSize(2)
-                }}
-                aria-label={t('presentationWorkspace.increaseFontSize', 'Increase font size')}
-              >
-                <span className="text-xl leading-none">A</span>
-                <ChevronDown className="size-3 rotate-180" />
-              </button>
-              <button
-                type="button"
-                className={textButtonClass(false, 'decrease-font-size')}
-                disabled={textDisabled}
-                onClick={() => {
-                  flashRibbonAction('decrease-font-size')
-                  changeFontSize(-2)
-                }}
-                aria-label={t('presentationWorkspace.decreaseFontSize', 'Decrease font size')}
-              >
-                <span className="text-sm leading-none">A</span>
-                <ChevronDown className="size-3" />
-              </button>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className={textButtonClass(Boolean(selectedTextElement?.bold))}
-                disabled={textDisabled}
-                aria-pressed={Boolean(selectedTextElement?.bold)}
-                onClick={() => updateSelectedTextElement({ bold: !selectedTextElement?.bold })}
-                aria-label={t('presentationWorkspace.bold', 'Bold')}
-              >
-                <Bold size={18} />
-              </button>
-              <button
-                type="button"
-                className={textButtonClass(Boolean(selectedTextElement?.italic))}
-                disabled={textDisabled}
-                aria-pressed={Boolean(selectedTextElement?.italic)}
-                onClick={() => updateSelectedTextElement({ italic: !selectedTextElement?.italic })}
-                aria-label={t('presentationWorkspace.italic', 'Italic')}
-              >
-                <Italic size={18} />
-              </button>
-              <button
-                type="button"
-                className={textButtonClass(Boolean(selectedTextElement?.underline))}
-                disabled={textDisabled}
-                aria-pressed={Boolean(selectedTextElement?.underline)}
-                onClick={() =>
-                  updateSelectedTextElement({ underline: !selectedTextElement?.underline })
-                }
-                aria-label={t('presentationWorkspace.underline', 'Underline')}
-              >
-                <Underline size={18} />
-              </button>
-              <label
-                className={`relative ${RIBBON_ICON_BUTTON_CLASS} ${
-                  textDisabled ? 'cursor-not-allowed opacity-30 hover:bg-transparent' : ''
-                }`}
-                aria-label={t('presentationWorkspace.fontColor', 'Font color')}
-              >
-                <Baseline size={18} />
-                <ChevronDown size={12} />
-                <span
-                  className="absolute bottom-1 left-1/2 h-0.5 w-5 -translate-x-1/2"
-                  style={{ backgroundColor: selectedTextElement?.color ?? '#111827' }}
-                />
-                <input
-                  className="sr-only"
-                  type="color"
-                  disabled={textDisabled}
-                  value={selectedTextElement?.color ?? '#111827'}
-                  onChange={(event) =>
-                    updateSelectedTextElement({
-                      color: event.currentTarget.value
-                    })
-                  }
-                />
-              </label>
-              <button
-                type="button"
-                className={textButtonClass(false, 'clear-formatting')}
-                disabled={textDisabled}
-                onClick={() => {
-                  flashRibbonAction('clear-formatting')
-                  clearTextFormatting()
-                }}
-                aria-label={t('presentationWorkspace.clearFormatting', 'Clear formatting')}
-              >
-                <Eraser size={18} />
-              </button>
-            </div>
-          </div>
-        </RibbonGroup>
-
-        <RibbonGroup
-          label={t('presentationWorkspace.ribbonGroups.paragraph', 'Paragraph')}
-          className="w-28"
-        >
-          <div className="grid h-full grid-rows-2 gap-1">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className={textButtonClass(false, 'line-spacing')}
-                disabled={textDisabled}
-                onClick={(event) => {
-                  flashRibbonAction('line-spacing')
-                  showLineSpacingMenu(event)
-                }}
-                aria-label={t('presentationWorkspace.lineSpacing', 'Line spacing')}
-              >
-                <WrapText size={19} />
-                <ChevronDown size={12} />
-              </button>
-            </div>
-            <div className="flex items-center gap-1">
-              {(
-                [
-                  ['left', AlignLeft],
-                  ['center', AlignCenter],
-                  ['right', AlignRight]
-                ] as const
-              ).map(([align, Icon]) => (
-                <button
-                  key={align}
-                  type="button"
-                  className={textButtonClass(selectedTextElement?.align === align)}
-                  disabled={textDisabled}
-                  aria-pressed={selectedTextElement?.align === align}
-                  onClick={() => updateSelectedTextElement({ align })}
-                  aria-label={t(`presentationWorkspace.align.${align}`, align)}
-                >
-                  <Icon size={19} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </RibbonGroup>
+        <PresentationHomeRibbon
+          disabled={textDisabled}
+          fontFamilies={fontFamilies}
+          fontFamily={selectedTextElement?.fontFamily ?? activeTheme.defaultTextStyle.fontFamily}
+          fontSize={
+            selectedTextElement
+              ? presentationCanvasPxToPoints(selectedTextElement.fontSize, document.width)
+              : INSERTED_TEXT_FONT_SIZE_POINTS
+          }
+          bold={toggleState('bold', Boolean(selectedTextElement?.bold))}
+          italic={toggleState('italic', Boolean(selectedTextElement?.italic))}
+          underline={toggleState('underline', Boolean(selectedTextElement?.underline))}
+          strikethrough={toggleState('strikethrough', Boolean(selectedTextElement?.strikethrough))}
+          baseline={selectedTextElement?.baseline ?? 'normal'}
+          color={selectedTextElement?.color ?? activeTheme.defaultTextStyle.color}
+          highlightColor={selectedTextElement?.highlightColor ?? null}
+          align={selectedTextElement?.align ?? 'left'}
+          theme={activeTheme}
+          onFontAccess={loadLocalFontsOnFirstGesture}
+          onFontFamilyChange={(fontFamily) => patchCharacterStyle({ fontFamily })}
+          onFontSizeChange={(fontSize) =>
+            patchCharacterStyle({
+              fontSize: presentationPointsToCanvasPx(fontSize, document.width)
+            })
+          }
+          onGrowFont={() => changeFontSize(1)}
+          onShrinkFont={() => changeFontSize(-1)}
+          onCharacterStyle={patchCharacterStyle}
+          onChangeCase={(textCase) => {
+            if (!selectedTextElement) return
+            const range =
+              textSelection?.elementId === selectedTextElement.id
+                ? textSelection
+                : { start: 0, end: selectedTextElement.text.length }
+            const paragraphs = changeTextCase(
+              normalizeTextParagraphs(selectedTextElement),
+              range.start,
+              range.end,
+              textCase
+            )
+            updateSelectedTextElement({
+              text: paragraphs
+                .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
+                .join('\n'),
+              paragraphs,
+              runs: flattenTextParagraphs(paragraphs)
+            })
+          }}
+          onReset={clearTextFormatting}
+          onAlign={(align) => patchParagraphs((paragraph) => ({ ...paragraph, align }))}
+          onBullets={(char) =>
+            patchParagraphs((paragraph) => ({
+              ...paragraph,
+              list:
+                char === undefined && paragraph.list?.kind === 'bullet'
+                  ? null
+                  : { kind: 'bullet', level: paragraph.list?.level ?? 0, char: char ?? '•' }
+            }))
+          }
+          onNumbering={(format) =>
+            patchParagraphs((paragraph) => ({
+              ...paragraph,
+              list:
+                format === undefined && paragraph.list?.kind === 'number'
+                  ? null
+                  : {
+                      kind: 'number',
+                      level: paragraph.list?.level ?? 0,
+                      format: format ?? 'arabicPeriod',
+                      startAt: 1
+                    }
+            }))
+          }
+          onDecreaseIndent={() =>
+            patchParagraphs((paragraph) => ({
+              ...paragraph,
+              marginLeft: Math.max(0, paragraph.marginLeft - 32),
+              list: paragraph.list
+                ? { ...paragraph.list, level: Math.max(0, paragraph.list.level - 1) }
+                : null
+            }))
+          }
+          onIncreaseIndent={() =>
+            patchParagraphs((paragraph) => ({
+              ...paragraph,
+              marginLeft: paragraph.marginLeft + 32,
+              list: paragraph.list ? { ...paragraph.list, level: paragraph.list.level + 1 } : null
+            }))
+          }
+          onLineSpacing={showLineSpacingMenu}
+          onAutoWidth={() =>
+            updateSelectedTextElement({
+              autoWidth: !selectedTextElement?.autoWidth,
+              autoSize: selectedTextElement?.autoWidth ? 'fixed' : 'content'
+            })
+          }
+        />
 
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
@@ -2037,13 +1909,19 @@ function EditableSessionDocumentView({
       if (target?.closest('[role="menu"], [role="dialog"]')) return
       const isFormControl = Boolean(target?.closest('input, select, textarea'))
       if (isFormControl) return
+      const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
+      const command = event.metaKey || event.ctrlKey
+      const isSlideClipboardCommand =
+        Boolean(target?.closest('[data-slide-option]')) &&
+        command &&
+        ['c', 'x', 'v'].includes(event.key.toLowerCase())
       const isActionControl = Boolean(
         target?.closest('button, a[href], [role="button"], [role="link"], [role="tab"]')
       )
       const isTabDelete =
         Boolean(target?.closest('[role="tab"]')) &&
         (event.key === 'Delete' || event.key === 'Backspace')
-      if (isActionControl && !isTabDelete) return
+      if (isActionControl && !isTabDelete && !isSlideClipboardCommand) return
       const isContentEditable =
         target instanceof HTMLElement &&
         (target.isContentEditable || target.getAttribute('contenteditable') === 'true')
@@ -2112,8 +1990,6 @@ function EditableSessionDocumentView({
         return
       }
 
-      const command = event.metaKey || event.ctrlKey
-      const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
       if (
         activeSlideId &&
         selectedElementIds.size > 0 &&
@@ -2139,16 +2015,30 @@ function EditableSessionDocumentView({
       }
       if (command && event.key.toLowerCase() === 'c') {
         event.preventDefault()
-        if (selectedElement) {
+        if (isSlideClipboardCommand) {
+          copySelectedSlides()
+        } else if (selectedElement) {
           setCopiedElement(selectedElement)
-          setCopiedSlideIds([])
         } else {
           copySelectedSlides()
         }
       }
+      if (command && event.key.toLowerCase() === 'x') {
+        event.preventDefault()
+        if (isSlideClipboardCommand) {
+          cutSelectedSlides()
+        } else if (selectedElement) {
+          setCopiedElement(selectedElement)
+          deleteElement()
+        } else {
+          cutSelectedSlides()
+        }
+      }
       if (command && event.key.toLowerCase() === 'v') {
         event.preventDefault()
-        if (copiedElement) {
+        if (isSlideClipboardCommand) {
+          pasteSlide()
+        } else if (copiedElement) {
           pasteElement()
         } else {
           pasteSlide()
@@ -2207,14 +2097,10 @@ function EditableSessionDocumentView({
         />
         <div
           id="presentation-ribbon-panel"
-          role="tabpanel"
-          aria-labelledby={`presentation-ribbon-tab-${activeRibbon}`}
-          aria-hidden={!isRibbonOpen}
-          inert={!isRibbonOpen}
+          role="toolbar"
+          aria-label={t('presentationWorkspace.home', 'Home')}
           data-testid="presentation-ribbon-frame"
-          className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
-            isRibbonOpen ? `${ribbonHeightClass} opacity-100` : 'h-0 opacity-0'
-          }`}
+          className={`shrink-0 overflow-hidden ${ribbonHeightClass}`}
         >
           {renderRibbon()}
         </div>
@@ -2233,10 +2119,12 @@ function EditableSessionDocumentView({
           navigator={
             <NavigatorRail
               data-slide-sidebar
+              role="listbox"
+              aria-multiselectable="true"
               className="presentation-slide-rail relative min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
               onContextMenu={showSlideSidebarMenu}
             >
-              <div className="space-y-1">
+              <div className="space-y-1" role="presentation">
                 {document.slideOrder.map((slideId, index) => {
                   const isSelected =
                     selectedSlideIds.size === 0
@@ -2246,6 +2134,8 @@ function EditableSessionDocumentView({
                     <React.Fragment key={slideId}>
                       <button
                         type="button"
+                        data-slide-divider
+                        data-slide-index={index}
                         className="group flex h-5 w-full items-center px-1"
                         onClick={() => setInsertionIndex(index)}
                         onDragOver={(event) => {
@@ -2268,7 +2158,13 @@ function EditableSessionDocumentView({
                       </button>
                       <button
                         draggable
-                        className="flex w-full gap-2 px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-none"
+                        data-slide-option
+                        data-slide-index={index}
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`flex w-full gap-2 rounded-md px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-none ${
+                          isSelected ? 'bg-primary/10 ring-2 ring-primary/60' : ''
+                        }`}
                         onClick={(event) => selectSlide(index, event)}
                         onDragStart={(event) => {
                           const ids = selectedSlideIds.has(slideId)
@@ -2314,7 +2210,7 @@ function EditableSessionDocumentView({
                         <span
                           className={`relative flex aspect-video w-full min-w-0 overflow-hidden border bg-black shadow-sm ${
                             isSelected
-                              ? 'border-warning ring-2 ring-warning/50'
+                              ? 'border-primary ring-2 ring-primary/60'
                               : index === activeSlideIndex
                                 ? 'border-primary ring-2 ring-primary/40'
                                 : 'border-transparent'
@@ -2345,6 +2241,8 @@ function EditableSessionDocumentView({
                 })}
                 <button
                   type="button"
+                  data-slide-divider
+                  data-slide-index={document.slideOrder.length}
                   className="group flex h-5 w-full items-center px-1"
                   onClick={() => setInsertionIndex(document.slideOrder.length)}
                   onDragOver={(event) => {
@@ -2396,7 +2294,6 @@ function EditableSessionDocumentView({
                       selectedElementId={selectedElementId}
                       selectedElementIds={selectedElementIds}
                       editingElementId={editingElementId}
-                      cropElementId={cropElementId}
                       isTextInsertMode={isTextInsertMode}
                       onSelectElement={selectElement}
                       onMarqueeSelect={(bounds, additive) => {
@@ -2412,12 +2309,18 @@ function EditableSessionDocumentView({
                         })
                       }}
                       onEditingElementChange={(elementId) => {
-                        if (elementId === null) commitTextDraft()
+                        if (elementId === null) {
+                          commitTextDraft()
+                          setTextSelection(null)
+                        }
                         setEditingElementId(elementId)
                       }}
                       onTextEditFinalizerChange={setTextEditorFinalizer}
+                      onTextSelectionChange={setTextSelection}
+                      onTextIndent={changeSelectedTextIndent}
                       onInsertText={addTextElement}
                       onElementContextMenu={showElementContextMenu}
+                      onCanvasContextMenu={showCanvasContextMenu}
                       onTransformStart={(elementId) => {
                         const current =
                           session.getSnapshot().renderedDocument.slides[activeSlideId]?.elements[
@@ -3077,37 +2980,15 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const { itemId } = useParams()
   const openDocument = usePresentationWorkspaceStore((state) => state.openDocument)
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
-  const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
-  const [isRibbonOpen, setIsRibbonOpen] = useState(true)
   const [backgroundPanel, setBackgroundPanel] = useState({
     itemId: activeDocument?.itemId ?? null,
     isOpen: false
   })
-  const [selectedElementType, setSelectedElementType] = useState<PresentationElementType | null>(
-    null
-  )
+  const [slideClipboard, setSlideClipboard] = useState<PresentationSlideClipboard | null>(null)
   const activeItemId = activeDocument?.itemId ?? null
   if (backgroundPanel.itemId !== activeItemId) {
     setBackgroundPanel({ itemId: activeItemId, isOpen: false })
   }
-  const ribbonTabs = useMemo<RibbonTab[]>(
-    () => (selectedElementType === 'image' ? [...BASE_RIBBON_TABS, 'picture'] : BASE_RIBBON_TABS),
-    [selectedElementType]
-  )
-  const effectiveActiveRibbon = ribbonTabs.includes(activeRibbon) ? activeRibbon : 'home'
-  const activeRibbonIndex = Math.max(0, ribbonTabs.indexOf(effectiveActiveRibbon))
-
-  const handleSelectedElementTypeChange = useCallback((type: PresentationElementType | null) => {
-    if (type !== 'image') {
-      const pictureTab = globalThis.document.getElementById('presentation-ribbon-tab-picture')
-      if (globalThis.document.activeElement === pictureTab) {
-        globalThis.document.getElementById('presentation-ribbon-tab-home')?.focus()
-      }
-      setActiveRibbon((current) => (current === 'picture' ? 'home' : current))
-    }
-    setSelectedElementType(type)
-  }, [])
-
   useEffect(() => {
     if (!itemId) return
     const routeItemId = itemId
@@ -3125,103 +3006,18 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     }
   }, [itemId, openDocument])
 
-  const handleRibbonTabClick = (tab: RibbonTab): void => {
-    if (activeRibbon === 'design') setBackgroundPanel((panel) => ({ ...panel, isOpen: false }))
-    if (tab === activeRibbon) {
-      setIsRibbonOpen((open) => !open)
-      return
-    }
-    setActiveRibbon(tab)
-    setIsRibbonOpen(true)
-  }
-
-  const handleRibbonTabKeyDown = (
-    event: React.KeyboardEvent<HTMLButtonElement>,
-    tabIndex: number
-  ): void => {
-    let nextIndex: number | null = null
-    if (event.key === 'ArrowLeft') {
-      nextIndex = (tabIndex - 1 + ribbonTabs.length) % ribbonTabs.length
-    } else if (event.key === 'ArrowRight') {
-      nextIndex = (tabIndex + 1) % ribbonTabs.length
-    } else if (event.key === 'Home') {
-      nextIndex = 0
-    } else if (event.key === 'End') {
-      nextIndex = ribbonTabs.length - 1
-    }
-    if (nextIndex === null) return
-
-    event.preventDefault()
-    const nextTab = ribbonTabs[nextIndex]
-    if (!nextTab) return
-    if (activeRibbon === 'design' && nextTab !== 'design') {
-      setBackgroundPanel((panel) => ({ ...panel, isOpen: false }))
-    }
-    setActiveRibbon(nextTab)
-    setIsRibbonOpen(true)
-    event.currentTarget.parentElement
-      ?.querySelectorAll<HTMLElement>('[role="tab"]')
-      [nextIndex]?.focus()
-  }
-
-  const getRibbonTabLabel = (tab: RibbonTab): string => {
-    const fallbacks: Record<RibbonTab, string> = {
-      home: '常用',
-      insert: '插入',
-      design: '設計',
-      picture: '圖片格式'
-    }
-    return t(
-      tab === 'picture' ? 'presentationWorkspace.pictureFormat' : `presentationWorkspace.${tab}`,
-      fallbacks[tab]
-    )
-  }
-
   return (
     <WorkspaceShell className="w-0 min-w-full bg-background text-foreground">
-      <div
-        role="tablist"
-        aria-label={t('presentationWorkspace.title')}
-        className="relative flex h-10 shrink-0 items-end overflow-x-auto bg-background px-2 sm:px-4"
-      >
-        {ribbonTabs.map((tab, tabIndex) => (
-          <button
-            key={tab}
-            id={`presentation-ribbon-tab-${tab}`}
-            type="button"
-            role="tab"
-            aria-selected={effectiveActiveRibbon === tab}
-            aria-controls="presentation-ribbon-panel"
-            aria-expanded={effectiveActiveRibbon === tab ? isRibbonOpen : undefined}
-            tabIndex={effectiveActiveRibbon === tab ? 0 : -1}
-            className={`h-9 w-16 rounded-t-lg text-sm transition-colors ${
-              effectiveActiveRibbon === tab
-                ? 'bg-content1 text-foreground'
-                : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
-            }`}
-            onClick={() => handleRibbonTabClick(tab)}
-            onKeyDown={(event) => handleRibbonTabKeyDown(event, tabIndex)}
-          >
-            {getRibbonTabLabel(tab)}
-          </button>
-        ))}
-        <span
-          className="pointer-events-none absolute bottom-0 left-4 z-10 h-1 w-16 bg-[#0ea5e9] transition-transform duration-200 ease-out"
-          style={{ transform: `translateX(${activeRibbonIndex * 64}px)` }}
-        />
-      </div>
-
       {activeDocument ? (
         activeDocument.mode === 'editable' ? (
           <EditableDocumentView
             deck={activeDocument}
-            activeRibbon={effectiveActiveRibbon}
-            isRibbonOpen={isRibbonOpen}
             isBackgroundPanelOpen={backgroundPanel.isOpen}
             onBackgroundPanelOpenChange={(isOpen) =>
               setBackgroundPanel({ itemId: activeDocument.itemId, isOpen })
             }
-            onSelectedElementTypeChange={handleSelectedElementTypeChange}
+            slideClipboard={slideClipboard}
+            onSlideClipboardChange={setSlideClipboard}
           />
         ) : (
           <PptxDocumentView deck={activeDocument} />

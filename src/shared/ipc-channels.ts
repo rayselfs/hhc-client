@@ -125,6 +125,7 @@ export interface LocalSyncRemoteItem {
   mimeType?: string
   size?: number
   etag?: string
+  sourceCreatedAt?: number
 }
 
 export interface LocalSyncImportFileRequest {

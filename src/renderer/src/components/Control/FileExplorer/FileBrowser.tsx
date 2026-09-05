@@ -63,6 +63,7 @@ import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import { listMediaJobs, subscribeMediaJobs } from '@renderer/lib/media-work-db'
 import { buildMediaJobViewState, type MediaJobViewState } from '@renderer/lib/media-job-view-state'
+import { formatLocalDateTime } from '@renderer/lib/format-local-date-time'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -226,15 +227,6 @@ function DragOverlayContent({
   )
 }
 
-function formatSearchDate(ts: number | undefined): string {
-  if (ts === undefined) return '—'
-  const d = new Date(ts)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}/${m}/${day}`
-}
-
 function formatSearchFileSize(bytes: number | undefined): string {
   if (bytes === undefined) return '—'
   if (bytes === 0) return '0 B'
@@ -244,7 +236,7 @@ function formatSearchFileSize(bytes: number | undefined): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
-const SEARCH_COL = { created: 90, size: 72, kind: 96, path: 200 }
+const SEARCH_COL = { created: 160, size: 72, kind: 96, path: 200 }
 const EMPTY_ARRAY: never[] = []
 const SLOW_CLICK_RENAME_MIN_MS = 320
 
@@ -332,7 +324,7 @@ function SearchResultsList({
                 className="flex-shrink-0 text-sm text-default-400 pl-2"
                 style={{ width: SEARCH_COL.created }}
               >
-                {formatSearchDate(createdAt)}
+                {formatLocalDateTime(createdAt)}
               </div>
               <div
                 className="flex-shrink-0 text-sm text-default-400 pl-2"

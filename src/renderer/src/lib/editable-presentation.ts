@@ -3,15 +3,16 @@ import { openFileExplorerDB } from './file-explorer-db'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { readPresentationArrayBuffer } from './presentation-source'
 import { persistEditablePresentationCreation } from './editable-presentation-creation'
+import { normalizeTextParagraphs } from './presentation-rich-text'
 import { FOLDER_DURATION_MS, type FileItemRecord } from '@shared/types/folder'
 import type { PlaceholderInfo, PresentationData } from '@aiden0z/pptx-renderer'
 import type { SlideData, SlideNode } from '@aiden0z/pptx-renderer'
-import type { PicNodeData, ShapeNodeData } from '@aiden0z/pptx-renderer'
+import type { PicNodeData, ShapeNodeData, ThemeData } from '@aiden0z/pptx-renderer'
 
 export const EDITABLE_PRESENTATION_DOCUMENT_KIND = 'editable-presentation-document'
 
 export type EditablePresentationElementType = 'text' | 'image' | 'shape' | 'line' | 'locked'
-export type EditableTextAlign = 'left' | 'center' | 'right'
+export type EditableTextAlign = 'left' | 'center' | 'right' | 'justify'
 export type EditableShapeKind = 'rectangle' | 'ellipse'
 export type EditableGradientDirection = 'left-right' | 'top-bottom' | 'diagonal'
 export type EditableGradientType = 'linear'
@@ -83,9 +84,14 @@ export interface EditableTextElement extends EditableElementBase {
   bold: boolean
   italic: boolean
   underline: boolean
+  strikethrough?: boolean
+  baseline?: 'normal' | 'superscript' | 'subscript'
+  characterSpacing?: number
   color: string
+  highlightColor?: string | null
   align: EditableTextAlign
   lineHeight: number
+  paragraphs?: EditableTextParagraph[]
 }
 
 export interface EditableTextRun {
@@ -96,6 +102,68 @@ export interface EditableTextRun {
   italic: boolean
   underline: boolean
   color: string
+  strikethrough?: boolean
+  baseline?: 'normal' | 'superscript' | 'subscript'
+  characterSpacing?: number
+  highlightColor?: string | null
+}
+
+export type EditableLineSpacing =
+  | { kind: 'multiple'; value: number }
+  | { kind: 'exact'; points: number }
+
+export type EditableListStyle =
+  | { kind: 'bullet'; level: number; char: string; font?: string }
+  | {
+      kind: 'number'
+      level: number
+      format: string
+      startAt?: number
+      sequenceId?: string
+    }
+
+export interface EditableTextParagraph {
+  runs: EditableTextRun[]
+  typingStyle?: EditableTextStyle
+  typingStyleCaret?: number
+  align: EditableTextAlign
+  lineSpacing: EditableLineSpacing
+  list: EditableListStyle | null
+  marginLeft: number
+  textIndent: number
+}
+
+export interface EditableTextStyle {
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  strikethrough: boolean
+  baseline: 'normal' | 'superscript' | 'subscript'
+  characterSpacing: number
+  color: string
+  highlightColor: string | null
+}
+
+export type EditableThemeColorSlot =
+  | 'dk1'
+  | 'dk2'
+  | 'lt1'
+  | 'lt2'
+  | 'accent1'
+  | 'accent2'
+  | 'accent3'
+  | 'accent4'
+  | 'accent5'
+  | 'accent6'
+  | 'hlink'
+  | 'folHlink'
+
+export interface EditablePresentationTheme {
+  id: string
+  defaultTextStyle: EditableTextStyle
+  colorScheme: Record<EditableThemeColorSlot, string>
 }
 
 export interface EditableImageElement extends EditableElementBase {
@@ -140,6 +208,7 @@ export interface EditablePresentationSlide {
   elementOrder: string[]
   elements: Record<string, EditablePresentationElement>
   notes: string
+  themeId?: string
 }
 
 export interface EditablePresentationDocument {
@@ -153,6 +222,8 @@ export interface EditablePresentationDocument {
   slideOrder: string[]
   slides: Record<string, EditablePresentationSlide>
   assets: Record<string, EditablePresentationAsset>
+  themes?: Record<string, EditablePresentationTheme>
+  defaultThemeId?: string
   createdAt: number
   updatedAt: number
 }
@@ -169,6 +240,7 @@ const DEFAULT_HEIGHT = 1080
 const DEFAULT_FONT_FAMILY = 'Inter Variable'
 export const DEFAULT_SLIDE_BACKGROUND_COLOR = '#ffffff'
 const DEFAULT_FOREGROUND_COLOR = '#111827'
+export const DEFAULT_PRESENTATION_THEME_ID = 'office-default'
 export type EditableTextAutoSize = 'content' | 'fixed'
 
 export function hasContentHeight(
@@ -179,7 +251,7 @@ export function hasContentHeight(
   )
 }
 
-export const INSERTED_TEXT_FONT_SIZE_POINTS = 18
+export const INSERTED_TEXT_FONT_SIZE_POINTS = 24
 export const INSERTED_TEXT_CLICK_SIZE = { width: 24, height: 32 } as const
 export const INSERTED_TEXT_DRAG_MIN_SIZE = { width: 80, height: 40 } as const
 export const CONTENT_HEIGHT_TEXT_PADDING_X = 8
@@ -196,6 +268,40 @@ export function presentationPointsToCanvasPx(points: number, documentWidth: numb
 
 export function presentationCanvasPxToPoints(px: number, documentWidth: number): number {
   return (px * POWERPOINT_STANDARD_WIDTH_POINTS) / documentWidth
+}
+
+export function createDefaultPresentationTheme(
+  documentWidth = DEFAULT_WIDTH
+): EditablePresentationTheme {
+  return {
+    id: DEFAULT_PRESENTATION_THEME_ID,
+    defaultTextStyle: {
+      fontFamily: DEFAULT_FONT_FAMILY,
+      fontSize: presentationPointsToCanvasPx(INSERTED_TEXT_FONT_SIZE_POINTS, documentWidth),
+      bold: false,
+      italic: false,
+      underline: false,
+      strikethrough: false,
+      baseline: 'normal',
+      characterSpacing: 0,
+      color: DEFAULT_FOREGROUND_COLOR,
+      highlightColor: null
+    },
+    colorScheme: {
+      dk1: '#000000',
+      dk2: '#44546a',
+      lt1: '#ffffff',
+      lt2: '#e7e6e6',
+      accent1: '#4472c4',
+      accent2: '#ed7d31',
+      accent3: '#a5a5a5',
+      accent4: '#ffc000',
+      accent5: '#5b9bd5',
+      accent6: '#70ad47',
+      hlink: '#0563c1',
+      folHlink: '#954f72'
+    }
+  }
 }
 
 type XmlNode = ShapeNodeData['source']
@@ -368,6 +474,7 @@ export function createBlankEditablePresentationDocument(
 ): EditablePresentationDocument {
   const slideId = crypto.randomUUID()
   const now = Date.now()
+  const theme = createDefaultPresentationTheme()
   return {
     id,
     name,
@@ -382,10 +489,13 @@ export function createBlankEditablePresentationDocument(
         background: createDefaultSlideBackground(),
         elementOrder: [],
         elements: {},
-        notes: ''
+        notes: '',
+        themeId: theme.id
       }
     },
     assets: {},
+    themes: { [theme.id]: theme },
+    defaultThemeId: theme.id,
     createdAt: now,
     updatedAt: now
   }
@@ -415,12 +525,17 @@ export function createTextElement(
     opacity: input.opacity ?? 1,
     text: input.text ?? '',
     runs: input.runs,
+    paragraphs: input.paragraphs,
     fontFamily: input.fontFamily ?? DEFAULT_FONT_FAMILY,
     fontSize,
     bold: input.bold ?? false,
     italic: input.italic ?? false,
     underline: input.underline ?? false,
+    strikethrough: input.strikethrough ?? false,
+    baseline: input.baseline ?? 'normal',
+    characterSpacing: input.characterSpacing ?? 0,
     color: input.color ?? DEFAULT_FOREGROUND_COLOR,
+    highlightColor: input.highlightColor ?? null,
     align: input.align ?? 'left',
     lineHeight
   }
@@ -933,6 +1048,9 @@ export function convertPresentationData(
   const slides: Record<string, EditablePresentationSlide> = {}
   const slideOrder: string[] = []
   const assets: Record<string, EditablePresentationAsset> = {}
+  const width = normalizeCanvasLength(presentation.width, DEFAULT_WIDTH)
+  const themes = convertPresentationThemes(presentation, width)
+  const defaultThemeId = Object.keys(themes)[0] ?? DEFAULT_PRESENTATION_THEME_ID
 
   for (const slide of presentation.slides) {
     const slideId = crypto.randomUUID()
@@ -940,7 +1058,8 @@ export function convertPresentationData(
     slides[slideId] = {
       ...convertedSlide,
       id: slideId,
-      name: `Slide ${slide.index + 1}`
+      name: `Slide ${slide.index + 1}`,
+      themeId: resolveSlideThemeId(slide, presentation) ?? defaultThemeId
     }
     slideOrder.push(slideId)
   }
@@ -950,15 +1069,55 @@ export function convertPresentationData(
     name: `${stripPresentationExtension(source.name)} Editable`,
     sourceItemId: source.id,
     sourceBlobId: getBlobId(source),
-    width: normalizeCanvasLength(presentation.width, DEFAULT_WIDTH),
+    width,
     height: normalizeCanvasLength(presentation.height, DEFAULT_HEIGHT),
     defaultSlideBackground: createDefaultSlideBackground(),
     slideOrder,
     slides,
     assets,
+    themes,
+    defaultThemeId,
     createdAt: now,
     updatedAt: now
   }
+}
+
+function convertPresentationThemes(
+  presentation: PresentationData,
+  documentWidth: number
+): Record<string, EditablePresentationTheme> {
+  const result: Record<string, EditablePresentationTheme> = {}
+  for (const [id, theme] of presentation.themes ?? []) {
+    const fallback = createDefaultPresentationTheme(documentWidth)
+    result[id] = {
+      id,
+      defaultTextStyle: {
+        ...fallback.defaultTextStyle,
+        fontFamily: theme.minorFont.latin || theme.minorFont.ea || DEFAULT_FONT_FAMILY
+      },
+      colorScheme: {
+        ...fallback.colorScheme,
+        ...Object.fromEntries(
+          [...theme.colorScheme].map(([slot, color]) => [slot, normalizeThemeColor(color)])
+        )
+      }
+    }
+  }
+  if (Object.keys(result).length === 0) {
+    const fallback = createDefaultPresentationTheme(documentWidth)
+    result[fallback.id] = fallback
+  }
+  return result
+}
+
+function normalizeThemeColor(color: string): string {
+  return color.startsWith('#') ? color : `#${color}`
+}
+
+function resolveSlideThemeId(slide: SlideData, presentation: PresentationData): string | undefined {
+  const layoutId = presentation.slideToLayout?.get(slide.index) ?? slide.layoutIndex
+  const masterId = presentation.layoutToMaster?.get(layoutId)
+  return masterId ? presentation.masterToTheme?.get(masterId) : undefined
 }
 
 function convertSlide(
@@ -1036,6 +1195,7 @@ function convertShapeNode(
 ): EditablePresentationElement[] {
   const elements: EditablePresentationElement[] = []
   const text = getShapeText(node)
+  const theme = getSlideTheme(slide, presentation)
   const shape = getEditableShapeKind(node.presetGeometry)
   const fillColor = readSrgbColor(node.fill) ?? 'transparent'
   const strokeColor = readSrgbColor(node.line) ?? '#000000'
@@ -1076,8 +1236,9 @@ function convertShapeNode(
   if (text) {
     const frame = resolveTextShapeFrame(node, slide, presentation)
     if (!frame) throw new Error(`Text placeholder frame is missing: ${node.name}`)
-    const style = resolveTextShapeStyle(node)
-    const runs = resolveTextRuns(node)
+    const style = resolveTextShapeStyle(node, theme)
+    const runs = resolveTextRuns(node, theme)
+    const paragraphs = resolveTextParagraphs(node, theme)
     elements.push({
       id: crypto.randomUUID(),
       type: 'text',
@@ -1091,6 +1252,7 @@ function convertShapeNode(
       opacity: 1,
       text,
       runs,
+      paragraphs,
       fontFamily: style.fontFamily,
       fontSize: style.fontSize,
       bold: style.bold,
@@ -1190,6 +1352,7 @@ function getEditableShapeKind(presetGeometry: string | undefined): EditableShape
 function normalizeTextAlign(value: string | undefined): EditableTextAlign {
   if (value === 'ctr') return 'center'
   if (value === 'r') return 'right'
+  if (value === 'just') return 'justify'
   return 'left'
 }
 
@@ -1289,21 +1452,32 @@ function createTextShapeFrame(
   return { x, y, width, height }
 }
 
-function resolveTextShapeStyle(node: ShapeNodeData): TextShapeStyle {
+function getSlideTheme(slide: SlideData, presentation: PresentationData): ThemeData | undefined {
+  const themeId = resolveSlideThemeId(slide, presentation)
+  return themeId ? presentation.themes?.get(themeId) : undefined
+}
+
+function resolveTextShapeStyle(node: ShapeNodeData, theme?: ThemeData): TextShapeStyle {
   const firstParagraph = node.textBody?.paragraphs[0]
   const firstRun = firstParagraph?.runs[0]
   return resolveTextStyle(
     firstRun?.properties,
     firstParagraph?.endParaRPr,
-    firstParagraph?.properties
+    firstParagraph?.properties,
+    theme
   )
 }
 
-function resolveTextRuns(node: ShapeNodeData): EditableTextRun[] | undefined {
+function resolveTextRuns(node: ShapeNodeData, theme?: ThemeData): EditableTextRun[] | undefined {
   const runs: EditableTextRun[] = []
   for (const [paragraphIndex, paragraph] of (node.textBody?.paragraphs ?? []).entries()) {
     for (const [runIndex, run] of paragraph.runs.entries()) {
-      const style = resolveTextStyle(run.properties, paragraph.endParaRPr, paragraph.properties)
+      const style = resolveTextStyle(
+        run.properties,
+        paragraph.endParaRPr,
+        paragraph.properties,
+        theme
+      )
       runs.push({
         text: `${paragraphIndex > 0 && runIndex === 0 ? '\n' : ''}${run.text}`,
         fontFamily: style.fontFamily,
@@ -1322,10 +1496,80 @@ function resolveTextRuns(node: ShapeNodeData): EditableTextRun[] | undefined {
   return runs.filter((run) => run.text.length > 0)
 }
 
+function resolveTextParagraphs(
+  node: ShapeNodeData,
+  theme?: ThemeData
+): EditableTextParagraph[] | undefined {
+  const paragraphs = node.textBody?.paragraphs.map((paragraph) => {
+    const runs = paragraph.runs.map((run) => {
+      const style = resolveTextStyle(
+        run.properties,
+        paragraph.endParaRPr,
+        paragraph.properties,
+        theme
+      )
+      const baseline = Number(run.properties?.attr('baseline') ?? 0)
+      const spacing = Number(run.properties?.attr('spc') ?? 0)
+      return {
+        text: run.text,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        bold: style.bold,
+        italic: style.italic,
+        underline: style.underline,
+        color: style.color,
+        strikethrough: isStrikeEnabled(run.properties?.attr('strike')),
+        baseline:
+          baseline > 0
+            ? ('superscript' as const)
+            : baseline < 0
+              ? ('subscript' as const)
+              : ('normal' as const),
+        characterSpacing: characterSpacingToPx(spacing),
+        highlightColor: readTextColor(run.properties?.child('highlight'), theme)
+      }
+    })
+    const properties = paragraph.properties
+    const exactPoints = properties?.child('lnSpc').child('spcPts').numAttr('val')
+    const multiple = properties?.child('lnSpc').child('spcPct').numAttr('val')
+    const bullet = properties?.child('buChar')
+    const number = properties?.child('buAutoNum')
+    const list: EditableListStyle | null = bullet?.exists()
+      ? {
+          kind: 'bullet',
+          level: paragraph.level,
+          char: bullet.attr('char') ?? '•',
+          font: properties?.child('buFont').attr('typeface')
+        }
+      : number?.exists()
+        ? {
+            kind: 'number',
+            level: paragraph.level,
+            format: number.attr('type') ?? 'arabicPeriod',
+            startAt: number.numAttr('startAt')
+          }
+        : null
+    return {
+      runs,
+      typingStyle: runs.at(-1),
+      align: normalizeTextAlign(properties?.attr('algn')),
+      lineSpacing:
+        exactPoints !== undefined
+          ? { kind: 'exact' as const, points: exactPoints / 100 }
+          : { kind: 'multiple' as const, value: multiple !== undefined ? multiple / 100000 : 1.15 },
+      list,
+      marginLeft: normalizeCanvasCoordinate(properties?.numAttr('marL')) ?? 0,
+      textIndent: normalizeCanvasCoordinate(properties?.numAttr('indent')) ?? 0
+    }
+  })
+  return paragraphs?.length ? paragraphs : undefined
+}
+
 function resolveTextStyle(
   runProperties: XmlNode | undefined,
   paragraphEndProperties: XmlNode | undefined,
-  paragraphProperties: XmlNode | undefined
+  paragraphProperties: XmlNode | undefined,
+  theme?: ThemeData
 ): TextShapeStyle {
   const fontSize = fontSizeToPx(
     runProperties?.numAttr('sz') ?? paragraphEndProperties?.numAttr('sz') ?? 3200
@@ -1333,16 +1577,16 @@ function resolveTextStyle(
 
   return {
     fontFamily:
-      readFontFamily(runProperties) ??
-      readFontFamily(paragraphEndProperties) ??
+      readFontFamily(runProperties, theme) ??
+      readFontFamily(paragraphEndProperties, theme) ??
       DEFAULT_FONT_FAMILY,
     fontSize,
     bold: isXmlTrue(runProperties?.attr('b') ?? paragraphEndProperties?.attr('b')),
     italic: isXmlTrue(runProperties?.attr('i') ?? paragraphEndProperties?.attr('i')),
     underline: isUnderlineEnabled(runProperties?.attr('u') ?? paragraphEndProperties?.attr('u')),
     color:
-      readSrgbColor(runProperties) ??
-      readSrgbColor(paragraphEndProperties) ??
+      readTextColor(runProperties, theme) ??
+      readTextColor(paragraphEndProperties, theme) ??
       DEFAULT_FOREGROUND_COLOR,
     align: normalizeTextAlign(paragraphProperties?.attr('algn')),
     lineHeight: 1.15
@@ -1367,6 +1611,10 @@ function fontSizeToPx(hundredthsOfPoint: number): number {
   return (hundredthsOfPoint / 100) * (CSS_PX_PER_INCH / 72)
 }
 
+function characterSpacingToPx(thousandthsOfPoint: number): number {
+  return (thousandthsOfPoint / 1000) * (CSS_PX_PER_INCH / 72)
+}
+
 function isXmlTrue(value: string | undefined): boolean {
   return value === '1' || value === 'true'
 }
@@ -1375,8 +1623,35 @@ function isUnderlineEnabled(value: string | undefined): boolean {
   return Boolean(value && value !== 'none')
 }
 
-function readFontFamily(node: XmlNode | undefined): string | null {
-  return node?.child('latin').attr('typeface') ?? node?.child('ea').attr('typeface') ?? null
+function isStrikeEnabled(value: string | undefined): boolean {
+  return Boolean(value && value !== 'noStrike')
+}
+
+function readFontFamily(node: XmlNode | undefined, theme?: ThemeData): string | null {
+  const value = node?.child('latin').attr('typeface') ?? node?.child('ea').attr('typeface')
+  if (!value) return null
+  if (value.startsWith('+mj')) return theme?.majorFont.latin || theme?.majorFont.ea || null
+  if (value.startsWith('+mn')) return theme?.minorFont.latin || theme?.minorFont.ea || null
+  return value
+}
+
+function readTextColor(node: XmlNode | undefined, theme?: ThemeData): string | null {
+  const direct = readSrgbColor(node)
+  if (direct) return direct
+  const scheme = node?.child('solidFill').child('schemeClr')
+  const slot = scheme?.attr('val')
+  const base = slot ? theme?.colorScheme.get(slot) : undefined
+  if (!base || !scheme) return null
+  const tint = scheme.child('tint').numAttr('val')
+  const shade = scheme.child('shade').numAttr('val')
+  const luminance = scheme.child('lumMod').numAttr('val')
+  const offset = scheme.child('lumOff').numAttr('val')
+  let color = normalizeThemeColor(base)
+  if (tint !== undefined) color = applyBrightness(color, 100 - tint / 1000)
+  if (shade !== undefined) color = applyBrightness(color, shade / 1000 - 100)
+  if (luminance !== undefined) color = applyBrightness(color, luminance / 1000 - 100)
+  if (offset !== undefined) color = applyBrightness(color, offset / 1000)
+  return color
 }
 
 function readSrgbColor(
@@ -1546,19 +1821,7 @@ function renderElementSvg(
 ): string {
   const transform = `rotate(${element.rotation} ${element.x + element.width / 2} ${element.y + element.height / 2})`
   if (element.type === 'text') {
-    if (element.runs?.length) {
-      const lineAdvance = element.fontSize * element.lineHeight
-      const body = element.runs
-        .flatMap((run) =>
-          run.text.split('\n').map((text, index) => {
-            const lineBreak = index > 0
-            return `<tspan${lineBreak ? ` x="${element.x}" dy="${lineAdvance}"` : ''} fill="${escapeXml(run.color)}" font-size="${run.fontSize}" font-family="${escapeXml(run.fontFamily)}" font-weight="${run.bold ? 700 : 400}" font-style="${run.italic ? 'italic' : 'normal'}"${run.underline ? ' text-decoration="underline"' : ''}>${escapeXml(text)}</tspan>`
-          })
-        )
-        .join('')
-      return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" opacity="${element.opacity}" transform="${transform}">${body}</text>`
-    }
-    return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" fill="${escapeXml(element.color)}" font-size="${element.fontSize}" font-family="${escapeXml(element.fontFamily)}" font-weight="${element.bold ? 700 : 400}" font-style="${element.italic ? 'italic' : 'normal'}" opacity="${element.opacity}" transform="${transform}">${escapeXml(element.text)}</text>`
+    return renderTextElementForeignObject(element, transform)
   }
   if (element.type === 'shape') {
     if (element.shape === 'ellipse') {
@@ -1573,6 +1836,40 @@ function renderElementSvg(
     return `<line x1="${element.x}" y1="${element.y}" x2="${element.x + element.width}" y2="${element.y + element.height}" stroke="${escapeXml(element.strokeColor)}" stroke-width="${element.strokeWidth}" opacity="${element.opacity}" transform="${transform}"/>`
   }
   return ''
+}
+
+function renderTextElementForeignObject(element: EditableTextElement, transform: string): string {
+  const paragraphs = normalizeTextParagraphs(element)
+  const body = paragraphs
+    .map((paragraph, paragraphIndex) => {
+      const marker =
+        paragraph.list?.kind === 'bullet'
+          ? `${paragraph.list.char} `
+          : paragraph.list?.kind === 'number'
+            ? `${(paragraph.list.startAt ?? 1) + paragraphIndex}. `
+            : ''
+      const runs = paragraph.runs
+        .map((run) => {
+          const decorations = [run.underline && 'underline', run.strikethrough && 'line-through']
+            .filter(Boolean)
+            .join(' ')
+          const verticalAlign =
+            run.baseline === 'superscript'
+              ? 'super'
+              : run.baseline === 'subscript'
+                ? 'sub'
+                : 'baseline'
+          return `<span style="color:${escapeXml(run.color)};background-color:${escapeXml(run.highlightColor ?? 'transparent')};font-family:${escapeXml(run.fontFamily)};font-size:${run.fontSize}px;font-weight:${run.bold ? 700 : 400};font-style:${run.italic ? 'italic' : 'normal'};text-decoration:${decorations || 'none'};vertical-align:${verticalAlign};letter-spacing:${run.characterSpacing ?? 0}px">${escapeXml(run.text)}</span>`
+        })
+        .join('')
+      const lineHeight =
+        paragraph.lineSpacing.kind === 'multiple'
+          ? String(paragraph.lineSpacing.value)
+          : `${paragraph.lineSpacing.points}pt`
+      return `<div style="min-height:1em;text-align:${paragraph.align};text-align-last:left;line-height:${lineHeight};margin-left:${paragraph.marginLeft}px;text-indent:${paragraph.textIndent}px">${escapeXml(marker)}${runs}</div>`
+    })
+    .join('')
+  return `<foreignObject x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" opacity="${element.opacity}" transform="${transform}"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word">${body}</div></foreignObject>`
 }
 
 function renderImageElementSvg(
@@ -1645,13 +1942,18 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
   ) {
     throw new Error('Invalid editable presentation document')
   }
+  const fallbackTheme = createDefaultPresentationTheme(parsed.width)
+  const themes = parsed.themes ?? { [fallbackTheme.id]: fallbackTheme }
+  const defaultThemeId = parsed.defaultThemeId ?? fallbackTheme.id
+  if (!themes[defaultThemeId]) themes[defaultThemeId] = fallbackTheme
   const slides: Record<string, EditablePresentationSlide> = {}
   for (const [slideId, slide] of Object.entries(
     parsed.slides as Record<string, EditablePresentationSlide>
   )) {
     slides[slideId] = {
       ...slide,
-      background: normalizeSlideBackground(slide.background)
+      background: normalizeSlideBackground(slide.background),
+      themeId: slide.themeId ?? defaultThemeId
     }
   }
   return {
@@ -1667,6 +1969,8 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
     slideOrder: parsed.slideOrder,
     slides,
     assets: parsed.assets ?? {},
+    themes,
+    defaultThemeId,
     createdAt: parsed.createdAt ?? Date.now(),
     updatedAt: parsed.updatedAt ?? Date.now()
   }

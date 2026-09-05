@@ -131,7 +131,8 @@ describe('HHC LINE read-only provider', () => {
           mimeType: 'image/jpeg',
           size: 42,
           etag: '"etag-1"',
-          contentHash: 'sha256:abc'
+          contentHash: 'sha256:abc',
+          sourceCreatedAt: Date.parse(item.createdAt)
         },
         {
           remoteItemId: 'item_deleted',
@@ -145,6 +146,17 @@ describe('HHC LINE read-only provider', () => {
       hasMore: false,
       reset: true
     })
+  })
+
+  it('omits an invalid asset creation time', async () => {
+    const client = api()
+    vi.mocked(client.getCollectionItem).mockResolvedValueOnce({ ...item, createdAt: 'invalid' })
+    const provider = new HhcLineReadonlyProvider({ api: client, getSession: vi.fn() })
+    await provider.initialScan('hhc-line:user_1', collection.id)
+
+    await expect(provider.getMetadata('hhc-line:user_1', item.id)).resolves.not.toHaveProperty(
+      'sourceCreatedAt'
+    )
   })
 
   it('passes the per-root collection ID through metadata, content, and source requests', async () => {

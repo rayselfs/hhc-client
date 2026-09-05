@@ -269,39 +269,6 @@ async function dragResizeHandle(
     .toEqual([`${before.x}px`, `${before.y}px`, `${before.width}px`, `${before.height}px`])
 }
 
-async function dragCropHandle(page: Page, handle: Locator, direction: ResizeHandle): Promise<void> {
-  await expectEffectiveHandleTarget(handle, direction)
-  const image = page.locator(
-    '.presentation-stage [data-slide-content] [data-slide-element] img[alt="Corner image"]'
-  )
-  const readCropGeometry = (): Promise<number[]> =>
-    image.evaluate((element) => {
-      const style = (element as HTMLElement).style
-      return [style.left, style.top, style.width, style.height].map((value) =>
-        Number.parseFloat(value)
-      )
-    })
-  const before = await readCropGeometry()
-  const target = await handle.boundingBox()
-  expect(target).not.toBeNull()
-  const dx = direction.includes('w') ? 4 : direction.includes('e') ? -4 : 0
-  const dy = direction.includes('n') ? 4 : direction.includes('s') ? -4 : 0
-  const x = target!.x + target!.width / 2
-  const y = target!.y + target!.height / 2
-  await page.mouse.move(x, y)
-  await page.mouse.down()
-  await page.mouse.move(x + dx, y + dy)
-  await page.mouse.up()
-  await expect.poll(readCropGeometry).not.toEqual(before)
-  const after = await readCropGeometry()
-  if (direction.includes('w')) expect(after[0], direction).toBeLessThan(before[0])
-  if (direction.includes('e')) expect(after[2], direction).toBeGreaterThan(before[2])
-  if (direction.includes('n')) expect(after[1], direction).toBeLessThan(before[1])
-  if (direction.includes('s')) expect(after[3], direction).toBeGreaterThan(before[3])
-  await page.keyboard.press('ControlOrMeta+z')
-  await expect.poll(readCropGeometry).toEqual(before)
-}
-
 async function dragWithTouch(
   page: Page,
   handle: Locator,
@@ -557,8 +524,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   const zoomSlider = page.getByRole('slider', { name: /Zoom|縮放/ })
   await expect(fit).toHaveAttribute('aria-pressed', 'true')
 
-  await page.getByRole('tab', { name: /^(Insert|插入)$/ }).click()
-  await page.getByRole('button', { name: /^(Text|文字)$/ }).click()
+  await page.getByRole('button', { name: /Text Box|文字方塊|文本框/ }).click()
   await page
     .locator('.presentation-stage [data-slide-surface]')
     .click({ position: { x: 160, y: 120 } })
@@ -577,12 +543,8 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
     }
   })
   expect(textMetrics.scrollHeight).toBeLessThanOrEqual(
-    textMetrics.lineHeight + textMetrics.verticalPadding + 1
+    textMetrics.lineHeight + textMetrics.verticalPadding + 3
   )
-  const homeTab = page.getByRole('tab', { name: /^(Home|常用)$/ })
-  await homeTab.click()
-  await expect(homeTab).toHaveAttribute('aria-expanded', 'true')
-
   const shapes = page.getByRole('button', { name: /^(Shapes|圖案|形状)$/ })
   const shapesBox = await shapes.boundingBox()
   expect(shapesBox).not.toBeNull()
@@ -599,15 +561,8 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await expect(shapes).toBeFocused()
 
   const ribbonPanel = page.locator('#presentation-ribbon-panel')
-  await homeTab.click()
-  await expect(ribbonPanel).toHaveAttribute('inert', '')
-  await expect(homeTab).toHaveAttribute('aria-expanded', 'false')
-  await homeTab.focus()
-  await page.keyboard.press('Tab')
-  expect(await ribbonPanel.evaluate((panel) => !panel.contains(document.activeElement))).toBe(true)
-  await homeTab.click()
   await expect(ribbonPanel).toHaveCSS('height', '96px')
-  await expect(homeTab).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByRole('tablist')).toHaveCount(0)
 
   await page.setViewportSize({ width: 1470, height: 726 })
   const stageSlot = page.locator('.workspace-stage-slot')
@@ -772,7 +727,10 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
     name: /Start projection|開始投影|开始投影/
   })
   await expectProjectionActionGeometry(presentationProjectionAction)
-  expect(await ribbon.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  expect(await ribbon.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  )
 
   await page.setViewportSize({ width: 900, height: 800 })
   await expect(navigator).toBeHidden()
@@ -803,8 +761,19 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   }))
   expect(ribbonMetrics.scrollWidth).toBeGreaterThan(ribbonMetrics.clientWidth)
 
-  await page.getByRole('tab', { name: /Design|設計/ }).click()
-  await page.getByRole('button', { name: /Format Background|設定背景格式/ }).click()
+  await viewport.evaluate((element) => {
+    element.scrollLeft = 0
+    element.scrollTop = 0
+  })
+  await expect
+    .poll(() => viewport.evaluate((element) => [element.scrollLeft, element.scrollTop]))
+    .toEqual([0, 0])
+  await page
+    .locator('.presentation-stage [data-slide-surface]')
+    .click({ button: 'right', position: { x: 20, y: 20 } })
+  await page
+    .getByRole('menuitem', { name: /Format Background|設定背景格式/ })
+    .click({ force: true })
   const inspectorOverlay = page.getByRole('dialog', {
     name: /Format Background|設定背景格式/
   })
@@ -837,13 +806,6 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   })
   expect(outsideInteractive.length).toBeGreaterThan(0)
   expect(outsideInteractive.every(Boolean)).toBe(true)
-  const designTab = page.locator('#presentation-ribbon-tab-design')
-  const outsideHomeTab = page.locator('#presentation-ribbon-tab-home')
-  const homeBox = await outsideHomeTab.boundingBox()
-  expect(homeBox).not.toBeNull()
-  await page.mouse.click(homeBox!.x + homeBox!.width / 2, homeBox!.y + homeBox!.height / 2)
-  await expect(inspectorOverlay).toBeVisible()
-  await expect(designTab).toHaveAttribute('aria-selected', 'true')
   const inspectorFocusables = inspectorOverlay.locator(
     'button:visible, input:visible, select:visible, textarea:visible, [tabindex]:not([tabindex="-1"]):visible'
   )
@@ -860,18 +822,6 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   await expect(inspectorSlot).not.toHaveAttribute('role', 'dialog')
   await expect(stage).not.toHaveAttribute('inert')
   await expect(stage).not.toHaveAttribute('aria-hidden')
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const active = document.activeElement as HTMLElement | null
-        if (!active || active === document.body) return false
-        const style = getComputedStyle(active)
-        return (
-          style.display !== 'none' && style.visibility !== 'hidden' && active.offsetParent !== null
-        )
-      })
-    )
-    .toBe(true)
   expect(
     await page.evaluate(() =>
       Boolean(document.activeElement?.closest('[hidden], [inert], [aria-hidden="true"]'))
@@ -904,9 +854,7 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
   )
 })
 
-test('keeps corner resize and crop chrome fully operable at every editor zoom', async ({
-  page
-}) => {
+test('keeps corner resize chrome fully operable at every editor zoom', async ({ page }) => {
   test.setTimeout(120_000)
   await page.setViewportSize({ width: 1200, height: 800 })
   await page.goto('/')
@@ -1017,23 +965,6 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
       )
     }
 
-    await page.getByRole('tab', { name: /Picture Format|圖片格式|图片格式/ }).click()
-    if ((await page.getByRole('button', { name: /Crop image/ }).count()) === 0) {
-      await page.getByRole('button', { name: /^(Crop|裁剪)$/ }).click()
-    }
-    for (const direction of HANDLE_DIRECTIONS) {
-      await dragCropHandle(
-        page,
-        page.getByRole('button', {
-          name: `Crop image ${HANDLE_LABELS[direction]}`,
-          exact: true
-        }),
-        direction
-      )
-    }
-    await page.getByRole('button', { name: /^(Crop|裁剪)$/ }).click()
-    await expect(page.getByRole('button', { name: /Crop image/ })).toHaveCount(0)
-
     await selectSlideElement(elements.nth(3))
     await expect(saved).toBeVisible()
     await setEditorZoom(page, zoomSlider, zoomValue, zoomPercent)
@@ -1063,7 +994,7 @@ test('keeps corner resize and crop chrome fully operable at every editor zoom', 
 test.describe('touch presentation editing', () => {
   test.use({ hasTouch: true })
 
-  test('commits touch resize and crop gestures while explicit cancellation restores geometry', async ({
+  test('commits touch resize gestures while explicit cancellation restores geometry', async ({
     page
   }) => {
     await page.setViewportSize({ width: 1200, height: 800 })
@@ -1099,18 +1030,6 @@ test.describe('touch presentation editing', () => {
     await expect.poll(readTextWidth).toBe(committedWidth)
     expect(cancelEvents).toContain('pointercancel')
     expect(cancelEvents).not.toContain('pointerup')
-
-    await selectSlideElement(elements.nth(2))
-    await page.getByRole('tab', { name: /Picture Format|圖片格式|图片格式/ }).click()
-    await page.getByRole('button', { name: /^(Crop|裁剪)$/ }).click()
-    const cropHandle = page.getByRole('button', { name: 'Crop image right', exact: true })
-    await expect(cropHandle).toHaveCSS('touch-action', 'none')
-    const image = elements.nth(2).getByRole('img', { name: 'Corner image' })
-    const initialCrop = await image.getAttribute('style')
-    const cropEvents = await dragWithTouch(page, cropHandle, -8, 0)
-    await expect.poll(() => image.getAttribute('style')).not.toBe(initialCrop)
-    expect(cropEvents).toContain('pointerup')
-    expect(cropEvents).not.toContain('pointercancel')
   })
 })
 

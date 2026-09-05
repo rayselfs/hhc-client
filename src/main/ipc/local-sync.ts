@@ -151,6 +151,23 @@ function isRecoverableScanError(error: unknown): boolean {
   return code === 'EACCES' || code === 'EPERM' || code === 'ENOENT' || code === 'ENOTDIR'
 }
 
+function sourceCreatedAtFromStat(stat: {
+  birthtimeMs?: number
+  mtimeMs?: number
+}): number | undefined {
+  if (
+    typeof stat.birthtimeMs === 'number' &&
+    Number.isFinite(stat.birthtimeMs) &&
+    stat.birthtimeMs > 0
+  ) {
+    return stat.birthtimeMs
+  }
+  if (typeof stat.mtimeMs === 'number' && Number.isFinite(stat.mtimeMs) && stat.mtimeMs > 0) {
+    return stat.mtimeMs
+  }
+  return undefined
+}
+
 function createWatchStatus(
   connectionId: string,
   state: LocalSyncWatchStatus['state'],
@@ -268,11 +285,18 @@ async function scanDirectory(
     if (isIgnoredSystemPath(relativePath)) continue
     const remoteItemId = remoteIdForRelativePath(relativePath)
     if (entry.isDirectory()) {
+      let sourceCreatedAt: number | undefined
+      try {
+        sourceCreatedAt = sourceCreatedAtFromStat(await fs.stat(fullPath))
+      } catch (error) {
+        if (!isRecoverableScanError(error)) throw error
+      }
       items.push({
         remoteItemId,
         parentRemoteItemId,
         kind: 'folder',
-        name: entry.name
+        name: entry.name,
+        ...(sourceCreatedAt === undefined ? {} : { sourceCreatedAt })
       })
       await scanDirectory(rootPath, fullPath, remoteItemId, items)
     } else if (entry.isFile()) {
@@ -283,13 +307,15 @@ async function scanDirectory(
         if (isRecoverableScanError(error)) continue
         throw error
       }
+      const sourceCreatedAt = sourceCreatedAtFromStat(stat)
       items.push({
         remoteItemId,
         parentRemoteItemId,
         kind: 'file',
         name: entry.name,
         size: stat.size,
-        etag: `${stat.mtimeMs}:${stat.size}`
+        etag: `${stat.mtimeMs}:${stat.size}`,
+        ...(sourceCreatedAt === undefined ? {} : { sourceCreatedAt })
       })
     }
   }

@@ -16,7 +16,6 @@ import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
-  createImageElement,
   createTextElement,
   insertBlankEditableSlide,
   removeEditableSlides
@@ -364,147 +363,137 @@ describe('PresentationWorkspacePage session integration', () => {
     const homeGroups = within(homeRibbon).getAllByRole('group')
 
     expect(homeGroups.map((group) => group.getAttribute('aria-label'))).toEqual([
-      'Clipboard',
       'Slides',
-      'Font',
-      'Paragraph',
+      'Text formatting',
       'Insert',
       'Arrange'
     ])
-    expect(within(homeRibbon).getByRole('button', { name: 'Paste' })).toBeDisabled()
+    expect(within(homeRibbon).queryByRole('button', { name: 'Paste' })).not.toBeInTheDocument()
     expect(within(homeRibbon).getByRole('button', { name: 'New Slide' })).toBeEnabled()
     expect(within(homeRibbon).getByRole('button', { name: 'Picture' })).toBeEnabled()
     expect(within(homeRibbon).getByRole('button', { name: 'Shapes' })).toBeEnabled()
     expect(within(homeRibbon).getByRole('button', { name: 'Text Box' })).toBeEnabled()
-    expect(homeGroups.every((group) => group.querySelector('p') === null)).toBe(true)
     expect(within(homeRibbon).queryAllByRole('spinbutton')).toHaveLength(0)
   })
 
-  it('exposes Ribbon tabs with roving selection and keyboard navigation', async () => {
-    const user = userEvent.setup()
+  it('keeps the Home ribbon visible without the old tab strip', async () => {
     render(
       <PresentationSessionRegistryProvider>
         <Workspace showPage onSession={() => undefined} />
       </PresentationSessionRegistryProvider>
     )
 
-    const tablist = await screen.findByRole('tablist')
-    const home = within(tablist).getByRole('tab', { name: '常用' })
-    const insert = within(tablist).getByRole('tab', { name: '插入' })
-    const design = within(tablist).getByRole('tab', { name: '設計' })
-    const panel = screen.getByRole('tabpanel')
-
-    expect(home).toHaveAttribute('aria-selected', 'true')
-    expect(home).toHaveAttribute('tabindex', '0')
-    expect(home).toHaveAttribute('aria-controls', panel.id)
-    expect(home).toHaveAttribute('aria-expanded', 'true')
-    expect(panel).toHaveAttribute('aria-labelledby', home.id)
-
-    home.focus()
-    await user.keyboard('{ArrowLeft}')
-    expect(design).toHaveFocus()
-    expect(design).toHaveAttribute('aria-selected', 'true')
-    expect(home).toHaveAttribute('tabindex', '-1')
-
-    await user.keyboard('{ArrowRight}')
-    expect(home).toHaveFocus()
-    expect(home).toHaveAttribute('aria-selected', 'true')
-
-    await user.keyboard('{End}')
-    expect(design).toHaveFocus()
-    expect(design).toHaveAttribute('aria-selected', 'true')
-
-    await user.keyboard('{Home}')
-    expect(home).toHaveFocus()
-    expect(home).toHaveAttribute('aria-selected', 'true')
-    expect(insert).toHaveAttribute('aria-selected', 'false')
-    expect(panel).toHaveAttribute('aria-labelledby', home.id)
-
-    await user.click(home)
-    expect(home).toHaveAttribute('aria-expanded', 'false')
-    await user.click(home)
-    expect(home).toHaveAttribute('aria-expanded', 'true')
+    expect(await screen.findByRole('toolbar', { name: 'Home' })).toBeVisible()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Text formatting' })).toBeInTheDocument()
   })
 
-  it('changes Ribbon tabs with arrow keys without nudging the selected image', async () => {
-    const user = userEvent.setup()
-    let registry: PresentationSessionRegistry | null = null
-    const document = createBlankEditablePresentationDocument('Sunday')
-    const slideId = document.slideOrder[0]
-    const image = createImageElement({
-      assetId: 'asset-1',
-      slideWidth: document.width,
-      slideHeight: document.height,
-      sourceWidth: 640,
-      sourceHeight: 360
+  it('uses the native slide and divider context-menu command sets', async () => {
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const second = insertBlankEditableSlide(source, 1)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: second.document,
+      revision: 0
     })
-    const withImage = addElementToSlide(document, slideId, image)
-    withImage.assets['asset-1'] = {
-      id: 'asset-1',
-      name: 'Worship image',
-      mimeType: 'image/png',
-      dataUrl: 'data:image/png;base64,AA=='
+    const session = await renderWorkspaceSession()
+    const slideItems = document.querySelectorAll<HTMLElement>('[data-slide-option]')
+
+    fireEvent.contextMenu(slideItems[1])
+    const itemMenu = mocks.showMenu.mock.calls.at(-1)?.[0] as Array<
+      { id?: string; disabled?: boolean; onAction?: () => void } | string
+    >
+    expect(itemMenu.map((item) => (typeof item === 'string' ? item : item.id))).toEqual([
+      'new-slide',
+      'separator',
+      'copy-slide',
+      'cut-slide',
+      'paste-slide'
+    ])
+    const copy = itemMenu.find((item) => typeof item !== 'string' && item.id === 'copy-slide') as {
+      onAction?: () => void
     }
-    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withImage, revision: 0 })
-    render(
-      <PresentationSessionRegistryProvider>
-        <Workspace showPage onSession={(next) => (registry = next)} />
-      </PresentationSessionRegistryProvider>
+    act(() => copy.onAction?.())
+
+    const divider = document.querySelector<HTMLElement>(
+      '[data-slide-divider][data-slide-index="1"]'
     )
+    expect(divider).not.toBeNull()
+    fireEvent.contextMenu(divider!)
+    const dividerMenu = mocks.showMenu.mock.calls.at(-1)?.[0] as Array<
+      { id?: string; disabled?: boolean; onAction?: () => void } | string
+    >
+    expect(dividerMenu.map((item) => (typeof item === 'string' ? item : item.id))).toEqual([
+      'new-slide',
+      'separator',
+      'paste-slide'
+    ])
+    const paste = dividerMenu.find(
+      (item) => typeof item !== 'string' && item.id === 'paste-slide'
+    ) as { disabled?: boolean; onAction?: () => void }
+    expect(paste.disabled).toBe(false)
+    act(() => paste.onAction?.())
 
-    await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
-    const session = registry!.get('deck-1')!
-    const imageElement = (await screen.findAllByRole('img', { name: 'Worship image' }))
-      .at(-1)
-      ?.closest('[data-slide-element]')
-    expect(imageElement).not.toBeNull()
-    fireEvent.pointerDown(imageElement!, { clientX: 10, clientY: 10 })
-    const home = screen.getByRole('tab', { name: '常用' })
-    const insert = screen.getByRole('tab', { name: '插入' })
-    const initialX = session.getSnapshot().renderedDocument.slides[slideId].elements[image.id].x
-
-    home.focus()
-    await user.keyboard('{ArrowRight}')
-
-    expect(insert).toHaveFocus()
-    expect(insert).toHaveAttribute('aria-selected', 'true')
-    expect(session.getSnapshot().renderedDocument.slides[slideId].elements[image.id].x).toBe(
-      initialX
-    )
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(3)
   })
 
-  it('skips Ribbon controls when the selected tab collapses its panel', async () => {
+  it('routes slide clipboard shortcuts while a sidebar item has focus', async () => {
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Element clipboard' })
+    const second = insertBlankEditableSlide(addElementToSlide(source, slideId, text), 1)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: second.document,
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const frame = (await screen.findAllByText('Element clipboard'))
+      .at(-1)!
+      .closest('[data-slide-element]')!
+    const slide = document.querySelectorAll<HTMLElement>('[data-slide-option]')[1]
+
+    fireEvent.click(frame)
+    fireEvent.keyDown(document, { key: 'c', code: 'KeyC', ctrlKey: true })
+    fireEvent.click(slide)
+    slide.focus()
+    fireEvent.keyDown(slide, { key: 'c', code: 'KeyC', ctrlKey: true })
+    fireEvent.keyDown(slide, { key: 'v', code: 'KeyV', ctrlKey: true })
+
+    expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(3)
+  })
+
+  it('keeps the slide clipboard while switching between open presentation tabs', async () => {
     const user = userEvent.setup()
+    const firstItem = makeEditableItem()
+    const secondItem = makeEditableItem('deck-2', 'Sermon.lpdeck')
+    useFileExplorerStore.setState({
+      items: { [firstItem.id]: firstItem, [secondItem.id]: secondItem },
+      _itemsArray: [firstItem, secondItem]
+    })
+    usePresentationWorkspaceStore.getState().openDocument(secondItem)
+    usePresentationWorkspaceStore.getState().setActiveDocument(firstItem.id)
+    let registry: PresentationSessionRegistry | null = null
     render(
       <PresentationSessionRegistryProvider>
-        <Workspace showPage onSession={() => undefined} />
+        <HeaderWorkspaceWithSession onSession={(next) => (registry = next)} />
       </PresentationSessionRegistryProvider>
     )
+    await waitFor(() => expect(registry?.get(firstItem.id)).toBeDefined())
+    fireEvent.keyDown(document.querySelector('[data-slide-sidebar]')!, {
+      key: 'c',
+      code: 'KeyC',
+      ctrlKey: true
+    })
 
-    const home = await screen.findByRole('tab', { name: '常用' })
-    const panel = await screen.findByRole('tabpanel')
-    await user.click(home)
+    await user.click(screen.getByText(secondItem.name))
+    await waitFor(() => expect(registry?.get(secondItem.id)).toBeDefined())
+    fireEvent.keyDown(document.querySelector('[data-slide-sidebar]')!, {
+      key: 'v',
+      code: 'KeyV',
+      ctrlKey: true
+    })
 
-    expect(panel).toHaveAttribute('aria-hidden', 'true')
-    expect(panel).toHaveAttribute('inert')
-    await user.tab()
-    expect(panel).not.toContainElement(document.activeElement as HTMLElement)
-  })
-
-  it('keeps text formatting on Home without adding a Text contextual tab', async () => {
-    renderEditableWorkspaceWithText()
-    const textElement = (await screen.findAllByText('Font target'))
-      .at(-1)
-      ?.closest('[data-slide-element]')
-
-    expect(textElement).not.toBeNull()
-    fireEvent.pointerDown(textElement!, { clientX: 10, clientY: 10 })
-
-    await waitFor(() =>
-      expect(screen.queryByRole('tab', { name: /^(Text|文字格式)$/ })).not.toBeInTheDocument()
-    )
-    expect(screen.getByRole('group', { name: 'Font' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Paragraph' })).toBeInTheDocument()
+    expect(registry!.get(secondItem.id)!.getSnapshot().renderedDocument.slideOrder).toHaveLength(2)
+    expect(registry!.get(firstItem.id)!.getSnapshot().renderedDocument.slideOrder).toHaveLength(1)
   })
 
   it('dispatches Windows and macOS editor commands through the active session', async () => {
@@ -525,7 +514,7 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.keyDown(document, { code: 'KeyN', key: 'N', metaKey: true, shiftKey: true })
     expect(session.getSnapshot().renderedDocument.slideOrder).toHaveLength(3)
 
-    fireEvent.click(screen.getByRole('button', { name: '1Keyboard target' }))
+    fireEvent.click(screen.getByRole('option', { name: '1Keyboard target' }))
     const textFrame = (await screen.findAllByText('Keyboard target'))
       .at(-1)
       ?.closest('[data-slide-element]')
@@ -659,6 +648,39 @@ describe('PresentationWorkspacePage session integration', () => {
     expect(textInsert).toHaveAttribute('aria-pressed', 'true')
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' })
     expect(textInsert).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('formats the whole text box after its character selection leaves edit mode', async () => {
+    const source = createBlankEditablePresentationDocument('Sunday')
+    const slideId = source.slideOrder[0]
+    const text = createTextElement({ text: 'Whole text' })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(source, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    const frame = (await screen.findAllByText('Whole text'))
+      .at(-1)!
+      .closest('[data-slide-element]')!
+
+    fireEvent.click(frame)
+    fireEvent.keyDown(document, { key: 'Enter', code: 'Enter' })
+    const content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!
+    const textNode = content.firstChild!
+    const range = document.createRange()
+    range.setStart(textNode, 1)
+    range.setEnd(textNode, 4)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    fireEvent(document, new Event('selectionchange'))
+    fireEvent.keyDown(content, { key: 'Escape', code: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Bold' }))
+
+    const updated = session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+    expect(updated.type === 'text' && updated.paragraphs?.[0].runs.every((run) => run.bold)).toBe(
+      true
+    )
   })
 
   it('finalizes pending text on Escape instead of discarding its active edit transaction', async () => {
@@ -829,6 +851,11 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.pointerDown(content, { clientX: 40, clientY: 20, pointerId: 1 })
     content.textContent = 'Navigate safely'
     fireEvent.input(content)
+    Object.defineProperty(HTMLElement.prototype, 'focus', {
+      configurable: true,
+      writable: true,
+      value: HTMLElement.prototype.focus
+    })
     const unload = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(unload)
     expect(unload.defaultPrevented).toBe(true)
@@ -1116,22 +1143,19 @@ describe('PresentationWorkspacePage session integration', () => {
     renderEditableWorkspaceWithText()
     fireEvent.click((await screen.findAllByRole('textbox')).at(-1)!)
     const fontSelector = screen.getByLabelText('Font family')
-    const retryButton = screen.getByRole('button', { name: 'Load local fonts' })
 
     fireEvent.pointerDown(fontSelector)
     fireEvent.focus(fontSelector)
 
     expect(mocks.queryLocalFontFamiliesOnce).toHaveBeenCalledOnce()
-    expect(retryButton).toBeDisabled()
     await act(async () => resolveFonts(['PMingLiU', 'MingLiU', 'DFKai-SB', 'PMingLiU', 'DFKai-SB']))
 
-    await waitFor(() => expect(retryButton).toBeEnabled())
     expect(screen.getAllByRole('option', { name: 'PMingLiU' })).toHaveLength(1)
     expect(screen.getAllByRole('option', { name: 'MingLiU' })).toHaveLength(1)
     expect(screen.getAllByRole('option', { name: 'DFKai-SB' })).toHaveLength(1)
   })
 
-  it('warns after font access is rejected and retries from the explicit control', async () => {
+  it('warns after font access is rejected and retries from the next selector gesture', async () => {
     mocks.queryLocalFontFamiliesOnce
       .mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'))
       .mockResolvedValueOnce(['Songti TC'])
@@ -1145,7 +1169,7 @@ describe('PresentationWorkspacePage session integration', () => {
         'Unable to load local fonts. Check the font access permission.'
       )
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Load local fonts' }))
+    fireEvent.pointerDown(screen.getByLabelText('Font family'))
 
     expect(await screen.findByRole('option', { name: 'Songti TC' })).toBeInTheDocument()
     expect(mocks.queryLocalFontFamiliesOnce).toHaveBeenCalledTimes(2)
@@ -1199,9 +1223,19 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
 
-    const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
-    await user.click(screen.getByRole('tab', { name: '設計' }))
-    await user.click(within(ribbonFrame).getByRole('button', { name: 'Format Background' }))
+    await screen.findByTestId('presentation-ribbon-frame')
+    const surface = window.document.querySelector<HTMLElement>(
+      '.presentation-stage [data-slide-surface]'
+    )
+    expect(surface).not.toBeNull()
+    fireEvent.contextMenu(surface!)
+    const menuItems = mocks.showMenu.mock.calls.at(-1)?.[0] as Array<
+      { id?: string; onAction?: () => void } | string
+    >
+    const formatBackground = menuItems.find(
+      (item) => typeof item !== 'string' && item.id === 'format-background'
+    ) as { onAction?: () => void } | undefined
+    act(() => formatBackground?.onAction?.())
     expect(window.document.querySelector('.workspace-inspector-slot')).not.toBeNull()
 
     await user.click(screen.getByText('Sermon.lpdeck'))
@@ -1255,7 +1289,7 @@ describe('PresentationWorkspacePage session integration', () => {
   })
 
   it.each([1920, 1280])(
-    'inserts 18 point text with line-height and vertical inset at %i px document width',
+    'inserts 24 point text with line-height and vertical inset at %i px document width',
     async (documentWidth) => {
       const sourceDocument = createBlankEditablePresentationDocument('Sunday')
       sourceDocument.width = documentWidth
@@ -1297,7 +1331,7 @@ describe('PresentationWorkspacePage session integration', () => {
         const element = slide.elements[slide.elementOrder[0]]
         expect(element.type).toBe('text')
         if (element.type !== 'text') return
-        expect((element.fontSize * 960) / documentWidth).toBe(18)
+        expect((element.fontSize * 960) / documentWidth).toBe(24)
         expect(element.height).toBe(
           Math.max(32, Math.ceil(element.fontSize * element.lineHeight) + 8)
         )
@@ -1305,8 +1339,7 @@ describe('PresentationWorkspacePage session integration', () => {
         expect(element.autoWidth).toBe(true)
       })
 
-      fireEvent.click(screen.getByRole('tab', { name: '插入' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Text' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Text Box' }))
       fireEvent.pointerDown(surface!, { clientX: 100, clientY: 100, pointerId: 1 })
       fireEvent.pointerUp(surface!, { clientX: 140, clientY: 120, pointerId: 1 })
 
@@ -1692,8 +1725,14 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
     fireEvent.compositionStart(textBox)
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: '插入' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Rectangle' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Shapes' }))
+    const menuItems = mocks.showMenu.mock.calls.at(-1)?.[0] as Array<
+      { id?: string; onAction?: () => void } | string
+    >
+    const insertRectangle = menuItems.find(
+      (item) => typeof item !== 'string' && item.id === 'insert-rectangle'
+    ) as { onAction?: () => void } | undefined
+    act(() => insertRectangle?.onAction?.())
 
     expect(session.getSnapshot().renderedDocument.slides[slideId].elementOrder).toEqual([text.id])
     expect(screen.getByLabelText('Resize text box right')).toBeInTheDocument()
@@ -1904,7 +1943,7 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
     textBox.textContent = 'Before switch'
     fireEvent.input(textBox)
-    fireEvent.click(screen.getByRole('button', { name: '2' }))
+    fireEvent.click(screen.getByRole('option', { name: '2' }))
     act(() => flushAnimationFrame())
 
     expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
@@ -1912,7 +1951,7 @@ describe('PresentationWorkspacePage session integration', () => {
     })
     expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(secondSlideId)
 
-    fireEvent.click(screen.getByRole('button', { name: '1Before switch' }))
+    fireEvent.click(screen.getByRole('option', { name: '1Before switch' }))
     const returnedTextBox = globalThis.document.querySelector<HTMLElement>(
       '.presentation-stage [data-text-content]'
     )
@@ -1933,8 +1972,6 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await screen.findByTestId('presentation-ribbon-frame')
-
-    fireEvent.click(screen.getByRole('tab', { name: /Design|設計/ }))
 
     expect(screen.queryByText(/Slide Size|投影片大小/)).not.toBeInTheDocument()
   })
@@ -1986,7 +2023,7 @@ describe('PresentationWorkspacePage session integration', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
       target: { value: 'Remember the closing prayer' }
     })
-    fireEvent.click(screen.getByRole('button', { name: '2' }))
+    fireEvent.click(screen.getByRole('option', { name: '2' }))
 
     const session = registry!.get('deck-1')!
     const firstSlideId = document.slideOrder[0]
@@ -1995,7 +2032,7 @@ describe('PresentationWorkspacePage session integration', () => {
     )
     expect(usePresentationWorkspaceStore.getState().getActiveSlideId('deck-1')).toBe(secondSlideId)
 
-    fireEvent.click(screen.getByRole('button', { name: '1' }))
+    fireEvent.click(screen.getByRole('option', { name: '1' }))
     act(() => session.undo())
     expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('')
     act(() => session.redo())

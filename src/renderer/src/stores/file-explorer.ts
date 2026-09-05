@@ -1,6 +1,5 @@
-import { create } from 'zustand'
+import { create, type Mutate, type StoreApi, type UseBoundStore } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { UseBoundStore, StoreApi } from 'zustand'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
@@ -29,6 +28,23 @@ interface FileExplorerSettingsState {
 interface FileExplorerSearchState {
   searchQuery: string
   setSearchQuery: (query: string) => void
+}
+
+type FileExplorerSettingsStore = UseBoundStore<
+  Mutate<StoreApi<FileExplorerSettingsState>, [['zustand/persist', unknown]]>
+>
+
+const CREATED_COLUMN_WIDTH = 160
+const EXPLORER_SETTINGS_VERSION = 2
+
+function migrateExplorerSettings(state: unknown): unknown {
+  if (!state || typeof state !== 'object') return state
+  const persisted = state as { colWidths?: { created?: number; size?: number; kind?: number } }
+  if (persisted.colWidths?.created !== 112) return state
+  return {
+    ...persisted,
+    colWidths: { ...persisted.colWidths, created: CREATED_COLUMN_WIDTH }
+  }
 }
 
 export const FILE_EXPLORER_ROOT_ID = 'file-root'
@@ -61,7 +77,7 @@ function createExplorerSettingsStore(
   persistName: string,
   defaults: { sortField: SortField; sortDir: SortDir },
   options: { version?: number; migrate?: (state: unknown) => unknown } = {}
-): UseBoundStore<StoreApi<FileExplorerSettingsState>> {
+): FileExplorerSettingsStore {
   return create<FileExplorerSettingsState>()(
     persist(
       (set) => ({
@@ -72,7 +88,7 @@ function createExplorerSettingsStore(
         setSortField: (sortField) => set({ sortField }),
         setSortDir: (sortDir) => set({ sortDir }),
         setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
-        colWidths: { created: 112, size: 80, kind: 96 },
+        colWidths: { created: CREATED_COLUMN_WIDTH, size: 80, kind: 96 },
         setColWidths: (widths) => set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
       }),
       {
@@ -94,7 +110,7 @@ function createExplorerSettingsStore(
 export const useFileExplorerSettings = createExplorerSettingsStore(
   'file-explorer-settings',
   { sortField: 'createdAt', sortDir: 'none' },
-  { version: 1, migrate: (state) => state }
+  { version: EXPLORER_SETTINGS_VERSION, migrate: migrateExplorerSettings }
 )
 
 export const useFileExplorerSearch = create<FileExplorerSearchState>()((set) => ({
@@ -104,13 +120,18 @@ export const useFileExplorerSearch = create<FileExplorerSearchState>()((set) => 
 
 export const useFavoritesExplorerSettings = createExplorerSettingsStore(
   'favorites-explorer-settings',
-  { sortField: 'name', sortDir: 'asc' }
+  { sortField: 'name', sortDir: 'asc' },
+  { version: EXPLORER_SETTINGS_VERSION, migrate: migrateExplorerSettings }
 )
 
-export const useTrashExplorerSettings = createExplorerSettingsStore('trash-explorer-settings', {
-  sortField: 'createdAt',
-  sortDir: 'desc'
-})
+export const useTrashExplorerSettings = createExplorerSettingsStore(
+  'trash-explorer-settings',
+  {
+    sortField: 'createdAt',
+    sortDir: 'desc'
+  },
+  { version: EXPLORER_SETTINGS_VERSION, migrate: migrateExplorerSettings }
+)
 
 interface FileExplorerCustomOrderState {
   orders: Record<string, string[]>

@@ -53,8 +53,36 @@ type EditableProjectionTextElement = EditableProjectionElementBase & {
   italic: boolean
   underline: boolean
   color: string
-  align: 'left' | 'center' | 'right'
+  align: 'left' | 'center' | 'right' | 'justify'
   lineHeight: number
+  runs?: EditableProjectionTextRun[]
+  paragraphs?: EditableProjectionTextParagraph[]
+}
+
+type EditableProjectionTextRun = {
+  text: string
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  color: string
+  strikethrough?: boolean
+  baseline?: 'normal' | 'superscript' | 'subscript'
+  characterSpacing?: number
+  highlightColor?: string | null
+}
+
+type EditableProjectionTextParagraph = {
+  runs: EditableProjectionTextRun[]
+  align: 'left' | 'center' | 'right' | 'justify'
+  lineSpacing: { kind: 'multiple'; value: number } | { kind: 'exact'; points: number }
+  list:
+    | { kind: 'bullet'; level: number; char: string; font?: string }
+    | { kind: 'number'; level: number; format: string; startAt?: number; sequenceId?: string }
+    | null
+  marginLeft: number
+  textIndent: number
 }
 
 type EditableProjectionImageElement = EditableProjectionElementBase & {

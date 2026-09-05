@@ -64,6 +64,41 @@ beforeEach(async () => {
 })
 
 describe('buildSyncRefreshPlan', () => {
+  it('uses source creation time and preserves existing time when the source omits it', () => {
+    const plan = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [existingEntry],
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: '.',
+          kind: 'file',
+          name: 'old.mp4',
+          size: 100,
+          etag: 'before',
+          sourceCreatedAt: 200
+        },
+        {
+          remoteItemId: 'new-file',
+          parentRemoteItemId: '.',
+          kind: 'file',
+          name: 'new.mp4',
+          size: 100
+        }
+      ]
+    })
+
+    expect(plan.items.find((item) => item.name === 'old.mp4')?.createdAt).toBe(200)
+    expect(plan.items.find((item) => item.name === 'new.mp4')?.createdAt).toBeGreaterThan(200)
+  })
+
   it('updates a downloaded HHC item name without replacing its blob or fetching content', async () => {
     const existingBlob = new Blob(['downloaded'])
     const db = await openFileExplorerDB()
