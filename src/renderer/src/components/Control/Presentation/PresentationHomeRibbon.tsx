@@ -23,7 +23,7 @@ import {
   WrapText
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Popover } from '@heroui/react/popover'
+import { Popover } from '@renderer/components/Common/MenuPopover'
 import type {
   EditablePresentationTheme,
   EditableTextAlign,

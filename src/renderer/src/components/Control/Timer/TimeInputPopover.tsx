@@ -1,4 +1,4 @@
-import { Popover } from '@heroui/react/popover'
+import { Popover } from '@renderer/components/Common/MenuPopover'
 import { Button } from '@heroui/react/button'
 import { Input } from '@heroui/react/input'
 import { useState } from 'react'

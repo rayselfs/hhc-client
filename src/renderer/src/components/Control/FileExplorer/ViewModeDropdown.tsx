@@ -1,7 +1,8 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Grid2X2, Grid3X3, AlignJustify, Check } from 'lucide-react'
-import { Dropdown, Button } from '@heroui/react'
+import { Button } from '@heroui/react'
+import { Dropdown } from '@renderer/components/Common/MenuPopover'
 import type { FileExplorerViewMode } from '@shared/types/folder'
 
 type ViewLabelKey =

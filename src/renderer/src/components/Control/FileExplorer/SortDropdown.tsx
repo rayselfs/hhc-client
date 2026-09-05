@@ -1,5 +1,6 @@
 import React from 'react'
-import { Dropdown, Button, Separator } from '@heroui/react'
+import { Button, Separator } from '@heroui/react'
+import { Dropdown } from '@renderer/components/Common/MenuPopover'
 import { ArrowUpDown, ArrowUp, ArrowDown, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SortField, SortDir, GroupMode } from '@renderer/stores/file-explorer'

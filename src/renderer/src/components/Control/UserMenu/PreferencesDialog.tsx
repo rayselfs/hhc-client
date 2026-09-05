@@ -114,7 +114,6 @@ export default function PreferencesDialog({
 
   return (
     <Modal.Root state={state}>
-      <Modal.Trigger />
       <Modal.Backdrop>
         <Modal.Container size="lg">
           <Modal.Dialog className="overflow-hidden p-0">

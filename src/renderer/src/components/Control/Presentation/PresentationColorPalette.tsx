@@ -1,7 +1,7 @@
 import { Button as AriaButton } from 'react-aria-components'
 import { useState } from 'react'
 import { Baseline, ChevronDown, Highlighter } from 'lucide-react'
-import { Popover } from '@heroui/react/popover'
+import { Popover } from '@renderer/components/Common/MenuPopover'
 import { useTranslation } from 'react-i18next'
 import type { EditablePresentationTheme } from '@renderer/lib/editable-presentation'
 

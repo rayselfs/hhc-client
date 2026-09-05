@@ -1,6 +1,6 @@
 import { Avatar } from '@heroui/react/avatar'
 import { Button } from '@heroui/react/button'
-import { Dropdown } from '@heroui/react/dropdown'
+import { Dropdown } from '@renderer/components/Common/MenuPopover'
 import { toast } from '@heroui/react/toast'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
