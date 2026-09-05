@@ -660,8 +660,18 @@ function EditableSessionDocumentView({
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
   const [zoomMode, setZoomMode] = useState<ZoomMode>('fit')
-  const [zoomPercent, setZoomPercent] = useState(100)
+  const [customZoomPercent, setZoomPercent] = useState(100)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
+  const zoomPercent =
+    zoomMode === 'fit' && viewportSize.width > 0 && viewportSize.height > 0
+      ? calculateFitZoomPercent(
+          viewportSize.width,
+          viewportSize.height,
+          PRESENTATION_CANVAS_WIDTH,
+          (PRESENTATION_CANVAS_WIDTH * document.height) / document.width,
+          PRESENTATION_VIEWPORT_PADDING
+        )
+      : customZoomPercent
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
   const formatBackgroundTriggerRef = useRef<HTMLElement>(null)
@@ -725,19 +735,6 @@ function EditableSessionDocumentView({
     observer.observe(viewport)
     return () => observer.disconnect()
   }, [])
-
-  useEffect(() => {
-    if (zoomMode !== 'fit' || viewportSize.width <= 0 || viewportSize.height <= 0) return
-    setZoomPercent(
-      calculateFitZoomPercent(
-        viewportSize.width,
-        viewportSize.height,
-        PRESENTATION_CANVAS_WIDTH,
-        (PRESENTATION_CANVAS_WIDTH * document.height) / document.width,
-        PRESENTATION_VIEWPORT_PADDING
-      )
-    )
-  }, [document.height, document.width, viewportSize, zoomMode])
 
   useLayoutEffect(() => {
     const pending = pendingZoomAnchorRef.current

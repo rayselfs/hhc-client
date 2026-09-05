@@ -1,5 +1,5 @@
 import { Button as AriaButton } from 'react-aria-components'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ListBox } from '@heroui/react/list-box'
 import {
   AlignCenter,
@@ -446,12 +446,12 @@ function FontSizeInput({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const label = value === 'mixed' ? '' : String(Math.round(value * 100) / 100)
-  const [draft, setDraft] = useState(label)
-  useEffect(() => setDraft(label), [label])
+  const [input, setInput] = useState<{ source: typeof value; text: string } | null>(null)
+  const draft = input?.source === value ? input.text : label
   const apply = (): void => {
     const size = Number(draft)
     if (Number.isFinite(size) && size > 0 && size !== value) onChange(size)
-    else setDraft(label)
+    setInput(null)
   }
   return (
     <input
@@ -461,7 +461,7 @@ function FontSizeInput({
       disabled={disabled}
       value={draft}
       placeholder={t('presentationWorkspace.mixed', 'Mixed')}
-      onChange={(event) => setDraft(event.currentTarget.value)}
+      onChange={(event) => setInput({ source: value, text: event.currentTarget.value })}
       onBlur={apply}
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
@@ -471,7 +471,7 @@ function FontSizeInput({
         }
         if (event.key === 'Escape') {
           event.preventDefault()
-          setDraft(label)
+          setInput(null)
           onFinish?.()
         }
       }}
