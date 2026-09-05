@@ -62,6 +62,13 @@ export interface SyncEntryRecord {
   retryCount?: number
   nextRetryAt?: number
   lastError?: string
+  syncReceipt?: {
+    contentVersion: string
+    appVersion: string
+    state: 'pending' | 'acknowledged' | 'rejected'
+    attempts: number
+    nextRetryAt: number
+  }
   downloadedBytes?: number
   downloadTotalBytes?: number
   createdAt: number
@@ -290,6 +297,13 @@ export async function putSyncEntry(
   const now = Date.now()
   const value = {
     ...record,
+    syncReceipt:
+      existing?.blobId === record.blobId &&
+      existing?.syncReceipt?.contentVersion === (record.etag ?? record.contentHash)
+        ? (existing?.syncReceipt ?? record.syncReceipt)
+        : record.syncReceipt?.contentVersion === (record.etag ?? record.contentHash)
+          ? record.syncReceipt
+          : undefined,
     id: existing?.id ?? record.id ?? crypto.randomUUID(),
     remoteLookupKey,
     createdAt: existing?.createdAt ?? record.createdAt ?? now,

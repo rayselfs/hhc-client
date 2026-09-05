@@ -214,6 +214,132 @@ describe('startSyncRuntime', () => {
     stop()
   })
 
+  it('continues ordinary refresh while meeting discovery never resolves', async () => {
+    const targetConnection = connection('hhc-runtime-hanging')
+    const target = root('root-hanging', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    const stop = startSyncRuntime({
+      hhcAuth: auth({ current: session() }),
+      meetingWindows: { list: () => new Promise(() => {}) }
+    })
+    try {
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+    } finally {
+      stop()
+    }
+  })
+
+  it('wakes at a known meeting start instead of waiting for the idle interval', async () => {
+    const targetConnection = connection('hhc-runtime-boundary')
+    const target = root('root-boundary', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    const stop = startSyncRuntime({
+      hhcAuth: auth({ current: session() }),
+      meetingWindows: windows([
+        {
+          startsAt: new Date(Date.now() + 10_000).toISOString(),
+          endsAt: new Date(Date.now() + 90_000).toISOString()
+        }
+      ])
+    })
+    try {
+      await vi.advanceTimersByTimeAsync(9_999)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+    } finally {
+      stop()
+    }
+  })
+
+  it('discovers schedule edits during idle polling without overlapping collection refreshes', async () => {
+    const targetConnection = connection('hhc-runtime-edited')
+    const target = root('root-edited', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    const meetingWindows = windows()
+    const stop = startSyncRuntime({ hhcAuth: auth({ current: session() }), meetingWindows })
+    try {
+      await vi.advanceTimersByTimeAsync(1_000)
+      vi.mocked(meetingWindows.list).mockResolvedValue([
+        {
+          startsAt: new Date(Date.now() - 1).toISOString(),
+          endsAt: new Date(Date.now() + 90_000).toISOString()
+        }
+      ])
+      await vi.advanceTimersByTimeAsync(16_000)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+    } finally {
+      stop()
+    }
+  })
+
+  it('ignores a late meeting response after runtime stop', async () => {
+    let resolve!: (value: { startsAt: string; endsAt: string }[]) => void
+    const meetingWindows: MeetingWindowsApi = {
+      list: () =>
+        new Promise((done) => {
+          resolve = done
+        })
+    }
+    const stop = startSyncRuntime({ meetingWindows })
+    await vi.advanceTimersByTimeAsync(0)
+    stop()
+    resolve([
+      {
+        startsAt: new Date(Date.now() - 1).toISOString(),
+        endsAt: new Date(Date.now() + 90_000).toISOString()
+      }
+    ])
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('wakes HHC on network recovery and removes the listener on stop', async () => {
+    const targetConnection = connection('hhc-runtime-online')
+    const target = root('root-online', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    const stop = startSyncRuntime({
+      hhcAuth: auth({ current: session() }),
+      meetingWindows: windows()
+    })
+    await vi.advanceTimersByTimeAsync(1_000)
+    window.dispatchEvent(new Event('online'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+    stop()
+    window.dispatchEvent(new Event('online'))
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes after sign-in without waiting for the idle collection interval', async () => {
+    const targetConnection = connection('hhc-runtime-signin')
+    const target = root('root-signin', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    const sessionRef: { current: HhcSession | null } = { current: null }
+    let generation = 0
+    const stop = startSyncRuntime({
+      hhcAuth: auth(sessionRef),
+      meetingWindows: windows(),
+      getHhcAuthGeneration: () => generation
+    })
+    try {
+      await vi.advanceTimersByTimeAsync(1_000)
+      sessionRef.current = session()
+      generation++
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+    } finally {
+      stop()
+    }
+  })
+
   it('switches to the active delay when refresh reports pending work', async () => {
     refreshAllOneDriveFoldersMock
       .mockResolvedValueOnce([

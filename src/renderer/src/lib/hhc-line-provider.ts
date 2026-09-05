@@ -30,8 +30,7 @@ import type { HhcLineAccessRequestAuth } from './hhc-line-access'
 
 type DownloadedContent = Awaited<ReturnType<HhcAssetApi['downloadContent']>>
 
-const receiptAttempts = new Set<string>()
-let receiptWarningCount = 0
+import { pendingHhcSyncReceipt, retryHhcSyncReceipt } from './hhc-sync-receipts'
 
 type HhcLineProviderOptions = {
   api: HhcAssetApi
@@ -102,6 +101,7 @@ async function saveNativeDownloadedContent(
       etag: metadata.etag,
       contentHash: metadata.contentHash,
       status: 'available-offline',
+      syncReceipt: pendingHhcSyncReceipt(request, metadata),
       downloadedBytes: content.size,
       downloadTotalBytes: content.size
     })
@@ -220,26 +220,18 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
       signal
     )
     const result = await this.save(request, content, metadata, canCommit)
-    const contentVersion = metadata.etag ?? metadata.contentHash
-    if (request.offlinePolicy === 'always-offline' && contentVersion) {
-      const key = `${request.remoteItemId}\0${contentVersion}`
-      if (!receiptAttempts.has(key)) {
-        receiptAttempts.add(key)
-        void this.options.api
-          .recordSyncReceipt({
-            collectionItemId: request.remoteItemId,
-            contentVersion,
-            state: 'available-offline',
-            appVersion: __APP_VERSION__
-          })
-          .catch(() => {
-            if (receiptWarningCount++ < 3) {
-              console.warn('[sync] Failed to record HHC available-offline receipt')
-            }
-          })
-      }
+    if (request.offlinePolicy === 'always-offline') {
+      void this.retryReceipt(request.providerConnectionId, request.remoteItemId, canCommit)
     }
     return result
+  }
+
+  retryReceipt(
+    connectionId: string,
+    itemId: string,
+    canCommit: SyncDownloadCommitGuard
+  ): Promise<void> {
+    return retryHhcSyncReceipt(this.options.api, connectionId, itemId, canCommit)
   }
 
   classifyError(error: unknown): SyncRetryClassification {

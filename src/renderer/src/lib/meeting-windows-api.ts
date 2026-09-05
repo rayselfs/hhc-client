@@ -20,6 +20,8 @@ type MeetingWindowsOptions = {
 }
 
 const CACHE_MS = 60_000
+const RETRY_MS = 15_000
+const REQUEST_TIMEOUT_MS = 5_000
 const QUERY_RANGE_MS = 24 * 60 * 60 * 1000
 
 function project(value: unknown): MediaSyncWindow[] {
@@ -64,40 +66,61 @@ export function createMeetingWindowsApi(
   const fetcher = options.fetcher ?? ((...args) => window.fetch(...args))
   let cached: MediaSyncWindow[] = []
   let cachedAt = Number.NEGATIVE_INFINITY
+  let cacheDuration = CACHE_MS
   let inFlight: Promise<MediaSyncWindow[]> | undefined
 
   return {
     list(now = Date.now()) {
-      if (now - cachedAt < CACHE_MS) return Promise.resolve(cached)
+      if (now >= cachedAt && now - cachedAt < cacheDuration) return Promise.resolve(cached)
       if (inFlight) return inFlight
-      inFlight = (async () => {
-        try {
-          const params = new URLSearchParams({
-            from: new Date(now - QUERY_RANGE_MS).toISOString(),
-            to: new Date(now + QUERY_RANGE_MS).toISOString()
+      const controller = new AbortController()
+      let timeout: ReturnType<typeof setTimeout>
+      const deadline = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort()
+          reject(new Error('Meeting lookup timed out'))
+        }, REQUEST_TIMEOUT_MS)
+      })
+      const request = async (): Promise<MediaSyncWindow[]> => {
+        const params = new URLSearchParams({
+          from: new Date(now - QUERY_RANGE_MS).toISOString(),
+          to: new Date(now + QUERY_RANGE_MS).toISOString()
+        })
+        const send = (token: string): Promise<Response> => {
+          controller.signal.throwIfAborted()
+          return fetcher(`${origin}/api/meeting-sync-windows?${params}`, {
+            headers: { accept: 'application/json', authorization: `Bearer ${token}` },
+            signal: controller.signal
           })
-          const send = (token: string): Promise<Response> =>
-            fetcher(`${origin}/api/meeting-sync-windows?${params}`, {
-              headers: { accept: 'application/json', authorization: `Bearer ${token}` }
-            })
-          const token = await auth.getAccessToken()
-          if (!token) throw new Error()
-          let response = await send(token)
-          if (response.status === 401) {
-            const refreshed = await auth.refreshAccessToken()
-            if (!refreshed) throw new Error()
-            response = await send(refreshed)
-          }
-          if (!response.ok) throw new Error()
-          cached = project(await response.json())
-        } catch {
+        }
+        const token = await auth.getAccessToken()
+        if (!token) throw new Error()
+        let response = await send(token)
+        if (response.status === 401) {
+          controller.signal.throwIfAborted()
+          const refreshed = await auth.refreshAccessToken()
+          if (!refreshed) throw new Error()
+          response = await send(refreshed)
+        }
+        if (!response.ok) throw new Error()
+        return project(await response.json())
+      }
+      inFlight = Promise.race([request(), deadline])
+        .then((windows) => {
+          cached = windows
+          cacheDuration = CACHE_MS
+          return cached
+        })
+        .catch(() => {
           cached = []
-        } finally {
+          cacheDuration = RETRY_MS
+          return cached
+        })
+        .finally(() => {
+          clearTimeout(timeout)
           cachedAt = now
           inFlight = undefined
-        }
-        return cached
-      })()
+        })
       return inFlight
     }
   }
