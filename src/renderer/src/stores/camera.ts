@@ -9,6 +9,8 @@ interface CameraStore {
   deviceId: string
   transform: CameraTransform
   cover: CameraTransform
+  capturing: boolean
+  selectorOpen: boolean
   busy: boolean
   error: string | null
   connection: 'idle' | 'connecting' | 'live' | 'unavailable'
@@ -23,6 +25,8 @@ export const useCameraStore = create<CameraStore>()(
       lastDeviceId: '',
       transform: initial,
       cover: initial,
+      capturing: false,
+      selectorOpen: false,
       busy: false,
       error: null,
       connection: 'idle',

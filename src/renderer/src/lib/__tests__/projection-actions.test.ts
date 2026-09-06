@@ -3,7 +3,13 @@ import { DEFAULT_SETTINGS, DEFAULT_STATE, useTimerStore } from '@renderer/stores
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useSettingsStore } from '@renderer/stores/settings'
 import type { FileItemRecord } from '@shared/types/folder'
-import { startMediaProjection, startTimerProjection } from '../projection-actions'
+import { useCameraStore } from '@renderer/stores/camera'
+import {
+  getProjectionHeaderState,
+  startProjectionForRoute,
+  startMediaProjection,
+  startTimerProjection
+} from '../projection-actions'
 
 describe('projection actions', () => {
   beforeEach(() => {
@@ -122,4 +128,37 @@ describe('projection actions', () => {
     })
     await result
   })
+})
+
+it('starts the camera through shared route actions only when capture is ready', async () => {
+  const startProjection = vi.fn(async () => undefined)
+  const deps = {
+    pathname: '/camera',
+    startProjection,
+    biblePayloads: null,
+    presentableItems: [],
+    onNoProjectableFiles: vi.fn(),
+    startMediaPresentation: vi.fn()
+  }
+  useCameraStore.setState({ capturing: false })
+  expect(
+    getProjectionHeaderState({ ...deps, isProjectionOpen: false, cameraReady: false }).disabled
+  ).toBe(true)
+  expect(await startProjectionForRoute(deps)).toBe(false)
+  expect(startProjection).not.toHaveBeenCalled()
+  useCameraStore.setState({ capturing: true })
+  expect(
+    getProjectionHeaderState({ ...deps, isProjectionOpen: false, cameraReady: true }).disabled
+  ).toBe(false)
+  expect(await startProjectionForRoute(deps)).toBe(true)
+  expect(startProjection).toHaveBeenCalledWith('camera', [
+    [
+      'camera:state',
+      expect.objectContaining({
+        status: 'connecting',
+        transform: useCameraStore.getState().transform
+      })
+    ]
+  ])
+  useCameraStore.setState({ capturing: false })
 })

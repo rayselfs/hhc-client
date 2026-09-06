@@ -8,6 +8,7 @@ import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import { getDisplayValues, useTimerStore } from '@renderer/stores/timer'
 import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
+import { useCameraStore } from '@renderer/stores/camera'
 import { isWeb } from '@renderer/lib/env'
 import type { FileItemRecord } from '@shared/types/folder'
 
@@ -15,6 +16,7 @@ export type ProjectionHeaderDisabledReason =
   | 'no-bible-payload'
   | 'no-presentable-items'
   | 'unsupported-route'
+  | 'no-camera-source'
 
 export interface ProjectionHeaderState {
   disabled: boolean
@@ -22,6 +24,7 @@ export interface ProjectionHeaderState {
 }
 
 interface ProjectionHeaderStateInput {
+  cameraReady?: boolean
   pathname: string
   isProjectionOpen: boolean
   biblePayloads: ContentMessageTuple[] | null
@@ -81,12 +84,15 @@ interface StartProjectionForRouteInput {
 }
 
 export function getProjectionHeaderState({
+  cameraReady = false,
   pathname,
   isProjectionOpen,
   biblePayloads,
   presentableItems
 }: ProjectionHeaderStateInput): ProjectionHeaderState {
   if (isProjectionOpen) return { disabled: false }
+  if (pathname === '/camera')
+    return cameraReady ? { disabled: false } : { disabled: true, reason: 'no-camera-source' }
   if (isTimerRoute(pathname)) return { disabled: false }
   if (isBibleRoute(pathname)) {
     return biblePayloads ? { disabled: false } : { disabled: true, reason: 'no-bible-payload' }
@@ -220,6 +226,17 @@ export async function startProjectionForRoute({
   startMediaPresentation,
   onNoProjectableFiles
 }: StartProjectionForRouteInput): Promise<boolean> {
+  if (pathname === '/camera') {
+    const camera = useCameraStore.getState()
+    if (!camera.capturing) return false
+    await startProjection('camera', [
+      [
+        'camera:state',
+        { sessionId: crypto.randomUUID(), transform: camera.transform, status: 'connecting' }
+      ]
+    ])
+    return true
+  }
   if (isTimerRoute(pathname)) {
     await startTimerProjection({ startProjection })
     return true

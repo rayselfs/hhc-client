@@ -8,6 +8,8 @@ import { ButtonGroup } from '@heroui/react/button-group'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
 import { X, Monitor } from 'lucide-react'
+import CameraSelector from '@renderer/components/Control/Camera/CameraSelector'
+import { useCameraStore } from '@renderer/stores/camera'
 import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
@@ -48,6 +50,8 @@ export default function Header(): React.JSX.Element {
   const navigate = useNavigate()
   const { isProjectionOpen, ensureProjectionOpen, startProjection, stopProjection } =
     useProjection()
+  const cameraReady = useCameraStore((state) => state.capturing)
+  const showCameraControls = location.pathname === '/camera'
   const mode = useTimerStore((s) => s.mode)
 
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
@@ -85,6 +89,7 @@ export default function Header(): React.JSX.Element {
     fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
   )
   const projectionHeaderState = getProjectionHeaderState({
+    cameraReady,
     pathname: location.pathname,
     isProjectionOpen,
     biblePayloads,
@@ -234,6 +239,11 @@ export default function Header(): React.JSX.Element {
         </div>
       </div>
 
+      {showCameraControls && (
+        <div className="absolute inset-y-0 left-2 right-14 flex items-center lg:left-1/2 lg:right-auto lg:-translate-x-1/2">
+          <CameraSelector />
+        </div>
+      )}
       <div className="flex items-center gap-2">
         {(showBibleControls || showFilesControls) && (
           <SearchBarToggle variant={showBibleControls ? 'bible' : 'fileExplorer'} />

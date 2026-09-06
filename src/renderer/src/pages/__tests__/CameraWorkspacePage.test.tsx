@@ -16,13 +16,16 @@ vi.mock('react-i18next', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-i18next')>()),
   useTranslation: () => ({ t: (key: string) => key })
 }))
-it('shows one source selector and no alternative fit modes', () => {
+it('shows canvas and reset without duplicate header controls', () => {
   render(
     <MemoryRouter>
       <CameraWorkspacePage />
     </MemoryRouter>
   )
-  expect(screen.getAllByRole('combobox')).toHaveLength(1)
-  expect(screen.getByRole('button', { name: 'camera.start' })).toBeDisabled()
+  expect(screen.getByTestId('camera-editor')).toBeVisible()
+  expect(screen.queryByRole('combobox')).toBeNull()
+  expect(screen.queryByRole('heading')).toBeNull()
+  expect(screen.getAllByRole('button')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'camera.reset' })).toBeDisabled()
   expect(screen.queryByText(/contain|stretch/i)).toBeNull()
 })

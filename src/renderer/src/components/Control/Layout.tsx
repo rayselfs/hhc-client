@@ -69,7 +69,6 @@ export default function Layout(): React.JSX.Element {
   const location = useLocation()
   const isPresentationWorkspace = location.pathname.startsWith('/presentations')
   const isMediaWorkspace = location.pathname === '/media'
-  const isCameraWorkspace = location.pathname === '/camera'
   useAutoUpdateCheck()
 
   useEffect(() => {
@@ -121,7 +120,7 @@ export default function Layout(): React.JSX.Element {
                         <div className="flex flex-1 flex-col min-h-0">
                           {isPresentationWorkspace ? (
                             <PresentationWorkspaceHeader />
-                          ) : isMediaWorkspace || isCameraWorkspace ? null : (
+                          ) : isMediaWorkspace ? null : (
                             <Header />
                           )}
                           <main

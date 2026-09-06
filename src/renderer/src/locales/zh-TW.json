@@ -1158,7 +1158,8 @@
       "bible": "聖經",
       "timer": "計時器",
       "media": "多媒體",
-      "edit": "編輯"
+      "edit": "編輯",
+      "camera": "攝影機"
     },
     "projection": {
       "start": "開始投影"
@@ -1204,6 +1205,16 @@
       "select_all": "全選",
       "delete": "刪除",
       "delete_alt": "刪除 (替代)"
+    },
+    "camera": {
+      "move_left": "向左移動 1 px",
+      "move_left_fast": "向左移動 10 px",
+      "move_right": "向右移動 1 px",
+      "move_right_fast": "向右移動 10 px",
+      "move_up": "向上移動 1 px",
+      "move_up_fast": "向上移動 10 px",
+      "move_down": "向下移動 1 px",
+      "move_down_fast": "向下移動 10 px"
     }
   },
   "favorites": {
@@ -1243,25 +1254,15 @@
     "pdfLoadFailed": "無法載入 PDF"
   },
   "camera": {
-    "title": "攝影機投影",
-    "back": "返回多媒體",
-    "source": "影像來源",
+    "title": "攝影機",
     "choose": "選擇來源",
-    "enable": "啟用攝影機",
-    "reset": "重設位置",
-    "start": "開始投影",
-    "stop": "停止投影",
+    "reset": "重設",
     "retry": "重試",
     "canvas": "攝影機畫布",
     "empty": "選擇攝影機以顯示預覽",
-    "hint": "拖曳移動，拉動角落或調整寬度縮放。方向鍵微調，Shift 加速。",
     "x": "X",
     "y": "Y",
     "width": "寬度",
-    "idle": "預覽",
-    "connecting": "連線中",
-    "live": "投影中",
-    "unavailable": "無訊號",
     "errors": {
       "unavailable": "無法使用攝影機，請確認裝置連線及使用安全網頁。",
       "NotAllowedError": "攝影機權限遭拒，請在系統設定允許存取後重試。",

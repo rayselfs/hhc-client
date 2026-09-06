@@ -11,17 +11,26 @@ export function createCameraCover(width: number, height: number): CameraTransfor
     height: height * scale
   }
 }
+export type CameraHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 export function resizeCamera(
   frame: CameraTransform,
-  corner: 'nw' | 'ne' | 'sw' | 'se',
+  corner: CameraHandle,
   width: number,
   coverWidth: number
 ): CameraTransform {
   const w = Math.min(coverWidth * 8, Math.max(coverWidth * 0.05, width))
   const h = (w * frame.height) / frame.width
   return {
-    x: corner.endsWith('w') ? frame.x + frame.width - w : frame.x,
-    y: corner.startsWith('n') ? frame.y + frame.height - h : frame.y,
+    x: corner.includes('w')
+      ? frame.x + frame.width - w
+      : corner.includes('e')
+        ? frame.x
+        : frame.x + (frame.width - w) / 2,
+    y: corner.includes('n')
+      ? frame.y + frame.height - h
+      : corner.includes('s')
+        ? frame.y
+        : frame.y + (frame.height - h) / 2,
     width: w,
     height: h
   }

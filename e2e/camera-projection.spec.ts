@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { completeOnboarding } from './helpers'
 
 test.use({
@@ -9,7 +9,16 @@ test.use({
   permissions: ['camera']
 })
 
-test('projects one camera with matching framing, survives navigation and reload, then releases capture', async ({
+async function selectCamera(page: Page): Promise<void> {
+  await page.getByTestId('camera-source-selector').click()
+  await expect(page.getByRole('option').first()).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('option')).toHaveCount(0)
+  await page.getByTestId('camera-source-selector').click()
+  await page.getByRole('option').first().click()
+}
+
+test('projects one camera with matching framing, survives navigation and reload, keeps capture after projection stops', async ({
   page,
   context
 }) => {
@@ -26,7 +35,7 @@ test('projects one camera with matching framing, survives navigation and reload,
   await completeOnboarding(page)
   await page.goto('/#/camera')
   const workspace = page.locator('section').filter({ has: page.getByTestId('camera-editor') })
-  await workspace.getByRole('button', { name: /Enable camera|啟用攝影機|启用摄像头/ }).click()
+  await selectCamera(page)
   await expect
     .poll(() =>
       page
@@ -35,7 +44,10 @@ test('projects one camera with matching framing, survives navigation and reload,
     )
     .toBeGreaterThan(0)
   const popup = context.waitForEvent('page')
-  await workspace.getByRole('button', { name: /^Start projection$|^開始投影$|^开始投影$/ }).click()
+  await page
+    .locator('header')
+    .getByRole('button', { name: /^Start projection$|^開始投影$|^开始投影$/ })
+    .click()
   const projection = await popup
   await expect(projection.getByTestId('camera-projection')).toBeVisible()
   await expect
@@ -52,14 +64,21 @@ test('projects one camera with matching framing, survives navigation and reload,
   await page.mouse.move(bounds.x + bounds.width * 0.6, bounds.y + bounds.height / 2)
   await page.mouse.up()
   await expect(workspace.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('192')
-  await editor.focus()
   await page.keyboard.press('Shift+ArrowRight')
   await expect(workspace.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('202')
+  await workspace.getByRole('spinbutton', { name: /Width|寬度|宽度/ }).fill('1200')
   const handle = await page.getByTestId('camera-resize-se').boundingBox()
   if (!handle) throw new Error('Resize handle is not visible')
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
   await page.mouse.down()
   await page.mouse.move(handle.x - bounds.width * 0.1, handle.y - bounds.height * 0.1)
+  await page.mouse.up()
+  await expect(page.locator('[data-testid^="camera-resize-"]')).toHaveCount(8)
+  const side = await page.getByTestId('camera-resize-e').boundingBox()
+  if (!side) throw new Error('Side handle is not visible')
+  await page.mouse.move(side.x + side.width / 2, side.y + side.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(side.x - 30, side.y + side.height / 2)
   await page.mouse.up()
   const frame = JSON.parse((await editor.getByTestId('camera-stage').getAttribute('data-frame'))!)
   expect(frame.width).toBeLessThan(1920)
@@ -67,8 +86,23 @@ test('projects one camera with matching framing, survives navigation and reload,
   await expect
     .poll(() => projection.getByTestId('camera-stage').getAttribute('data-frame'))
     .toBe(JSON.stringify(frame))
-  await workspace.getByRole('button', { name: /Reset position|重設位置|重设位置/ }).click()
+  await workspace.getByRole('button', { name: /^Reset$|^重設$|^重设$/ }).click()
   await expect(workspace.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('0')
+  await workspace.getByRole('spinbutton', { name: 'X', exact: true }).fill('4000')
+  const hiddenHandle = await page.getByTestId('camera-resize-e').boundingBox()
+  expect(hiddenHandle!.x).toBeGreaterThan(bounds.x + bounds.width)
+  await workspace.getByRole('button', { name: /^Reset$|^重設$|^重设$/ }).click()
+  await workspace.getByRole('spinbutton', { name: /Width|寬度|宽度/ }).fill('1200')
+  await workspace.getByRole('spinbutton', { name: 'X', exact: true }).fill('360')
+  await workspace.getByRole('spinbutton', { name: 'Y', exact: true }).fill('200')
+  for (const dark of [false, true]) {
+    await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' })
+    await expect(page.locator('html')).toHaveCSS('color-scheme', dark ? 'dark' : 'light')
+    await expect(editor).toHaveCSS('outline-style', 'solid')
+    const foreground = await workspace.evaluate((element) => getComputedStyle(element).color)
+    await expect(page.getByTestId('camera-source-selector')).toHaveCSS('color', foreground)
+    await page.screenshot({ path: `/tmp/hhc-camera-${dark ? 'dark' : 'light'}.png` })
+  }
   await workspace.getByRole('spinbutton', { name: 'X', exact: true }).fill('120')
   await expect
     .poll(() => projection.getByTestId('camera-stage').getAttribute('data-frame'))
@@ -86,9 +120,7 @@ test('projects one camera with matching framing, survives navigation and reload,
       { timeout: 15000 }
     )
     .toBeGreaterThan(0)
-  await page
-    .getByRole('link', { name: /Camera projection|攝影機投影|摄像头投影/, exact: true })
-    .click()
+  await page.getByRole('link', { name: /^Camera$|^攝影機$|^摄像头$/, exact: true }).click()
   await page.evaluate(() => {
     for (const track of Reflect.get(window, '__cameraTracks') as MediaStreamTrack[]) {
       track.stop()
@@ -108,7 +140,10 @@ test('projects one camera with matching framing, survives navigation and reload,
       { timeout: 15000 }
     )
     .toBeGreaterThan(0)
-  await workspace.getByRole('button', { name: /^Stop projection$|^停止投影$/ }).click()
+  await page
+    .locator('header')
+    .getByRole('button', { name: /^Stop projection$|^停止投影$/ })
+    .click()
   await expect.poll(() => projection.isClosed()).toBe(true)
   await page.locator('nav a[href="#/files"]').click()
   await expect
@@ -120,7 +155,7 @@ test('projects one camera with matching framing, survives navigation and reload,
           ).length
       )
     )
-    .toBe(0)
+    .toBe(1)
 })
 
 test('allows retry after camera permission is denied', async ({ page }) => {
@@ -139,10 +174,10 @@ test('allows retry after camera permission is denied', async ({ page }) => {
   await completeOnboarding(page)
   await page.goto('/#/camera')
   const workspace = page.locator('section').filter({ has: page.getByTestId('camera-editor') })
-  await workspace.getByRole('button', { name: /Enable camera|啟用攝影機|启用摄像头/ }).click()
+  await selectCamera(page)
   await expect(workspace.getByRole('alert')).toBeVisible()
   await expect(
-    workspace.getByRole('button', { name: /^Start projection$|^開始投影$|^开始投影$/ })
+    page.locator('header').getByRole('button', { name: /^Start projection$|^開始投影$|^开始投影$/ })
   ).toBeDisabled()
   await workspace.getByRole('button', { name: /^Retry$|^重試$|^重试$/ }).click()
   await expect(workspace.getByRole('alert')).toHaveCount(0)
@@ -157,26 +192,34 @@ test('remembers the camera across page reload without starting projection', asyn
 }) => {
   await page.goto('/')
   await completeOnboarding(page)
-  await page
-    .getByRole('link', { name: /Camera projection|攝影機投影|摄像头投影/, exact: true })
-    .click()
+  await page.getByRole('link', { name: /^Camera$|^攝影機$|^摄像头$/, exact: true }).click()
   await expect(page.getByTestId('camera-editor')).toBeVisible()
-  await page.getByRole('button', { name: /Enable camera|啟用攝影機|启用摄像头/ }).click()
+  await selectCamera(page)
   await expect
     .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
     .toBeGreaterThan(0)
-  const deviceId = await page.getByRole('combobox').inputValue()
+  const deviceId = await page
+    .locator('video')
+    .evaluate(
+      (video: HTMLVideoElement) =>
+        (video.srcObject as MediaStream).getVideoTracks()[0].getSettings().deviceId
+    )
   expect(deviceId).not.toBe('')
   await page.reload()
   await expect
     .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
     .toBeGreaterThan(0)
-  await expect(page.getByRole('combobox')).toHaveValue(deviceId)
+  expect(
+    await page
+      .locator('video')
+      .evaluate(
+        (video: HTMLVideoElement) =>
+          (video.srcObject as MediaStream).getVideoTracks()[0].getSettings().deviceId
+      )
+  ).toBe(deviceId)
   expect(context.pages()).toHaveLength(1)
   await page.locator('nav a[href="#/files"]').click()
-  await page
-    .getByRole('link', { name: /Camera projection|攝影機投影|摄像头投影/, exact: true })
-    .click()
+  await page.getByRole('link', { name: /^Camera$|^攝影機$|^摄像头$/, exact: true }).click()
   await expect
     .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
     .toBeGreaterThan(0)

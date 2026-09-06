@@ -1158,7 +1158,8 @@
       "bible": "Bible",
       "timer": "Timer",
       "media": "Media",
-      "edit": "Edit"
+      "edit": "Edit",
+      "camera": "Camera"
     },
     "projection": {
       "start": "Start projection"
@@ -1204,6 +1205,16 @@
       "select_all": "Select All",
       "delete": "Delete",
       "delete_alt": "Delete (Alternative)"
+    },
+    "camera": {
+      "move_left": "Move left 1 px",
+      "move_left_fast": "Move left 10 px",
+      "move_right": "Move right 1 px",
+      "move_right_fast": "Move right 10 px",
+      "move_up": "Move up 1 px",
+      "move_up_fast": "Move up 10 px",
+      "move_down": "Move down 1 px",
+      "move_down_fast": "Move down 10 px"
     }
   },
   "favorites": {
@@ -1243,25 +1254,15 @@
     "pdfLoadFailed": "Failed to load PDF"
   },
   "camera": {
-    "title": "Camera projection",
-    "back": "Back to media",
-    "source": "Video source",
+    "title": "Camera",
     "choose": "Select a source",
-    "enable": "Enable camera",
-    "reset": "Reset position",
-    "start": "Start projection",
-    "stop": "Stop projection",
+    "reset": "Reset",
     "retry": "Retry",
     "canvas": "Camera canvas",
     "empty": "Choose a camera to preview",
-    "hint": "Drag to move. Resize with corner handles or width. Arrow keys move; Shift moves faster.",
     "x": "X",
     "y": "Y",
     "width": "Width",
-    "idle": "Preview",
-    "connecting": "Connecting",
-    "live": "Live",
-    "unavailable": "No signal",
     "errors": {
       "unavailable": "Camera unavailable. Check the device and use a secure page.",
       "NotAllowedError": "Camera access denied. Allow access in system settings and retry.",

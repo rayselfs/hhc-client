@@ -16,3 +16,11 @@ it('keeps the opposite corner and aspect ratio when resizing', () => {
     height: 540
   })
 })
+
+it('locks aspect ratio around the opposite midpoint for edge handles', () => {
+  const frame = { x: 0, y: 0, width: 1920, height: 1080 }
+  expect(resizeCamera(frame, 'e', 960, 1920)).toEqual({ x: 0, y: 270, width: 960, height: 540 })
+  expect(resizeCamera(frame, 'w', 960, 1920)).toEqual({ x: 960, y: 270, width: 960, height: 540 })
+  expect(resizeCamera(frame, 'n', 960, 1920)).toEqual({ x: 480, y: 540, width: 960, height: 540 })
+  expect(resizeCamera(frame, 's', 960, 1920)).toEqual({ x: 480, y: 0, width: 960, height: 540 })
+})
