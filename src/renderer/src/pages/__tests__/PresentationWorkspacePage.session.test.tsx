@@ -847,6 +847,52 @@ describe('PresentationWorkspacePage session integration', () => {
     }
   })
 
+  it('resumes autosaving a pending draft after composition is canceled without changes', async () => {
+    const initial = createBlankEditablePresentationDocument('Canceled composition')
+    const slideId = initial.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(initial, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    vi.useFakeTimers()
+    const flushAnimationFrame = mockAnimationFrame()
+    try {
+      fireEvent.pointerDown(
+        document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+        { clientX: 40, clientY: 20, pointerId: 1 }
+      )
+      const content = document.querySelector<HTMLElement>(
+        '.presentation-stage [data-text-content][contenteditable="true"]'
+      )!
+      content.textContent = 'Pending text'
+      fireEvent.input(content)
+      act(() => flushAnimationFrame())
+      expect(session.getSnapshot().draftKind).toBe('text')
+      fireEvent.compositionStart(content)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      expect(session.getSnapshot().draftKind).toBe('text')
+      fireEvent.compositionEnd(content)
+      act(() => flushAnimationFrame())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+      expect(session.getSnapshot().draftKind).toBeNull()
+      expect(session.getSnapshot().save.status).toBe('saved')
+      expect(session.getSnapshot().history.present.slides[slideId].elements[text.id]).toMatchObject(
+        {
+          text: 'Pending text'
+        }
+      )
+      expect(session.getSnapshot().save.persistedRevision).toBeGreaterThan(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('settles a refocused pending blur through text commit without leaving edit mode unsafe', async () => {
     const flushAnimationFrame = mockAnimationFrame()
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')

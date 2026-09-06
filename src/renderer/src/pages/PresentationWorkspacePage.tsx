@@ -894,9 +894,12 @@ function EditableSessionDocumentView({
         textDraftStartedAtRef.current = null
         return
       }
-      textCommitTimerRef.current = window.setTimeout(() => {
+      textCommitTimerRef.current = window.setTimeout(function commitWhenReady() {
         textCommitTimerRef.current = null
-        if (textEditorFinalizerRef.current?.isComposing?.()) return
+        if (textEditorFinalizerRef.current?.isComposing?.()) {
+          textCommitTimerRef.current = window.setTimeout(commitWhenReady, 750)
+          return
+        }
         textDraftStartedAtRef.current = null
         if (session.getSnapshot().draftKind === 'text') session.commitDraft()
       }, 750)

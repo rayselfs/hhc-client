@@ -62,3 +62,9 @@ The source still serializes the full document and inline image data. Each source
 ## Remaining delivery gates
 
 No PR/remote CI, merge, release, signed package installation, or Windows physical-device smoke has been performed. Local Electron smoke is not installed-package or Windows acceptance. Keep the worktree and branch for review and these later delivery gates.
+
+## PR review follow-up
+
+Independent review identified an IME cancellation edge case: if the draft timer expired during composition and composition ended without changing the DOM text, the existing draft did not resume autosaving. The timer now retains its scheduled retry until composition ends, while existing editor cleanup continues to cancel it. A regression test first failed with the draft remaining pending, then passed after the fix. The test installs its manual animation-frame mock after fake timers to keep timer ownership deterministic across the full suite.
+
+Post-fix verification: all 87 focused workspace/session/save-coordinator tests, lint, type checks, and production build passed. Remote CI validates the updated PR commit before merge. Release remains deferred.
