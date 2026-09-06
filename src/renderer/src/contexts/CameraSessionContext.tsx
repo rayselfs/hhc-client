@@ -83,6 +83,7 @@ export function CameraSessionProvider({
           cover,
           transform: cover,
           deviceId: settings.deviceId ?? deviceId,
+          lastDeviceId: settings.deviceId ?? deviceId,
           busy: false
         })
         track.addEventListener(
@@ -118,6 +119,28 @@ export function CameraSessionProvider({
     setStream(null)
     useCameraStore.setState({ busy: false, deviceId: '', connection: 'idle' })
   }, [pathname, projecting])
+
+  useEffect(() => {
+    if (pathname !== '/camera' || session.current?.getStream()) return
+    let cancelled = false
+    const restore = async (): Promise<void> => {
+      await listDevices()
+      if (cancelled) return
+      const { lastDeviceId, devices } = useCameraStore.getState()
+      if (!lastDeviceId) return
+      if (devices.some((device) => device.id === lastDeviceId)) {
+        await selectSource(lastDeviceId)
+      } else {
+        useCameraStore.setState({ error: 'NotFoundError' })
+      }
+    }
+    void restore().catch(() => {
+      if (!cancelled) useCameraStore.setState({ error: 'unavailable' })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname, listDevices, selectSource])
 
   useEffect(() => {
     if (!projecting || recovery.status !== 'ready' || !stream) {

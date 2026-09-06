@@ -38,3 +38,9 @@ The E2E fake device and simulated `ended` event test application handling, not p
 Windows installed application, external UVC capture card, signed macOS camera access, physical unplug/replug and busy-device handling, multiple display DPI, and 30-minute continuous operation require hardware smoke. Capture-to-projection median/p95 latency has not been measured externally; the planned 30-sample p95 ≤250 ms target is not yet accepted. A successful peer connection or reported frame rate does not establish latency.
 
 Remote CI, PR, merge, release and web deployment have not been performed. Retain the task worktree until integration and required hardware checks are complete. Personal cloud sync remains a separate future task.
+
+## Follow-up: independent navigation and remembered device
+
+The user corrected the entry point: camera projection is now a top-level navigation item, with the canvas always present. The media entry and back-to-media control are removed. Only the last successfully selected device ID is persisted locally with the existing Zustand storage adapter. Entering the page restores preview only when that exact device is enumerated; missing devices do not trigger fallback capture. Automatic preview does not start or take over projection.
+
+Validation: three browser E2E scenarios passed, including pointer/keyboard composition, projection recovery, permission retry, remembered device after reload and route re-entry, and missing-device handling. Web and Electron builds passed. The earlier packaged binary predates this UI follow-up; run `npm run dev` in the task worktree to test the current source.

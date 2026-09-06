@@ -12,7 +12,10 @@ vi.mock('@renderer/contexts/CameraSessionContext', () => ({
     retry: vi.fn()
   })
 }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('react-i18next', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-i18next')>()),
+  useTranslation: () => ({ t: (key: string) => key })
+}))
 it('shows one source selector and no alternative fit modes', () => {
   render(
     <MemoryRouter>

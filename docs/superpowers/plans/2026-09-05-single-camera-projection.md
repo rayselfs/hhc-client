@@ -10,6 +10,10 @@
 
 **Spec:** 本文件「Confirmed scope and design」承載 2026-09-05 對話確認需求：一次一個來源、預設只有 cover、保留手動移動縮放。使用者於 2026-09-06 授權依本計劃實作；merge、release 與正式硬體驗收尚未完成。
 
+## Product amendment — 2026-09-06
+
+User correction supersedes the original media entry and non-persistence decisions below: camera is an independent top-level navigation item. Its page always shows the canvas. Persist only the last successfully selected device ID locally; on page entry, enumerate and preview that exact device if present. Missing devices leave the canvas empty; automatic preview does not claim projection ownership.
+
 ## Execution status — 2026-09-06
 
 - Tasks 1–4: capture/peer, shared stage, workspace and projection integration implemented on `feat/single-camera-projection`, based on `origin/main` `3e523d35`.

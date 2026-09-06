@@ -887,12 +887,6 @@ export default function FilesPage(): React.JSX.Element {
         onChange={(e) => void handleFolderChange(e)}
       />
       <FileExplorerShell itemCount={itemCount} selectedCount={selectedCount}>
-        <button
-          className="mx-3 mt-3 rounded-lg border border-border px-3 py-2 text-sm"
-          onClick={() => navigate('/camera')}
-        >
-          {t('camera.title')}
-        </button>
         <FolderPersistenceStatus
           className="mx-3 mt-3"
           status={persistenceStatus}

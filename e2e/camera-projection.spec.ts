@@ -77,7 +77,7 @@ test('projects one camera with matching framing, survives navigation and reload,
   await expect
     .poll(() => projection.getByTestId('camera-stage').getAttribute('data-frame'))
     .toContain('"width":960')
-  await workspace.getByRole('link', { name: /Back to media|返回多媒體|返回多媒体/ }).click()
+  await page.locator('nav a[href="#/files"]').click()
   await expect(projection.getByTestId('camera-projection')).toBeVisible()
   await projection.reload()
   await expect
@@ -87,7 +87,7 @@ test('projects one camera with matching framing, survives navigation and reload,
     )
     .toBeGreaterThan(0)
   await page
-    .getByRole('button', { name: /Camera projection|攝影機投影|摄像头投影/, exact: true })
+    .getByRole('link', { name: /Camera projection|攝影機投影|摄像头投影/, exact: true })
     .click()
   await page.evaluate(() => {
     for (const track of Reflect.get(window, '__cameraTracks') as MediaStreamTrack[]) {
@@ -110,7 +110,7 @@ test('projects one camera with matching framing, survives navigation and reload,
     .toBeGreaterThan(0)
   await workspace.getByRole('button', { name: /^Stop projection$|^停止投影$/ }).click()
   await expect.poll(() => projection.isClosed()).toBe(true)
-  await workspace.getByRole('link', { name: /Back to media|返回多媒體|返回多媒体/ }).click()
+  await page.locator('nav a[href="#/files"]').click()
   await expect
     .poll(() =>
       page.evaluate(
@@ -149,4 +149,47 @@ test('allows retry after camera permission is denied', async ({ page }) => {
   await expect
     .poll(() => workspace.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
     .toBeGreaterThan(0)
+})
+
+test('remembers the camera across page reload without starting projection', async ({
+  page,
+  context
+}) => {
+  await page.goto('/')
+  await completeOnboarding(page)
+  await page
+    .getByRole('link', { name: /Camera projection|攝影機投影|摄像头投影/, exact: true })
+    .click()
+  await expect(page.getByTestId('camera-editor')).toBeVisible()
+  await page.getByRole('button', { name: /Enable camera|啟用攝影機|启用摄像头/ }).click()
+  await expect
+    .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
+    .toBeGreaterThan(0)
+  const deviceId = await page.getByRole('combobox').inputValue()
+  expect(deviceId).not.toBe('')
+  await page.reload()
+  await expect
+    .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
+    .toBeGreaterThan(0)
+  await expect(page.getByRole('combobox')).toHaveValue(deviceId)
+  expect(context.pages()).toHaveLength(1)
+  await page.locator('nav a[href="#/files"]').click()
+  await page
+    .getByRole('link', { name: /Camera projection|攝影機投影|摄像头投影/, exact: true })
+    .click()
+  await expect
+    .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
+    .toBeGreaterThan(0)
+  await page.addInitScript(() => {
+    const enumerate = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices)
+    navigator.mediaDevices.enumerateDevices = async () =>
+      (await enumerate()).filter((device) => device.kind !== 'videoinput')
+  })
+  await page.reload()
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect
+    .poll(() =>
+      page.locator('video').evaluate((video: HTMLVideoElement) => video.srcObject === null)
+    )
+    .toBe(true)
 })

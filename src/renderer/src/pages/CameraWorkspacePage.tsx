@@ -1,5 +1,4 @@
 import { useRef } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import CameraStage from '@renderer/components/Common/CameraStage'
 import { useCameraSession } from '@renderer/contexts/CameraSessionContext'
@@ -68,9 +67,6 @@ export default function CameraWorkspacePage(): React.JSX.Element {
   return (
     <section className="mx-auto flex max-w-6xl flex-col gap-4" aria-label={t('camera.title')}>
       <div className="flex flex-wrap items-center gap-3">
-        <Link to="/files" className={control}>
-          {t('camera.back')}
-        </Link>
         <h1 className="mr-auto text-xl font-semibold">{t('camera.title')}</h1>
         <span role="status" className="text-sm text-muted">
           {t(`camera.${state.connection}`)}
