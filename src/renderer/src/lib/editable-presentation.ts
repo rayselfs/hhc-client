@@ -444,6 +444,30 @@ function rgbToHex(red: number, green: number, blue: number): string {
   return `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`
 }
 
+export function getSlideBackgroundOutline(
+  background: EditableSlideBackground
+): 'light' | 'dark' | 'mixed' {
+  const normalized = normalizeSlideBackground(background)
+  const colors =
+    normalized.type === 'gradient' && 'stops' in normalized
+      ? normalized.stops.map((stop) =>
+          colorWithTransparency(applyBrightness(stop.color, stop.brightness), stop.transparency)
+        )
+      : [getSlideBackgroundCss(normalized)]
+  const outlines = new Set(
+    colors.map((color) => {
+      const rgb = parseHexColor(color)
+      if (!rgb) return 'mixed'
+      const linear = [rgb.red, rgb.green, rgb.blue].map((value) => {
+        const channel = value / 255
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+      })
+      return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722 < 0.179 ? 'light' : 'dark'
+    })
+  )
+  return outlines.size === 1 ? [...outlines][0] : 'mixed'
+}
+
 export function getSlideBackgroundPrimaryColor(background: EditableSlideBackground): string {
   const normalized = normalizeSlideBackground(background)
   if (normalized.type !== 'gradient') return normalized.color
@@ -925,11 +949,7 @@ export function resetSlideBackground(
   document: EditablePresentationDocument,
   slideId: string
 ): EditablePresentationDocument {
-  return updateSlideBackground(
-    document,
-    slideId,
-    document.defaultSlideBackground ?? createDefaultSlideBackground()
-  )
+  return updateSlideBackground(document, slideId, createDefaultSlideBackground())
 }
 
 export function updateSlideNotes(

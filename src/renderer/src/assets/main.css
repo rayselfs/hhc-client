@@ -405,3 +405,17 @@ body {
 ::highlight(presenter-text-selection) {
   background-color: rgb(90 155 240 / 35%);
 }
+
+@keyframes presentation-insertion-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.presentation-insertion-line {
+  animation: presentation-insertion-blink 600ms step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .presentation-insertion-line {
+    animation: none;
+  }
+}

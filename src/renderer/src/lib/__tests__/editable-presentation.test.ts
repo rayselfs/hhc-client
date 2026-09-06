@@ -24,6 +24,7 @@ import {
   duplicateElementInSlide,
   generateEditablePresentationThumbnail,
   getSlideBackgroundCss,
+  getSlideBackgroundOutline,
   insertBlankEditableSlide,
   loadEditablePresentation,
   loadEditablePresentationSnapshot,
@@ -397,7 +398,17 @@ describe('editable presentation documents', () => {
         { color: '#2563eb', position: 100, transparency: 20, brightness: 15 }
       ]
     })
-    expect(reset.slides[firstSlideId].background).toEqual(applied.slides[firstSlideId].background)
+    expect(reset.slides[firstSlideId].background).toEqual({
+      type: 'solid',
+      color: '#ffffff',
+      transparency: 0
+    })
+    const added = addBlankEditableSlide(reset)
+    expect(added.slides[added.slideOrder[2]].background).toEqual(applied.defaultSlideBackground)
+    const resetAll = applySlideBackgroundToAllSlides(reset, reset.slides[firstSlideId].background)
+    expect(addBlankEditableSlide(resetAll).defaultSlideBackground).toEqual(
+      reset.slides[firstSlideId].background
+    )
     expect(reset.slides[secondSlideId].background).toEqual(applied.slides[secondSlideId].background)
   })
 
@@ -1193,4 +1204,24 @@ describe('editable presentation documents', () => {
       })
     }
   })
+})
+
+it('chooses thumbnail outlines from the composited slide background', () => {
+  expect(getSlideBackgroundOutline({ type: 'solid', color: '#ffffff', transparency: 0 })).toBe(
+    'dark'
+  )
+  expect(getSlideBackgroundOutline({ type: 'solid', color: '#000000', transparency: 0 })).toBe(
+    'light'
+  )
+  expect(getSlideBackgroundOutline({ type: 'solid', color: '#000000', transparency: 100 })).toBe(
+    'dark'
+  )
+  expect(
+    getSlideBackgroundOutline({
+      type: 'gradient',
+      from: '#000000',
+      to: '#ffffff',
+      direction: 'left-right'
+    })
+  ).toBe('mixed')
 })

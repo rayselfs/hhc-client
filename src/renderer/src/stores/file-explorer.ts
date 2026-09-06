@@ -18,6 +18,7 @@ export interface FolderDisplayPreference {
   sortField: SortField
   sortDir: SortDir
   groupMode: GroupMode
+  groupSortDir: 'asc' | 'desc'
 }
 
 interface FileExplorerSettingsState {
@@ -44,15 +45,27 @@ type FileExplorerSettingsStore = UseBoundStore<
 >
 
 const CREATED_COLUMN_WIDTH = 160
-const EXPLORER_SETTINGS_VERSION = 3
+const EXPLORER_SETTINGS_VERSION = 4
 
 function migrateExplorerSettings(state: unknown): unknown {
   if (!state || typeof state !== 'object') return state
-  const persisted = state as { colWidths?: { created?: number; size?: number; kind?: number } }
-  if (persisted.colWidths?.created !== 112) return state
+  const persisted = state as Partial<FileExplorerSettingsState>
   return {
     ...persisted,
-    colWidths: { ...persisted.colWidths, created: CREATED_COLUMN_WIDTH }
+    ...(persisted.colWidths?.created === 112
+      ? { colWidths: { ...persisted.colWidths, created: CREATED_COLUMN_WIDTH } }
+      : {}),
+    folderDisplay: Object.fromEntries(
+      Object.entries(persisted.folderDisplay ?? {}).map(([id, display]) => [
+        id,
+        {
+          ...display,
+          groupSortDir:
+            display.groupSortDir ??
+            (display.groupMode !== 'none' && display.sortDir === 'asc' ? 'asc' : 'desc')
+        }
+      ])
+    )
   }
 }
 
@@ -281,6 +294,7 @@ export function resolveFolderDisplay(
   return {
     ...defaults,
     groupMode: 'none',
+    groupSortDir: 'desc',
     ...(isLine
       ? { sortField: 'createdAt' as const, sortDir: 'desc' as const, groupMode: 'date' as const }
       : {}),

@@ -45,13 +45,15 @@ describe('media date groups and folder preferences', () => {
     expect(resolveFolderDisplay('child', folders, defaults)).toEqual({
       sortField: 'createdAt',
       sortDir: 'desc',
-      groupMode: 'date'
+      groupMode: 'date',
+      groupSortDir: 'desc'
     })
     expect(resolveFolderDisplay('child', folders, defaults, { groupMode: 'none' }).groupMode).toBe(
       'none'
     )
     expect(resolveFolderDisplay('ordinary', folders, defaults)).toEqual({
       ...defaults,
+      groupSortDir: 'desc',
       groupMode: 'none'
     })
     useFileExplorerSettings.getState().setFolderDisplay('child', { groupMode: 'none' })
@@ -60,6 +62,6 @@ describe('media date groups and folder preferences', () => {
       groupMode: 'none',
       sortDir: 'asc'
     })
-    expect(useFileExplorerSettings.persist.getOptions().version).toBe(3)
+    expect(useFileExplorerSettings.persist.getOptions().version).toBe(4)
   })
 })

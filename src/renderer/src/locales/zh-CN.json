@@ -673,8 +673,8 @@
     "gradientLeftRight": "由左至右",
     "gradientTopBottom": "由上至下",
     "gradientDiagonal": "对角线",
-    "applyToAll": "Apply to All",
-    "resetBackground": "Reset Background",
+    "applyToAll": "应用到全部",
+    "resetBackground": "重置",
     "inspector": "检查器",
     "fileName": "文件名",
     "slideCount": "幻灯片数",
@@ -747,16 +747,16 @@
       "justify": "两端对齐"
     },
     "objectAlign": {
-      "left": "对象左对齐",
-      "center": "对象水平居中",
-      "right": "对象右对齐",
-      "top": "对象顶端对齐",
-      "middle": "对象垂直居中",
-      "bottom": "对象底端对齐"
+      "left": "左对齐",
+      "center": "水平居中",
+      "right": "右对齐",
+      "top": "顶端对齐",
+      "middle": "垂直居中",
+      "bottom": "底端对齐"
     },
     "distribute": {
-      "horizontal": "水平等距分布对象",
-      "vertical": "垂直等距分布对象"
+      "horizontal": "水平等距分布",
+      "vertical": "垂直等距分布"
     },
     "mixed": "混合",
     "searchFonts": "搜索字体",

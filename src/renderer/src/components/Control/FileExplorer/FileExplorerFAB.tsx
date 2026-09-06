@@ -1,6 +1,7 @@
+import { Separator } from '@heroui/react/separator'
 import { useState } from 'react'
 import { Plus, FolderPlus, Upload, Folder, Presentation } from 'lucide-react'
-import { Dropdown } from '@heroui/react/dropdown'
+import { Dropdown } from '@renderer/components/Common/MenuPopover'
 import { useTranslation } from 'react-i18next'
 import { computeExpiresAt, type FolderDuration } from '@shared/types/folder'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -113,6 +114,7 @@ export default function FileExplorerFAB({
                   </Dropdown.Item>
                 </Dropdown.Section>
               )}
+              {!isReadOnly && <Separator />}
               {!isReadOnly && (
                 <Dropdown.Section>
                   <Dropdown.Item
@@ -138,6 +140,7 @@ export default function FileExplorerFAB({
                   </Dropdown.Item>
                 </Dropdown.Section>
               )}
+              {!isReadOnly && hasSourceActions && <Separator />}
               {hasSourceActions && (
                 <Dropdown.Section>
                   {onAddLocalSyncFolder && (

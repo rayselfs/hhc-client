@@ -263,8 +263,8 @@ export default function EditableSlideSurface({
       updates = { rotation: ((rotation % 360) + 360) % 360 }
     } else if (drag.mode === 'move') {
       updates = {
-        x: Math.max(0, drag.original.x + dx),
-        y: Math.max(0, drag.original.y + dy)
+        x: drag.original.x + dx,
+        y: drag.original.y + dy
       } as Partial<EditablePresentationElement>
     } else if (drag.mode === 'crop' && drag.original.type === 'image' && drag.handle) {
       updates = {
@@ -597,7 +597,7 @@ export default function EditableSlideSurface({
           {marquee && (
             <div
               data-testid="element-marquee"
-              className="pointer-events-none absolute border border-primary bg-primary/15"
+              className="pointer-events-none absolute border border-accent bg-accent/15"
               style={{
                 left: Math.min(marquee.startX, marquee.currentX),
                 top: Math.min(marquee.startY, marquee.currentY),
@@ -1004,7 +1004,7 @@ function ElementHandles({
               <span
                 data-resize-handle-visual
                 className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white ${
-                  cropMode ? 'bg-warning' : 'bg-primary'
+                  cropMode ? 'bg-warning' : 'bg-accent'
                 }`}
                 style={{ width: handleSize, height: handleSize, borderWidth }}
               />
@@ -1046,7 +1046,7 @@ function ElementHandles({
       >
         <span
           data-resize-handle-visual
-          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary"
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-accent"
           style={{ width: handleSize, height: handleSize, borderWidth }}
         />
       </span>
@@ -1351,6 +1351,7 @@ function TextElementContent({
   const hasPendingTextRef = useRef(false)
   const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
   const registeredFinalizerRef = useRef<TextEditFinalizer | null>(null)
+  const measuredLayoutRef = useRef<unknown[]>([])
   const contentHeight = hasContentHeight(element)
   const paragraphs = useMemo(() => normalizeTextParagraphs(element), [element])
   const hasRichText = Boolean(element.paragraphs?.length || element.runs?.length)
@@ -1585,6 +1586,28 @@ function TextElementContent({
       isComposingRef.current
     )
       return
+    const layout = [
+      element.id,
+      element.text,
+      element.runs,
+      element.paragraphs,
+      element.width,
+      element.height,
+      element.autoSize,
+      element.autoWidth,
+      element.fontFamily,
+      element.fontSize,
+      element.bold,
+      element.italic,
+      element.baseline,
+      element.characterSpacing,
+      element.align,
+      element.lineHeight,
+      loadedFontKey,
+      slideId
+    ]
+    if (layout.every((value, index) => value === measuredLayoutRef.current[index])) return
+    measuredLayoutRef.current = layout
     const updates = measureAutoSizedTextElement(contentRef.current, element, element.text)
     if (Object.keys(updates).length) onTextLayoutChange?.(slideId, element.id, updates)
   }, [editable, element, fontKey, loadedFontKey, onTextLayoutChange, slideId])

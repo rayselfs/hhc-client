@@ -1,6 +1,6 @@
 import { Avatar } from '@heroui/react/avatar'
 import { Button } from '@heroui/react/button'
-import { Dropdown } from '@heroui/react/dropdown'
+import { Dropdown } from '@renderer/components/Common/MenuPopover'
 import { toast } from '@heroui/react/toast'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -56,6 +56,15 @@ export default function UserMenu({
   const { status, session, signInStatus, signIn, cancelSignIn, signOut } = useHhcAuth()
   const accountLabel =
     status === 'authenticated' && session ? session.displayName : t('userMenu.guest')
+
+  const avatarInitials =
+    accountLabel
+      .split('@')[0]
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || '?'
 
   const handleCloseApp = async (): Promise<void> => {
     const confirmed = await confirm({
@@ -120,7 +129,7 @@ export default function UserMenu({
                 <Avatar.Image src={session.avatarUrl} alt={accountLabel} />
               ) : null}
               <Avatar.Fallback>
-                <CircleUser />
+                {status === 'authenticated' && session ? avatarInitials : <CircleUser />}
               </Avatar.Fallback>
             </Avatar.Root>
             {isExpanded && <span>{accountLabel}</span>}

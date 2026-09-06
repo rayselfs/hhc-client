@@ -69,7 +69,18 @@ export function ContextMenuProvider({
 
     const handleClickOutside = (e: MouseEvent): void => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        if (e.type === 'mousedown' && e.button === 2) return
         close()
+        if (
+          e.type === 'contextmenu' &&
+          !(
+            e.target instanceof Element &&
+            e.target.closest('input, textarea, [contenteditable="true"]')
+          )
+        ) {
+          e.preventDefault()
+          e.stopImmediatePropagation()
+        }
       }
     }
 
@@ -84,7 +95,7 @@ export function ContextMenuProvider({
     document.addEventListener('mousedown', handleClickOutside, true)
     document.addEventListener('keydown', handleEscape, true)
     document.addEventListener('scroll', handleScroll, true)
-    document.addEventListener('contextmenu', handleClickOutside)
+    document.addEventListener('contextmenu', handleClickOutside, true)
     window.addEventListener('resize', handleResize)
     window.addEventListener('blur', handleBlur)
 
@@ -92,14 +103,21 @@ export function ContextMenuProvider({
       document.removeEventListener('mousedown', handleClickOutside, true)
       document.removeEventListener('keydown', handleEscape, true)
       document.removeEventListener('scroll', handleScroll, true)
-      document.removeEventListener('contextmenu', handleClickOutside)
+      document.removeEventListener('contextmenu', handleClickOutside, true)
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('blur', handleBlur)
     }
   }, [menu, close])
 
   useEffect(() => {
-    const suppress = (e: Event): void => e.preventDefault()
+    const suppress = (e: Event): void => {
+      if (
+        e.target instanceof Element &&
+        e.target.closest('input, textarea, [contenteditable="true"]')
+      )
+        return
+      e.preventDefault()
+    }
     document.addEventListener('contextmenu', suppress)
     return () => document.removeEventListener('contextmenu', suppress)
   }, [])

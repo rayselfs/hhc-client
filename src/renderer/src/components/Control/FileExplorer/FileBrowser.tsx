@@ -54,7 +54,8 @@ import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
-import { getProjectionPlaylist, isPresentable } from '@renderer/lib/presentability'
+import { isPresentable } from '@renderer/lib/presentability'
+import { getExplorerProjectionPlaylist } from '@renderer/lib/file-explorer-projection'
 import { presentMediaItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
@@ -405,7 +406,7 @@ export function FileBrowser({
   const customOrders = useFileExplorerCustomOrder((state) => state.orders)
   const setCustomOrder = useFileExplorerCustomOrder((state) => state.setOrder)
   const viewMode = useFileExplorerSettings((state) => state.viewMode)
-  const { sortField, sortDir, setSortFieldAndDir, setSortDir, groupMode } =
+  const { sortField, sortDir, setSortFieldAndDir, setSortDir, groupMode, groupSortDir } =
     useCurrentFolderDisplay()
   const colWidths = useFileExplorerSettings((state) => state.colWidths)
   const setColWidths = useFileExplorerSettings((state) => state.setColWidths)
@@ -646,8 +647,9 @@ export function FileBrowser({
   }, [allItems, sortField, sortDir, currentFolderId, customOrders])
 
   const sortedItems = useMemo(
-    () => (groupMode === 'date' ? groupItemsByDate(orderedItems, timezone, sortDir) : orderedItems),
-    [orderedItems, groupMode, timezone, sortDir]
+    () =>
+      groupMode === 'date' ? groupItemsByDate(orderedItems, timezone, groupSortDir) : orderedItems,
+    [orderedItems, groupMode, timezone, groupSortDir]
   )
 
   const sortedFileItems = useMemo(() => {
@@ -803,7 +805,7 @@ export function FileBrowser({
         return
       }
       if (file && isPresentable(file.mimeType)) {
-        const playlist = getProjectionPlaylist(sortedFileItems, file)
+        const playlist = getExplorerProjectionPlaylist(sortedFileItems, file)
         void presentMediaItem({
           item: file,
           playlist,
@@ -1033,7 +1035,7 @@ export function FileBrowser({
         config: SHORTCUTS.MEDIA.START_FROM_CURRENT,
         handler: () => {
           const requestedItem = sortedFileItems.find((item) => selectedIds.has(item.id))
-          const playlist = getProjectionPlaylist(sortedFileItems, requestedItem)
+          const playlist = getExplorerProjectionPlaylist(sortedFileItems, requestedItem)
           if (playlist.length === 0) {
             toast.warning(t('fileExplorer.noProjectableFiles'))
             return

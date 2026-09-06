@@ -46,7 +46,6 @@ export default function AboutDialog({ isOpen, onOpenChange }: AboutDialogProps):
 
   return (
     <Modal.Root state={state}>
-      <Modal.Trigger />
       <Modal.Backdrop>
         <Modal.Container size="sm">
           <Modal.Dialog className="overflow-hidden p-0">

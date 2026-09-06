@@ -71,7 +71,7 @@ describe('PresenterSidebar', () => {
   })
 
   it('updates local notes immediately and debounces store update', () => {
-    render(<PresenterSidebar previewCache={{}} />)
+    render(<PresenterSidebar previewCache={{}} onNext={vi.fn()} />)
 
     const textarea = screen.getByPlaceholderText('presenter.notesPlaceholder')
     fireEvent.change(textarea, { target: { value: 'hello' } })

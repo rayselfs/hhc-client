@@ -1,8 +1,9 @@
+import { useSettingsStore } from '@renderer/stores/settings'
 import { useCurrentFolderDisplay } from '@renderer/stores/file-explorer'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
@@ -24,12 +25,13 @@ import {
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
 import {
+  useFileExplorerCustomOrder,
   useFileExplorerStore,
   useFileExplorerSettings,
   useFavoritesExplorerSettings,
   useTrashExplorerSettings
 } from '@renderer/stores/file-explorer'
-import { getProjectionPlaylist } from '@renderer/lib/presentability'
+import { getExplorerProjectionPlaylist } from '@renderer/lib/file-explorer-projection'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import {
@@ -77,12 +79,10 @@ export default function Header(): React.JSX.Element {
   const showFavoritesControls = isFavoritesRoute(location.pathname)
   const showTrashControls = isTrashRoute(location.pathname)
   const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
-  const presentableItems = useMemo(
-    () =>
-      getProjectionPlaylist(
-        fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
-      ),
-    [currentFolderId, fileItems]
+  useSettingsStore((state) => state.timezone)
+  useFileExplorerCustomOrder((state) => state.orders[currentFolderId])
+  const presentableItems = getExplorerProjectionPlaylist(
+    fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
   )
   const projectionHeaderState = getProjectionHeaderState({
     pathname: location.pathname,

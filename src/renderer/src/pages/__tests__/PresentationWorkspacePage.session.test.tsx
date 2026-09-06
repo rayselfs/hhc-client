@@ -411,6 +411,7 @@ describe('PresentationWorkspacePage session integration', () => {
       'separator',
       'copy-slide',
       'cut-slide',
+      'delete-slide',
       'paste-slide'
     ])
     const copy = itemMenu.find((item) => typeof item !== 'string' && item.id === 'copy-slide') as {
@@ -797,6 +798,101 @@ describe('PresentationWorkspacePage session integration', () => {
     ).toMatchObject({ text: 'Pending navigation text' })
   })
 
+  it('commits continuous text within four seconds but never during composition', async () => {
+    const flushAnimationFrame = mockAnimationFrame()
+    const initial = createBlankEditablePresentationDocument('Continuous typing')
+    const slideId = initial.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(initial, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    vi.useFakeTimers()
+    try {
+      fireEvent.pointerDown(
+        document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+        { clientX: 40, clientY: 20, pointerId: 1 }
+      )
+      const content = document.querySelector<HTMLElement>(
+        '.presentation-stage [data-text-content][contenteditable="true"]'
+      )!
+      act(() => session.beginDraft('text'))
+      for (let index = 0; index < 10; index++) {
+        content.textContent = `Continuous ${index}`
+        fireEvent.input(content)
+        act(() => flushAnimationFrame())
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(500)
+        })
+      }
+      expect(session.getSnapshot().history.present.slides[slideId].elements[text.id]).toMatchObject(
+        { text: 'Continuous 8' }
+      )
+      expect(session.getSnapshot().save.persistedRevision).toBeGreaterThan(0)
+      fireEvent.compositionStart(content)
+      const committed = session.getSnapshot().history.present
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000)
+      })
+      expect(session.getSnapshot().history.present).toBe(committed)
+      content.textContent = '完成輸入'
+      fireEvent.compositionEnd(content)
+      act(() => flushAnimationFrame())
+      expect(session.getSnapshot().history.present.slides[slideId].elements[text.id]).toMatchObject(
+        { text: '完成輸入' }
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('resumes autosaving a pending draft after composition is canceled without changes', async () => {
+    const initial = createBlankEditablePresentationDocument('Canceled composition')
+    const slideId = initial.slideOrder[0]
+    const text = createTextElement({ text: 'Before', width: 120, height: 40 })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: addElementToSlide(initial, slideId, text),
+      revision: 0
+    })
+    const session = await renderWorkspaceSession()
+    vi.useFakeTimers()
+    const flushAnimationFrame = mockAnimationFrame()
+    try {
+      fireEvent.pointerDown(
+        document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')!,
+        { clientX: 40, clientY: 20, pointerId: 1 }
+      )
+      const content = document.querySelector<HTMLElement>(
+        '.presentation-stage [data-text-content][contenteditable="true"]'
+      )!
+      content.textContent = 'Pending text'
+      fireEvent.input(content)
+      act(() => flushAnimationFrame())
+      expect(session.getSnapshot().draftKind).toBe('text')
+      fireEvent.compositionStart(content)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      expect(session.getSnapshot().draftKind).toBe('text')
+      fireEvent.compositionEnd(content)
+      act(() => flushAnimationFrame())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+      expect(session.getSnapshot().draftKind).toBeNull()
+      expect(session.getSnapshot().save.status).toBe('saved')
+      expect(session.getSnapshot().history.present.slides[slideId].elements[text.id]).toMatchObject(
+        {
+          text: 'Pending text'
+        }
+      )
+      expect(session.getSnapshot().save.persistedRevision).toBeGreaterThan(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('settles a refocused pending blur through text commit without leaving edit mode unsafe', async () => {
     const flushAnimationFrame = mockAnimationFrame()
     const sourceDocument = createBlankEditablePresentationDocument('Sunday')
@@ -813,6 +909,9 @@ describe('PresentationWorkspacePage session integration', () => {
       </PresentationSessionRegistryProvider>
     )
     await waitFor(() => expect(registry?.get('deck-1')).toBeDefined())
+    await act(async () => {
+      await registry!.get('deck-1')!.flush()
+    })
     vi.useFakeTimers()
     try {
       let content = document.querySelector<HTMLElement>('.presentation-stage [data-text-content]')
@@ -836,15 +935,17 @@ describe('PresentationWorkspacePage session integration', () => {
       )!
       act(() => flushAnimationFrame())
       await act(async () => {
-        vi.advanceTimersByTime(1000)
-        await Promise.resolve()
-        await Promise.resolve()
+        await vi.advanceTimersByTimeAsync(1750)
       })
 
       expect(
         registry!.get('deck-1')!.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
       ).toMatchObject({ text: 'Refocused text' })
       expect(registry!.get('deck-1')!.getSnapshot().draftKind).toBeNull()
+      expect(registry!.hasPendingEditorWork?.('deck-1')).toBe(false)
+      await act(async () => {
+        await registry!.get('deck-1')!.flush()
+      })
       expect(registry!.hasUnsafeWork()).toBe(false)
       expect(content).toHaveAttribute('contenteditable', 'true')
     } finally {
@@ -1881,7 +1982,7 @@ describe('PresentationWorkspacePage session integration', () => {
 
     expect(session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]).toMatchObject({
       text: 'Before Nudge',
-      x: 21
+      x: 25
     })
   })
 

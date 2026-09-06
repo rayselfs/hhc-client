@@ -1,3 +1,4 @@
+import { groupItemsByDate } from './file-explorer-grouping'
 import type { AnyItemRecord, FileItemRecord } from '@shared/types/folder'
 import { isFileItem } from '@shared/types/folder'
 import type { FilePlaybackPhase } from '@shared/projection-messages'
@@ -80,11 +81,19 @@ export function getPresentableItems(
 export function getProjectionPlaylist(
   items: AnyItemRecord[],
   requestedItem?: FileItemRecord,
-  platform = getPresentabilityPlatform()
+  platform = getPresentabilityPlatform(),
+  groupTimezone?: string
 ): FileItemRecord[] {
   const presentable = getPresentableItems(items, platform)
   if (requestedItem && getMediaType(requestedItem.mimeType, platform) === 'presentation') {
     return presentable.filter((item) => item.id === requestedItem.id)
   }
-  return presentable.filter((item) => getMediaType(item.mimeType, platform) !== 'presentation')
+  const playlist = presentable.filter(
+    (item) => getMediaType(item.mimeType, platform) !== 'presentation'
+  )
+  if (!groupTimezone) return playlist
+  const grouped = groupItemsByDate(playlist, groupTimezone, 'desc')
+  const targetId = requestedItem?.id ?? playlist[0]?.id
+  const target = grouped.find((item) => item.id === targetId)
+  return target ? grouped.filter((item) => item.dateGroup === target.dateGroup) : []
 }

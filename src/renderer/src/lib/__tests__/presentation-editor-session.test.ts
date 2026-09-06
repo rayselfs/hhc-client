@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   addElementToSlide,
+  updateSlideBackground,
+  updateSlideNotes,
+  addBlankEditableSlide,
   createTextElement,
   updateElementInSlide,
   createBlankEditablePresentationDocument
@@ -224,16 +227,37 @@ describe('presentation editor session', () => {
     expect(session.getSnapshot()).toBe(session.getSnapshot())
   })
 
+  it('does not regenerate the cover for names, notes, or non-cover edits', async () => {
+    const refreshThumbnail = vi.fn().mockResolvedValue(undefined)
+    const session = createSession({ refreshThumbnail })
+    let doc = addBlankEditableSlide(initialDocument)
+    doc = updateSlideNotes(doc, doc.slideOrder[0], 'Cover notes')
+    doc = updateSlideBackground(doc, doc.slideOrder[1], {
+      type: 'solid',
+      color: '#123456',
+      transparency: 0
+    })
+    session.commit({ ...doc, name: 'Renamed' })
+    await session.flush()
+    expect(refreshThumbnail).not.toHaveBeenCalled()
+  })
+
   it('refreshes the thumbnail once after the latest revision becomes idle', async () => {
     const refreshThumbnail = vi.fn().mockResolvedValue(undefined)
     const session = createSession({ refreshThumbnail })
-    session.commit({ ...initialDocument, name: 'Saved' })
+    session.commit(
+      updateSlideBackground(initialDocument, initialDocument.slideOrder[0], {
+        type: 'solid',
+        color: '#123456',
+        transparency: 0
+      })
+    )
 
     await session.flush()
     await Promise.resolve()
 
     expect(refreshThumbnail).toHaveBeenCalledTimes(1)
-    expect(refreshThumbnail).toHaveBeenCalledWith(expect.objectContaining({ name: 'Saved' }))
+    expect(refreshThumbnail).toHaveBeenCalledWith(session.getSnapshot().history.present)
   })
 
   it('reports a thumbnail warning and retries it without rewriting the document', async () => {
@@ -246,7 +270,13 @@ describe('presentation editor session', () => {
       mirrorWarnings: []
     }))
     const session = createSession({ persist, refreshThumbnail })
-    session.commit({ ...initialDocument, name: 'Saved' })
+    session.commit(
+      updateSlideBackground(initialDocument, initialDocument.slideOrder[0], {
+        type: 'solid',
+        color: '#123456',
+        transparency: 0
+      })
+    )
     await session.flush()
     await Promise.resolve()
     await Promise.resolve()
@@ -261,6 +291,24 @@ describe('presentation editor session', () => {
     expect(session.getSnapshot().save.mirrorWarnings).not.toContain('thumbnail')
   })
 
+  it('keeps thumbnail writes serialized when discarding a newer unsaved edit', async () => {
+    const first = deferred<void>()
+    const refreshThumbnail = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue(undefined)
+    const session = createSession({ refreshThumbnail })
+    session.commit({ ...initialDocument, width: 1000 })
+    await session.flush()
+    session.commit({ ...initialDocument, width: 1100 })
+    await session.flush()
+    session.commit({ ...initialDocument, width: 1200 })
+    await session.discard()
+    expect(refreshThumbnail).toHaveBeenCalledTimes(1)
+    first.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(refreshThumbnail).toHaveBeenCalledTimes(2)
+    expect(refreshThumbnail.mock.calls[1][0].width).toBe(1100)
+  })
+
   it('refreshes a newer saved revision after an older thumbnail finishes', async () => {
     const firstThumbnail = deferred<void>()
     const secondThumbnail = deferred<void>()
@@ -269,9 +317,9 @@ describe('presentation editor session', () => {
       .mockReturnValueOnce(firstThumbnail.promise)
       .mockReturnValueOnce(secondThumbnail.promise)
     const session = createSession({ refreshThumbnail })
-    session.commit({ ...initialDocument, name: 'First' })
+    session.commit({ ...initialDocument, name: 'First', width: 1000 })
     await session.flush()
-    session.commit({ ...initialDocument, name: 'Second' })
+    session.commit({ ...initialDocument, name: 'Second', width: 1100 })
     await session.flush()
 
     expect(refreshThumbnail).toHaveBeenCalledTimes(1)

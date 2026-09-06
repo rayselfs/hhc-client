@@ -10,7 +10,7 @@ import {
 } from '@renderer/stores/media-projection'
 import { getMediaType } from '@renderer/lib/presentability'
 
-export default function PresenterNavigation(): React.JSX.Element {
+export default function PresenterNavigation({ onNext }: { onNext: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const canPrev = useMediaProjectionStore((s) => s.canPrev())
   const canNext = useMediaProjectionStore((s) => s.canNext())
@@ -19,7 +19,7 @@ export default function PresenterNavigation(): React.JSX.Element {
   const currentIndex = useMediaProjectionStore((s) => s.currentIndex)
   const total = useMediaProjectionStore((s) => s.playlist.length)
   const presentation = useMediaProjectionStore((s) => s.typeStates.presentation)
-  const next = useMediaProjectionStore((s) => s.next)
+  const isEnded = useMediaProjectionStore((s) => s.isEnded)
   const prev = useMediaProjectionStore((s) => s.prev)
 
   const navigate = async (action: () => MediaProjectionActionResult): Promise<void> => {
@@ -73,8 +73,8 @@ export default function PresenterNavigation(): React.JSX.Element {
         <Button
           variant="outline"
           isIconOnly
-          isDisabled={!canNext}
-          onPress={() => void navigate(next)}
+          isDisabled={!canNext && !isEnded}
+          onPress={onNext}
           className="w-12 h-12 rounded-full shrink-0 size-5"
           aria-label={t('presenter.next')}
         >

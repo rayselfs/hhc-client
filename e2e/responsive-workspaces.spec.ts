@@ -731,12 +731,13 @@ test('keeps the editable presentation stage primary at the 900px breakpoint', as
     name: /Start projection|開始投影|开始投影/
   })
   await expectProjectionActionGeometry(presentationProjectionAction)
-  expect(await ribbon.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  expect(await ribbon.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   )
 
   await page.setViewportSize({ width: 900, height: 800 })
+  expect(await ribbon.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
   await expect(navigator).toBeHidden()
   await expect(slidesTrigger).toBeVisible()
   await expect(stage).toBeVisible()

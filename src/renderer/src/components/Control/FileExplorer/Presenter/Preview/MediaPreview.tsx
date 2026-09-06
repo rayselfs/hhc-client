@@ -1,26 +1,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from '@heroui/react/toast'
 import type { FileItemRecord } from '@shared/types/folder'
 import type { MediaTypeDescriptor } from '@renderer/lib/presenter-registry'
-import {
-  resolveMediaProjectionAction,
-  useMediaProjectionStore,
-  type MediaProjectionActionResult
-} from '@renderer/stores/media-projection'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 interface MediaPreviewProps {
   currentItem: FileItemRecord | null
   descriptor: MediaTypeDescriptor | null
   isEnded?: boolean
   onExit: () => void
+  onNext: () => void
 }
 
 export default function MediaPreview({
   currentItem,
   descriptor,
   isEnded = false,
-  onExit
+  onExit,
+  onNext
 }: MediaPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const previewBoxRef = useRef<HTMLDivElement>(null)
@@ -29,7 +26,6 @@ export default function MediaPreview({
   const panDragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0, w: 1, h: 1, zoom: 1 })
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
-  const { next } = useMediaProjectionStore.getState()
 
   useEffect(() => {
     const el = previewBoxRef.current
@@ -84,15 +80,6 @@ export default function MediaPreview({
 
   const PreviewComponent = descriptor?.PreviewComponent ?? null
 
-  const advance = async (): Promise<void> => {
-    if (
-      (await resolveMediaProjectionAction(next() as MediaProjectionActionResult)).status ===
-      'blocked'
-    ) {
-      toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
-    }
-  }
-
   return (
     <div
       ref={previewBoxRef}
@@ -117,7 +104,7 @@ export default function MediaPreview({
             onExit()
             return
           }
-          if (descriptor?.clickToAdvance && zoomLevel <= 1) void advance()
+          if (descriptor?.clickToAdvance && zoomLevel <= 1) onNext()
         }}
       >
         {isEnded ? (

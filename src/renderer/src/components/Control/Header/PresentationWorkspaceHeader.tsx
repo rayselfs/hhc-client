@@ -1,3 +1,4 @@
+import { ButtonGroup } from '@heroui/react/button-group'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
@@ -236,41 +237,44 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   )
 
   return (
-    <header className="relative flex h-14 shrink-0 items-center gap-1 bg-content1/80 px-2">
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-divider" />
+    <header className="relative flex h-14 shrink-0 items-center gap-1 bg-surface/80 px-2">
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-separator" />
       <Button
         isIconOnly
-        variant="ghost"
+        size="lg"
+        variant="outline"
         className="relative z-10"
         onPress={() => void runPresentationSafeAction(() => navigate('/files'))}
         aria-label={t('presentationWorkspace.backToFiles')}
       >
-        <Home size={18} />
+        <Home size={16} />
       </Button>
-      <Button
-        isIconOnly
-        variant="ghost"
-        className="relative z-10"
-        isDisabled={!canUndo}
-        onPress={() => {
-          if (activeItemId) registry.undo?.(activeItemId)
-        }}
-        aria-label={t('presentationWorkspace.undo', 'Undo')}
-      >
-        <Undo2 size={18} />
-      </Button>
-      <Button
-        isIconOnly
-        variant="ghost"
-        className="relative z-10"
-        isDisabled={!canRedo}
-        onPress={() => {
-          if (activeItemId) registry.redo?.(activeItemId)
-        }}
-        aria-label={t('presentationWorkspace.redo', 'Redo')}
-      >
-        <Redo2 size={18} />
-      </Button>
+      <ButtonGroup variant="outline">
+        <Button
+          isIconOnly
+          variant="outline"
+          className="relative z-10"
+          isDisabled={!canUndo}
+          onPress={() => {
+            if (activeItemId) registry.undo?.(activeItemId)
+          }}
+          aria-label={t('presentationWorkspace.undo', 'Undo')}
+        >
+          <Undo2 size={18} />
+        </Button>
+        <Button
+          isIconOnly
+          variant="outline"
+          className="relative z-10"
+          isDisabled={!canRedo}
+          onPress={() => {
+            if (activeItemId) registry.redo?.(activeItemId)
+          }}
+          aria-label={t('presentationWorkspace.redo', 'Redo')}
+        >
+          <Redo2 size={18} />
+        </Button>
+      </ButtonGroup>
       {documents.map((deck) => (
         <div
           key={deck.itemId}
@@ -278,8 +282,8 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
           tabIndex={0}
           className={`relative flex h-10 max-w-56 self-end items-center gap-2 rounded-t-xl border px-3 text-sm ${
             deck.itemId === activeItemId
-              ? 'z-20 -mb-px border-divider border-b-background bg-background text-foreground shadow-sm'
-              : 'z-10 mb-px border-transparent bg-content2 text-default-500 hover:text-foreground'
+              ? 'z-20 -mb-px border-separator border-b-background bg-background text-foreground shadow-sm'
+              : 'z-10 mb-px border-transparent bg-surface-secondary text-muted hover:text-foreground'
           }`}
           onClick={() => {
             if (editingItemId !== deck.itemId) void activateDocument(deck.itemId)
@@ -294,7 +298,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
           {editingItemId === deck.itemId ? (
             <input
               ref={editInputRef}
-              className="min-w-0 flex-1 rounded-md border border-primary/50 bg-background px-1 text-sm text-foreground outline-none"
+              className="min-w-0 flex-1 rounded-md border border-accent/50 bg-background px-1 text-sm text-foreground outline-none"
               value={editingName}
               aria-label={t('fileExplorer.renameFile', 'Rename file')}
               onChange={(event) => setEditingName(event.currentTarget.value)}
@@ -340,7 +344,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       ))}
       <div className="relative z-10 ml-auto flex items-center gap-3">
         {activeDocument?.saveStatus && (
-          <div className="flex items-center gap-2 text-xs text-default-500">
+          <div className="flex items-center gap-2 text-xs text-muted">
             <span role={activeDocument.saveStatus === 'error' ? 'alert' : undefined}>
               {t(
                 `presentationWorkspace.saveStatus.${activeDocument.saveStatus}`,

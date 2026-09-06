@@ -282,6 +282,13 @@ describe('ContextMenuContext', () => {
     expect(item.className).toContain('text-danger')
   })
 
+  it('preserves the native text-editing context menu', () => {
+    renderWithProvider(<textarea data-testid="text" />)
+    const event = createEvent.contextMenu(screen.getByTestId('text'))
+    fireEvent(screen.getByTestId('text'), event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
   it('suppresses browser default contextmenu', () => {
     renderWithProvider(<div data-testid="area">content</div>)
 

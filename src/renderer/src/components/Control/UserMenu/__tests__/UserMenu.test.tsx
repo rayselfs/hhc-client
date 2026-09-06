@@ -101,6 +101,19 @@ describe('UserMenu', () => {
     expect(container.querySelector('button button')).not.toBeInTheDocument()
   })
 
+  it.each([
+    ['Alice Chen', 'AC'],
+    ['王小明', '王'],
+    ['  小明   王  ', '小王'],
+    ['alice@example.org', 'A'],
+    ['   ', '?']
+  ])('uses website initials for %s without a profile image', (displayName, initials) => {
+    auth.value.status = 'authenticated'
+    auth.value.session = { userId: 'user', displayName, roles: [] }
+    const { container } = renderUserMenu()
+    expect(container.querySelector('[data-slot="avatar-fallback"]')).toHaveTextContent(initials)
+  })
+
   it('renders all menu items', () => {
     renderUserMenu()
     expect(screen.getByText('Login')).toBeInTheDocument()
