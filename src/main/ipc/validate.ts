@@ -1,3 +1,4 @@
+import { isCameraSignal, isCameraState, isCameraMessageFrom } from '@shared/camera'
 import { BrowserWindow } from 'electron'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 import type { WindowManager } from '../windowManager'
@@ -105,6 +106,12 @@ function validateProjectionPayload(channel: string, data: unknown): boolean {
   const obj = data
 
   switch (channel) {
+    case 'camera:state':
+      return isCameraState(data)
+    case 'camera:ready':
+      return isCameraMessageFrom(channel, data, 'projection')
+    case 'camera:signal':
+      return isCameraSignal(data)
     case '__system:blank':
       return typeof obj.showDefault === 'boolean'
     case '__system:blackout':
@@ -250,7 +257,7 @@ function validateProjectionReplayPayload(generation: number, data: unknown): boo
   if (!isRecord(data) || data.generation !== generation || !isRecord(data.snapshot)) return false
   const snapshot = data.snapshot
   if (
-    !['timer', 'bible', 'media'].includes(String(snapshot.owner)) ||
+    !['timer', 'bible', 'media', 'camera'].includes(String(snapshot.owner)) ||
     typeof snapshot.showDefault !== 'boolean' ||
     typeof snapshot.isBlackout !== 'boolean' ||
     !isRecord(snapshot.timer) ||
@@ -264,6 +271,7 @@ function validateProjectionReplayPayload(generation: number, data: unknown): boo
   const bible = snapshot.bible
   const media = snapshot.media
   return (
+    (snapshot.camera == null || isCameraState(snapshot.camera)) &&
     validateNullablePayload('timer:tick', timer.tick) &&
     validateNullablePayload('timer:stopwatch', timer.stopwatch) &&
     validateNullablePayload('timer:overtime-message', timer.overtimeMessage) &&

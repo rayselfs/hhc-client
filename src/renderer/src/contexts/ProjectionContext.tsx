@@ -429,7 +429,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const send = useCallback(
     <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {
       const coordinator = getCoordinator()
-      if (channel === 'file:playback-state') {
+      if (channel === 'camera:signal' || channel === 'camera:ready') {
+        getAdapter(adapterRef, browserSessionId).send(channel, data)
+      } else if (channel === 'file:playback-state') {
         coordinator.recordPlayback(
           getAdapter(adapterRef, browserSessionId).getGeneration(),
           data as ProjectionPayload<'file:playback-state'>

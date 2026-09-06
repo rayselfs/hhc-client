@@ -1,3 +1,4 @@
+import { CameraSessionProvider } from '@renderer/contexts/CameraSessionContext'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppLoadingScreen from '@renderer/components/Control/AppLoadingScreen'
@@ -109,42 +110,46 @@ export default function Layout(): React.JSX.Element {
       <ShortcutScopeProvider>
         <TimerEngineProvider>
           <ProjectionProvider>
-            <ContextMenuProvider>
-              <ConfirmDialogProvider>
-                <PresentationSessionRegistryProvider>
-                  <PresentationCloseDecisionProvider>
-                    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-                      {!isMediaWorkspace && <Sidebar />}
-                      <div className="flex flex-1 flex-col min-h-0">
-                        {isPresentationWorkspace ? (
-                          <PresentationWorkspaceHeader />
-                        ) : isMediaWorkspace ? null : (
-                          <Header />
-                        )}
-                        <main
-                          className={
-                            isPresentationWorkspace || isMediaWorkspace
-                              ? 'flex-1 overflow-hidden'
-                              : 'flex-1 overflow-y-auto py-4 px-3'
-                          }
-                        >
-                          <Outlet />
-                        </main>
+            <CameraSessionProvider>
+              <ContextMenuProvider>
+                <ConfirmDialogProvider>
+                  <PresentationSessionRegistryProvider>
+                    <PresentationCloseDecisionProvider>
+                      <div className="flex h-screen overflow-hidden bg-background text-foreground">
+                        {!isMediaWorkspace && <Sidebar />}
+                        <div className="flex flex-1 flex-col min-h-0">
+                          {isPresentationWorkspace ? (
+                            <PresentationWorkspaceHeader />
+                          ) : isMediaWorkspace ? null : (
+                            <Header />
+                          )}
+                          <main
+                            className={
+                              isPresentationWorkspace || isMediaWorkspace
+                                ? 'flex-1 overflow-hidden'
+                                : 'flex-1 overflow-y-auto py-4 px-3'
+                            }
+                          >
+                            <Outlet />
+                          </main>
+                        </div>
+                        {!isMediaWorkspace && <FloatingTimer />}
                       </div>
-                      {!isMediaWorkspace && <FloatingTimer />}
-                    </div>
-                    <ConfirmDialog />
-                    <PresentationCloseDecisionDialog />
-                    <PresentationNavigationGuard />
-                    <PresentationElectronCloseBridge />
-                    <TimerProjectionBridge />
-                    <MediaProjectionBridge onHhcAccessRevoked={handleHhcProjectionAccessRevoked} />
-                    <LanRemoteBridge />
-                    <ProjectionRecoveryNotice />
-                  </PresentationCloseDecisionProvider>
-                </PresentationSessionRegistryProvider>
-              </ConfirmDialogProvider>
-            </ContextMenuProvider>
+                      <ConfirmDialog />
+                      <PresentationCloseDecisionDialog />
+                      <PresentationNavigationGuard />
+                      <PresentationElectronCloseBridge />
+                      <TimerProjectionBridge />
+                      <MediaProjectionBridge
+                        onHhcAccessRevoked={handleHhcProjectionAccessRevoked}
+                      />
+                      <LanRemoteBridge />
+                      <ProjectionRecoveryNotice />
+                    </PresentationCloseDecisionProvider>
+                  </PresentationSessionRegistryProvider>
+                </ConfirmDialogProvider>
+              </ContextMenuProvider>
+            </CameraSessionProvider>
           </ProjectionProvider>
         </TimerEngineProvider>
       </ShortcutScopeProvider>

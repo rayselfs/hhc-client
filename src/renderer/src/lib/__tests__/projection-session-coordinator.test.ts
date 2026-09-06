@@ -563,3 +563,26 @@ describe('ProjectionSessionCoordinator', () => {
     expect(send).not.toHaveBeenCalled()
   })
 })
+
+it('caches passive timer updates without sending them over an active camera', () => {
+  const send = vi.fn()
+  const coordinator = createProjectionSessionCoordinator(send)
+  coordinator.startSession('camera', [])
+  coordinator.beginGeneration({ generation: 1, status: 'opening', reason: 'created' })
+  coordinator.ready(1)
+  send.mockClear()
+  coordinator.project('timer:tick', {
+    mode: 'clock',
+    remainingSeconds: 0,
+    phase: 'main',
+    mainDisplay: '00:00',
+    subDisplay: '',
+    progress: 0,
+    overtimeSeconds: 0,
+    overtimeMessage: null,
+    reminderColor: null
+  })
+  expect(send).not.toHaveBeenCalled()
+  expect(coordinator.getSnapshot()?.timer.tick?.mode).toBe('clock')
+  coordinator.dispose()
+})

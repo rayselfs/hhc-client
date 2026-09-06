@@ -1158,7 +1158,8 @@
       "bible": "Bible",
       "timer": "Timer",
       "media": "Media",
-      "edit": "Edit"
+      "edit": "Edit",
+      "camera": "Camera"
     },
     "projection": {
       "start": "Start projection"
@@ -1204,6 +1205,16 @@
       "select_all": "Select All",
       "delete": "Delete",
       "delete_alt": "Delete (Alternative)"
+    },
+    "camera": {
+      "move_left": "Move left 1 px",
+      "move_left_fast": "Move left 10 px",
+      "move_right": "Move right 1 px",
+      "move_right_fast": "Move right 10 px",
+      "move_up": "Move up 1 px",
+      "move_up_fast": "Move up 10 px",
+      "move_down": "Move down 1 px",
+      "move_down_fast": "Move down 10 px"
     }
   },
   "favorites": {
@@ -1241,5 +1252,26 @@
     "videoPreparing": "Preparing video...",
     "videoLoadFailed": "Failed to load video",
     "pdfLoadFailed": "Failed to load PDF"
+  },
+  "camera": {
+    "title": "Camera",
+    "choose": "Select a source",
+    "reset": "Reset",
+    "retry": "Retry",
+    "canvas": "Camera canvas",
+    "empty": "Choose a camera to preview",
+    "x": "X",
+    "y": "Y",
+    "width": "Width",
+    "errors": {
+      "unavailable": "Camera unavailable. Check the device and use a secure page.",
+      "NotAllowedError": "Camera access denied. Allow access in system settings and retry.",
+      "NotFoundError": "No camera found. Connect a device and retry.",
+      "NotReadableError": "Camera unavailable or in use by another app.",
+      "OverconstrainedError": "Selected camera unavailable. Select a source again.",
+      "ended": "Camera disconnected. Reconnect and retry.",
+      "connection": "Projection connection failed. Retry to reconnect.",
+      "playback": "Video playback failed. Select the source again."
+    }
   }
 }

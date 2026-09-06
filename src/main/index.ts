@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, protocol } from 'electron'
+import { registerMediaPermissions } from './media-permissions'
+import { app, BrowserWindow, ipcMain, nativeTheme, protocol, session } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { WindowManager } from './windowManager'
 import { registerProjectionHandlers } from './ipc/projection'
@@ -137,6 +138,7 @@ if (gotSingleInstanceLock) {
     registerHhcAssetHandlers(wm, hhcAuthService)
     registerOneDriveDownloadHandlers(wm)
     registerNativeMediaProtocol()
+    registerMediaPermissions(session.defaultSession, () => wm.getMainWindow()?.webContents)
     wm.createMainWindow()
     registerUpdateService(wm)
 

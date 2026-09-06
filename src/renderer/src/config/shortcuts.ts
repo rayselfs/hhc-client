@@ -32,6 +32,16 @@ export const SHORTCUTS = {
     ITALIC: { code: 'KeyI', ctrl: true, mac: { ctrl: false, meta: true } },
     UNDERLINE: { code: 'KeyU', ctrl: true, mac: { ctrl: false, meta: true } }
   },
+  CAMERA: {
+    MOVE_LEFT: { code: 'ArrowLeft' },
+    MOVE_RIGHT: { code: 'ArrowRight' },
+    MOVE_UP: { code: 'ArrowUp' },
+    MOVE_DOWN: { code: 'ArrowDown' },
+    MOVE_LEFT_FAST: { code: 'ArrowLeft', shift: true },
+    MOVE_RIGHT_FAST: { code: 'ArrowRight', shift: true },
+    MOVE_UP_FAST: { code: 'ArrowUp', shift: true },
+    MOVE_DOWN_FAST: { code: 'ArrowDown', shift: true }
+  },
   BIBLE: {
     PREV_VERSE: { code: 'ArrowUp' },
     NEXT_VERSE: { code: 'ArrowDown' },

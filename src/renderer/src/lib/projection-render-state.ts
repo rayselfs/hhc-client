@@ -1,3 +1,4 @@
+import { isCameraState, type CameraState } from '@shared/camera'
 import type {
   FileControlPayload,
   ProjectionChannel,
@@ -6,9 +7,10 @@ import type {
 } from '@shared/projection-messages'
 
 export interface ProjectionRenderState {
+  camera: CameraState | null
   showDefault: boolean
   isBlackout: boolean
-  activeContent: 'timer' | 'bible' | 'file' | null
+  activeContent: 'timer' | 'bible' | 'file' | 'camera' | null
   timerData: ProjectionPayload<'timer:tick'> | null
   stopwatchData: ProjectionPayload<'timer:stopwatch'> | null
   bibleChapter: ProjectionPayload<'bible:chapter'> | null
@@ -30,6 +32,7 @@ export type ProjectionRenderAction =
     }
 
 export const initialProjectionRenderState: ProjectionRenderState = {
+  camera: null,
   showDefault: true,
   isBlackout: false,
   activeContent: null,
@@ -71,10 +74,10 @@ export function reduceProjectionRenderState(
           }
         : confirmedMediaState
     return {
+      camera: isCameraState(snapshot.camera) ? snapshot.camera : null,
       showDefault: snapshot.showDefault,
       isBlackout: snapshot.isBlackout,
-      activeContent:
-        snapshot.owner === 'media' ? 'file' : snapshot.owner === 'bible' ? 'bible' : 'timer',
+      activeContent: snapshot.owner === 'media' ? 'file' : snapshot.owner,
       timerData: snapshot.timer.tick,
       stopwatchData: snapshot.timer.stopwatch,
       bibleChapter: snapshot.bible.chapter,
@@ -90,6 +93,8 @@ export function reduceProjectionRenderState(
 
   const { channel, data } = action
   switch (channel) {
+    case 'camera:state':
+      return isCameraState(data) ? { ...state, camera: data } : state
     case '__system:blank':
       return {
         ...state,
@@ -104,7 +109,14 @@ export function reduceProjectionRenderState(
       const owner = (data as ProjectionPayload<'__system:active-owner'>).owner
       return {
         ...state,
-        activeContent: owner === 'media' ? 'file' : owner === 'bible' ? 'bible' : 'timer'
+        activeContent:
+          owner === 'media'
+            ? 'file'
+            : owner === 'camera'
+              ? 'camera'
+              : owner === 'bible'
+                ? 'bible'
+                : 'timer'
       }
     }
     case 'timer:tick':
@@ -150,11 +162,12 @@ export function reduceProjectionRenderState(
 
 export function selectVisibleProjection(
   state: ProjectionRenderState
-): 'blackout' | 'default' | 'timer' | 'bible' | 'file' {
+): 'blackout' | 'default' | 'timer' | 'bible' | 'file' | 'camera' {
   if (state.isBlackout) return 'blackout'
   if (state.showDefault) return 'default'
   if (state.activeContent === 'timer' && state.timerData) return 'timer'
   if (state.activeContent === 'bible' && state.bibleChapter) return 'bible'
+  if (state.activeContent === 'camera' && state.camera) return 'camera'
   if (state.activeContent === 'file' && state.fileData) return 'file'
   return 'default'
 }

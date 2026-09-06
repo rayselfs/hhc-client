@@ -13,7 +13,7 @@ import type {
 
 export type ReplayableProjectionChannel = Exclude<
   ProjectionChannel,
-  `__system:${string}` | 'file:playback-state' | 'file:end'
+  `__system:${string}` | 'file:playback-state' | 'file:end' | 'camera:signal' | 'camera:ready'
 >
 
 export interface ProjectionRecoveryState {
@@ -206,6 +206,8 @@ function reduceReplayableMessage(
     }
     case 'file:control':
       return reduceFileControl(snapshot, data as ProjectionPayload<'file:control'>)
+    case 'camera:state':
+      return { ...snapshot, camera: data as ProjectionPayload<'camera:state'> }
     case 'timer:sync':
       return snapshot
   }
@@ -388,7 +390,8 @@ export function createProjectionSessionCoordinator(
         channel,
         data as ProjectionPayload<ReplayableProjectionChannel>
       )
-      if (recovery.status === 'ready') send(channel, data)
+      if (recovery.status === 'ready' && (channel !== 'timer:tick' || snapshot.owner === 'timer'))
+        send(channel, data)
       notify()
     },
 

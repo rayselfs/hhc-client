@@ -1,3 +1,4 @@
+import CameraProjection from '@renderer/components/Projection/CameraProjection'
 import { useEffect, useReducer } from 'react'
 import DefaultProjection from '@renderer/components/Projection/DefaultProjection'
 import BibleProjection from '@renderer/components/Projection/BibleProjection'
@@ -62,6 +63,7 @@ export default function ProjectionPage(): React.JSX.Element {
         'timer:stopwatch',
         'bible:chapter',
         'bible:settings',
+        'camera:state',
         'file:show',
         'file:control',
         'settings:timer-ring-color'
@@ -104,6 +106,20 @@ export default function ProjectionPage(): React.JSX.Element {
   }, [state.activeContent, state.isBlackout, state.showDefault])
 
   const visible = selectVisibleProjection(state)
+  if (state.activeContent === 'camera' && state.camera && !state.showDefault) {
+    return (
+      <>
+        <CameraProjection
+          camera={state.camera}
+          generation={state.generation || browserSession.generation}
+          browserSessionId={browserSession.sessionId}
+        />
+        {state.isBlackout && (
+          <div className="fixed inset-0 bg-black" data-testid="projection-blackout" />
+        )}
+      </>
+    )
+  }
   if (visible === 'blackout') {
     return <div className="h-screen w-screen bg-black" data-testid="projection-blackout" />
   }
