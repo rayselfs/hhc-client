@@ -1,3 +1,4 @@
+import { isCameraMessageFrom } from '@shared/camera'
 import { BrowserWindow, ipcMain } from 'electron'
 import { WindowManager } from '../windowManager'
 import { isKnownWindow, isMainWindow, validateProjectionTransportTuple } from './validate'
@@ -52,14 +53,16 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
   ipcMain.on('projection:send', (event, ...args: unknown[]) => {
     if (!isMainWindow(windowManager, event)) return
     if (!validateProjectionTransportTuple(args)) return
-    const [generation] = args
+    const [generation, channel, data] = args
+    if (!isCameraMessageFrom(channel, data, 'main')) return
     if (windowManager.getProjectionState().lifecycle.generation !== generation) return
     windowManager.sendToProjection('projection:message', ...args)
   })
 
   ipcMain.on('projection:send-to-main', (event, ...args: unknown[]) => {
     if (!validateProjectionTransportTuple(args)) return
-    const [generation, channel] = args
+    const [generation, channel, data] = args
+    if (!isCameraMessageFrom(channel, data, 'projection')) return
     if (!windowManager.isCurrentProjectionSender(event.sender, generation)) return
     if (channel === '__system:ready' && !windowManager.markProjectionReady(generation)) return
     windowManager.sendToMain('projection:message', ...args)

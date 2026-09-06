@@ -329,3 +329,21 @@ describe('projection:get-displays', () => {
     expect(result).toEqual([])
   })
 })
+
+it('relays camera offers only from main and answers only from current projection', () => {
+  mockWindowManager.getProjectionState.mockReturnValue({
+    exists: true,
+    lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+  })
+  vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+  const offer = { sessionId: 'camera-1', kind: 'offer', sdp: 'offer' }
+  const answer = { sessionId: 'camera-1', kind: 'answer', sdp: 'answer' }
+  getOnHandler('projection:send')(makeEvent(), 4, 'camera:signal', offer)
+  expect(mockWindowManager.sendToProjection).toHaveBeenCalledOnce()
+  getOnHandler('projection:send')(makeEvent(), 4, 'camera:signal', answer)
+  expect(mockWindowManager.sendToProjection).toHaveBeenCalledOnce()
+  getOnHandler('projection:send-to-main')(makeEvent(), 4, 'camera:signal', answer)
+  expect(mockWindowManager.sendToMain).toHaveBeenCalledOnce()
+  getOnHandler('projection:send-to-main')(makeEvent(), 4, 'camera:signal', offer)
+  expect(mockWindowManager.sendToMain).toHaveBeenCalledOnce()
+})

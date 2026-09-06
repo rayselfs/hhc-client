@@ -428,3 +428,29 @@ describe('createProjectionAdapter factory', () => {
     expect(mockProjectionApi.send).not.toHaveBeenCalled()
   })
 })
+
+it('rejects malformed and wrong-direction camera signaling in browser transport', () => {
+  vi.mocked(isElectron).mockReturnValue(false)
+  const adapter = createProjectionAdapter('main', 'browser-session')
+  adapter.setGeneration(1)
+  const receive = vi.fn()
+  adapter.on('camera:signal', receive)
+  const listener = mockAddEventListener.mock.calls.find(([name]) => name === 'message')![1]
+  const send = (data: unknown): void =>
+    listener({
+      data: {
+        generation: 1,
+        sessionId: 'browser-session',
+        senderRole: 'projection',
+        sender: 'other',
+        channel: 'camera:signal',
+        data
+      }
+    })
+  send({ sessionId: 'camera', kind: 'answer', sdp: 'valid' })
+  expect(receive).toHaveBeenCalledOnce()
+  send({ sessionId: 'camera', kind: 'offer', sdp: 'wrong direction' })
+  send({ sessionId: 'camera', kind: 'answer', sdp: 'x'.repeat(65537) })
+  expect(receive).toHaveBeenCalledOnce()
+  adapter.dispose()
+})

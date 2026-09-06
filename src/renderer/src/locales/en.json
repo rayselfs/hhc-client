@@ -1241,5 +1241,36 @@
     "videoPreparing": "Preparing video...",
     "videoLoadFailed": "Failed to load video",
     "pdfLoadFailed": "Failed to load PDF"
+  },
+  "camera": {
+    "title": "Camera projection",
+    "back": "Back to media",
+    "source": "Video source",
+    "choose": "Select a source",
+    "enable": "Enable camera",
+    "reset": "Reset position",
+    "start": "Start projection",
+    "stop": "Stop projection",
+    "retry": "Retry",
+    "canvas": "Camera canvas",
+    "empty": "Choose a camera to preview",
+    "hint": "Drag to move. Resize with corner handles or width. Arrow keys move; Shift moves faster.",
+    "x": "X",
+    "y": "Y",
+    "width": "Width",
+    "idle": "Preview",
+    "connecting": "Connecting",
+    "live": "Live",
+    "unavailable": "No signal",
+    "errors": {
+      "unavailable": "Camera unavailable. Check the device and use a secure page.",
+      "NotAllowedError": "Camera access denied. Allow access in system settings and retry.",
+      "NotFoundError": "No camera found. Connect a device and retry.",
+      "NotReadableError": "Camera unavailable or in use by another app.",
+      "OverconstrainedError": "Selected camera unavailable. Select a source again.",
+      "ended": "Camera disconnected. Reconnect and retry.",
+      "connection": "Projection connection failed. Retry to reconnect.",
+      "playback": "Video playback failed. Select the source again."
+    }
   }
 }

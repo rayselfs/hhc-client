@@ -5,6 +5,7 @@ import RouteError from '@renderer/components/RouteError'
 import { isOnboarded } from '@renderer/lib/onboarding'
 import WelcomePage from '@renderer/pages/WelcomePage'
 
+const CameraWorkspacePage = lazy(() => import('@renderer/pages/CameraWorkspacePage'))
 const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
 const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
 const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
@@ -44,6 +45,15 @@ const routes = [
         element: (
           <Suspense fallback={null}>
             <BiblePage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'camera',
+        element: (
+          <Suspense fallback={null}>
+            <CameraWorkspacePage />
           </Suspense>
         ),
         ErrorBoundary: RouteError

@@ -139,3 +139,27 @@ it('applies incremental messages after replay', () => {
   expect(next.generation).toBe(3)
   expect(next.activeContent).toBe('timer')
 })
+
+it('replays camera framing and never lets a late camera state take another owner', () => {
+  const camera = {
+    sessionId: 'camera-1',
+    status: 'live' as const,
+    transform: { x: 0, y: -180, width: 1920, height: 1440 }
+  }
+  const next = reduceProjectionRenderState(initialProjectionRenderState, {
+    type: 'replay',
+    payload: { generation: 1, snapshot: { ...snapshot('camera'), camera } }
+  })
+  expect(selectVisibleProjection(next)).toBe('camera')
+  const other = reduceProjectionRenderState(next, {
+    type: 'message',
+    channel: '__system:active-owner',
+    data: { owner: 'timer' }
+  })
+  const late = reduceProjectionRenderState(other, {
+    type: 'message',
+    channel: 'camera:state',
+    data: camera
+  })
+  expect(late.activeContent).toBe('timer')
+})

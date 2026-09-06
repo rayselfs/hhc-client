@@ -1,3 +1,4 @@
+import type { CameraSignal, CameraState } from './camera'
 /**
  * Typed projection message contract.
  *
@@ -137,6 +138,9 @@ type EditableProjectionAsset = {
 }
 
 export interface AppMessages {
+  'camera:signal': CameraSignal
+  'camera:ready': { sessionId: string }
+  'camera:state': CameraState
   /** High-frequency timer tick data for projection display */
   'timer:tick': TimerTickPayload
   /** Full timer state sync (after settings changes, on reconnect) */
@@ -217,7 +221,7 @@ export type FileControlPayload =
   | { action: 'zoom'; value: number }
   | { action: 'pan'; value: { x: number; y: number } }
 
-export type ProjectionOwner = 'timer' | 'bible' | 'media'
+export type ProjectionOwner = 'timer' | 'bible' | 'media' | 'camera'
 
 export type ProjectionLifecycleStatus = 'closed' | 'opening' | 'ready' | 'recovering' | 'failed'
 
@@ -270,6 +274,7 @@ export interface ProjectionPendingFileControls {
 }
 
 export interface ProjectionSessionSnapshot {
+  camera?: CameraState | null
   owner: ProjectionOwner
   showDefault: boolean
   isBlackout: boolean
@@ -339,7 +344,7 @@ export type ProjectionTransportTuple = {
 
 export type ProjectionContentChannel = Exclude<
   ProjectionChannel,
-  `__system:${string}` | 'file:playback-state'
+  `__system:${string}` | 'file:playback-state' | 'camera:signal' | 'camera:ready'
 >
 
 export type ProjectionContentMessageTuple = {
