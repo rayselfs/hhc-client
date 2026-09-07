@@ -9,6 +9,7 @@ import {
 } from '../personal-sync-db'
 import { advancePersonalOutbox, startPersonalSync } from '../personal-sync-runtime'
 import { releasePersonalSyncLease } from '../personal-sync-db'
+import { pullPersonalChanges } from '../personal-sync-pull'
 import { usePersonalSyncStore } from '../../stores/personal-sync'
 import {
   preservePersonalContentConflict,
@@ -88,6 +89,31 @@ it('replays the exact submitted body after a lost mutation response, without a n
   expect(api.createUpload).toHaveBeenCalledTimes(1)
   expect(api.getUpload).not.toHaveBeenCalled()
   expect(await listPersonalOutbox('alice')).toEqual([])
+})
+
+it('reuses the acknowledged local content instead of downloading its own upload again', async () => {
+  await run()
+  api.getChanges.mockResolvedValue({
+    collection: { id: 'space', revision: 1 },
+    items: [
+      {
+        id: 'remote',
+        collectionId: 'space',
+        kind: 'file',
+        name: 'image.png',
+        assetId: 'new-asset',
+        revision: 1
+      }
+    ],
+    nextCursor: 'cursor',
+    hasMore: false,
+    reset: true
+  })
+  await pullPersonalChanges('alice', 'worker', api, new AbortController().signal)
+  expect(api.downloadSnapshot).not.toHaveBeenCalled()
+  expect(await (await openFileExplorerDB()).get('folder-items', 'file')).toMatchObject({
+    url: 'blob:snapshot'
+  })
 })
 
 it('waits for scanning and preserves immutable bytes on a rate limit', async () => {

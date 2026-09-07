@@ -3,7 +3,9 @@ import { persist } from 'zustand/middleware'
 import { createPersistName, hhcPersistStorage } from '@renderer/lib/persist-storage'
 
 type PersonalAccountStatus = 'loading' | 'anonymous' | 'authenticated' | 'unavailable'
+export type PersonalItemStatus = 'pending' | 'synced' | 'conflict' | 'failed'
 interface PersonalSyncState {
+  itemStatuses: Record<string, PersonalItemStatus>
   lastOwnerId: string | null
   activeOwnerId: string | null
   accountStatus: PersonalAccountStatus
@@ -15,6 +17,7 @@ interface PersonalSyncState {
 export const usePersonalSyncStore = create<PersonalSyncState>()(
   persist(
     (set) => ({
+      itemStatuses: {},
       lastOwnerId: null,
       activeOwnerId: null,
       accountStatus: 'loading',
@@ -36,7 +39,8 @@ export const usePersonalSyncStore = create<PersonalSyncState>()(
                 ? null
                 : state.lastOwnerId,
           syncStatus: 'idle',
-          errorCode: null
+          errorCode: null,
+          itemStatuses: {}
         }))
     }),
     {

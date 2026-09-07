@@ -364,11 +364,18 @@ export function useCurrentFolderDisplay(): FolderDisplayPreference & {
 export async function refreshPersonalCatalog(ownerId: string): Promise<void> {
   const generation = ++personalCatalogGeneration
   const db = await openFileExplorerDB()
-  const tx = db.transaction(['folder-records', 'folder-items'])
+  const tx = db.transaction([
+    'folder-records',
+    'folder-items',
+    'personal-sync-nodes',
+    'personal-sync-outbox'
+  ])
   // ponytail: full catalog scan; add an owner index if measured library sizes make this slow.
-  const [allFolders, allItems] = await Promise.all([
+  const [allFolders, allItems, nodes, outbox] = await Promise.all([
     tx.objectStore('folder-records').getAll(),
-    tx.objectStore('folder-items').getAll()
+    tx.objectStore('folder-items').getAll(),
+    tx.objectStore('personal-sync-nodes').index('by-owner').getAll(ownerId),
+    tx.objectStore('personal-sync-outbox').index('by-owner').getAll(ownerId)
   ])
   await tx.done
   if (
@@ -376,6 +383,28 @@ export async function refreshPersonalCatalog(ownerId: string): Promise<void> {
     usePersonalSyncStore.getState().activeOwnerId !== ownerId
   )
     return
+  const failures = new Map(
+    outbox
+      .filter((operation) => operation.failure)
+      .map((operation) => [operation.nodeId, operation.failure])
+  )
+  usePersonalSyncStore.setState({
+    itemStatuses: Object.fromEntries(
+      nodes.map((node) => {
+        const failure = failures.get(node.id)
+        return [
+          node.id,
+          failure === 'conflict'
+            ? 'conflict'
+            : failure
+              ? 'failed'
+              : node.localRevision === node.syncedLocalRevision
+                ? 'synced'
+                : 'pending'
+        ]
+      })
+    )
+  })
   useFileExplorerStore.setState((state) => {
     const folders = Object.fromEntries([
       ...Object.entries(state.folders).filter(([, folder]) => !folder.personalOwnerId),
@@ -533,6 +562,12 @@ function personalWrite(
 }
 useFileExplorerStore.setState({
   purgeTrash: purgeExpiredTrashFromStore,
+  toggleFavorite: (id) => {
+    if (!isPersonalNode(id)) return localFileActions.toggleFavorite(id)
+    void import('@renderer/lib/personal-file-actions')
+      .then((actions) => actions.togglePersonalFolderFavorite(id))
+      .catch(reportPersonalWriteError)
+  },
   updateFolder: (id, updates) => {
     if (!isPersonalNode(id)) return localFileActions.updateFolder(id, updates)
     if (updates.name !== undefined) personalWrite(id, { type: 'rename', name: updates.name })

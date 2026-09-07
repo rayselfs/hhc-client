@@ -1276,7 +1276,7 @@
   },
   "personalCloud": {
     "title": "Cloud folder",
-    "idle": "Saved locally",
+    "idle": "Preparing cloud folder",
     "pending": "Saved locally, pending sync",
     "syncing": "Syncing",
     "synced": "Synced",
@@ -1292,6 +1292,7 @@
     "changed": "Content changed. Review the conflict again.",
     "backupConfirm": "Copy all {{count}} affected items to local media, then replace their local changes with the cloud versions.",
     "discardConfirm": "Discard local changes to {{count}} affected items and download the cloud versions. This does not modify the cloud.",
-    "copyCreated": "Version conflict: local content preserved in a conflict copy"
+    "copyCreated": "Version conflict: local content preserved in a conflict copy",
+    "missingFonts": "Fonts may be missing on this device: {{fonts}}. Fallback fonts are displayed; the original font settings are retained."
   }
 }

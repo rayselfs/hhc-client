@@ -380,7 +380,7 @@ async function installResizeFixture(page: Page): Promise<void> {
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error)
       })
-    const open = indexedDB.open('hhc-file-explorer', 5)
+    const open = indexedDB.open('hhc-file-explorer')
     const db = await requestResult(open)
     const read = db.transaction(['folder-items', 'file-blobs'], 'readonly')
     const items = (await requestResult(read.objectStore('folder-items').getAll())) as Array<{

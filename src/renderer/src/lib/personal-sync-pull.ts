@@ -49,7 +49,12 @@ export async function pullPersonalChanges(
       continue
     const item = node ? await db.get('folder-items', node.id) : undefined
     const blob = item?.type === 'file' ? await db.get('file-blobs', getBlobId(item)) : undefined
-    if (!blob || node?.remoteAssetId !== remote.assetId || !(await isFileBlobRecordAvailable(blob)))
+    // An acknowledged revision already has the exact local bytes, even before its asset ID is pulled.
+    if (
+      !blob ||
+      (node?.remoteAssetId !== remote.assetId && node?.remoteRevision !== remote.revision) ||
+      !(await isFileBlobRecordAvailable(blob))
+    )
       pending.push(remote)
   }
   const stage = async (index: number): Promise<void> => {

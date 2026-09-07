@@ -3,7 +3,8 @@ import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explore
 import {
   createPersonalFolder,
   ensurePersonalLocalSpace,
-  mutatePersonalNode
+  mutatePersonalNode,
+  togglePersonalFolderFavorite
 } from '../personal-file-actions'
 import { usePersonalSyncStore } from '../../stores/personal-sync'
 import { createExplorerFolder, useFileExplorerStore } from '../../stores/file-explorer'
@@ -18,6 +19,17 @@ beforeEach(async () => {
     { id: 'space', revision: 100 },
     new AbortController().signal
   )
+})
+
+it('keeps local favorites separate from queued cloud metadata', async () => {
+  const folder = await createPersonalFolder('Original', 'personal:space')
+  await mutatePersonalNode(folder, { type: 'rename', name: 'Updated' })
+  await togglePersonalFolderFavorite(folder)
+  expect(await (await openFileExplorerDB()).get('folder-records', folder)).toMatchObject({
+    name: 'Updated',
+    isFavorited: true
+  })
+  expect(await listPersonalOutbox('alice')).toHaveLength(2)
 })
 
 it('creates nested folders durably and maps a local parent to its remote ID', async () => {

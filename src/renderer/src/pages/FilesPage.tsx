@@ -47,7 +47,7 @@ import {
   resolveUniqueName,
   validateDisplayName
 } from '@renderer/lib/file-naming'
-import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
+import { isFolderReadOnlyBySyncLink, isPersonalRootFolder } from '@renderer/lib/sync-readonly'
 import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
 import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
@@ -234,6 +234,7 @@ export default function FilesPage(): React.JSX.Element {
     const state = useFileExplorerStore.getState()
     for (const id of ids) {
       const folder = state.folders[id]
+      if (folder && isPersonalRootFolder(folder)) return true
       if (folder && isFolderReadOnlyBySyncLink(folder.id, state.folders)) return true
       const item = state.items[id]
       if (item && isFolderReadOnlyBySyncLink(item.parentId, state.folders)) return true
@@ -652,6 +653,7 @@ export default function FilesPage(): React.JSX.Element {
     const state = useFileExplorerStore.getState()
     const target = state.folders[id]
     if (!target) return
+    if (isPersonalRootFolder(target)) return
     if (isFolderReadOnlyBySyncLink(target.id, state.folders)) return
     setEditingId(id)
     setEditModalName(target.name)
@@ -755,10 +757,9 @@ export default function FilesPage(): React.JSX.Element {
         return
       }
 
-      const isReadOnly = isFolderReadOnlyBySyncLink(
-        folder.id,
-        useFileExplorerStore.getState().folders
-      )
+      const isReadOnly =
+        isPersonalRootFolder(folder) ||
+        isFolderReadOnlyBySyncLink(folder.id, useFileExplorerStore.getState().folders)
       showFolderMenu({
         folder,
         isAlreadySelected,

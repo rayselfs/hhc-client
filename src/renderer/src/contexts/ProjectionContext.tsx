@@ -8,6 +8,8 @@ import {
   type ReplayableProjectionChannel
 } from '@renderer/lib/projection-session-coordinator'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { isPersonalRecordVisible } from '@renderer/stores/personal-sync'
 import type { ProjectionVlcFailure } from '@shared/ipc-channels'
 import type {
   ProjectionChannel,
@@ -376,6 +378,19 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     adapter.setGeneration(0)
     updateOpen(false)
   }, [browserSessionId, getCoordinator, stopPolling, updateOpen])
+
+  useEffect(
+    () =>
+      useFileExplorerStore.subscribe((_state, previous) => {
+        const itemId = getCoordinator().getSnapshot()?.media.show?.itemId
+        const item = itemId ? previous.items[itemId] : undefined
+        if (item && !isPersonalRecordVisible(item)) {
+          getCoordinator().endSession()
+          void closeProjection().catch(() => undefined)
+        }
+      }),
+    [closeProjection, getCoordinator]
+  )
 
   const claimProjection = useCallback(
     (owner: ProjectionOwner, options?: { unblank?: boolean }): void => {

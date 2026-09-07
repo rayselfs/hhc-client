@@ -15,6 +15,7 @@ import type {
 } from '@renderer/lib/presentation-editor-session'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 
 const mocks = vi.hoisted(() => ({
   loadEditablePresentationSnapshot: vi.fn(),
@@ -123,6 +124,7 @@ function RegistryProbe({
 
 describe('PresentationSessionRegistryContext', () => {
   beforeEach(() => {
+    usePersonalSyncStore.getState().setAccount('anonymous')
     mocks.loadEditablePresentationSnapshot.mockReset()
     mocks.createPresentationEditorSession.mockReset()
     usePresentationWorkspaceStore.setState({
@@ -130,6 +132,27 @@ describe('PresentationSessionRegistryContext', () => {
       activeItemId: null,
       activeSlideIdByItemId: {}
     })
+  })
+
+  it('hides departing personal tabs, flushes their session and rejects reopening from another account', async () => {
+    usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+    const item = { ...makeEditableItem('private-deck'), personalOwnerId: 'alice' }
+    const document = makeDocument('Private', item.id)
+    const session = createFakeSession(document)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 1 })
+    mocks.createPresentationEditorSession.mockReturnValue(session)
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <RegistryProbe onRegistry={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await registry!.open(item)
+    usePresentationWorkspaceStore.getState().openDocument(item)
+    act(() => usePersonalSyncStore.getState().setAccount('authenticated', 'bob'))
+    expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
+    await vi.waitFor(() => expect(session.dispose).toHaveBeenCalled())
+    await expect(registry!.open(item)).rejects.toThrow('Personal account changed')
   })
 
   it('returns one session when the same item is opened twice', async () => {

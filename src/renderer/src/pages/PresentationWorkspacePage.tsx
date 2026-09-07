@@ -109,6 +109,7 @@ import {
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import {
   getDocumentFontFamilies,
+  findUnavailablePresentationFonts,
   mergeFontFamilies,
   queryLocalFontFamiliesOnce,
   supportsLocalFontAccess
@@ -1373,6 +1374,20 @@ function EditableSessionDocumentView({
 
   const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
   const documentFonts = useMemo(() => getDocumentFontFamilies(document), [document])
+  const [unavailableFonts, setUnavailableFonts] = useState<string[]>([])
+  const fontKey = documentFonts.join('\0')
+  useEffect(() => {
+    if (!deck.personalOwnerId) return
+    let active = true
+    void findUnavailablePresentationFonts(fontKey ? fontKey.split('\0') : [])
+      .then((fonts) => {
+        if (active) setUnavailableFonts(fonts)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [deck.personalOwnerId, fontKey])
   const fontFamilies = useMemo(
     () => mergeFontFamilies(recentFonts, documentFonts, FONT_FAMILIES, localFontFamilies),
     [recentFonts, documentFonts, localFontFamilies]
@@ -2222,6 +2237,11 @@ function EditableSessionDocumentView({
         >
           {renderRibbon()}
         </div>
+        {unavailableFonts.length ? (
+          <p role="status" className="shrink-0 px-3 py-1 text-xs text-warning">
+            {t('personalCloud.missingFonts', { fonts: unavailableFonts.join(', ') })}
+          </p>
+        ) : null}
         <ResponsivePanelGroup
           navigatorWidth={railWidth}
           navigatorLabel={t('presentationWorkspace.slides', 'Slides')}

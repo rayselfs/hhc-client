@@ -6,6 +6,7 @@ import {
   resetMediaResourceLocksForTests
 } from '@renderer/lib/media-resource-locks'
 import type { FileItemRecord } from '@shared/types/folder'
+import { usePersonalSyncStore } from '../personal-sync'
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
   openFileExplorerDB: vi.fn(async () => ({}) as IDBDatabase),
@@ -48,6 +49,16 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 }
 
 const files = [makeFile('a', 'a.png'), makeFile('b', 'b.png'), makeFile('c', 'c.png')]
+
+it('clears a departing personal playlist and rejects its stale item reference', () => {
+  usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+  const privateFile = { ...makeFile('private', 'private.png'), personalOwnerId: 'alice' }
+  useMediaProjectionStore.getState().startPresentation([privateFile], 0)
+  expect(useMediaProjectionStore.getState().playlist).toHaveLength(1)
+  usePersonalSyncStore.getState().setAccount('anonymous')
+  expect(useMediaProjectionStore.getState().playlist).toEqual([])
+  expect(useMediaProjectionStore.getState().startPresentation([privateFile], 0)).toBe(false)
+})
 const pptxFile = makeFile(
   'deck',
   'deck.pptx',

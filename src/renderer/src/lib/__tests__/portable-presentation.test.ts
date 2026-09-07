@@ -4,6 +4,7 @@ import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explore
 import {
   clearEditablePresentationCache,
   createBlankEditablePresentationDocument,
+  createTextElement,
   loadEditablePresentation
 } from '../editable-presentation'
 
@@ -77,6 +78,21 @@ it('round-trips embedded images, themes and notes with a new local document iden
     themes: document.themes,
     slides: { [document.slideOrder[0]]: { notes: 'Speaker notes' } }
   })
+})
+
+it.each([
+  { fontSize: -1 },
+  { fontFamily: 'Arial; background:url(https://example.org)' },
+  { color: 'url(https://example.org)' },
+  { lineHeight: 0 }
+])('rejects invalid portable text styles and retains the original bytes: %j', async (change) => {
+  const document = createBlankEditablePresentationDocument('Styles')
+  const slide = document.slides[document.slideOrder[0]]
+  const element = { ...createTextElement({ text: 'Portable text' }), ...change }
+  slide.elements[element.id] = element
+  slide.elementOrder.push(element.id)
+  await expect(load(document)).rejects.toThrow()
+  expect(await (await openFileExplorerDB()).get('file-blobs', 'portable-source')).toBeDefined()
 })
 
 it('opens a native downloaded deck without an IndexedDB blob or the original PPTX', async () => {

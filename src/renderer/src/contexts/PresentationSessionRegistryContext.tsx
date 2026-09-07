@@ -4,6 +4,7 @@ import type { EditablePresentationDocument } from '@renderer/lib/editable-presen
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
+import { isPersonalRecordVisible, usePersonalSyncStore } from '@renderer/stores/personal-sync'
 
 export type CloseDecision = 'keep-editing' | 'retry' | 'discard'
 
@@ -77,6 +78,7 @@ export function PresentationSessionRegistryProvider({
     }
 
     const open = async (item: FileItemRecord): Promise<PresentationEditorSession> => {
+      if (!isPersonalRecordVisible(item)) throw new Error('Personal account changed')
       const existing = sessionsRef.current.get(item.id)
       if (existing) return existing
       const opening = openingRef.current.get(item.id)
@@ -93,6 +95,7 @@ export function PresentationSessionRegistryProvider({
           import('@renderer/lib/presentation-editor-session')
         ])
         const { document, revision } = await loadEditablePresentationSnapshot(item)
+        if (!isPersonalRecordVisible(item)) throw new Error('Personal account changed')
         const session = createPresentationEditorSession({
           initialDocument: document,
           initialRevision: revision,
@@ -247,6 +250,25 @@ export function PresentationSessionRegistryProvider({
       }
     }
   }, [])
+
+  useEffect(
+    () =>
+      usePersonalSyncStore.subscribe((state, previous) => {
+        if (state.activeOwnerId === previous.activeOwnerId) return
+        for (const document of usePresentationWorkspaceStore.getState().documents) {
+          if (isPersonalRecordVisible(document)) continue
+          // Finalize before unmounting the editor; failed saves stay in the hidden session for recovery.
+          const saving = registry.finalizeAndFlush(document.itemId)
+          usePresentationWorkspaceStore.getState().closeDocument(document.itemId)
+          void saving
+            .then(async () => {
+              if (!isPersonalRecordVisible(document)) await registry.close(document.itemId)
+            })
+            .catch(() => undefined)
+        }
+      }),
+    [registry]
+  )
 
   useEffect(
     () => () => {

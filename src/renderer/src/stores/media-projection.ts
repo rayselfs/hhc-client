@@ -18,6 +18,7 @@ import {
   type PresentationSnapshot
 } from '@renderer/lib/presentation-readiness'
 import { ensureSyncItemAvailableForPresentation } from '@renderer/lib/cloud-provider'
+import { isPersonalRecordVisible, usePersonalSyncStore } from './personal-sync'
 
 interface StartPresentationWithReadinessOptions {
   prioritizeStartItem?: boolean
@@ -269,6 +270,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   startPresentation: (files: FileItemRecord[], startIndex: number) => {
+    if (files.some((item) => !isPersonalRecordVisible(item))) return false
     const generation = beginProjectionAction()
     return commitAfterPreflight(generation, prepareEditableProjection(files[startIndex]), () => {
       releaseProjectionLocks?.()
@@ -293,6 +295,8 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   ): Promise<PresentationReadinessReport> => {
     const generation = beginProjectionAction()
     const requestedItem = files[startIndex]
+    if (files.some((item) => !isPersonalRecordVisible(item)))
+      return blockedReadinessReport(requestedItem, 'presentation-projection-superseded')
     let report = await analyzePresentationReadiness(files)
     if (!isCurrentProjectionAction(generation)) {
       return blockedReadinessReport(requestedItem, 'presentation-projection-superseded')
@@ -563,3 +567,10 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
     })
   }
 }))
+
+usePersonalSyncStore.subscribe((state, previous) => {
+  if (state.activeOwnerId === previous.activeOwnerId) return
+  beginProjectionAction()
+  if (useMediaProjectionStore.getState().playlist.some((item) => !isPersonalRecordVisible(item)))
+    useMediaProjectionStore.getState().exit()
+})

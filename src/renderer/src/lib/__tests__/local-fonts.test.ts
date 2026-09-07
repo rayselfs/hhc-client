@@ -5,6 +5,7 @@ import {
 } from '../editable-presentation'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  findUnavailablePresentationFonts,
   getDocumentFontFamilies,
   mergeFontFamilies,
   queryLocalFontFamilies,
@@ -81,4 +82,27 @@ describe('local fonts', () => {
       mergeFontFamilies(['Inter Variable', 'Arial'], ['Aptos'], ['Arial', 'PingFang TC'])
     ).toEqual(['Inter Variable', 'Arial', 'Aptos', 'PingFang TC'])
   })
+})
+
+it('reports only font families that match both fallback measurements', async () => {
+  const context = {
+    font: '',
+    measureText: () => ({
+      width: context.font.includes('Installed Family')
+        ? 300
+        : context.font.endsWith('monospace')
+          ? 100
+          : 200
+    })
+  }
+  const spy = vi
+    .spyOn(HTMLCanvasElement.prototype, 'getContext')
+    .mockImplementation(() => context as unknown as CanvasRenderingContext2D)
+  try {
+    await expect(
+      findUnavailablePresentationFonts(['Installed Family', 'Missing Family'])
+    ).resolves.toEqual(['Missing Family'])
+  } finally {
+    spy.mockRestore()
+  }
 })

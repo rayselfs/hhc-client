@@ -4,6 +4,7 @@ import { openFileExplorerDB } from './file-explorer-db'
 import { commitPersonalFileMutation, commitPersonalLocalMutation } from './personal-sync-db'
 import { resolveUniqueName } from './file-naming'
 import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
+import i18n from '@renderer/i18n'
 import {
   FILE_EXPLORER_ROOT_ID,
   publishPersistedFileItem,
@@ -41,7 +42,7 @@ export async function ensurePersonalLocalSpace(
       await tx.objectStore('folder-records').add({
         id: rootId,
         personalOwnerId: ownerId,
-        name: 'Cloud folder',
+        name: i18n.t('personalCloud.title'),
         parentId: FILE_EXPLORER_ROOT_ID,
         sortIndex: -1,
         createdAt: Date.now(),
@@ -243,6 +244,28 @@ export async function setPersonalFileNotes(id: string, notes: string | undefined
     await tx.objectStore('folder-items').put(updated)
     await tx.done
     if (usePersonalSyncStore.getState().activeOwnerId === ownerId) publishPersistedFileItem(updated)
+  } catch (error) {
+    try {
+      tx.abort()
+    } catch {
+      /* Already completed. */
+    }
+    await tx.done.catch(() => undefined)
+    throw error
+  }
+}
+
+export async function togglePersonalFolderFavorite(id: string): Promise<void> {
+  const ownerId = activeOwner()
+  const db = await openFileExplorerDB()
+  const tx = db.transaction('folder-records', 'readwrite')
+  try {
+    const folder = await tx.store.get(id)
+    if (!folder || folder.personalOwnerId !== ownerId || folder.deletedAt)
+      throw new Error('Personal folder is unavailable')
+    await tx.store.put({ ...folder, isFavorited: !folder.isFavorited })
+    await tx.done
+    await refreshPersonalCatalog(ownerId)
   } catch (error) {
     try {
       tx.abort()

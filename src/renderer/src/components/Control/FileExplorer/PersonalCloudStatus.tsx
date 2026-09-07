@@ -24,17 +24,15 @@ import { requestPersonalSync } from '@renderer/lib/personal-sync-runtime'
 
 export function PersonalCloudStatus(): React.JSX.Element | null {
   const ownerId = usePersonalSyncStore((state) => state.activeOwnerId)
-  const hasRoot = useFileExplorerStore((state) =>
-    state._foldersArray.some(
-      (folder) => folder.personalOwnerId === ownerId && folder.parentId === FILE_EXPLORER_ROOT_ID
-    )
-  )
-  return ownerId && hasRoot ? <PersonalCloudAccountStatus key={ownerId} ownerId={ownerId} /> : null
+  return ownerId ? <PersonalCloudAccountStatus key={ownerId} ownerId={ownerId} /> : null
 }
 
 function PersonalCloudAccountStatus({ ownerId }: { ownerId: string }): React.JSX.Element {
   const { t } = useTranslation()
   const status = usePersonalSyncStore((state) => state.syncStatus)
+  const hasBlockedItems = usePersonalSyncStore((state) =>
+    Object.values(state.itemStatuses).some((value) => value === 'conflict' || value === 'failed')
+  )
   const accountStatus = usePersonalSyncStore((state) => state.accountStatus)
   const confirm = useConfirm()
   const sessions = usePresentationSessionRegistry()
@@ -116,7 +114,7 @@ function PersonalCloudAccountStatus({ ownerId }: { ownerId: string }): React.JSX
       <span role="status" className="mr-auto text-sm">
         {t('personalCloud.title')} · {t(`personalCloud.${displayedStatus}`)}
       </span>
-      {status === 'conflict' || status === 'failed' ? (
+      {status === 'conflict' || hasBlockedItems ? (
         <>
           <Button
             size="sm"
