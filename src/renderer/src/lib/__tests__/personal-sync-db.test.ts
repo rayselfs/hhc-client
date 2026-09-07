@@ -3,6 +3,7 @@ import { Blob as NodeBlob } from 'node:buffer'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
+  acknowledgePersonalOperation,
   commitPersonalLocalMutation,
   listPersonalOutbox,
   type PersonalLocalMutationWrite
@@ -200,4 +201,72 @@ it('recovers durable operations after the database connection and modules restar
   } finally {
     ;(await restartedStorage.openFileExplorerDB()).close()
   }
+})
+
+it('acknowledges only the committed revision and binds its dependent operation', async () => {
+  await commitPersonalLocalMutation(createWrite())
+  await commitPersonalLocalMutation({
+    ...createWrite(),
+    operationId: 'operation-2',
+    localRevision: 2,
+    mutation: { type: 'replace-content' },
+    catalog: { ...item, url: 'blob:snapshot-2' },
+    snapshot: { id: 'snapshot-2', blob: new Blob(['two']), size: 3 }
+  })
+  await acknowledgePersonalOperation('alice', 'operation-1', {
+    itemId: 'remote-file',
+    nodeRevision: 4,
+    collectionRevision: 4
+  })
+  const db = await openFileExplorerDB()
+  expect(await db.get('personal-sync-nodes', item.id)).toMatchObject({
+    localRevision: 2,
+    syncedLocalRevision: 1
+  })
+  expect(await listPersonalOutbox('alice')).toMatchObject([
+    { id: 'operation-2', expectedRevision: 4, dependsOn: undefined }
+  ])
+})
+
+it('keeps a rename revision dirty until both content and rename are acknowledged', async () => {
+  await commitPersonalLocalMutation(createWrite())
+  await acknowledgePersonalOperation('alice', 'operation-1', {
+    itemId: 'remote-file',
+    nodeRevision: 1,
+    collectionRevision: 1
+  })
+  await commitPersonalLocalMutation({
+    ...createWrite(),
+    operationId: 'operation-2',
+    localRevision: 2,
+    mutation: { type: 'replace-content' },
+    catalog: { ...item, name: 'Renamed.png', url: 'blob:snapshot-2' },
+    snapshot: { id: 'snapshot-2', blob: new Blob(['two']), size: 3 }
+  })
+  await acknowledgePersonalOperation('alice', 'operation-2', {
+    itemId: 'remote-file',
+    nodeRevision: 2,
+    collectionRevision: 2
+  })
+  const db = await openFileExplorerDB()
+  expect(await db.get('personal-sync-nodes', item.id)).toMatchObject({ syncedLocalRevision: 1 })
+  await acknowledgePersonalOperation('alice', 'operation-2:rename', {
+    itemId: 'remote-file',
+    nodeRevision: 3,
+    collectionRevision: 3
+  })
+  expect(await db.get('personal-sync-nodes', item.id)).toMatchObject({ syncedLocalRevision: 2 })
+})
+
+it('preserves pending data when an ACK belongs to another owner or an aborted session', async () => {
+  await commitPersonalLocalMutation(createWrite())
+  const result = { itemId: 'remote-file', nodeRevision: 1, collectionRevision: 1 }
+  await expect(acknowledgePersonalOperation('bob', 'operation-1', result)).rejects.toThrow('owner')
+  await expect(
+    acknowledgePersonalOperation('alice', 'operation-1', result, AbortSignal.abort())
+  ).rejects.toThrow()
+  expect(await listPersonalOutbox('alice')).toHaveLength(1)
+  expect(await (await openFileExplorerDB()).get('personal-sync-nodes', item.id)).toMatchObject({
+    syncedLocalRevision: 0
+  })
 })

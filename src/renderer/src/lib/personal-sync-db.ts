@@ -3,6 +3,7 @@ import { openFileExplorerDB, type FileBlobRecord } from './file-explorer-db'
 import { getBlobId } from './blob-identity'
 import { isElectron } from './env'
 import { createResourceCleanupRecord } from './resource-cleanup-journal'
+import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 
 export type PersonalLocalMutation =
   | { type: 'create-folder' | 'create-file'; name: string; parentId: string }
@@ -60,6 +61,7 @@ export interface PersonalLocalMutationWrite {
   mutation: PersonalLocalMutation
   snapshot?: FileBlobRecord
   stagingCleanupId?: string
+  contentRevision?: number
 }
 
 export async function commitPersonalFileMutation(
@@ -74,7 +76,13 @@ export async function commitPersonalFileMutation(
   if (!isElectron()) {
     await commitPersonalLocalMutation({
       ...write,
-      snapshot: { id, blob: file, storage: 'indexed-db', size: file.size }
+      snapshot: {
+        id,
+        blob: file,
+        storage: 'indexed-db',
+        size: file.size,
+        revision: write.contentRevision
+      }
     })
     return
   }
@@ -101,7 +109,7 @@ export async function commitPersonalFileMutation(
     await commitPersonalLocalMutation({
       ...write,
       stagingCleanupId: cleanup.id,
-      snapshot: { id, storage: 'native-fs', size: imported.size }
+      snapshot: { id, storage: 'native-fs', size: imported.size, revision: write.contentRevision }
     })
   })
 }
@@ -197,6 +205,12 @@ export async function commitPersonalLocalMutation(
     } else {
       await tx.objectStore('folder-records').put({ ...write.catalog, expiresAt: null })
     }
+    const renameAfterContent =
+      write.mutation.type === 'replace-content' &&
+      existingCatalog &&
+      'name' in existingCatalog &&
+      existingCatalog.name !== write.catalog.name
+    const lastOperationId = renameAfterContent ? `${write.operationId}:rename` : write.operationId
     await nodes.put({
       id: write.nodeId,
       ownerId: write.ownerId,
@@ -205,7 +219,7 @@ export async function commitPersonalLocalMutation(
       localRevision: write.localRevision,
       syncedLocalRevision: node?.syncedLocalRevision ?? 0,
       remoteRevision: node?.remoteRevision ?? 0,
-      lastOperationId: write.operationId
+      lastOperationId
     })
     await tx.objectStore('personal-sync-outbox').add({
       id: write.operationId,
@@ -221,14 +235,33 @@ export async function commitPersonalLocalMutation(
       snapshotBlobId: write.snapshot?.id,
       ...('type' in write.catalog && write.snapshot
         ? {
-            fileName: write.catalog.name,
+            fileName:
+              write.catalog.mimeType === EDITABLE_PRESENTATION_MIME_TYPE &&
+              !/\.lpdeck$/i.test(write.catalog.name)
+                ? `${write.catalog.name}.lpdeck`
+                : write.catalog.name,
             mimeType: write.catalog.mimeType,
             sizeBytes: write.catalog.size
           }
         : {}),
       createdAt: Date.now()
     })
-    await states.put({ ...state, sequence: state.sequence + 1 })
+    if (renameAfterContent) {
+      await tx.objectStore('personal-sync-outbox').add({
+        id: lastOperationId,
+        ownerId: write.ownerId,
+        nodeId: write.nodeId,
+        remoteId: write.remoteId,
+        sequence: state.sequence + 2,
+        localRevision: write.localRevision,
+        mutation: { type: 'rename', name: write.catalog.name },
+        expectedRevision: 0,
+        expectedCollectionRevision: state.collectionRevision,
+        dependsOn: write.operationId,
+        createdAt: Date.now()
+      })
+    }
+    await states.put({ ...state, sequence: state.sequence + (renameAfterContent ? 2 : 1) })
     if (write.stagingCleanupId) {
       await tx.objectStore('resource-cleanup-journal').delete(write.stagingCleanupId)
     }
@@ -241,5 +274,104 @@ export async function commitPersonalLocalMutation(
     }
     await tx.done.catch(() => undefined)
     throw error
+  }
+}
+
+export async function acknowledgePersonalOperation(
+  ownerId: string,
+  operationId: string,
+  result: { itemId: string; nodeRevision: number; collectionRevision: number },
+  signal?: AbortSignal
+): Promise<void> {
+  signal?.throwIfAborted()
+  if (
+    !Number.isSafeInteger(result.nodeRevision) ||
+    result.nodeRevision < 1 ||
+    !Number.isSafeInteger(result.collectionRevision) ||
+    result.collectionRevision < result.nodeRevision
+  ) {
+    throw new Error('Invalid personal mutation acknowledgement')
+  }
+  const db = await openFileExplorerDB()
+  const tx = db.transaction(
+    ['personal-sync-nodes', 'personal-sync-state', 'personal-sync-outbox', 'file-blobs'],
+    'readwrite'
+  )
+  const abort = (): void => {
+    try {
+      tx.abort()
+    } catch {
+      /* Already committed or aborted. */
+    }
+  }
+  signal?.addEventListener('abort', abort, { once: true })
+  try {
+    signal?.throwIfAborted()
+    const outbox = tx.objectStore('personal-sync-outbox')
+    const operation = await outbox.get(operationId)
+    if (!operation) {
+      await tx.done
+      return
+    }
+    if (operation.ownerId !== ownerId || operation.remoteId !== result.itemId) {
+      throw new Error('Personal acknowledgement owner or item does not match')
+    }
+    const nodes = tx.objectStore('personal-sync-nodes')
+    const states = tx.objectStore('personal-sync-state')
+    const [node, state, pending] = await Promise.all([
+      nodes.get(operation.nodeId),
+      states.get(ownerId),
+      outbox.index('by-owner').getAll(ownerId)
+    ])
+    if (!node || !state || node.ownerId !== ownerId) throw new Error('Personal owner is missing')
+    if (pending.some((entry) => entry.sequence < operation.sequence)) {
+      throw new Error('Personal acknowledgements must follow outbox order')
+    }
+    await outbox.delete(operationId)
+    const remaining = pending.filter((entry) => entry.id !== operationId)
+    for (const next of remaining) {
+      let updated = next
+      if (next.dependsOn === operationId) {
+        updated = { ...updated, dependsOn: undefined, expectedRevision: result.nodeRevision }
+      }
+      // Only advance a folder command past our own next revision, never unseen remote changes.
+      if (
+        result.collectionRevision === state.collectionRevision + 1 &&
+        next.expectedCollectionRevision === state.collectionRevision
+      ) {
+        updated = { ...updated, expectedCollectionRevision: result.collectionRevision }
+      }
+      if (updated !== next) await outbox.put(updated)
+    }
+    const outstandingRevision = Math.min(
+      ...remaining.filter((entry) => entry.nodeId === node.id).map((entry) => entry.localRevision)
+    )
+    await nodes.put({
+      ...node,
+      remoteRevision: Math.max(node.remoteRevision, result.nodeRevision),
+      syncedLocalRevision: Math.max(
+        node.syncedLocalRevision,
+        Math.min(operation.localRevision, outstandingRevision - 1)
+      ),
+      lastOperationId: node.lastOperationId === operationId ? undefined : node.lastOperationId
+    })
+    await states.put({
+      ...state,
+      collectionRevision: Math.max(state.collectionRevision, result.collectionRevision)
+    })
+    if (operation.snapshotBlobId) {
+      const blobs = tx.objectStore('file-blobs')
+      const snapshot = await blobs.get(operation.snapshotBlobId)
+      if (snapshot)
+        await blobs.put({ ...snapshot, refCount: Math.max(0, (snapshot.refCount ?? 1) - 1) })
+    }
+    signal?.throwIfAborted()
+    await tx.done
+  } catch (error) {
+    abort()
+    await tx.done.catch(() => undefined)
+    throw error
+  } finally {
+    signal?.removeEventListener('abort', abort)
   }
 }
