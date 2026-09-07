@@ -273,7 +273,7 @@ export interface IpcInvokeMap {
   'app:set-model-dir': { args: [string]; result: void }
   'app:check-whisper-dir': { args: [string]; result: WhisperDirInfo }
   'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
-  'native-fs:import-file': { args: [string, string]; result: { size: number } }
+  'native-fs:import-file': { args: [string, string | Uint8Array]; result: { size: number } }
   'native-fs:file-exists': { args: [string]; result: boolean }
   'native-fs:delete-file': { args: [string]; result: void }
   'video-poster:get-info': { args: []; result: VideoPosterInfo }

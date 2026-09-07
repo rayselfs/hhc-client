@@ -7,6 +7,7 @@ const {
   mockStat,
   mockMkdir,
   mockCopyFile,
+  mockWriteFile,
   mockRename,
   mockRm,
   mockUnlink,
@@ -17,6 +18,7 @@ const {
   mockStat: vi.fn(),
   mockMkdir: vi.fn(),
   mockCopyFile: vi.fn(),
+  mockWriteFile: vi.fn(),
   mockRename: vi.fn(),
   mockRm: vi.fn(),
   mockUnlink: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock('fs', () => {
     stat: mockStat,
     mkdir: mockMkdir,
     copyFile: mockCopyFile,
+    writeFile: mockWriteFile,
     rename: mockRename,
     rm: mockRm,
     unlink: mockUnlink
@@ -112,6 +115,20 @@ beforeEach(() => {
 })
 
 describe('native file import', () => {
+  it('stages generated document bytes before publishing the native file', async () => {
+    const bytes = new Uint8Array(new TextEncoder().encode('{"schemaVersion":1}'))
+    mockStat.mockResolvedValueOnce({ isFile: () => true, size: bytes.byteLength })
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    await expect(getHandler('native-fs:import-file')(makeEvent(), validId, bytes)).resolves.toEqual(
+      { size: bytes.byteLength }
+    )
+    expect(mockWriteFile).toHaveBeenCalledWith(expect.stringContaining(`.${validId}.`), bytes, {
+      flag: 'wx'
+    })
+    expect(mockCopyFile).not.toHaveBeenCalled()
+    expect(mockRename).toHaveBeenCalledWith(expect.any(String), nativeFilePath)
+  })
+
   it('copies a file larger than 2GB through a temporary file and atomic rename', async () => {
     const size = 3 * 1024 ** 3
     mockStat

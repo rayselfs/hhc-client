@@ -110,9 +110,11 @@ const speechApi = {
 }
 
 const nativeFsApi = {
-  importFile: (id: string, file: File) => {
+  importFile: async (id: string, file: File) => {
     const sourcePath = webUtils.getPathForFile(file)
-    return typedInvoke('native-fs:import-file', id, sourcePath)
+    if (sourcePath) return typedInvoke('native-fs:import-file', id, sourcePath)
+    if (file.size > 200 * 1024 * 1024) throw new Error('Generated file exceeds 200 MiB')
+    return typedInvoke('native-fs:import-file', id, new Uint8Array(await file.arrayBuffer()))
   },
   getUrl: (id: string, mimeType: string) =>
     `hhc-media://file/${encodeURIComponent(id)}?type=${encodeURIComponent(mimeType)}`,

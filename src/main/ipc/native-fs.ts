@@ -173,12 +173,21 @@ export function registerNativeFsHandlers(wm: WindowManager): void {
     async (event, id: unknown, sourcePath: unknown): Promise<{ size: number }> => {
       if (!isMainWindow(wm, event)) throw new Error('Unauthorized native file import')
       const destinationPath = getNativeFilePath(id)
-      if (typeof sourcePath !== 'string' || !isAbsolute(sourcePath)) {
+      const bytes = sourcePath instanceof Uint8Array ? sourcePath : null
+      if (
+        bytes
+          ? bytes.byteLength > 200 * 1024 * 1024
+          : typeof sourcePath !== 'string' || !isAbsolute(sourcePath)
+      ) {
         throw new Error('Invalid native file source')
       }
 
-      const sourceStat = await fs.stat(sourcePath)
-      if (!sourceStat.isFile()) throw new Error('Native file source is not a file')
+      let size = bytes?.byteLength ?? 0
+      if (typeof sourcePath === 'string') {
+        const sourceStat = await fs.stat(sourcePath)
+        if (!sourceStat.isFile()) throw new Error('Native file source is not a file')
+        size = sourceStat.size
+      }
 
       const dir = getNativeFsDir()
       await fs.mkdir(dir, { recursive: true })
@@ -186,9 +195,10 @@ export function registerNativeFsHandlers(wm: WindowManager): void {
 
       return mutateVideoSource(id as string, async () => {
         try {
-          await fs.copyFile(sourcePath, temporaryPath)
+          if (bytes) await fs.writeFile(temporaryPath, bytes, { flag: 'wx' })
+          else if (typeof sourcePath === 'string') await fs.copyFile(sourcePath, temporaryPath)
           const copiedStat = await fs.stat(temporaryPath)
-          if (!copiedStat.isFile() || copiedStat.size !== sourceStat.size) {
+          if (!copiedStat.isFile() || copiedStat.size !== size) {
             throw new Error('Native file copy verification failed')
           }
           await fs.rename(temporaryPath, destinationPath)
