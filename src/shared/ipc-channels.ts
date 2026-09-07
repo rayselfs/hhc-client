@@ -6,6 +6,8 @@
  * names and payload shapes at compile time.
  */
 
+import type { PersonalNativeApi } from './personal-cloud'
+
 import type {
   ProjectionLifecycleEvent,
   ProjectionTransportTuple,
@@ -306,6 +308,42 @@ export interface IpcInvokeMap {
   'hhc-auth:refresh-access-token': { args: []; result: string | null }
   'hhc-auth:get-session': { args: []; result: HhcSession | null }
   'hhc-auth:sign-out': { args: []; result: void }
+  'personal-cloud:ensureSpace': {
+    args: Parameters<PersonalNativeApi['ensureSpace']>
+    result: Awaited<ReturnType<PersonalNativeApi['ensureSpace']>>
+  }
+  'personal-cloud:getChanges': {
+    args: Parameters<PersonalNativeApi['getChanges']>
+    result: Awaited<ReturnType<PersonalNativeApi['getChanges']>>
+  }
+  'personal-cloud:createUpload': {
+    args: Parameters<PersonalNativeApi['createUpload']>
+    result: Awaited<ReturnType<PersonalNativeApi['createUpload']>>
+  }
+  'personal-cloud:getUpload': {
+    args: Parameters<PersonalNativeApi['getUpload']>
+    result: Awaited<ReturnType<PersonalNativeApi['getUpload']>>
+  }
+  'personal-cloud:uploadSnapshot': {
+    args: Parameters<PersonalNativeApi['uploadSnapshot']>
+    result: Awaited<ReturnType<PersonalNativeApi['uploadSnapshot']>>
+  }
+  'personal-cloud:completeUpload': {
+    args: Parameters<PersonalNativeApi['completeUpload']>
+    result: Awaited<ReturnType<PersonalNativeApi['completeUpload']>>
+  }
+  'personal-cloud:mutate': {
+    args: Parameters<PersonalNativeApi['mutate']>
+    result: Awaited<ReturnType<PersonalNativeApi['mutate']>>
+  }
+  'personal-cloud:downloadSnapshot': {
+    args: Parameters<PersonalNativeApi['downloadSnapshot']>
+    result: Awaited<ReturnType<PersonalNativeApi['downloadSnapshot']>>
+  }
+  'personal-cloud:cancel': {
+    args: Parameters<PersonalNativeApi['cancel']>
+    result: Awaited<ReturnType<PersonalNativeApi['cancel']>>
+  }
   'hhc-assets:list-collections': { args: [string?]; result: HhcAssetCollectionPage }
   'hhc-assets:get-collection-changes': {
     args: [HhcAssetCollectionRequest]

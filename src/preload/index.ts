@@ -1,3 +1,4 @@
+import type { PersonalNativeApi } from '../shared/personal-cloud'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   IpcInvokeChannel,
@@ -184,6 +185,18 @@ const hhcAuthApi = {
   ) => typedOn('hhc-auth:session-changed', callback)
 }
 
+const personalCloudApi: PersonalNativeApi = {
+  ensureSpace: (input) => typedInvoke('personal-cloud:ensureSpace', input),
+  getChanges: (input) => typedInvoke('personal-cloud:getChanges', input),
+  createUpload: (input) => typedInvoke('personal-cloud:createUpload', input),
+  getUpload: (input) => typedInvoke('personal-cloud:getUpload', input),
+  uploadSnapshot: (input) => typedInvoke('personal-cloud:uploadSnapshot', input),
+  completeUpload: (input) => typedInvoke('personal-cloud:completeUpload', input),
+  mutate: (input) => typedInvoke('personal-cloud:mutate', input),
+  downloadSnapshot: (input) => typedInvoke('personal-cloud:downloadSnapshot', input),
+  cancel: (input) => typedInvoke('personal-cloud:cancel', input)
+}
+
 const hhcAssetsApi = {
   listCollections: (cursor?: string) => typedInvoke('hhc-assets:list-collections', cursor),
   getCollectionChanges: (request: IpcInvokeMap['hhc-assets:get-collection-changes']['args'][0]) =>
@@ -233,6 +246,7 @@ const api = {
   oneDrive: oneDriveApi,
   hhcAuth: hhcAuthApi,
   hhcAssets: hhcAssetsApi,
+  personalCloud: personalCloudApi,
   lanRemote: lanRemoteApi
 }
 

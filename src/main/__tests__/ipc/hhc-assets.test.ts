@@ -131,7 +131,7 @@ beforeEach(() => {
   mockClose.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
   mockRm.mockResolvedValue(undefined)
-  mockOpen.mockResolvedValue({ write: mockWrite, close: mockClose })
+  mockOpen.mockResolvedValue({ writeFile: mockWrite, close: mockClose })
   mockRegisterLease.mockReturnValue({
     kind: 'native-lease',
     url: 'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=video%2Fmp4',

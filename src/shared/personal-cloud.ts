@@ -322,3 +322,49 @@ export function createAuthenticatedPersonalCloudApi(
     return response
   })
 }
+
+export interface PersonalNativeRequest {
+  ownerId: string
+  requestId: string
+}
+export interface PersonalNativeDownload {
+  fileId: string
+  size: number
+  mimeType: string
+}
+export type PersonalCloudReply<T> =
+  | { ok: true; value: T }
+  | {
+      ok: false
+      status: number
+      code: string
+      retryAfterMs: number
+    }
+export interface PersonalNativeApi {
+  ensureSpace(input: PersonalNativeRequest): Promise<PersonalCloudReply<PersonalSpace>>
+  getChanges(
+    input: PersonalNativeRequest & { cursor?: string }
+  ): Promise<PersonalCloudReply<PersonalChangePage>>
+  createUpload(
+    input: PersonalNativeRequest & { upload: PersonalUploadInput; operationId: string }
+  ): Promise<PersonalCloudReply<PersonalUploadState>>
+  getUpload(
+    input: PersonalNativeRequest & { uploadId: string }
+  ): Promise<PersonalCloudReply<PersonalUploadState>>
+  uploadSnapshot(
+    input: PersonalNativeRequest & { uploadId: string; blobId: string }
+  ): Promise<PersonalCloudReply<void>>
+  completeUpload(
+    input: PersonalNativeRequest & {
+      uploadId: string
+      upload: Pick<PersonalUploadInput, 'mimeType' | 'sizeBytes'>
+    }
+  ): Promise<PersonalCloudReply<PersonalUploadState>>
+  mutate(
+    input: PersonalNativeRequest & { mutation: PersonalMutationRequest }
+  ): Promise<PersonalCloudReply<PersonalMutationResult>>
+  downloadSnapshot(
+    input: PersonalNativeRequest & { itemId: string; revision: number; blobId: string }
+  ): Promise<PersonalCloudReply<PersonalNativeDownload>>
+  cancel(requestId: string): Promise<void>
+}

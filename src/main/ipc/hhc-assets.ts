@@ -215,6 +215,14 @@ async function downloadContent(
     `/api/assets/collections/${collectionId}/items/${itemId}/content`,
     { headers: { accept: '*/*' }, signal }
   )
+  return saveAssetContent(response, destinationPath, signal)
+}
+
+export async function saveAssetContent(
+  response: Response,
+  destinationPath: string,
+  signal?: AbortSignal
+): Promise<{ size: number; mimeType: string; etag: string }> {
   const declaredSize = Number(response.headers.get('content-length') ?? 0)
   if (!Number.isFinite(declaredSize) || declaredSize < 0 || declaredSize > MAX_CONTENT_BYTES) {
     throw requestError()
@@ -233,7 +241,7 @@ async function downloadContent(
       if (!value) continue
       size += value.byteLength
       if (size > MAX_CONTENT_BYTES) throw requestError()
-      await file.write(Buffer.from(value))
+      await file.writeFile(Buffer.from(value))
     }
   } catch (error) {
     await reader.cancel().catch(() => undefined)

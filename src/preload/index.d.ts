@@ -1,3 +1,4 @@
+import type { PersonalNativeApi } from '../shared/personal-cloud'
 import type {
   ProjectionChannel,
   ProjectionLifecycleEvent,
@@ -223,6 +224,7 @@ declare global {
       oneDrive: OneDriveAPI
       hhcAuth: HhcAuthAPI
       hhcAssets: HhcAssetsAPI
+      personalCloud: PersonalNativeApi
       lanRemote: LanRemoteAPI
     }
   }
