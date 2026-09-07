@@ -117,7 +117,7 @@ describe('browser HHC auth', () => {
       client_id: 'client-web',
       redirect_uri: `${CLIENT_ORIGIN}/oauth/callback`,
       response_type: 'code',
-      scope: 'openid profile',
+      scope: 'openid profile presenter:cloud:use',
       code_challenge_method: 'S256'
     })
     expect(url.searchParams.get('state')).toHaveLength(43)

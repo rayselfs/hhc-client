@@ -61,6 +61,15 @@ const routes = [
       { path: 'service', element: <Navigate to="/timer" replace /> },
       { path: 'soundboard', element: <Navigate to="/timer" replace /> },
       {
+        path: 'cloud-files',
+        element: (
+          <Suspense fallback={null}>
+            <FilesPage cloud />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
         path: 'files',
         element: (
           <Suspense fallback={null}>

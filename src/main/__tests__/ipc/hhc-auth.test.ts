@@ -232,7 +232,7 @@ describe('HhcAuthService authorization', () => {
       redirect_uri: 'hhc-presenter://auth/account',
       response_type: 'code',
       code_challenge_method: 'S256',
-      scope: 'openid profile'
+      scope: 'openid profile presenter:cloud:use'
     })
     expect(authorize.searchParams.get('state')).toBeTruthy()
     expect(authorize.searchParams.get('code_challenge')).toBeTruthy()

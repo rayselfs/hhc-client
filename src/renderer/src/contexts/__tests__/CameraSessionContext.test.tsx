@@ -1,0 +1,117 @@
+import { useEffect } from 'react'
+import { act, render, waitFor } from '@testing-library/react'
+import { beforeEach, expect, it, vi } from 'vitest'
+import { MemoryRouter, useNavigate } from 'react-router-dom'
+import { CameraSessionProvider, useCameraSession } from '../CameraSessionContext'
+import { useCameraStore } from '@renderer/stores/camera'
+
+const projection = vi.hoisted(() => ({
+  activeOwner: 'camera',
+  isProjectionOpen: false,
+  recovery: { status: 'ready', generation: 0 },
+  projectionReadyCount: 0,
+  on: vi.fn(),
+  send: vi.fn(),
+  stopProjection: vi.fn().mockResolvedValue(undefined)
+}))
+vi.mock('../ProjectionContext', () => ({ useProjection: () => projection }))
+let navigate: ReturnType<typeof useNavigate>
+let camera: ReturnType<typeof useCameraSession>
+function Controls(): null {
+  const nextNavigate = useNavigate()
+  const nextCamera = useCameraSession()
+  useEffect(() => {
+    navigate = nextNavigate
+    camera = nextCamera
+  }, [nextNavigate, nextCamera])
+  return null
+}
+beforeEach(() => {
+  projection.isProjectionOpen = false
+  projection.stopProjection.mockClear()
+  useCameraStore.setState({ lastDeviceId: '', deviceId: '', busy: false, layouts: {} })
+})
+it('accesses devices only on the camera route and stops a late capture after leaving', async () => {
+  let resolve!: (stream: MediaStream) => void
+  const getUserMedia = vi.fn(
+    () =>
+      new Promise<MediaStream>((done) => {
+        resolve = done
+      })
+  )
+  const enumerateDevices = vi
+    .fn()
+    .mockResolvedValue([{ kind: 'videoinput', deviceId: 'cam', label: 'Camera' }])
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      getUserMedia,
+      enumerateDevices,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
+    }
+  })
+  render(
+    <MemoryRouter initialEntries={['/files']}>
+      <CameraSessionProvider>
+        <Controls />
+      </CameraSessionProvider>
+    </MemoryRouter>
+  )
+  expect(enumerateDevices).not.toHaveBeenCalled()
+  expect(getUserMedia).not.toHaveBeenCalled()
+  act(() => navigate('/camera'))
+  await waitFor(() => expect(enumerateDevices).toHaveBeenCalled())
+  let selecting!: Promise<void>
+  act(() => {
+    selecting = camera.selectSource('cam')
+  })
+  await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1))
+  act(() => navigate('/bible'))
+  const stop = vi.fn()
+  await act(async () => {
+    resolve({ getTracks: () => [{ stop }] } as unknown as MediaStream)
+    await selecting
+  })
+  expect(stop).toHaveBeenCalledTimes(1)
+  expect(useCameraStore.getState().capturing).toBe(false)
+  expect(projection.stopProjection).not.toHaveBeenCalled()
+})
+
+it('releases an active camera and stops its projection when leaving the page', async () => {
+  const stop = vi.fn()
+  const track = {
+    stop,
+    getSettings: () => ({ deviceId: 'cam', width: 1920, height: 1080 }),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn()
+  }
+  const stream = { getTracks: () => [track], getVideoTracks: () => [track] }
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      getUserMedia: vi.fn().mockResolvedValue(stream),
+      enumerateDevices: vi
+        .fn()
+        .mockResolvedValue([{ kind: 'videoinput', deviceId: 'cam', label: 'Camera' }]),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
+    }
+  })
+  render(
+    <MemoryRouter initialEntries={['/camera']}>
+      <CameraSessionProvider>
+        <Controls />
+      </CameraSessionProvider>
+    </MemoryRouter>
+  )
+  await act(async () => {
+    await camera.selectSource('cam')
+  })
+  expect(useCameraStore.getState().capturing).toBe(true)
+  projection.isProjectionOpen = true
+  act(() => navigate('/files'))
+  expect(stop).toHaveBeenCalledTimes(1)
+  expect(projection.stopProjection).toHaveBeenCalledTimes(1)
+  expect(useCameraStore.getState().capturing).toBe(false)
+})

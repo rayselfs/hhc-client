@@ -214,6 +214,12 @@ export default function Header(): React.JSX.Element {
         </ButtonGroup>
         {showFilesControls && (
           <Breadcrumb
+            rootFolderId={
+              location.pathname === '/cloud-files'
+                ? getFolderPath(currentFolderId).find((folder) => folder.personalOwnerId)?.id
+                : undefined
+            }
+            rootLabel={location.pathname === '/cloud-files' ? t('nav.cloudFiles') : undefined}
             currentFolderId={currentFolderId}
             getFolderPath={getFolderPath}
             onNavigate={handleBreadcrumbNavigate}

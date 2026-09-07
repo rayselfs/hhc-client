@@ -113,7 +113,7 @@ describe('persistEditablePresentationCreation', () => {
 it('retains a durable personal creation when thumbnail generation fails', async () => {
   const { usePersonalSyncStore } = await import('../../stores/personal-sync')
   const { ensurePersonalLocalSpace } = await import('../personal-file-actions')
-  usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+  usePersonalSyncStore.getState().setAccount('authenticated', 'alice', true)
   await ensurePersonalLocalSpace(
     'alice',
     { id: 'space', revision: 0 },

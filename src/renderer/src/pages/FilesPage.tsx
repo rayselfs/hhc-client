@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { toast } from '@heroui/react/toast'
@@ -53,6 +53,8 @@ import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersi
 import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 import { PersonalCloudStatus } from '@renderer/components/Control/FileExplorer/PersonalCloudStatus'
+
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 
 const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
@@ -114,7 +116,30 @@ async function countDeletedSoundboardPadUsages(targetIds: Set<string>): Promise<
   )
 }
 
-export default function FilesPage(): React.JSX.Element {
+export default function FilesPage({
+  cloud = false
+}: {
+  cloud?: boolean
+}): React.JSX.Element | null {
+  const ownerId = usePersonalSyncStore((state) => state.activeOwnerId)
+  const folders = useFileExplorerStore((state) => state.folders)
+  const currentId = useFileExplorerStore((state) => state.currentFolderId)
+  const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
+  const root = Object.values(folders).find(
+    (folder) => folder.personalOwnerId === ownerId && isPersonalRootFolder(folder)
+  )
+  const inScope = cloud
+    ? Boolean(ownerId && root && folders[currentId]?.personalOwnerId === ownerId)
+    : !folders[currentId]?.personalOwnerId
+  useLayoutEffect(() => {
+    if (!inScope && (!cloud || root))
+      void navigateToFolder(cloud ? root!.id : FILE_EXPLORER_ROOT_ID)
+  }, [cloud, inScope, navigateToFolder, root])
+  if (!inScope) return cloud && ownerId ? <PersonalCloudStatus /> : null
+  return <FilesWorkspace key={cloud ? ownerId : 'local'} cloud={cloud} />
+}
+
+function FilesWorkspace({ cloud }: { cloud: boolean }): React.JSX.Element {
   const { t } = useTranslation()
   const { session, getAccessToken, getAuthGeneration, refreshAccessToken, endSession } =
     useHhcAuth()
@@ -187,26 +212,44 @@ export default function FilesPage(): React.JSX.Element {
   useEffect(() => {
     const userId = session?.userId
     setClaimsResolvedUserId(null)
-    if (!userId) return
+    if (!userId || cloud) return
     let active = true
-    void getAccessToken()
-      .then((token) => {
-        if (active && token && sessionRef.current?.userId === userId) {
-          setClaimsResolvedUserId(userId)
-        }
-      })
-      .catch(() => undefined)
+    let pending = false
+    const refresh = async (): Promise<void> => {
+      if (pending) return
+      pending = true
+      try {
+        const folders = await hhcLineProvider.listFolders()
+        if (active && sessionRef.current?.userId === userId)
+          setClaimsResolvedUserId(folders.length > 0 ? userId : null)
+      } catch {
+        if (active) setClaimsResolvedUserId(null)
+      } finally {
+        pending = false
+      }
+    }
+    void refresh()
+    const timer = setInterval(() => void refresh(), 30_000)
+    const onRefresh = (): void => {
+      void refresh()
+    }
+    window.addEventListener('focus', onRefresh)
+    window.addEventListener('online', onRefresh)
     return () => {
       active = false
+      clearInterval(timer)
+      window.removeEventListener('focus', onRefresh)
+      window.removeEventListener('online', onRefresh)
     }
-  }, [getAccessToken, session?.userId])
+  }, [cloud, hhcLineProvider, session?.userId, isHhcLineImporting])
 
   const itemCount = useFileExplorerStore(
     useCallback(
       (state) =>
         (state._itemsByParent[currentFolderId]?.filter((item) => !item.deletedAt).length ?? 0) +
-        (state._childFoldersByParent[currentFolderId]?.filter((folder) => !folder.deletedAt)
-          .length ?? 0),
+        (state._childFoldersByParent[currentFolderId]?.filter(
+          (folder) => !folder.deletedAt && !isPersonalRootFolder(folder)
+        ).length ?? 0),
       [currentFolderId]
     )
   )
@@ -905,7 +948,7 @@ export default function FilesPage(): React.JSX.Element {
         onChange={(e) => void handleFolderChange(e)}
       />
       <FileExplorerShell itemCount={itemCount} selectedCount={selectedCount}>
-        <PersonalCloudStatus />
+        {cloud && <PersonalCloudStatus />}
         <FolderPersistenceStatus
           className="mx-3 mt-3"
           status={persistenceStatus}

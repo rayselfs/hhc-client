@@ -11,7 +11,7 @@ interface PersonalSyncState {
   accountStatus: PersonalAccountStatus
   syncStatus: 'idle' | 'pending' | 'syncing' | 'synced' | 'conflict' | 'auth-required' | 'failed'
   errorCode: string | null
-  setAccount(status: PersonalAccountStatus, ownerId?: string): void
+  setAccount(status: PersonalAccountStatus, ownerId?: string, allowed?: boolean): void
 }
 
 export const usePersonalSyncStore = create<PersonalSyncState>()(
@@ -23,18 +23,22 @@ export const usePersonalSyncStore = create<PersonalSyncState>()(
       accountStatus: 'loading',
       syncStatus: 'idle',
       errorCode: null,
-      setAccount: (status, ownerId) =>
+      setAccount: (status, ownerId, allowed = false) =>
         set((state) => ({
           accountStatus: status,
           activeOwnerId:
             status === 'authenticated'
-              ? (ownerId ?? null)
+              ? allowed
+                ? (ownerId ?? null)
+                : null
               : status === 'unavailable'
                 ? state.lastOwnerId
                 : null,
           lastOwnerId:
             status === 'authenticated'
-              ? (ownerId ?? null)
+              ? allowed
+                ? (ownerId ?? null)
+                : null
               : status === 'anonymous'
                 ? null
                 : state.lastOwnerId,
@@ -46,7 +50,8 @@ export const usePersonalSyncStore = create<PersonalSyncState>()(
     {
       name: createPersistName('personal-sync'),
       storage: hhcPersistStorage,
-      version: 0,
+      version: 1,
+      migrate: () => ({ lastOwnerId: null }),
       partialize: (state) => ({ lastOwnerId: state.lastOwnerId })
     }
   )

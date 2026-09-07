@@ -34,6 +34,9 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const runPresentationSafeAction = usePresentationSafeAction()
   const documents = usePresentationWorkspaceStore((state) => state.documents)
   const activeItemId = usePresentationWorkspaceStore((state) => state.activeItemId)
+  const filesPath = useFileExplorerStore((state) =>
+    activeItemId && state.items[activeItemId]?.personalOwnerId ? '/cloud-files' : '/files'
+  )
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
   const updateDocumentName = usePresentationWorkspaceStore((state) => state.updateDocumentName)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -84,7 +87,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     }
     if (!closed) return
     const nextActiveItemId = usePresentationWorkspaceStore.getState().activeItemId
-    navigate(nextActiveItemId ? getPresentationWorkspacePath(nextActiveItemId) : '/files')
+    navigate(nextActiveItemId ? getPresentationWorkspacePath(nextActiveItemId) : filesPath)
   }
 
   const startRename = (deck: { itemId: string; name: string }): void => {
@@ -244,7 +247,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         size="lg"
         variant="outline"
         className="relative z-10"
-        onPress={() => void runPresentationSafeAction(() => navigate('/files'))}
+        onPress={() => void runPresentationSafeAction(() => navigate(filesPath))}
         aria-label={t('presentationWorkspace.backToFiles')}
       >
         <Home size={16} />

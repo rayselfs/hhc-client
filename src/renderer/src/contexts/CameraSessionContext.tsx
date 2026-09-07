@@ -22,24 +22,41 @@ export function CameraSessionProvider({
   children: React.ReactNode
 }): React.JSX.Element {
   const { pathname } = useLocation()
-  const { activeOwner, isProjectionOpen, recovery, projectionReadyCount, on, send } =
-    useProjection()
+  const {
+    activeOwner,
+    isProjectionOpen,
+    recovery,
+    projectionReadyCount,
+    on,
+    send,
+    stopProjection
+  } = useProjection()
   const session = useRef<ReturnType<typeof createCameraSession> | null>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [retry, setRetry] = useState(0)
   const projecting = activeOwner === 'camera' && isProjectionOpen
 
   useEffect(() => {
+    if (pathname !== '/camera') return
     session.current = createCameraSession()
     return () => {
       session.current?.dispose()
       session.current = null
-      useCameraStore.setState({ capturing: false, busy: false })
+      setStream(null)
+      useCameraStore.setState({
+        capturing: false,
+        busy: false,
+        selectorOpen: false,
+        connection: 'idle'
+      })
     }
-  }, [])
+  }, [pathname])
 
   const listDevices = useCallback(async (): Promise<void> => {
+    const current = session.current
+    if (!current) return
     const devices = await navigator.mediaDevices?.enumerateDevices()
+    if (session.current !== current) return
     useCameraStore.setState({
       devices:
         devices
@@ -48,12 +65,13 @@ export function CameraSessionProvider({
     })
   }, [])
   useEffect(() => {
+    if (pathname !== '/camera') return
     const changed = (): void => {
       void listDevices().catch(() => undefined)
     }
     navigator.mediaDevices?.addEventListener('devicechange', changed)
     return () => navigator.mediaDevices?.removeEventListener('devicechange', changed)
-  }, [listDevices])
+  }, [pathname, listDevices])
 
   const selectSource = useCallback(
     async (deviceId: string): Promise<void> => {
@@ -70,11 +88,8 @@ export function CameraSessionProvider({
         const track = next.getVideoTracks()[0]
         const settings = track.getSettings()
         const cover = createCameraCover(settings.width ?? 1920, settings.height ?? 1080)
+        useCameraStore.getState().activateSource(settings.deviceId ?? deviceId, cover)
         useCameraStore.setState({
-          cover,
-          transform: cover,
-          deviceId: settings.deviceId ?? deviceId,
-          lastDeviceId: settings.deviceId ?? deviceId,
           busy: false,
           capturing: true
         })
@@ -127,7 +142,11 @@ export function CameraSessionProvider({
   }, [pathname, listDevices, selectSource])
 
   useEffect(() => {
-    if (!projecting || recovery.status !== 'ready' || !stream) {
+    if (pathname !== '/camera' && projecting) void stopProjection().catch(() => undefined)
+  }, [pathname, projecting, stopProjection])
+
+  useEffect(() => {
+    if (pathname !== '/camera' || !projecting || recovery.status !== 'ready' || !stream) {
       useCameraStore.setState({ connection: projecting ? 'unavailable' : 'idle' })
       return
     }
@@ -211,6 +230,7 @@ export function CameraSessionProvider({
       unstore()
     }
   }, [
+    pathname,
     projecting,
     recovery.status,
     recovery.generation,
@@ -222,10 +242,12 @@ export function CameraSessionProvider({
   ])
 
   const prepareSources = async (): Promise<void> => {
-    if (useCameraStore.getState().busy) return
+    const current = session.current
+    if (!current || useCameraStore.getState().busy) return
     useCameraStore.setState({ busy: true, error: null })
     try {
       await listDevices()
+      if (session.current !== current) return
       const devices = useCameraStore.getState().devices
       if (!session.current?.getStream() && !devices.some((device) => device.id)) {
         // Permission discovery does not select or retain a default camera.
@@ -234,14 +256,16 @@ export function CameraSessionProvider({
           audio: false
         })
         permissionStream.getTracks().forEach((track) => track.stop())
+        if (session.current !== current) return
         await listDevices()
       }
       if (!useCameraStore.getState().devices.some((device) => device.id))
         useCameraStore.setState({ error: 'NotFoundError' })
     } catch (error) {
+      if (session.current !== current) return
       useCameraStore.setState({ error: error instanceof Error ? error.name : 'unavailable' })
     } finally {
-      useCameraStore.setState({ busy: false })
+      if (session.current === current) useCameraStore.setState({ busy: false })
     }
   }
   return (

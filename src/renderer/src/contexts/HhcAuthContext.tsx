@@ -54,8 +54,10 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
 
   const sessionUserId = session?.userId
   useLayoutEffect(() => {
-    usePersonalSyncStore.getState().setAccount(status, sessionUserId)
-  }, [status, sessionUserId])
+    usePersonalSyncStore
+      .getState()
+      .setAccount(status, sessionUserId, session?.presenterCloudAccess === true)
+  }, [status, sessionUserId, session?.presenterCloudAccess])
 
   const invalidateTokenRequests = useCallback((): void => {
     sessionEpochRef.current += 1

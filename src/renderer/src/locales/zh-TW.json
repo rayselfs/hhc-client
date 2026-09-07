@@ -4,6 +4,7 @@
     "description": "專為教會聚會設計的投影系統。"
   },
   "nav": {
+    "cloudFiles": "雲端文件",
     "timer": "計時器",
     "bible": "聖經",
     "service": "流程",

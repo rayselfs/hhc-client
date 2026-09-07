@@ -30,7 +30,12 @@ type Transaction = {
 
 type SessionResponse = {
   authenticated?: boolean
-  user?: { id?: string; display_name?: string; avatar_url?: string }
+  user?: {
+    id?: string
+    display_name?: string
+    avatar_url?: string
+    presenter_cloud_access?: boolean
+  }
 }
 
 type TokenResponse = { access_token?: string }
@@ -195,7 +200,10 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       userId: data.user.id,
       displayName: data.user.display_name,
       ...(data.user.avatar_url ? { avatarUrl: data.user.avatar_url } : {}),
-      roles
+      roles,
+      ...(typeof data.user.presenter_cloud_access === 'boolean'
+        ? { presenterCloudAccess: data.user.presenter_cloud_access }
+        : {})
     }
     this.notify()
     return this.session
@@ -229,6 +237,8 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     this.accessToken = token
     this.session = { ...session, roles: readClaims(token, session.userId, this.now()) }
     this.notify()
+    await this.getSession()
+    if (generation !== this.authGeneration || this.session?.userId !== expectedUserId) return null
     return token
   }
 
@@ -250,6 +260,8 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     this.accessToken = token
     this.session = { ...session, roles: readClaims(token, session.userId, this.now()) }
     this.notify()
+    await this.getSession()
+    if (generation !== this.authGeneration || this.session?.userId !== expectedUserId) return null
     return token
   }
 
@@ -395,7 +407,10 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
         userId: sessionData.user.id,
         displayName: sessionData.user.display_name,
         ...(sessionData.user.avatar_url ? { avatarUrl: sessionData.user.avatar_url } : {}),
-        roles
+        roles,
+        ...(typeof sessionData.user.presenter_cloud_access === 'boolean'
+          ? { presenterCloudAccess: sessionData.user.presenter_cloud_access }
+          : {})
       }
       this.notify()
       return true

@@ -223,7 +223,7 @@ it('rejects a stale conflict choice, then atomically resets only the reviewed no
 })
 
 it('aborts the account worker and fences a successful mutation arriving after stop', async () => {
-  usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+  usePersonalSyncStore.getState().setAccount('authenticated', 'alice', true)
   await releasePersonalSyncLease('alice', 'worker')
   let receivedSignal: AbortSignal | undefined
   let finish: (() => void) | undefined

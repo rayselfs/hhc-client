@@ -135,7 +135,7 @@ describe('PresentationSessionRegistryContext', () => {
   })
 
   it('hides departing personal tabs, flushes their session and rejects reopening from another account', async () => {
-    usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+    usePersonalSyncStore.getState().setAccount('authenticated', 'alice', true)
     const item = { ...makeEditableItem('private-deck'), personalOwnerId: 'alice' }
     const document = makeDocument('Private', item.id)
     const session = createFakeSession(document)
@@ -149,7 +149,7 @@ describe('PresentationSessionRegistryContext', () => {
     )
     await registry!.open(item)
     usePresentationWorkspaceStore.getState().openDocument(item)
-    act(() => usePersonalSyncStore.getState().setAccount('authenticated', 'bob'))
+    act(() => usePersonalSyncStore.getState().setAccount('authenticated', 'bob', true))
     expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
     await vi.waitFor(() => expect(session.dispose).toHaveBeenCalled())
     await expect(registry!.open(item)).rejects.toThrow('Personal account changed')

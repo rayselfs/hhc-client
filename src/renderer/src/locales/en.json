@@ -4,6 +4,7 @@
     "description": "A projection system designed for church services."
   },
   "nav": {
+    "cloudFiles": "Cloud documents",
     "timer": "TIMER",
     "bible": "BIBLE",
     "service": "SERVICE",
