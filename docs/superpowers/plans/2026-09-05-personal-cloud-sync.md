@@ -20,7 +20,7 @@
 - 服務端以受信任登入身分決定 owner；不接受 client 指定 owner、namespace、grant 或 Blob key。
 - 雲端有效資料不自動到期；軟刪除、解除同步、清除本機快取是不同操作。
 - 不改 Bible 刪除流程；不讓 File Explorer 呼叫 `cleanupExpired()`。
-- 正式實作時每個 repo 自最新 `origin/main` 建立隔離 worktree；各自 PR、CI、release、smoke。2026-09-07 使用者已授權開始實作；部署仍需另行授權。
+- 正式實作時每個 repo 自最新 `origin/main` 建立隔離 worktree；各自 PR、CI、release、smoke。2026-09-07 使用者已授權開始實作；2026-09-07 使用者另已授權依序發 PR、等待 CI、merge、release，持續到整份計劃完成。
 
 ## Confirmed scope and design
 
@@ -222,7 +222,15 @@ expect(pendingOperations).toHaveLength(1)
 - Validation: actual PostgreSQL-backed HTTP upload/scan-state/Range/owner tests, full Go race suite, vet, migration policy, OpenAPI, both Docker builds, gateway runtime method/host/auth matrix, Bicep compilation, Terraform fmt/validate. No production changes were made.
 - Actual disposable PostgreSQL 17 tests cover concurrent root creation and updates, receipt replay, injected transaction rollback, owner isolation, cycles, NFC name collisions, scan-gated head replacement, subtree restore and changes across pagination boundaries.
 - Full database-backed `go test -race ./... -count=1 -p=1` and `go vet ./...` passed. Migration policy and OpenAPI validation passed; repository-wide OpenAPI warnings remain.
-- Tasks 3–6 remain open. No cloud UI, client sync, cross-device acceptance, PR, merge or release is claimed. Next implementation is the atomic local outbox in the Presenter file-explorer DB.
+- Remaining work: Tasks 3–4, client/UI/deck/cleanup parts of Task 5, and Task 6 release/device acceptance. No cloud UI, client sync or device acceptance is claimed yet.
+- User authorized automatic PR/CI/merge/release and continued implementation through the entire plan on 2026-09-07. A thread heartbeat (automation ID `automation`, every 30 minutes) resumes unfinished work and must be paused when all plan items are actually verified complete.
+- Producer PR: https://github.com/HallelujahHomeChurch/asset-api/pull/57 (head includes `050a014`, personal GC and restore protection).
+- Gateway PR: https://github.com/HallelujahHomeChurch/api-gateway/pull/79 .
+- Infrastructure PR: https://github.com/HallelujahHomeChurch/azure-infra/pull/58 .
+- All three PRs are open; check current CI and exact heads before merge. Release order: asset-api producer/Bicep → reviewed azure-infra plan, merged change and deliberate Terraform apply → gateway → Presenter. azure-infra has no automatic apply workflow; never apply unrelated drift or an unreviewed plan.
+- Server GC additions: active heads/29-day trash survive, 31-day restores fail, orphan staging waits 24 hours and excludes active uploads/workers, and head attachment/restore/replacement extend the asset lease to fence concurrent purge. Migration 019 indexes personal asset references. Full disposable PostgreSQL-backed Go race suite passed after these changes.
+- Local database fixture is Docker container `codex-personal-cloud-pg`, PostgreSQL 17, bound only to `127.0.0.1:55439`, database `asset_test`. It is disposable test infrastructure, not production.
+- Next implementation: atomic local outbox in the Presenter file-explorer DB, then runtime and all mutation entrypoints. Existing folder store mutators publish optimistically and must be handled specifically for personal writes; preserve legacy providers and Bible behavior.
 
 ## Acceptance checklist
 
