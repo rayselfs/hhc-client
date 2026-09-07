@@ -66,3 +66,30 @@ it('cancels native work and rejects a late success after logout', async () => {
   ).rejects.toMatchObject({ name: 'AbortError' })
   expect(cancel).toHaveBeenCalledWith(ensureSpace.mock.calls[0]?.[0]?.requestId)
 })
+
+it('completes browser uploads using the original snapshot checksum', async () => {
+  const { Blob } = await import('node:buffer')
+  const { webcrypto } = await import('node:crypto')
+  vi.stubGlobal('crypto', webcrypto)
+  mocks.getBlob.mockResolvedValue({ id: 'snapshot', blob: new Blob(['one']) })
+  fetcher.mockResolvedValue(
+    Response.json({
+      id: 'upload',
+      contentPath: '/api/assets/personal-space/uploads/upload/content',
+      expiresAt: '2030-01-01T00:00:00Z',
+      uploadStatus: 'completed',
+      scanStatus: 'pending',
+      processingStatus: 'not_required'
+    })
+  )
+  await createPersonalCloudProvider(auth, 'alice').completeUpload('upload', {
+    blobId: 'snapshot',
+    mimeType: 'image/png',
+    sizeBytes: 3
+  })
+  expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({
+    mimeType: 'image/png',
+    sizeBytes: 3,
+    checksumSha256: '7692c3ad3540bb803c020b3aee66cd8887123234ea0c6e7143c0add73ff431ed'
+  })
+})

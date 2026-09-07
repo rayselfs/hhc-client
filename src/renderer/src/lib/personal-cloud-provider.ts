@@ -4,13 +4,23 @@ import {
   PersonalCloudHttpError,
   PERSONAL_MAX_FILE_BYTES,
   type PersonalCloudHttpApi,
+  type PersonalUploadInput,
+  type PersonalUploadState,
   type PersonalCloudReply,
   type PersonalNativeRequest
 } from '@shared/personal-cloud'
 import { getFileBlobRecord, type FileBlobRecord } from './file-explorer-db'
 import { isElectron } from './env'
 
-export type PersonalCloudProvider = Omit<PersonalCloudHttpApi, 'putUpload' | 'downloadContent'> & {
+export type PersonalCloudProvider = Omit<
+  PersonalCloudHttpApi,
+  'putUpload' | 'downloadContent' | 'completeUpload'
+> & {
+  completeUpload(
+    uploadId: string,
+    input: Pick<PersonalUploadInput, 'mimeType' | 'sizeBytes'> & { blobId: string },
+    signal?: AbortSignal
+  ): Promise<PersonalUploadState>
   uploadSnapshot(uploadId: string, blobId: string, signal: AbortSignal): Promise<void>
   // Native callers journal and lock blobId until the catalog transaction commits.
   downloadSnapshot(
@@ -85,7 +95,24 @@ export function createPersonalCloudProvider(
     getChanges: api.getChanges,
     createUpload: api.createUpload,
     getUpload: api.getUpload,
-    completeUpload: api.completeUpload,
+    completeUpload: async (uploadId, input, signal) => {
+      signal?.throwIfAborted()
+      const record = await getFileBlobRecord(input.blobId)
+      if (!record?.blob) throw new PersonalCloudHttpError(0, 'source-missing')
+      const digest = await crypto.subtle.digest('SHA-256', await record.blob.arrayBuffer())
+      signal?.throwIfAborted()
+      return api.completeUpload(
+        uploadId,
+        {
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          checksumSha256: Array.from(new Uint8Array(digest), (byte) =>
+            byte.toString(16).padStart(2, '0')
+          ).join('')
+        },
+        signal
+      )
+    },
     mutate: api.mutate,
     uploadSnapshot: async (uploadId, blobId, signal) => {
       signal.throwIfAborted()

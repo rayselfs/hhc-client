@@ -1,6 +1,6 @@
 import { ipcMain, net } from 'electron'
-import { openAsBlob, promises as fs } from 'node:fs'
-import { randomUUID } from 'node:crypto'
+import { createReadStream, openAsBlob, promises as fs } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
 import type { HhcAuthAdapter } from '@shared/hhc-auth'
 import type { IpcInvokeChannel } from '@shared/ipc-channels'
 import { isValidNativeFileId } from '@shared/native-media'
@@ -198,11 +198,22 @@ export function registerPersonalCloudHandlers(wm: WindowManager, auth: Auth): vo
   register('personal-cloud:getUpload', ['uploadId'], (api, input, signal) =>
     api.getUpload(opaque(input.uploadId), signal)
   )
-  register('personal-cloud:completeUpload', ['uploadId', 'upload'], (api, input, signal) => {
-    const upload = exact(input.upload, ['mimeType', 'sizeBytes'])
+  register('personal-cloud:completeUpload', ['uploadId', 'upload'], async (api, input, signal) => {
+    const upload = exact(input.upload, ['mimeType', 'sizeBytes', 'blobId'])
+    const hash = createHash('sha256')
+    for await (const chunk of createReadStream(getNativeFilePath(fileId(upload.blobId)), {
+      signal
+    })) {
+      hash.update(chunk)
+    }
+    signal.throwIfAborted()
     return api.completeUpload(
       opaque(input.uploadId),
-      { mimeType: text(upload.mimeType), sizeBytes: number(upload.sizeBytes) },
+      {
+        mimeType: text(upload.mimeType),
+        sizeBytes: number(upload.sizeBytes),
+        checksumSha256: hash.digest('hex')
+      },
       signal
     )
   })

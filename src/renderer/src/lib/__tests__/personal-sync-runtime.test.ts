@@ -254,3 +254,20 @@ it('aborts the account worker and fences a successful mutation arriving after st
     usePersonalSyncStore.getState().setAccount('anonymous')
   }
 })
+
+it('verifies existing immutable staging after losing the PUT response', async () => {
+  api.createUpload.mockResolvedValue({ ...upload, uploadStatus: 'created' })
+  api.getUpload.mockResolvedValue({ ...upload, uploadStatus: 'created' })
+  api.uploadSnapshot.mockRejectedValueOnce(new TypeError('Response lost'))
+  api.uploadSnapshot.mockRejectedValueOnce(new PersonalCloudHttpError(409, 'AST_CONFLICT'))
+  api.completeUpload.mockResolvedValue(upload)
+  await expect(run()).rejects.toThrow('Response lost')
+  expect(await run()).toBe('acknowledged')
+  expect(api.completeUpload).toHaveBeenCalledWith(
+    'upload',
+    { mimeType: 'image/png', sizeBytes: 3, blobId: 'snapshot' },
+    expect.any(AbortSignal)
+  )
+  expect(api.createUpload).toHaveBeenCalledTimes(1)
+  expect(await listPersonalOutbox('alice')).toEqual([])
+})

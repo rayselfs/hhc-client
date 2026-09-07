@@ -109,3 +109,29 @@ it('accepts the dependent rename operation ID emitted by a deck save', async () 
     })
   ).toMatchObject({ ok: true })
 })
+
+it('completes uploads with the SHA-256 of the immutable native snapshot', async () => {
+  await writeFile(join(mocks.root, blobId), 'one')
+  mocks.fetch.mockResolvedValue(
+    Response.json({
+      id: 'upload',
+      contentPath: '/api/assets/personal-space/uploads/upload/content',
+      expiresAt: '2030-01-01T00:00:00Z',
+      uploadStatus: 'completed',
+      scanStatus: 'pending',
+      processingStatus: 'not_required'
+    })
+  )
+  expect(
+    await invoke('completeUpload', {
+      ...request,
+      uploadId: 'upload',
+      upload: { blobId, mimeType: 'image/png', sizeBytes: 3 }
+    })
+  ).toMatchObject({ ok: true })
+  const body = JSON.parse(mocks.fetch.mock.calls[0][1].body)
+  expect(body.checksumSha256).toBe(
+    '7692c3ad3540bb803c020b3aee66cd8887123234ea0c6e7143c0add73ff431ed'
+  )
+  expect(body).not.toHaveProperty('blobId')
+})

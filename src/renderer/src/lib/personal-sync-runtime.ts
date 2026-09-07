@@ -77,10 +77,19 @@ export async function advancePersonalOutbox(
           return 'scanning'
         }
         if (upload.uploadStatus === 'created') {
-          await api.uploadSnapshot(upload.id, operation.snapshotBlobId, signal)
+          try {
+            await api.uploadSnapshot(upload.id, operation.snapshotBlobId, signal)
+          } catch (error) {
+            // A lost PUT response leaves immutable staging; completion verifies the original checksum.
+            if (!(error instanceof PersonalCloudHttpError) || error.status !== 409) throw error
+          }
           upload = await api.completeUpload(
             upload.id,
-            { mimeType: input.mimeType, sizeBytes: input.sizeBytes },
+            {
+              mimeType: input.mimeType,
+              sizeBytes: input.sizeBytes,
+              blobId: operation.snapshotBlobId
+            },
             signal
           )
         }

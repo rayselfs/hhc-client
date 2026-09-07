@@ -80,7 +80,7 @@ export interface PersonalCloudHttpApi {
   putUpload(uploadId: string, blob: Blob, signal?: AbortSignal): Promise<void>
   completeUpload(
     uploadId: string,
-    input: Pick<PersonalUploadInput, 'mimeType' | 'sizeBytes'>,
+    input: Pick<PersonalUploadInput, 'mimeType' | 'sizeBytes'> & { checksumSha256: string },
     signal?: AbortSignal
   ): Promise<PersonalUploadState>
   mutate(input: PersonalMutationRequest, signal?: AbortSignal): Promise<PersonalMutationResult>
@@ -357,7 +357,7 @@ export interface PersonalNativeApi {
   completeUpload(
     input: PersonalNativeRequest & {
       uploadId: string
-      upload: Pick<PersonalUploadInput, 'mimeType' | 'sizeBytes'>
+      upload: Pick<PersonalUploadInput, 'mimeType' | 'sizeBytes'> & { blobId: string }
     }
   ): Promise<PersonalCloudReply<PersonalUploadState>>
   mutate(
