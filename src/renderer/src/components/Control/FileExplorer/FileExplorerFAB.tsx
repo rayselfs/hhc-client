@@ -1,10 +1,11 @@
+import { toast } from '@heroui/react/toast'
 import { Separator } from '@heroui/react/separator'
 import { useState } from 'react'
 import { Plus, FolderPlus, Upload, Folder, Presentation } from 'lucide-react'
 import { Dropdown } from '@renderer/components/Common/MenuPopover'
 import { useTranslation } from 'react-i18next'
 import { computeExpiresAt, type FolderDuration } from '@shared/types/folder'
-import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { createExplorerFolder, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 
@@ -35,7 +36,10 @@ export default function FileExplorerFAB({
 
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
-  const addFolder = useFileExplorerStore((state) => state.addFolder)
+  const isPersonalFolder = useFileExplorerStore((state) =>
+    Boolean(state.folders[state.currentFolderId]?.personalOwnerId)
+  )
+  const addFolder = createExplorerFolder
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -56,12 +60,18 @@ export default function FileExplorerFAB({
     setIsModalOpen(true)
   }
 
-  function handleModalSubmit(): void {
+  async function handleModalSubmit(): Promise<void> {
     if (isReadOnly) return
     const name = folderName.trim()
     if (!name) return
-    addFolder(name, currentFolderId, computeExpiresAt(folderDuration))
-    setIsModalOpen(false)
+    try {
+      await addFolder(name, currentFolderId, computeExpiresAt(folderDuration))
+      setIsModalOpen(false)
+    } catch (error) {
+      toast.danger(
+        error instanceof Error ? error.message : t('fileExplorer.invalidName', 'Invalid name')
+      )
+    }
   }
 
   const hasWritableActions = !isReadOnly
@@ -80,6 +90,7 @@ export default function FileExplorerFAB({
         onFolderNameChange={setFolderName}
         folderDuration={folderDuration}
         onFolderDurationChange={setFolderDuration}
+        hideDuration={isPersonalFolder}
       />
       <div className="fixed bottom-6 right-6 z-50">
         <Dropdown.Root>

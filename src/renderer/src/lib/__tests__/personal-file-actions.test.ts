@@ -1,4 +1,4 @@
-import { beforeEach, expect, it } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
   createPersonalFolder,
@@ -6,6 +6,7 @@ import {
   mutatePersonalNode
 } from '../personal-file-actions'
 import { usePersonalSyncStore } from '../../stores/personal-sync'
+import { createExplorerFolder, useFileExplorerStore } from '../../stores/file-explorer'
 import { listPersonalOutbox } from '../personal-sync-db'
 
 beforeEach(async () => {
@@ -43,4 +44,17 @@ it('retains offline edits and refuses another account mutation of the same local
     name: 'Offline'
   })
   expect(await listPersonalOutbox('alice')).toHaveLength(2)
+})
+
+it('routes public rename and delete actions through the outbox and blocks the legacy synchronous writer', async () => {
+  const folder = await createExplorerFolder('Routed', 'personal:space')
+  expect(useFileExplorerStore.getState().addFolder('Unsafe', 'personal:space')).toBe('')
+  useFileExplorerStore.getState().updateFolder(folder, { name: 'Renamed' })
+  await vi.waitFor(async () => expect(await listPersonalOutbox('alice')).toHaveLength(2))
+  useFileExplorerStore.getState().softDeleteFolder(folder)
+  await vi.waitFor(async () => expect(await listPersonalOutbox('alice')).toHaveLength(3))
+  expect(await (await openFileExplorerDB()).get('folder-records', folder)).toMatchObject({
+    name: 'Renamed',
+    deletedAt: expect.any(Number)
+  })
 })

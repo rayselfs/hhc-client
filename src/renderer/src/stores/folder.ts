@@ -65,7 +65,9 @@ export interface FolderStoreState {
 }
 
 function isFolderReadOnly(folderId: string, folders: Record<string, FolderRecord>): boolean {
-  return isFolderReadOnlyBySyncLink(folderId, folders)
+  return (
+    Boolean(folders[folderId]?.personalOwnerId) || isFolderReadOnlyBySyncLink(folderId, folders)
+  )
 }
 
 function isItemInReadOnlyFolder(
@@ -245,6 +247,7 @@ export function createFolderStore(config: FolderStoreConfig) {
 
     addFolder: (name, parentId, expiresAt) => {
       const resolvedParentId = parentId ?? get().currentFolderId
+      if (resolvedParentId !== config.rootId && !get().folders[resolvedParentId]) return ''
       if (isFolderReadOnly(resolvedParentId, get().folders)) return ''
       const siblings = get().getChildFolders(resolvedParentId)
       const resolvedName = resolveUniqueName(

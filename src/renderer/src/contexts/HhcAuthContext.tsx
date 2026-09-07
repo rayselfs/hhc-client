@@ -150,7 +150,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
           const nextUserId = nextSession?.userId
           if (previousUserId !== nextUserId) {
             authGenerationRef.current += 1
-            usePersonalSyncStore.getState().setAccount('loading')
+            usePersonalSyncStore.getState().setAccount(previousUserId ? 'anonymous' : 'loading')
           }
           if (!nextSession || previousUserId !== nextUserId) invalidateTokenRequests()
           if (previousUserId && previousUserId !== nextUserId) {
@@ -284,7 +284,13 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
         authGenerationRef.current += 1
       }
     } catch (error) {
-      if (adapterRef.current === adapter) signOutPendingRef.current = false
+      if (adapterRef.current === adapter) {
+        signOutPendingRef.current = false
+        const current = sessionRef.current
+        usePersonalSyncStore
+          .getState()
+          .setAccount(current ? 'authenticated' : 'anonymous', current?.userId)
+      }
       throw error
     }
   }, [cleanupDepartingAccount, invalidateTokenRequests])

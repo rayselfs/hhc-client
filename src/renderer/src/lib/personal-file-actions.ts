@@ -4,7 +4,11 @@ import { openFileExplorerDB } from './file-explorer-db'
 import { commitPersonalFileMutation, commitPersonalLocalMutation } from './personal-sync-db'
 import { resolveUniqueName } from './file-naming'
 import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
-import { FILE_EXPLORER_ROOT_ID, refreshPersonalCatalog } from '@renderer/stores/file-explorer'
+import {
+  FILE_EXPLORER_ROOT_ID,
+  publishPersistedFileItem,
+  refreshPersonalCatalog
+} from '@renderer/stores/file-explorer'
 
 function activeOwner(): string {
   const ownerId = usePersonalSyncStore.getState().activeOwnerId
@@ -47,6 +51,7 @@ export async function ensurePersonalLocalSpace(
     signal.throwIfAborted()
     if (activeOwner() !== ownerId) throw new Error('Personal account changed')
     await tx.done
+    await refreshPersonalCatalog(ownerId)
   } catch (error) {
     try {
       tx.abort()
@@ -215,4 +220,29 @@ export async function mutatePersonalNode(
     mutation: operation
   })
   await publish(ownerId)
+}
+
+export async function setPersonalFileNotes(id: string, notes: string | undefined): Promise<void> {
+  const ownerId = activeOwner()
+  const db = await openFileExplorerDB()
+  const tx = db.transaction(['personal-sync-nodes', 'folder-items'], 'readwrite')
+  try {
+    const node = await tx.objectStore('personal-sync-nodes').get(id)
+    const item = await tx.objectStore('folder-items').get(id)
+    if (node?.ownerId !== ownerId || item?.type !== 'file')
+      throw new Error('Personal file is unavailable')
+    // File projection notes are local settings; pulls preserve them independently of cloud content.
+    const updated = { ...item, notes }
+    await tx.objectStore('folder-items').put(updated)
+    await tx.done
+    if (usePersonalSyncStore.getState().activeOwnerId === ownerId) publishPersistedFileItem(updated)
+  } catch (error) {
+    try {
+      tx.abort()
+    } catch {
+      /* Already completed. */
+    }
+    await tx.done.catch(() => undefined)
+    throw error
+  }
 }

@@ -1038,12 +1038,14 @@ async function createEditablePresentationItem(
   const itemId = document.id
   const blob = createDocumentBlob(document)
   const db = await openFileExplorerDB()
+  const parent = await db.get('folder-records', parentId)
   const siblings = (await db.getAllFromIndex('folder-items', 'by-parent', parentId)).filter(
     (item) => item.deletedAt == null
   )
   const now = Date.now()
   const item: FileItemRecord = {
     id: itemId,
+    ...(parent?.personalOwnerId ? { personalOwnerId: parent.personalOwnerId } : {}),
     parentId,
     type: 'file',
     sortIndex: Math.max(-1, ...siblings.map((item) => item.sortIndex)) + 1,

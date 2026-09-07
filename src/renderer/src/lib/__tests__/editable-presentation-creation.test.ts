@@ -109,3 +109,26 @@ describe('persistEditablePresentationCreation', () => {
     expect(changed).toHaveBeenCalledOnce()
   })
 })
+
+it('retains a durable personal creation when thumbnail generation fails', async () => {
+  const { usePersonalSyncStore } = await import('../../stores/personal-sync')
+  const { ensurePersonalLocalSpace } = await import('../personal-file-actions')
+  usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+  await ensurePersonalLocalSpace(
+    'alice',
+    { id: 'space', revision: 0 },
+    new AbortController().signal
+  )
+  const personalItem = { ...item, parentId: 'personal:space' }
+  await persistEditablePresentationCreation(
+    { ...input, item: personalItem },
+    {
+      saveThumbnail: vi.fn().mockRejectedValue(new Error('Thumbnail quota'))
+    }
+  )
+  const db = await openFileExplorerDB()
+  expect(await db.get('folder-items', item.id)).toMatchObject({ personalOwnerId: 'alice' })
+  expect(await db.getAll('personal-sync-outbox')).toHaveLength(1)
+  expect(await db.get('file-blobs', item.id)).toMatchObject({ refCount: 2 })
+  usePersonalSyncStore.getState().setAccount('anonymous')
+})

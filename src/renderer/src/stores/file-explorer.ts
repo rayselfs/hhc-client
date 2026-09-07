@@ -2,7 +2,12 @@ import { useCallback } from 'react'
 import { isPersonalRecordVisible, usePersonalSyncStore } from './personal-sync'
 import { create, type Mutate, type StoreApi, type UseBoundStore } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
+import {
+  deleteFileBlob,
+  getFileSource,
+  openFileExplorerDB,
+  storeFileBlob
+} from '@renderer/lib/file-explorer-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord, FolderRecord } from '@shared/types/folder'
@@ -201,6 +206,18 @@ export async function addFileItemToStore(
   parentId: string,
   canonicalMimeType = file.type || 'application/octet-stream'
 ): Promise<string> {
+  const parent =
+    useFileExplorerStore.getState().folders[parentId] ??
+    (await (await openFileExplorerDB()).get('folder-records', parentId))
+  if (!parent && parentId !== FILE_EXPLORER_ROOT_ID)
+    throw new Error('File destination is unavailable')
+  if (parent?.personalOwnerId) {
+    return (await import('@renderer/lib/personal-file-actions')).createPersonalFile(
+      file,
+      parentId,
+      canonicalMimeType
+    )
+  }
   const db = await openFileExplorerDB()
   const id = crypto.randomUUID()
 
@@ -419,5 +436,156 @@ usePersonalSyncStore.subscribe((state, previous) => {
         usePersonalSyncStore.setState({ syncStatus: 'failed', errorCode: 'catalog-unavailable' })
       }
     })
+  }
+})
+
+export async function createExplorerFolder(
+  name: string,
+  parentId?: string,
+  expiresAt?: number | null
+): Promise<string> {
+  const store = useFileExplorerStore.getState()
+  const parent = parentId ?? store.currentFolderId
+  const destination =
+    store.folders[parent] ?? (await (await openFileExplorerDB()).get('folder-records', parent))
+  if (!destination && parent !== FILE_EXPLORER_ROOT_ID)
+    throw new Error('Folder destination is unavailable')
+  if (destination?.personalOwnerId) {
+    return (await import('@renderer/lib/personal-file-actions')).createPersonalFolder(name, parent)
+  }
+  return store.addFolder(name, parent, expiresAt)
+}
+
+function reportPersonalWriteError(error: unknown): void {
+  usePersonalSyncStore.setState({
+    syncStatus: 'failed',
+    errorCode: error instanceof Error ? error.message : 'local-write-failed'
+  })
+}
+
+async function copyPersonalBoundaryFile(itemId: string, parentId: string): Promise<string | null> {
+  const item = useFileExplorerStore.getState().items[itemId]
+  if (!item || item.type !== 'file' || !isPersonalRecordVisible(item)) return null
+  const db = await openFileExplorerDB()
+  const { getBlobId } = await import('@renderer/lib/blob-identity')
+  const source = await getFileSource(db, getBlobId(item), item.mimeType)
+  if (!source) throw new Error('Personal copy source is not available offline')
+  try {
+    const response = await fetch(source.url)
+    if (!response.ok) throw new Error('Personal copy source could not be read')
+    const blob = await response.blob()
+    if (!isPersonalRecordVisible(item)) throw new Error('Personal account changed')
+    return addFileItemToStore(
+      new File([blob], item.name, { type: item.mimeType }),
+      parentId,
+      item.mimeType
+    )
+  } finally {
+    source.revoke()
+  }
+}
+
+export async function copyExplorerFolder(id: string, parentId: string): Promise<string> {
+  const state = useFileExplorerStore.getState()
+  const source = state.folders[id]
+  if (!source || !isPersonalRecordVisible(source)) throw new Error('Copy source is unavailable')
+  let ancestor: string | null = parentId
+  const seen = new Set<string>()
+  while (ancestor && !seen.has(ancestor)) {
+    if (ancestor === id) throw new Error('Cannot copy a folder into itself')
+    seen.add(ancestor)
+    ancestor = state.folders[ancestor]?.parentId ?? null
+  }
+  await state.ensureItemsLoaded(id)
+  const items = useFileExplorerStore
+    .getState()
+    .getItems(id)
+    .filter((item) => !item.deletedAt)
+  const folders = useFileExplorerStore
+    .getState()
+    .getChildFolders(id)
+    .filter((folder) => !folder.deletedAt)
+  const target = await createExplorerFolder(source.name, parentId)
+  if (!target) throw new Error('Copy destination is unavailable')
+  for (const item of items) {
+    if (!(await useFileExplorerStore.getState().copyItem(item.id, target)))
+      throw new Error('File copy failed')
+  }
+  for (const folder of folders) await copyExplorerFolder(folder.id, target)
+  return target
+}
+
+const localFileActions = useFileExplorerStore.getState()
+function isPersonalNode(id: string): boolean {
+  const state = useFileExplorerStore.getState()
+  return Boolean(state.folders[id]?.personalOwnerId || state.items[id]?.personalOwnerId)
+}
+function personalWrite(
+  id: string,
+  mutation: Parameters<typeof import('@renderer/lib/personal-file-actions').mutatePersonalNode>[1]
+): void {
+  void import('@renderer/lib/personal-file-actions')
+    .then((actions) => actions.mutatePersonalNode(id, mutation))
+    .catch(reportPersonalWriteError)
+}
+useFileExplorerStore.setState({
+  updateFolder: (id, updates) => {
+    if (!isPersonalNode(id)) return localFileActions.updateFolder(id, updates)
+    if (updates.name !== undefined) personalWrite(id, { type: 'rename', name: updates.name })
+  },
+  updateItem: (id, updates) => {
+    if (!isPersonalNode(id)) return localFileActions.updateItem?.(id, updates)
+    if ('name' in updates && updates.name !== undefined)
+      personalWrite(id, { type: 'rename', name: updates.name })
+    if ('notes' in updates) {
+      void import('@renderer/lib/personal-file-actions')
+        .then((actions) => actions.setPersonalFileNotes(id, updates.notes))
+        .catch(reportPersonalWriteError)
+    }
+  },
+  softDeleteFolder: (id) =>
+    isPersonalNode(id)
+      ? personalWrite(id, { type: 'delete' })
+      : localFileActions.softDeleteFolder(id),
+  softDeleteItem: (id) =>
+    isPersonalNode(id)
+      ? personalWrite(id, { type: 'delete' })
+      : localFileActions.softDeleteItem(id),
+  deleteFolder: (id) =>
+    isPersonalNode(id) ? personalWrite(id, { type: 'delete' }) : localFileActions.deleteFolder(id),
+  removeItem: (id) =>
+    isPersonalNode(id) ? personalWrite(id, { type: 'delete' }) : localFileActions.removeItem(id),
+  restoreFolder: (id) =>
+    isPersonalNode(id)
+      ? personalWrite(id, { type: 'restore' })
+      : localFileActions.restoreFolder(id),
+  restoreItem: (id) =>
+    isPersonalNode(id) ? personalWrite(id, { type: 'restore' }) : localFileActions.restoreItem(id),
+  moveItem: (id, parentId) => {
+    const source = useFileExplorerStore.getState().items[id]
+    const destination = useFileExplorerStore.getState().folders[parentId]
+    if (!source?.personalOwnerId && !destination?.personalOwnerId)
+      return localFileActions.moveItem(id, parentId)
+    if (source?.personalOwnerId && source.personalOwnerId === destination?.personalOwnerId)
+      personalWrite(id, { type: 'move', parentId })
+    else void copyPersonalBoundaryFile(id, parentId).catch(reportPersonalWriteError)
+  },
+  moveFolder: (id, parentId) => {
+    const state = useFileExplorerStore.getState()
+    if (!state.folders[id]?.personalOwnerId && !state.folders[parentId]?.personalOwnerId)
+      return localFileActions.moveFolder(id, parentId)
+    if (state.folders[id]?.personalOwnerId === state.folders[parentId]?.personalOwnerId)
+      personalWrite(id, { type: 'move', parentId })
+    else void copyExplorerFolder(id, parentId).catch(reportPersonalWriteError)
+  },
+  copyItem: async (id, parentId) => {
+    if (!isPersonalNode(id) && !isPersonalNode(parentId))
+      return localFileActions.copyItem(id, parentId)
+    try {
+      return await copyPersonalBoundaryFile(id, parentId)
+    } catch (error) {
+      reportPersonalWriteError(error)
+      return null
+    }
   }
 })
