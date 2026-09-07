@@ -2,6 +2,7 @@ import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB, unwrap } from 'idb'
 import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
 import { isElectron } from './env'
+import type { PersonalOutboxRecord, PersonalSyncNode, PersonalSyncState } from './personal-sync-db'
 
 export interface FileBlobRecord {
   id: string
@@ -25,9 +26,24 @@ export interface ResourceCleanupJournalRecord {
   lastError?: string
   createdAt: number
   updatedAt: number
+  stagingLock?: string
 }
 
 export interface FileExplorerDBSchema extends DBSchema {
+  'personal-sync-outbox': {
+    key: string
+    value: PersonalOutboxRecord
+    indexes: { 'by-owner': string }
+  }
+  'personal-sync-nodes': {
+    key: string
+    value: PersonalSyncNode
+    indexes: { 'by-owner': string }
+  }
+  'personal-sync-state': {
+    key: string
+    value: PersonalSyncState
+  }
   'file-blobs': {
     key: string
     value: FileBlobRecord
@@ -49,7 +65,7 @@ export interface FileExplorerDBSchema extends DBSchema {
 }
 
 const DB_NAME = 'hhc-file-explorer'
-export const FILE_EXPLORER_DB_VERSION = 5
+export const FILE_EXPLORER_DB_VERSION = 6
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
@@ -57,6 +73,21 @@ function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
   if (!fileExplorerDBPromise) {
     fileExplorerDBPromise = openDB<FileExplorerDBSchema>(DB_NAME, FILE_EXPLORER_DB_VERSION, {
       upgrade(db, oldVersion, _newVersion, tx) {
+        if (!db.objectStoreNames.contains('personal-sync-outbox')) {
+          db.createObjectStore('personal-sync-outbox', { keyPath: 'id' }).createIndex(
+            'by-owner',
+            'ownerId'
+          )
+        }
+        if (!db.objectStoreNames.contains('personal-sync-nodes')) {
+          db.createObjectStore('personal-sync-nodes', { keyPath: 'id' }).createIndex(
+            'by-owner',
+            'ownerId'
+          )
+        }
+        if (!db.objectStoreNames.contains('personal-sync-state')) {
+          db.createObjectStore('personal-sync-state', { keyPath: 'ownerId' })
+        }
         if (!db.objectStoreNames.contains('file-blobs')) {
           db.createObjectStore('file-blobs', { keyPath: 'id' })
         }

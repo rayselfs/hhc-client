@@ -1294,7 +1294,7 @@ describe('HHC LINE collection connection', () => {
     const put = db.put.bind(db)
     vi.spyOn(db, 'put').mockImplementation(async (storeName, value) => {
       const result = await put(storeName, value)
-      if (storeName === 'folder-records' && value.id.includes(':collection:')) {
+      if (storeName === 'folder-records' && 'id' in value && value.id.includes(':collection:')) {
         sessionRef.current = {
           userId: 'user-2',
           displayName: 'Grace',

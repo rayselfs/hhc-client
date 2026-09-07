@@ -72,6 +72,16 @@ async function processResourceCleanup(record: ResourceCleanupJournalRecord): Pro
 export async function retryResourceCleanup(id: string): Promise<void> {
   const db = await openFileExplorerDB()
   const record = await db.get('resource-cleanup-journal', id)
+  if (record?.stagingLock) {
+    await navigator.locks.request(record.stagingLock, () => retryResourceCleanupUnlocked(id))
+    return
+  }
+  await retryResourceCleanupUnlocked(id)
+}
+
+async function retryResourceCleanupUnlocked(id: string): Promise<void> {
+  const db = await openFileExplorerDB()
+  const record = await db.get('resource-cleanup-journal', id)
   if (!record) return
 
   try {
