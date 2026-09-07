@@ -156,26 +156,26 @@ if successCount != 1 || conflictCount != 1 {
 
 - [x] Add fake-indexeddb tests for transaction abort, restart recovery, consecutive edits while upload active, native staging failure and account isolation.
 - [x] Run `npx vitest run src/renderer/src/lib/__tests__/personal-sync-db.test.ts` and verify failures.
-- [ ] Add new object stores with non-destructive upgrade. Route all personal create/rename/move/delete/restore/copy and deck-save call sites through the transaction helper; search every caller of folder mutation methods and file upload functions before edits.
-- [ ] Assert the failure boundary explicitly:
+- [x] Add new object stores with non-destructive upgrade. Route all personal create/rename/move/delete/restore/copy and deck-save call sites through the transaction helper; search every caller of folder mutation methods and file upload functions before edits.
+- [x] Assert the failure boundary explicitly:
 
 ```ts
 expect(await db.get('personal-sync-outbox', operationId)).toBeUndefined()
 expect(await db.get('folder-items', itemId)).toEqual(beforeItem)
 ```
 
-- [ ] Preserve immutable snapshot bytes until ACK and dependent operations settle; integrate cleanup journal rather than eagerly delete old content. Publish Zustand updates only after local durable commit.
-- [ ] Re-run focused tests and existing folder/deck persistence tests; commit `feat: persist personal cloud edits with outbox`.
+- [x] Preserve immutable snapshot bytes until ACK and dependent operations settle; integrate cleanup journal rather than eagerly delete old content. Publish Zustand updates only after local durable commit.
+- [x] Re-run focused tests and existing folder/deck persistence tests; commit `feat: persist personal cloud edits with outbox`.
 
 ## Task 4: Bidirectional sync, retry and conflicts
 
 **Files:** `personal-sync-runtime.ts`, `personal-cloud-provider.ts`, `personal-sync-db.ts`, HHC API adapters, IPC/preload, `cloud-provider.ts`, `app-init.ts`; new runtime/provider tests.
 **Interfaces:** Runtime exposes `startPersonalSync(accountUserId): () => void` and `requestPersonalSync(accountUserId): void`; consumes Task 2 APIs and Task 3 durable operations. Stop aborts I/O and fences late ACKs, without deleting pending data.
 
-- [ ] Add deterministic fake-API tests for lost mutation response, 401/429/5xx, expired upload, blocked scan, remote update versus dirty content, delete versus offline edit, parent dependency, reset cursor and interrupted download.
-- [ ] Run `npx vitest run src/renderer/src/lib/__tests__/personal-sync-runtime.test.ts` before implementation.
-- [ ] Implement startup/reconnect/manual refresh and bounded periodic polling by extending existing runtime scheduling; single account worker with IDB lease. Reuse transfer storage/download code, but commit personal state and cursor in the file explorer DB.
-- [ ] Implement conflict copy once per conflicting operation with stable ID. Verify retry does not create extra copies and ACK for revision 1 cannot mark revision 2 clean.
+- [x] Add deterministic fake-API tests for lost mutation response, 401/429/5xx, expired upload, blocked scan, remote update versus dirty content, delete versus offline edit, parent dependency, reset cursor and interrupted download.
+- [x] Run `npx vitest run src/renderer/src/lib/__tests__/personal-sync-runtime.test.ts` before implementation.
+- [x] Implement startup/reconnect/manual refresh and bounded periodic polling by extending existing runtime scheduling; single account worker with IDB lease. Reuse transfer storage/download code, but commit personal state and cursor in the file explorer DB.
+- [x] Implement conflict copy once per conflicting operation with stable ID. Verify retry does not create extra copies and ACK for revision 1 cannot mark revision 2 clean.
 
 ```ts
 expect(node.localRevision).toBe(2)
@@ -183,29 +183,29 @@ expect(node.syncedLocalRevision).toBe(1)
 expect(pendingOperations).toHaveLength(1)
 ```
 
-- [ ] Test logout/relogin same account recovers outbox, different account cannot drain it, and in-flight old-account responses cannot mutate current UI. Re-run related sync/read-only tests; commit `feat: synchronize personal cloud changes safely`.
+- [x] Test logout/relogin same account recovers outbox, different account cannot drain it, and in-flight old-account responses cannot mutate current UI. Re-run related sync/read-only tests; commit `feat: synchronize personal cloud changes safely`.
 
 ## Task 5: File Explorer, offline deck editing and garbage collection
 
 **Files:** UI/deck map, `sync-readonly.ts`, `sync-unlink.ts`, stores; asset-api retention worker tests; new `personal-cloud-sync.spec.ts`.
 **Interfaces:** Personal provider advertises write capability; legacy providers default readonly. `.lpdeck` parser outputs the existing document plus supported schemaVersion and remapped local provenance; editor uses existing save coordinator with Task 3 commit.
 
-- [ ] Add tests proving personal folders permit all mutation entrypoints while LINE/OneDrive remain readonly; downloaded decks edit offline; server rejection leaves local bytes intact.
-- [ ] Run `npx vitest run src/renderer/src/lib/__tests__/sync-readonly.test.ts src/renderer/src/lib/__tests__/editable-presentation-persistence.test.ts` plus new personal UI cases.
-- [ ] Add one cloud root entry, pending/conflict status, retry and conflict resolution using existing File Explorer UI; no additional dashboard. Hide unsupported cross-root move and use copy semantics.
-- [ ] Add schema migration and round-trip tests for embedded images, themes, notes, legacy deck and missing fonts. Unknown version opens an error state without rewriting bytes.
-- [ ] Ensure active cloud files have no local expiry; trash cleanup cannot purge pending operations or dirty content. Server GC keeps current heads and 30-day trash; orphan staging older than 24 hours is collectible only after checking active upload state. Replaced content stays protected for at least existing download lease/ticket duration.
-- [ ] Verify retention with a clock-controlled test: active files older than 14 days survive, 29-day trash survives, eligible 31-day trash is purged, active/dirty references remain intact.
-- [ ] Commit UI/deck and server retention changes in their respective repos after tests pass.
+- [x] Add tests proving personal folders permit all mutation entrypoints while LINE/OneDrive remain readonly; downloaded decks edit offline; server rejection leaves local bytes intact.
+- [x] Run `npx vitest run src/renderer/src/lib/__tests__/sync-readonly.test.ts src/renderer/src/lib/__tests__/editable-presentation-persistence.test.ts` plus new personal UI cases.
+- [x] Add one cloud root entry, pending/conflict status, retry and conflict resolution using existing File Explorer UI; no additional dashboard. Hide unsupported cross-root move and use copy semantics.
+- [x] Add schema migration and round-trip tests for embedded images, themes, notes, legacy deck and missing fonts. Unknown version opens an error state without rewriting bytes.
+- [x] Ensure active cloud files have no local expiry; trash cleanup cannot purge pending operations or dirty content. Server GC keeps current heads and 30-day trash; orphan staging older than 24 hours is collectible only after checking active upload state. Replaced content stays protected for at least existing download lease/ticket duration.
+- [x] Verify retention with a clock-controlled test: active files older than 14 days survive, 29-day trash survives, eligible 31-day trash is purged, active/dirty references remain intact.
+- [x] Commit UI/deck and server retention changes in their respective repos after tests pass.
 
 ## Task 6: Release and end-to-end acceptance
 
-- [ ] Presenter: `npm run lint`, `npm run typecheck`, `npx vitest run`, `npm run build`, `npm run build:web`, `npx playwright test e2e/personal-cloud-sync.spec.ts --project=chromium`.
-- [ ] asset-api: disposable DB-backed `go test -race ./... -count=1 -p=1`, `go vet ./...`, migration policy scripts, OpenAPI lint, all required `.github/workflows/ci.yml` checks. Gateway: route matrix, auth tests, OpenAPI and required CI.
-- [ ] Cross-device smoke: A creates folder/image/deck, B receives and edits; A receives B changes; both offline edit same deck then reconnect; both versions survive; retry after commit response loss creates no duplicates; remote delete versus offline edit loses no bytes.
+- [x] Presenter: `npm run lint`, `npm run typecheck`, `npx vitest run`, `npm run build`, `npm run build:web`, `npx playwright test e2e/personal-cloud-sync.spec.ts --project=chromium`.
+- [x] asset-api: disposable DB-backed `go test -race ./... -count=1 -p=1`, `go vet ./...`, migration policy scripts, OpenAPI lint, all required `.github/workflows/ci.yml` checks. Gateway: route matrix, auth tests, OpenAPI and required CI.
+- [x] Cross-device smoke: A creates folder/image/deck, B receives and edits; A receives B changes; both offline edit same deck then reconnect; both versions survive; retry after commit response loss creates no duplicates; remote delete versus offline edit loses no bytes.
 - [ ] Run actual Electron macOS + Windows and browser against authorized test account. Record account alias, device/app version, operation ID, cloud revision and downloaded hash without tokens.
-- [ ] Release producer first: asset-api migration/API/health → gateway routes/health → Presenter package and web release. Each repo requires separate PR/CI/merge/release evidence; perform deployments only when authorized.
-- [ ] Rollback client/gateway first if needed; keep additive schema and pending local outbox. Never drop personal data as rollback. Record tests versus deployment versus device smoke separately.
+- [x] Release producer first: asset-api migration/API/health → gateway routes/health → Presenter package and web release. Each repo requires separate PR/CI/merge/release evidence; perform deployments only when authorized.
+- [x] Rollback client/gateway first if needed; keep additive schema and pending local outbox. Never drop personal data as rollback. Record tests versus deployment versus device smoke separately.
 - [ ] Remove only this task's clean temporary worktrees after merged commits, successful releases and device smoke; otherwise preserve them. Planning-only delivery makes no implementation or deployment claim.
 
 ## Execution status — 2026-09-07
@@ -234,13 +234,13 @@ expect(pendingOperations).toHaveLength(1)
 
 ## Acceptance checklist
 
-- [ ] One owner, one cloud root; another account cannot read/write/upload/restore.
-- [ ] CRUD and nested move converge across two computers; interrupted writes never expose partial content.
-- [ ] Offline operations survive restart; uncertain retries do not duplicate work.
-- [ ] Concurrent same-account edits preserve both versions, including delete/edit conflict.
-- [ ] `.lpdeck` remains editable and presentable on another device without the original PPTX or local blob IDs.
-- [ ] Active files never inherit LINE expiry; trash/GC and unlink cannot discard unsynced data.
-- [ ] Legacy sync providers and existing projection flows pass regression checks.
+- [x] One owner, one cloud root; another account cannot read/write/upload/restore.
+- [x] CRUD and nested move converge across two computers; interrupted writes never expose partial content.
+- [x] Offline operations survive restart; uncertain retries do not duplicate work.
+- [x] Concurrent same-account edits preserve both versions, including delete/edit conflict.
+- [x] `.lpdeck` remains editable and presentable on another device without the original PPTX or local blob IDs.
+- [x] Active files never inherit LINE expiry; trash/GC and unlink cannot discard unsynced data.
+- [x] Legacy sync providers and existing projection flows pass regression checks.
 
 ### Local persistence checkpoint
 
@@ -313,3 +313,24 @@ expect(pendingOperations).toHaveLength(1)
 - Presenter PR #50 opened at `c033dc20`; CI Quality Gates `34089687794` and web preview `34089687914` both passed. macOS local package passed runtime checks and the real control/projection recovery smoke. OAuth login on the isolated native profile succeeded; personal collection `f8bb6e87debd2eb33f5f0ac22f3a4618` was read at revision 0, then a QA folder was created through the UI.
 - Native acceptance caught a real generated-file boundary: `webUtils.getPathForFile()` returns no source path for newly created/saved deck bytes. The shared native import now accepts bounded generated bytes through the same temporary-file/atomic-rename path while preserving disk copying for ordinary imports. The new native regression failed first, then all 46 focused tests and build passed. A rebuilt native app successfully opened the newly created cloud deck. This fix requires another exact-head CI run before merge.
 - Authenticated upload completion exposed the missing `checksumSha256` field in the client contract. Native completion now streams the immutable disk snapshot into SHA-256; browser completion hashes its immutable Blob. A 409 from repeating an uncertain PUT proceeds to checksum-verified completion instead of incorrectly treating staging reuse as a content conflict. Native and browser checksum regressions plus lost-PUT-response coverage pass. Full lint, 3,203 tests and desktop build passed. Existing rejected local bytes were backed up through the native UI before retrying a new cloud deck.
+
+
+### Authenticated macOS acceptance and release evidence
+
+- Presenter PR #50 merged as `e4ba1b073575e995681b6fff584479d2fc328c65` after exact-head CI `34092120340` and web preview `34092120292` passed. Tag `v2.5.0` points to that merge. Desktop release `34093193433` and web deployment `34093193445` both succeeded. Public GitHub release `v2.5.0` was published at 2026-09-07 07:13:48 UTC; Windows installer, macOS DMG/ZIP, updater manifests and SHA256SUMS were read back. Both release jobs passed packaged runtime and projection smoke, including generated snapshot persistence.
+- Gateway PR #80 fixed internal JWT/error routes reapplying the global 10 MiB request limit. A real-container regression reproduced 413 before the fix, then verified 200 MiB reaches authorization (401 without a token) while one byte over the public limit remains 413. PR CI `34091931501` and Production Release `34092141426` passed. Merge `651565a50fc632fbfb5ef1321d6448aa15535387`; latest/ready `api-gateway--0000121`; image digest `sha256:8e410f99d8df58effb801f99869ba7e00b946825cf67c39d628e13043cb55ec2`.
+- Actual macOS arm64 Electron package, isolated user-data profile, account alias Ray Chang: normal OAuth login; cloud root and nested folder creation; generated deck creation; image upload/rename; drag into a nested folder; subtree deletion and trash restoration; light/dark visual checks. Offline speaker notes survived renderer restart and synchronized after reconnect. Edited text rendered in the actual projection window.
+- The 200 MiB native upload completed at cloud revision 7, then downloaded as exactly 209,715,200 bytes. SHA-256 matched the original: `8c6ed9b1987c5576eba89d34ff2ac38701877033b4bc9aacc36ea588098145e3`. The deck at revision 8 downloaded with both edited text and offline notes intact; SHA-256 `eae2b2aa2fef1ef6a3bfe96b1df27746cd540ce11840369ba82c0b9e51e8dfa6` (2,451 bytes). Image revision 6 downloaded with SHA-256 `7b3dedc715cc68009f4f7d096f60734d41c2139cf0f97ab3b06426a472994853` (68 bytes). These are native production transfer receipts, not yet browser or Windows account acceptance.
+- Failed pre-fix deck/video attempts were preserved using the explicit local-backup UI before retry. Successful QA objects remain under `Cloud QA 2026-09-07`; no unrelated account content was changed. Source operations and hashes are recorded in `/tmp/hhc-personal-native-download-evidence.json`, `/tmp/hhc-personal-native-offline.log`, and `/tmp/hhc-personal-native-move-restore.log` on the task host. Tokens are not part of these receipts.
+- Latest full local checks: 3,203 unit tests across 275 files; lint and desktop build/typechecks passed. Browser E2E previously passed 49 tests with one existing skip; final exact-head PR CI reran the full browser suite successfully. A new packaged-app test writes, reads back and cleans a generated snapshot; it passed on actual macOS and is included in both Windows/macOS release jobs.
+- Remaining at this checkpoint: published desktop/web artifacts, browser cross-client deck/conflict acceptance and Windows authenticated device verification. The subsequent production evidence below closes the publication and browser gates. User was asked whether they will perform Windows acceptance or provide a reachable test environment. Keep temporary task worktrees while these gates remain open.
+
+### Production cross-client acceptance
+
+- Production browser at `https://client.alive.org.tw`, normal web OAuth, account alias Ray Chang, received the native QA folder, nested image, editable deck and 200 MiB video. Downloaded video and image SHA-256 match the native receipts above. The deck displayed `Portable cloud QA` and the original offline notes without access to the original machine's paths.
+- Browser kept an offline edit while native committed another offline edit after restart/reconnect. Native operation `0ec02418-1dd8-440b-92d2-85682a036673` became deck revision 14, SHA-256 `cc85f47274532b679e7b2ec82f23245abcd58c83ea1ce0c88a3b0f923948d466` (2,455 bytes). Browser operation `7d99417d-016e-480a-b82e-6c12a4c22d37` generated one conflict copy at revision 15, item `12de1304-1e54-4641-86bb-4b1429a22fa3`, SHA-256 `b217f4977668311a6d8fba766cb687cb30a93807dad2d31b0054989197c85fa6` (2,506 bytes). Browser outbox drained; native downloaded both revisions and verified their distinct notes and matching hashes. Receipts: `/tmp/hhc-personal-browser-receipts.json` and `/tmp/hhc-personal-native-conflict-evidence.json`.
+- Upgrade observation: old QA tabs retaining the pre-v6 IndexedDB connection blocked the new tab's database upgrade at the loading screen. Closing those old QA tabs released it without deleting local data. Users updating with old browser tabs open should close those old tabs and reopen Presenter. Service-worker cache clearing alone did not release the database lock.
+- No rollback was required. Additive schema, server content, local pending operations and task worktrees remain preserved. Actual authenticated Windows user-device acceptance is still pending; Windows CI packaged smoke is recorded separately and does not replace it.
+
+- Deterministic delete/edit race: native session was fully offline, edit operation `3d027c94-0204-4da1-b856-f16c5e2f79d3` and immutable snapshot `d9c6843b-de21-4422-87eb-d9d2550b3f0d` survived renderer restart before web deleted the original and reached Synced. Only then native reconnected. It retained the edited notes in `Untitled Presentation (conflict 3d027c94)`; web received that live copy while the original remained tombstoned. Downloaded copy: 2,472 bytes, SHA-256 `a530f0c6daa03d6e76c0ae70de2f78073fb428b8c2db632154dd0edef1ea39f4`. Receipts: `/tmp/hhc-personal-native-delete-edit.log`, `/tmp/hhc-personal-delete-edit-catalog.json`, `/tmp/hhc-personal-browser-delete-edit-receipt.json`. An earlier browser-only offline probe did not establish the ordering and is not used as delete/edit evidence.
+- Acceptance checklist completion combines automated owner isolation, atomicity, retries, retention and legacy regression checks with the authenticated macOS/browser operations above. It does not certify an unavailable authenticated Windows device. Keep the Windows execution and worktree-cleanup checkboxes open until that evidence exists.
