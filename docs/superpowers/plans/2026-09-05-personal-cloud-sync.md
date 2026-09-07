@@ -154,8 +154,8 @@ if successCount != 1 || conflictCount != 1 {
 **Files:** Presenter persistence files from map plus `lib/__tests__/personal-sync-db.test.ts`.
 **Interfaces:** Add `commitPersonalLocalMutation(input): Promise<void>` taking owner ID, node ID, local revision, mutation payload and optional immutable blob ID. It writes catalog/node/outbox atomically; `personal-sync-db.ts` owns its concrete input types. Runtime consumes durable records, never optimistic Zustand state.
 
-- [ ] Add fake-indexeddb tests for transaction abort, restart recovery, consecutive edits while upload active, native staging failure and account isolation.
-- [ ] Run `npx vitest run src/renderer/src/lib/__tests__/personal-sync-db.test.ts` and verify failures.
+- [x] Add fake-indexeddb tests for transaction abort, restart recovery, consecutive edits while upload active, native staging failure and account isolation.
+- [x] Run `npx vitest run src/renderer/src/lib/__tests__/personal-sync-db.test.ts` and verify failures.
 - [ ] Add new object stores with non-destructive upgrade. Route all personal create/rename/move/delete/restore/copy and deck-save call sites through the transaction helper; search every caller of folder mutation methods and file upload functions before edits.
 - [ ] Assert the failure boundary explicitly:
 
@@ -227,7 +227,7 @@ expect(pendingOperations).toHaveLength(1)
 - Producer PR: https://github.com/HallelujahHomeChurch/asset-api/pull/57 (head includes `050a014`, personal GC and restore protection).
 - Gateway PR: https://github.com/HallelujahHomeChurch/api-gateway/pull/79 .
 - Infrastructure PR: https://github.com/HallelujahHomeChurch/azure-infra/pull/58 .
-- All three PRs are open; check current CI and exact heads before merge. Release order: asset-api producer/Bicep → reviewed azure-infra plan, merged change and deliberate Terraform apply → gateway → Presenter. azure-infra has no automatic apply workflow; never apply unrelated drift or an unreviewed plan.
+- Producer PR #57 merged as `9b827e1`; Production Release run `34078418371` succeeded, including deployment, health, workers and OpenAPI. Infrastructure PR #58 merged as `baa7566`; reviewed fresh production plan changes only gateway Dapr request size to 210 (asset-api was set by its Bicep release). Terraform apply is in progress; verify its result. Gateway PR #79 is open at `759b415`; CI run `34078728055` succeeded after updating the exact OpenAPI and runtime fragment expectations. Check current exact head before merge. Release order: asset-api producer/Bicep → reviewed azure-infra plan, merged change and deliberate Terraform apply → gateway → Presenter. azure-infra has no automatic apply workflow; never apply unrelated drift or an unreviewed plan.
 - Server GC additions: active heads/29-day trash survive, 31-day restores fail, orphan staging waits 24 hours and excludes active uploads/workers, and head attachment/restore/replacement extend the asset lease to fence concurrent purge. Migration 019 indexes personal asset references. Full disposable PostgreSQL-backed Go race suite passed after these changes.
 - Local database fixture is Docker container `codex-personal-cloud-pg`, PostgreSQL 17, bound only to `127.0.0.1:55439`, database `asset_test`. It is disposable test infrastructure, not production.
 - Next implementation: atomic local outbox in the Presenter file-explorer DB, then runtime and all mutation entrypoints. Existing folder store mutators publish optimistically and must be handled specifically for personal writes; preserve legacy providers and Bible behavior.
@@ -241,3 +241,10 @@ expect(pendingOperations).toHaveLength(1)
 - [ ] `.lpdeck` remains editable and presentable on another device without the original PPTX or local blob IDs.
 - [ ] Active files never inherit LINE expiry; trash/GC and unlink cannot discard unsynced data.
 - [ ] Legacy sync providers and existing projection flows pass regression checks.
+
+### Local persistence checkpoint
+
+- Presenter commit `d5ec943a` adds DB version 6, atomic catalog/node/outbox/snapshot writes, account isolation, sequence/dependency recording, native staging journals with Web Locks, and pending-snapshot protection during storage repair.
+- Focused verification: 66 tests across personal DB, file DB, cleanup journal, storage integrity and LINE connection; full node/web typecheck and changed-file ESLint passed.
+- This is the persistence foundation only. No personal root or UI is enabled. Task 3 still requires every mutation/deck-save call site, subtree semantics and durable UI publication. ACK/lease/runtime/conflicts, portable deck parsing and device acceptance remain unfinished.
+- Native staging records acquire a Web Lock also respected by journal cleanup; failed staging IDs cannot be reused until cleanup completes. Avoid bypassing this helper for personal content.
