@@ -8,6 +8,7 @@ import {
   useRef,
   useState
 } from 'react'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 import type { HhcAuthAdapter, HhcSession } from '@shared/hhc-auth'
 import { createHhcAuthAdapter, registerHhcSessionOwner } from '@renderer/lib/hhc-auth'
 
@@ -50,6 +51,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     () => registerHhcSessionOwner(() => (signOutPendingRef.current ? null : sessionRef.current)),
     []
   )
+
+  const sessionUserId = session?.userId
+  useLayoutEffect(() => {
+    usePersonalSyncStore.getState().setAccount(status, sessionUserId)
+  }, [status, sessionUserId])
 
   const invalidateTokenRequests = useCallback((): void => {
     sessionEpochRef.current += 1
@@ -142,7 +148,10 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
           }
           const previousUserId = sessionRef.current?.userId
           const nextUserId = nextSession?.userId
-          if (previousUserId !== nextUserId) authGenerationRef.current += 1
+          if (previousUserId !== nextUserId) {
+            authGenerationRef.current += 1
+            usePersonalSyncStore.getState().setAccount('loading')
+          }
           if (!nextSession || previousUserId !== nextUserId) invalidateTokenRequests()
           if (previousUserId && previousUserId !== nextUserId) {
             cleanupUserId = previousUserId
@@ -264,6 +273,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     setSignInStatus('idle')
     setPendingSignInExpiresAt(null)
     signOutPendingRef.current = true
+    usePersonalSyncStore.getState().setAccount('anonymous')
     invalidateTokenRequests()
     try {
       const generation = authGenerationRef.current

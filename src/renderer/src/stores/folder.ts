@@ -144,7 +144,12 @@ export function createFolderStore(config: FolderStoreConfig) {
           }
         }
 
-        const rootItems = await ops.loadItemsByParent(config.rootId)
+        const rootItems = (await ops.loadItemsByParent(config.rootId)).filter(
+          (item) => config.isVisible?.(item) ?? true
+        )
+        for (const folder of Object.values(folderMap)) {
+          if (config.isVisible && !config.isVisible(folder)) delete folderMap[folder.id]
+        }
         const itemMap: Record<string, AnyItemRecord> = {}
         for (const item of rootItems) {
           itemMap[item.id] = item
@@ -202,6 +207,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           set((state) => {
             const newItems = { ...state.items }
             for (const item of items) {
+              if (config.isVisible && !config.isVisible(item)) continue
               newItems[item.id] = item
             }
             const newLoaded = new Set(state.loadedParents)

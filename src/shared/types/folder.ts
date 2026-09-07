@@ -67,6 +67,7 @@ export type FileItem = FileItemRecord
 export type FolderItem = ItemRecord
 
 export interface FolderStoreConfig {
+  isVisible?: (record: FolderRecord | AnyItemRecord) => boolean
   rootId: string
   rootName: string
   getDB: () => Promise<unknown>

@@ -7,7 +7,7 @@ import { saveThumbnail } from './thumbnail-db'
 import { isFileItem } from '@shared/types/folder'
 import { getBlobId } from './blob-identity'
 import { commitPersonalFileMutation } from './personal-sync-db'
-import { getCurrentHhcSession } from './hhc-auth'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 import { publishPersistedFileItem } from '@renderer/stores/file-explorer'
 
 export interface EditablePresentationRevisionWrite {
@@ -50,6 +50,7 @@ export async function persistEditablePresentationRevision(
     const snapshotId = crypto.randomUUID()
     const catalog = {
       ...item,
+      personalOwnerId: personalNode.ownerId,
       name: write.catalogName ?? item.name,
       url: `blob:${snapshotId}`,
       size: blob.size
@@ -67,7 +68,8 @@ export async function persistEditablePresentationRevision(
       },
       new File([body], catalog.name, { type: EDITABLE_PRESENTATION_MIME_TYPE })
     )
-    if (getCurrentHhcSession()?.userId === personalNode.ownerId) publishPersistedFileItem(catalog)
+    if (usePersonalSyncStore.getState().activeOwnerId === personalNode.ownerId)
+      publishPersistedFileItem(catalog)
     return { revision: write.revision, mirrorWarnings: [] }
   }
   const tx = db.transaction(['file-blobs', 'folder-items'], 'readwrite')

@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { isPersonalRecordVisible, usePersonalSyncStore } from './personal-sync'
 import { create, type Mutate, type StoreApi, type UseBoundStore } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
@@ -74,10 +75,15 @@ export const FILE_EXPLORER_ROOT_ID = 'file-root'
 export const useFileExplorerStore = createFolderStore({
   rootId: FILE_EXPLORER_ROOT_ID,
   rootName: 'Files',
+  isVisible: isPersonalRecordVisible,
   getDB: () => openFileExplorerDB()
 })
 
+let personalCatalogGeneration = 0
+
 export function publishPersistedFileItem(item: FileItemRecord): void {
+  personalCatalogGeneration += 1
+  if (!isPersonalRecordVisible(item)) return
   useFileExplorerStore.setState((state) => {
     const items = { ...state.items, [item.id]: item }
     const siblings = [
@@ -88,7 +94,12 @@ export function publishPersistedFileItem(item: FileItemRecord): void {
       items,
       _itemsArray: Object.values(items),
       _itemsByParent: {
-        ...state._itemsByParent,
+        ...Object.fromEntries(
+          Object.entries(state._itemsByParent).map(([parentId, entries]) => [
+            parentId,
+            parentId === item.parentId ? entries : entries.filter((entry) => entry.id !== item.id)
+          ])
+        ),
         [item.parentId]: siblings
       }
     }
@@ -332,3 +343,81 @@ export function useCurrentFolderDisplay(): FolderDisplayPreference & {
     setGroupMode
   }
 }
+
+export async function refreshPersonalCatalog(ownerId: string): Promise<void> {
+  const generation = ++personalCatalogGeneration
+  const db = await openFileExplorerDB()
+  const tx = db.transaction(['folder-records', 'folder-items'])
+  // ponytail: full catalog scan; add an owner index if measured library sizes make this slow.
+  const [allFolders, allItems] = await Promise.all([
+    tx.objectStore('folder-records').getAll(),
+    tx.objectStore('folder-items').getAll()
+  ])
+  await tx.done
+  if (
+    generation !== personalCatalogGeneration ||
+    usePersonalSyncStore.getState().activeOwnerId !== ownerId
+  )
+    return
+  useFileExplorerStore.setState((state) => {
+    const folders = Object.fromEntries([
+      ...Object.entries(state.folders).filter(([, folder]) => !folder.personalOwnerId),
+      ...allFolders
+        .filter((folder) => folder.personalOwnerId === ownerId)
+        .map((folder) => [folder.id, folder] as const)
+    ])
+    const items = Object.fromEntries([
+      ...Object.entries(state.items).filter(([, item]) => !item.personalOwnerId),
+      ...allItems
+        .filter((item) => item.personalOwnerId === ownerId)
+        .map((item) => [item.id, item] as const)
+    ])
+    const childFoldersByParent: typeof state._childFoldersByParent = {}
+    for (const folder of Object.values(folders)) {
+      if (folder.parentId !== null) (childFoldersByParent[folder.parentId] ??= []).push(folder)
+    }
+    const itemsByParent: typeof state._itemsByParent = {}
+    for (const item of Object.values(items)) (itemsByParent[item.parentId] ??= []).push(item)
+    for (const entries of Object.values(childFoldersByParent))
+      entries.sort((a, b) => a.sortIndex - b.sortIndex)
+    for (const entries of Object.values(itemsByParent))
+      entries.sort((a, b) => a.sortIndex - b.sortIndex)
+    return {
+      folders,
+      items,
+      _foldersArray: Object.values(folders),
+      _itemsArray: Object.values(items),
+      _childFoldersByParent: childFoldersByParent,
+      _itemsByParent: itemsByParent,
+      loadedParents: new Set([
+        ...state.loadedParents,
+        ...allFolders
+          .filter((folder) => folder.personalOwnerId === ownerId)
+          .map((folder) => folder.id)
+      ])
+    }
+  })
+}
+
+usePersonalSyncStore.subscribe((state, previous) => {
+  if (state.activeOwnerId === previous.activeOwnerId) return
+  personalCatalogGeneration += 1
+  const catalog = useFileExplorerStore.getState()
+  removeCleanedEntriesFromStore({
+    folderIds: Object.values(catalog.folders)
+      .filter((folder) => !isPersonalRecordVisible(folder))
+      .map((folder) => folder.id),
+    itemIds: Object.values(catalog.items)
+      .filter((item) => !isPersonalRecordVisible(item))
+      .map((item) => item.id)
+  })
+  if (state.activeOwnerId) {
+    const refresh = refreshPersonalCatalog(state.activeOwnerId)
+    const generation = personalCatalogGeneration
+    void refresh.catch(() => {
+      if (generation === personalCatalogGeneration) {
+        usePersonalSyncStore.setState({ syncStatus: 'failed', errorCode: 'catalog-unavailable' })
+      }
+    })
+  }
+})
