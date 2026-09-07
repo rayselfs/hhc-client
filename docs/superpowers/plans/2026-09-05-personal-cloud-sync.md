@@ -143,11 +143,11 @@ if successCount != 1 || conflictCount != 1 {
 **Files:** asset-api HTTP handlers, policy/media validation, OpenAPI/tests; gateway exact route configs, OpenAPI and route test script.
 **Interfaces:** Consumes Task 1 owner collection and mutation store; produces all HTTP endpoints in the contract table. No browser receives private Blob/SAS credentials.
 
-- [ ] Add handler tests for forged owner headers, unauthorized upload ID, wrong MIME/size, scan rejection, request cancellation, Range download and owner mismatch. Add schema-version/reference corruption fixtures for `.lpdeck`.
-- [ ] Run `go test ./internal/httpapi ./internal/assets -run 'Personal|Presenter' -count=1`; confirm new cases fail before handler implementation.
-- [ ] Implement server-owned upload metadata and streaming content proxy. Enforce a 200 MiB per-file maximum as initial policy, including `.lpdeck`; expose structured failure to client. Reuse existing admission/rate controls rather than add a billing/quota system.
-- [ ] Add exact gateway routes only on existing Presenter API host policy; inspect `conf.d/` source/include ownership before edit. Extend request-body limits/timeouts narrowly for content upload. Keep adjacent unknown paths, wrong methods and `/priv/*` rejected.
-- [ ] Test `bash scripts/test-personal-cloud-routes.sh`, `go test ./...`, `go vet ./...` in gateway; run asset handler tests and OpenAPI checks. Commit separately in each repo.
+- [x] Add handler tests for forged owner headers, unauthorized upload ID, wrong MIME/size, scan rejection, request cancellation, Range download and owner mismatch. Add schema-version/reference corruption fixtures for `.lpdeck`.
+- [x] Run `go test ./internal/httpapi ./internal/assets -run 'Personal|Presenter' -count=1`; confirm new cases fail before handler implementation.
+- [x] Implement server-owned upload metadata and streaming content proxy. Enforce a 200 MiB per-file maximum as initial policy, including `.lpdeck`; expose structured failure to client. Reuse existing admission/rate controls rather than add a billing/quota system.
+- [x] Add exact gateway routes only on existing Presenter API host policy; inspect `conf.d/` source/include ownership before edit. Extend request-body limits/timeouts narrowly for content upload. Keep adjacent unknown paths, wrong methods and `/priv/*` rejected.
+- [x] Test `bash scripts/test-personal-cloud-routes.sh`, `go test ./...`, `go vet ./...` in gateway; run asset handler tests and OpenAPI checks. Commit separately in each repo.
 
 ## Task 3: Durable local operations and immutable content snapshots
 
@@ -213,10 +213,16 @@ expect(pendingOperations).toHaveLength(1)
 - Presenter worktree: `.worktrees/personal-cloud-sync`, branch `feat/personal-cloud-sync`, based on `02c59386` (camera PR #49 merged).
 - asset-api worktree: `.worktrees/personal-cloud-sync`, branch `feat/personal-cloud-sync`, based on `c4465cf`.
 - Task 1 completed in asset-api commit `a078572`: additive migration 017, owner-scoped collection/node mutations, receipts, immutable paginated snapshots and tombstones.
-- Task 2 in progress: authenticated space, changes and mutation handlers implemented; upload/content proxy, portable deck validation and gateway routing remain outstanding.
+- Task 2 completed locally: asset-api `0bcb6e3` / `1102777`, gateway `b8dd292`, azure-infra `a7dcb09`.
+- Owner-scoped create/PUT/complete/status and revision/Range content endpoints are implemented. Staging publication uses Azure If-None-Match and local atomic hard links; late writes clean obsolete staging. Replays preserve microsecond timestamp precision.
+- `.lpdeck` server validation covers legacy/v1 schema, graph/order/reference consistency, bounded geometry and embedded raster images (PNG/JPEG/GIF/WebP/BMP, 20 MiB per image). SVG and external/local URLs are rejected. Task 5 must use the same client policy and retain unsupported original bytes.
+- Download acquisition takes a ten-minute purge exclusion lease; HTTP transfers have a five-minute deadline. Active heads and 30-day trash are protected from purge. Full orphan/version/trash collection remains Task 5.
+- Additional required repository: `/Users/rayselfs/Projects/hhc/website/azure-infra/.worktrees/personal-cloud-sync`. Gateway and asset-api Dapr request limits are set to 210 MB in Terraform, with the asset-api Bicep source kept consistent. nginx and API enforce the 200 MiB file limit.
+- Dapr defaults require explicit larger-body configuration: https://docs.dapr.io/operations/configuration/increase-request-size/ . Changes are authored only; Terraform plan/apply and actual Azure large-file acceptance remain release gates.
+- Validation: actual PostgreSQL-backed HTTP upload/scan-state/Range/owner tests, full Go race suite, vet, migration policy, OpenAPI, both Docker builds, gateway runtime method/host/auth matrix, Bicep compilation, Terraform fmt/validate. No production changes were made.
 - Actual disposable PostgreSQL 17 tests cover concurrent root creation and updates, receipt replay, injected transaction rollback, owner isolation, cycles, NFC name collisions, scan-gated head replacement, subtree restore and changes across pagination boundaries.
 - Full database-backed `go test -race ./... -count=1 -p=1` and `go vet ./...` passed. Migration policy and OpenAPI validation passed; repository-wide OpenAPI warnings remain.
-- Tasks 3–6 remain open. No cloud UI, client sync, cross-device acceptance, PR, merge or release is claimed.
+- Tasks 3–6 remain open. No cloud UI, client sync, cross-device acceptance, PR, merge or release is claimed. Next implementation is the atomic local outbox in the Presenter file-explorer DB.
 
 ## Acceptance checklist
 
