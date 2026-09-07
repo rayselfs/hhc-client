@@ -1,5 +1,9 @@
 import { toast } from '@heroui/react/toast'
-import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
+import {
+  addFileItemToStore,
+  createExplorerFolder,
+  useFileExplorerStore
+} from '@renderer/stores/file-explorer'
 import { generateThumbnail, yieldToMain } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail } from '@renderer/lib/thumbnail-db'
 import { isWeb } from '@renderer/lib/env'
@@ -267,7 +271,7 @@ export async function uploadFilesForKind(
 export async function uploadFolderFiles(
   allFiles: File[],
   currentFolderId: string,
-  addFolder: (name: string, parentId: string) => string
+  addFolder: (name: string, parentId: string) => string | Promise<string>
 ): Promise<number> {
   const candidates = await prepareUploadCandidates(allFiles)
   if (candidates.length === 0) return 0
@@ -294,7 +298,8 @@ export async function uploadFolderFiles(
         const parentPath = parts.slice(0, depth - 1).join('/')
         const parentId =
           depth === 1 ? currentFolderId : (pathToFolderId.get(parentPath) ?? currentFolderId)
-        const id = addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
+        const id = await addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
+        if (!id) throw new Error('Folder creation failed')
         await yieldToMain()
         pathToFolderId.set(folderPath, id)
       }
@@ -319,7 +324,7 @@ export async function uploadFolderFilesFromStore(
   allFiles: File[],
   currentFolderId: string
 ): Promise<number> {
-  return uploadFolderFiles(allFiles, currentFolderId, useFileExplorerStore.getState().addFolder)
+  return uploadFolderFiles(allFiles, currentFolderId, createExplorerFolder)
 }
 
 export async function uploadFromDataTransfer(
@@ -339,7 +344,7 @@ export async function uploadFromDataTransfer(
   const relativePaths = new Map(
     filesWithPaths.map(({ file, relativePath }) => [file, relativePath])
   )
-  const { addFolder } = useFileExplorerStore.getState()
+  const addFolder = createExplorerFolder
   const store = useFileExplorerStore.getState()
   const usedNamesByParent = new Map<string, Set<string>>()
 
@@ -363,7 +368,8 @@ export async function uploadFromDataTransfer(
         const parentPath = parts.slice(0, depth - 1).join('/')
         const parentId =
           depth === 1 ? targetFolderId : (pathToFolderId.get(parentPath) ?? targetFolderId)
-        const id = addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
+        const id = await addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
+        if (!id) throw new Error('Folder creation failed')
         await yieldToMain()
         pathToFolderId.set(folderPath, id)
       }

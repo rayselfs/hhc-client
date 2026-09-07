@@ -1,4 +1,5 @@
 import type { EditablePresentationDocument } from './editable-presentation'
+import { loadPresentationFont } from './font-loader'
 interface LocalFontData {
   family: string
 }
@@ -59,6 +60,25 @@ export function getDocumentFontFamilies(document: EditablePresentationDocument):
               ]) ?? []
             ]
       )
+    )
+  )
+}
+
+export async function findUnavailablePresentationFonts(families: string[]): Promise<string[]> {
+  await Promise.all(families.map((family) => loadPresentationFont(family).catch(() => undefined)))
+  const context = document.createElement('canvas').getContext('2d')
+  if (!context) return []
+  const sample = 'mmmmmmWWWWW漢字0123456789'
+  const measure = (font: string): number => {
+    context.font = `32px ${font}`
+    return context.measureText(sample).width
+  }
+  const fallbacks = ['monospace', 'serif']
+  const widths = fallbacks.map(measure)
+  // ponytail: compare two fallback metrics; use an authorized local-font inventory if ambiguous fonts matter.
+  return families.filter((family) =>
+    fallbacks.every(
+      (fallback, index) => measure(`${JSON.stringify(family)}, ${fallback}`) === widths[index]
     )
   )
 }

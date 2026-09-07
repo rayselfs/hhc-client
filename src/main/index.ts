@@ -27,6 +27,7 @@ import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 import { createHhcAuthService, registerHhcAuthIpc } from './ipc/hhc-auth'
 import { registerHhcAssetHandlers } from './ipc/hhc-assets'
+import { registerPersonalCloudHandlers } from './ipc/personal-cloud'
 import { createHhcPresenterProtocolDispatcher } from './protocol-router'
 import { registerAppProtocol } from './app-protocol'
 
@@ -136,6 +137,7 @@ if (gotSingleInstanceLock) {
     registerOneDriveCredentialHandlers(wm)
     registerHhcAuthIpc(wm, hhcAuthService)
     registerHhcAssetHandlers(wm, hhcAuthService)
+    registerPersonalCloudHandlers(wm, hhcAuthService)
     registerOneDriveDownloadHandlers(wm)
     registerNativeMediaProtocol()
     registerMediaPermissions(session.defaultSession, () => wm.getMainWindow()?.webContents)

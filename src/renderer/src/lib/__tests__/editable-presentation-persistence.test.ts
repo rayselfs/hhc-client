@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Blob as NodeBlob } from 'node:buffer'
+import { Blob as NodeBlob, File as NodeFile } from 'node:buffer'
 import type { FileItemRecord } from '@shared/types/folder'
 import { createBlankEditablePresentationDocument } from '../editable-presentation'
 import {
@@ -78,6 +78,7 @@ async function seedAuthority(
 
 beforeEach(async () => {
   vi.stubGlobal('Blob', NodeBlob)
+  vi.stubGlobal('File', NodeFile)
   await resetFileExplorerDBForTests()
   await resetMediaWorkDBForTests()
 })
@@ -205,5 +206,51 @@ describe('refreshEditablePresentationThumbnail', () => {
       dataUrl: expect.stringMatching(/^data:image\/svg\+xml;base64,/)
     })
     window.removeEventListener('hhc:thumbnail-ready', listener)
+  })
+})
+
+it('saves personal deck bytes and rename operations without overwriting an uploading revision', async () => {
+  await seedAuthority()
+  const db = await openFileExplorerDB()
+  await db.put('personal-sync-state', {
+    ownerId: 'alice',
+    collectionId: 'cloud',
+    rootId: item.parentId,
+    collectionRevision: 1,
+    sequence: 0
+  })
+  await db.put('personal-sync-nodes', {
+    id: item.id,
+    ownerId: 'alice',
+    remoteId: 'remote-deck',
+    kind: 'file',
+    localRevision: 1,
+    syncedLocalRevision: 1,
+    remoteRevision: 1
+  })
+
+  await persistEditablePresentationRevision(createWrite())
+  const firstCatalog = await db.get('folder-items', item.id)
+  const firstOperations = await db.getAll('personal-sync-outbox')
+  expect(firstCatalog).toMatchObject({ name: 'Renamed' })
+  expect(firstCatalog && 'url' in firstCatalog && firstCatalog.url).not.toBe(item.url)
+  expect(firstOperations).toHaveLength(2)
+  const replace = firstOperations.find((operation) => operation.mutation.type === 'replace-content')
+  expect(replace).toMatchObject({ fileName: 'Renamed.lpdeck' })
+  const firstSnapshot = await db.get('file-blobs', replace?.snapshotBlobId ?? '')
+  expect(JSON.parse(await readBlobText(firstSnapshot?.blob))).toMatchObject({ name: 'Renamed' })
+  expect(firstOperations.find((operation) => operation.mutation.type === 'rename')).toMatchObject({
+    dependsOn: replace?.id,
+    localRevision: 2
+  })
+
+  await persistEditablePresentationRevision(
+    createWrite({ revision: 5, document: { ...initialDocument, name: 'Later' } })
+  )
+  expect(await db.getAll('personal-sync-outbox')).toHaveLength(3)
+  expect(await db.get('file-blobs', replace?.snapshotBlobId ?? '')).toMatchObject({ revision: 4 })
+  expect(await db.get('personal-sync-nodes', item.id)).toMatchObject({
+    localRevision: 3,
+    syncedLocalRevision: 1
   })
 })

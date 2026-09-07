@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from '@heroui/react/toast'
 import { Trash2, RotateCcw } from 'lucide-react'
 import { Button } from '@heroui/react/button'
 import { Input } from '@heroui/react/input'
@@ -55,7 +56,6 @@ export default function TrashPage(): React.JSX.Element {
   const { showMenu } = useContextMenu()
   const foldersArray = useFileExplorerStore((state) => state._foldersArray)
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
-  const foldersById = useFileExplorerStore((state) => state.folders)
   const restoreFolder = useFileExplorerStore((state) => state.restoreFolder)
   const restoreItem = useFileExplorerStore((state) => state.restoreItem)
   const viewMode = useTrashExplorerSettings((state) => state.viewMode)
@@ -106,18 +106,37 @@ export default function TrashPage(): React.JSX.Element {
   const thumbnails = useThumbnails(thumbnailFileItems)
 
   const getRestoreTargetParentId = useCallback(
-    (originalParentId: string | null | undefined): string => {
+    (originalParentId: string | null | undefined, ownerId?: string): string => {
+      const foldersById = useFileExplorerStore.getState().folders
       return originalParentId &&
         foldersById[originalParentId] &&
         !foldersById[originalParentId].deletedAt
         ? originalParentId
-        : FILE_EXPLORER_ROOT_ID
+        : ownerId
+          ? (Object.values(foldersById).find(
+              (folder) =>
+                folder.personalOwnerId === ownerId && folder.parentId === FILE_EXPLORER_ROOT_ID
+            )?.id ?? FILE_EXPLORER_ROOT_ID)
+          : FILE_EXPLORER_ROOT_ID
     },
-    [foldersById]
+    []
   )
 
   const getActiveSiblingNames = useCallback(
     (entry: TrashEntry, targetParentId: string): string[] => {
+      const { _foldersArray: foldersArray, _itemsArray: itemsArray } =
+        useFileExplorerStore.getState()
+      const record = entry.kind === 'folder' ? entry.folder : entry.item
+      if (record.personalOwnerId)
+        return [...foldersArray, ...itemsArray]
+          .filter(
+            (sibling) =>
+              sibling.parentId === targetParentId &&
+              !sibling.deletedAt &&
+              sibling.id !== record.id &&
+              'name' in sibling
+          )
+          .map((sibling) => ('name' in sibling ? sibling.name : ''))
       if (entry.kind === 'folder') {
         return foldersArray
           .filter(
@@ -138,12 +157,21 @@ export default function TrashPage(): React.JSX.Element {
         )
         .map((item) => item.name)
     },
-    [foldersArray, itemsArray]
+    []
   )
 
   const restoreEntry = useCallback(
-    (entry: TrashEntry, name?: string): void => {
+    async (entry: TrashEntry, name?: string): Promise<void> => {
       const trimmedName = name?.trim()
+      const record = entry.kind === 'folder' ? entry.folder : entry.item
+      if (record.personalOwnerId) {
+        const actions = await import('@renderer/lib/personal-file-actions')
+        await actions.mutatePersonalNode(record.id, {
+          type: 'restore',
+          ...(trimmedName ? { name: trimmedName } : {})
+        })
+        return
+      }
       if (entry.kind === 'folder') {
         if (trimmedName && trimmedName !== entry.folder.name) {
           useFileExplorerStore.getState().updateFolder(entry.folder.id, { name: trimmedName })
@@ -160,16 +188,19 @@ export default function TrashPage(): React.JSX.Element {
   )
 
   const requestRestoreEntry = useCallback(
-    (entry: TrashEntry): boolean => {
+    async (entry: TrashEntry): Promise<boolean> => {
       const originalParentId =
         entry.kind === 'folder' ? entry.folder.originalParentId : entry.item.originalParentId
-      const targetParentId = getRestoreTargetParentId(originalParentId)
+      const targetParentId = getRestoreTargetParentId(
+        originalParentId,
+        (entry.kind === 'folder' ? entry.folder : entry.item).personalOwnerId
+      )
       const name = entry.kind === 'folder' ? entry.folder.name : entry.item.name
       if (hasNameConflict(name, getActiveSiblingNames(entry, targetParentId))) {
         setRestoreConflict({ entry, targetParentId, name })
         return false
       }
-      restoreEntry(entry)
+      await restoreEntry(entry)
       return true
     },
     [getActiveSiblingNames, getRestoreTargetParentId, restoreEntry]
@@ -222,22 +253,45 @@ export default function TrashPage(): React.JSX.Element {
   } = useItemSelection(allIds)
 
   const requestRestoreIds = useCallback(
-    (ids: Set<string>): void => {
-      for (const id of ids) {
-        const entry = entries.find((e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === id)
-        if (!entry) continue
-        if (!requestRestoreEntry(entry)) return
+    async (ids: Set<string>): Promise<void> => {
+      const depth = (id: string): number => {
+        const state = useFileExplorerStore.getState()
+        let parent = (state.folders[id] ?? state.items[id])?.parentId
+        const seen = new Set<string>()
+        while (parent && !seen.has(parent)) {
+          seen.add(parent)
+          parent = state.folders[parent]?.parentId ?? null
+        }
+        return seen.size
       }
-      clearSelection()
+      try {
+        for (const id of [...ids].sort((a, b) => depth(a) - depth(b))) {
+          const state = useFileExplorerStore.getState()
+          const folder = state.folders[id]
+          const item = state.items[id]
+          if (folder?.deletedAt) {
+            if (!(await requestRestoreEntry({ kind: 'folder', folder }))) return
+          } else if (item?.type === 'file' && item.deletedAt) {
+            if (!(await requestRestoreEntry({ kind: 'file', item }))) return
+          }
+        }
+        clearSelection()
+      } catch (error) {
+        toast.danger(error instanceof Error ? error.message : 'Restore failed')
+      }
     },
-    [clearSelection, entries, requestRestoreEntry]
+    [clearSelection, requestRestoreEntry]
   )
 
-  const submitRestoreConflict = useCallback((): void => {
+  const submitRestoreConflict = useCallback(async (): Promise<void> => {
     if (!restoreConflict || !canSubmitRestore) return
-    restoreEntry(restoreConflict.entry, restoreName)
-    setRestoreConflict(null)
-    clearSelection()
+    try {
+      await restoreEntry(restoreConflict.entry, restoreName)
+      setRestoreConflict(null)
+      clearSelection()
+    } catch (error) {
+      toast.danger(error instanceof Error ? error.message : 'Restore failed')
+    }
   }, [canSubmitRestore, clearSelection, restoreConflict, restoreEntry, restoreName])
 
   const gridItemsWithSelection = useMemo(
@@ -247,7 +301,14 @@ export default function TrashPage(): React.JSX.Element {
 
   const permanentlyDeleteIds = useCallback(
     async (ids: Set<string>): Promise<void> => {
-      if (ids.size === 0) return
+      if (
+        ids.size === 0 ||
+        entries.some((entry) => {
+          const record = entry.kind === 'folder' ? entry.folder : entry.item
+          return ids.has(record.id) && Boolean(record.personalOwnerId)
+        })
+      )
+        return
       const confirmed = await confirm({
         title: t('trash.permanentDeleteTitle'),
         description: t('trash.permanentDeleteDescription'),
@@ -288,6 +349,10 @@ export default function TrashPage(): React.JSX.Element {
           'separator',
           {
             id: 'permanent-delete',
+            disabled: entries.some((entry) => {
+              const record = entry.kind === 'folder' ? entry.folder : entry.item
+              return effectiveIds.has(record.id) && Boolean(record.personalOwnerId)
+            }),
             label: t('fileExplorer.contextMenu.permanentDelete'),
             icon: React.createElement(Trash2, { size: 14 }),
             variant: 'danger',
@@ -297,7 +362,7 @@ export default function TrashPage(): React.JSX.Element {
         event
       )
     },
-    [showMenu, t, selectedIds, setSelectedIds, requestRestoreIds, permanentlyDeleteIds]
+    [showMenu, t, selectedIds, setSelectedIds, requestRestoreIds, permanentlyDeleteIds, entries]
   )
 
   const handleContainerContextMenu = useCallback(
@@ -308,6 +373,9 @@ export default function TrashPage(): React.JSX.Element {
         [
           {
             id: 'empty-trash',
+            disabled: entries.some((entry) =>
+              Boolean((entry.kind === 'folder' ? entry.folder : entry.item).personalOwnerId)
+            ),
             label: t('trash.emptyTrash'),
             icon: React.createElement(Trash2, { size: 14 }),
             variant: 'danger',
@@ -317,7 +385,7 @@ export default function TrashPage(): React.JSX.Element {
         event
       )
     },
-    [allIds, permanentlyDeleteIds, showMenu, t]
+    [allIds, permanentlyDeleteIds, showMenu, t, entries]
   )
 
   const handleSortChange = useCallback(

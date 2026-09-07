@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef } from 'react'
-import { Folder, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Cloud, Folder, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
@@ -220,7 +220,11 @@ export const ListView = React.memo(function ListView({
                           : undefined
                       }
                     >
-                      <Folder size={20} className="text-accent" fill="currentColor" />
+                      {item.isPersonalRoot ? (
+                        <Cloud size={20} className="text-accent" />
+                      ) : (
+                        <Folder size={20} className="text-accent" fill="currentColor" />
+                      )}
                     </span>
                   ) : (
                     <div className="text-danger">
@@ -251,6 +255,7 @@ export const ListView = React.memo(function ListView({
                       {item.name}
                     </div>
                     <FileItemStatus
+                      personalStatus={item.personalStatus}
                       variant="badge"
                       folderHealth={item.syncFolderHealth}
                       folderHealthTooltip={item.syncFolderHealthTooltip}

@@ -612,7 +612,8 @@ describe('editable presentation documents', () => {
       id: 'asset-1',
       name: 'photo.png',
       mimeType: 'image/png',
-      dataUrl: 'data:image/png;base64,AAA='
+      dataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6ZaoAAAAASUVORK5CYII='
     }
     const text = createTextElement({
       x: 12,

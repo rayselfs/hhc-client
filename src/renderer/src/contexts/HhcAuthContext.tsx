@@ -8,6 +8,7 @@ import {
   useRef,
   useState
 } from 'react'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 import type { HhcAuthAdapter, HhcSession } from '@shared/hhc-auth'
 import { createHhcAuthAdapter, registerHhcSessionOwner } from '@renderer/lib/hhc-auth'
 
@@ -51,6 +52,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     []
   )
 
+  const sessionUserId = session?.userId
+  useLayoutEffect(() => {
+    usePersonalSyncStore.getState().setAccount(status, sessionUserId)
+  }, [status, sessionUserId])
+
   const invalidateTokenRequests = useCallback((): void => {
     sessionEpochRef.current += 1
     accessTokenPromiseRef.current = null
@@ -81,6 +87,10 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     let active = true
     let adapter: HhcAuthAdapter | null = null
     let unsubscribe: (() => void) | null = null
+    let retryBootstrap = (): void => {}
+    const retry = (): void => retryBootstrap()
+    window.addEventListener('online', retry)
+    window.addEventListener('focus', retry)
 
     void createHhcAuthAdapter()
       .then(async (createdAdapter) => {
@@ -92,6 +102,8 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
 
         adapterRef.current = createdAdapter
         const bootstrapEpoch = sessionEpochRef.current
+        let bootstrapUnavailable = false
+        let bootstrapRunning = false
         let cleanupUserId: string | null = null
         let cleanupInFlight = false
         let pendingSession: HhcSession | null = null
@@ -130,6 +142,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
 
         unsubscribe = createdAdapter.subscribe((nextSession) => {
           if (!active) return
+          bootstrapUnavailable = false
           if (nextSession) {
             signInAttemptRef.current += 1
             setSignInStatus('idle')
@@ -142,7 +155,10 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
           }
           const previousUserId = sessionRef.current?.userId
           const nextUserId = nextSession?.userId
-          if (previousUserId !== nextUserId) authGenerationRef.current += 1
+          if (previousUserId !== nextUserId) {
+            authGenerationRef.current += 1
+            usePersonalSyncStore.getState().setAccount(previousUserId ? 'anonymous' : 'loading')
+          }
           if (!nextSession || previousUserId !== nextUserId) invalidateTokenRequests()
           if (previousUserId && previousUserId !== nextUserId) {
             cleanupUserId = previousUserId
@@ -156,18 +172,36 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
           publishSession(nextSession, !nextSession || previousUserId !== nextUserId)
         })
 
-        try {
-          const nextSession = await createdAdapter.getSession()
-          if (!active || sessionEpochRef.current !== bootstrapEpoch) return
-          sessionRef.current = nextSession
-          setSession(nextSession)
-          setStatus(nextSession ? 'authenticated' : 'anonymous')
-        } catch {
-          if (!active || sessionEpochRef.current !== bootstrapEpoch) return
-          sessionRef.current = null
-          setSession(null)
-          setStatus('unavailable')
+        const bootstrap = async (): Promise<void> => {
+          if (bootstrapRunning) return
+          bootstrapRunning = true
+          try {
+            const nextSession = await createdAdapter.getSession()
+            if (!active || sessionEpochRef.current !== bootstrapEpoch) return
+            bootstrapUnavailable = false
+            sessionRef.current = nextSession
+            setSession(nextSession)
+            setStatus(nextSession ? 'authenticated' : 'anonymous')
+          } catch {
+            if (!active || sessionEpochRef.current !== bootstrapEpoch) return
+            bootstrapUnavailable = true
+            sessionRef.current = null
+            setSession(null)
+            setStatus('unavailable')
+          } finally {
+            bootstrapRunning = false
+          }
         }
+        retryBootstrap = () => {
+          if (
+            bootstrapUnavailable &&
+            active &&
+            !signOutPendingRef.current &&
+            sessionEpochRef.current === bootstrapEpoch
+          )
+            void bootstrap()
+        }
+        await bootstrap()
       })
       .catch(() => {
         if (!active) return
@@ -177,6 +211,8 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
 
     return () => {
       active = false
+      window.removeEventListener('online', retry)
+      window.removeEventListener('focus', retry)
       unsubscribe?.()
       if (adapterRef.current === adapter) adapterRef.current = null
       sessionRef.current = null
@@ -264,6 +300,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     setSignInStatus('idle')
     setPendingSignInExpiresAt(null)
     signOutPendingRef.current = true
+    usePersonalSyncStore.getState().setAccount('anonymous')
     invalidateTokenRequests()
     try {
       const generation = authGenerationRef.current
@@ -274,7 +311,13 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
         authGenerationRef.current += 1
       }
     } catch (error) {
-      if (adapterRef.current === adapter) signOutPendingRef.current = false
+      if (adapterRef.current === adapter) {
+        signOutPendingRef.current = false
+        const current = sessionRef.current
+        usePersonalSyncStore
+          .getState()
+          .setAccount(current ? 'authenticated' : 'anonymous', current?.userId)
+      }
       throw error
     }
   }, [cleanupDepartingAccount, invalidateTokenRequests])

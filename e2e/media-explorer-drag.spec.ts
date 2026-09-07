@@ -7,7 +7,7 @@ test('date groups preserve days, persist disabled grouping, and support extra-la
   await page.goto('/')
   await completeOnboarding(page)
   await page.evaluate(async () => {
-    const open = indexedDB.open('hhc-file-explorer', 5)
+    const open = indexedDB.open('hhc-file-explorer')
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       open.onsuccess = () => resolve(open.result)
       open.onerror = () => reject(open.error)

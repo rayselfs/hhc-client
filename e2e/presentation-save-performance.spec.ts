@@ -21,7 +21,7 @@ async function installFixture(page: Page, count: number): Promise<void> {
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error)
       })
-    const db = await result(indexedDB.open('hhc-file-explorer', 5))
+    const db = await result(indexedDB.open('hhc-file-explorer'))
     const records = (await result(
       db.transaction('file-blobs').objectStore('file-blobs').getAll()
     )) as Array<{ id: string; blob: Blob; revision?: number }>

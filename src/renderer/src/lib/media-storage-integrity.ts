@@ -72,6 +72,10 @@ export async function scanMediaStorageIntegrity(
     }
   }
 
+  for (const operation of await db.getAll('personal-sync-outbox')) {
+    if (operation.snapshotBlobId) incrementReference(expectedRefCounts, operation.snapshotBlobId)
+  }
+
   for (const entry of syncEntries) {
     if (!entry.blobId) continue
     if (!blobIds.has(entry.blobId)) {
@@ -128,21 +132,27 @@ export async function scanMediaStorageIntegrity(
 }
 
 export async function repairMediaStorageIntegrity(): Promise<MediaStorageIntegrityRepairResult> {
-  const [fileBlobs, syncEntries, db] = await Promise.all([
-    listFileBlobRecords(),
-    listSyncEntries(),
-    openFileExplorerDB()
+  const [syncEntries, db] = await Promise.all([listSyncEntries(), openFileExplorerDB()])
+  const tx = db.transaction(
+    ['file-blobs', 'folder-items', 'personal-sync-outbox', 'resource-cleanup-journal'],
+    'readwrite'
+  )
+  const [fileBlobs, folderItems, outbox] = await Promise.all([
+    tx.objectStore('file-blobs').getAll(),
+    tx.objectStore('folder-items').getAll(),
+    tx.objectStore('personal-sync-outbox').getAll()
   ])
-  const folderItems = await db.getAll('folder-items')
   const expectedRefCounts = new Map<string, number>()
   const syncBlobIds = new Set(syncEntries.flatMap((entry) => (entry.blobId ? [entry.blobId] : [])))
   for (const item of folderItems) {
     if (isFileItem(item)) incrementReference(expectedRefCounts, getBlobId(item))
   }
+  for (const operation of outbox) {
+    if (operation.snapshotBlobId) incrementReference(expectedRefCounts, operation.snapshotBlobId)
+  }
   const correctedRefCounts: string[] = []
   const cleanupRecords = []
   const deferredBlobIds: string[] = []
-  const tx = db.transaction(['file-blobs', 'resource-cleanup-journal'], 'readwrite')
   const blobStore = tx.objectStore('file-blobs')
   const journalStore = tx.objectStore('resource-cleanup-journal')
 

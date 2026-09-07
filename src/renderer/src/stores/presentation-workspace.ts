@@ -5,6 +5,7 @@ import type {
   PresentationSaveStatus
 } from '@renderer/lib/presentation-save-coordinator'
 import type { FileItemRecord } from '@shared/types/folder'
+import { isPersonalRecordVisible } from './personal-sync'
 
 export interface PresentationWorkspaceDocument {
   itemId: string
@@ -14,6 +15,7 @@ export interface PresentationWorkspaceDocument {
   url: string
   size: number
   openedAt: number
+  personalOwnerId?: string
   slideCount?: number
   saveStatus?: PresentationSaveStatus
   mirrorWarnings?: PresentationMirrorWarning[]
@@ -50,7 +52,8 @@ function toWorkspaceDocument(item: FileItemRecord): PresentationWorkspaceDocumen
     mimeType: item.mimeType,
     url: item.url,
     size: item.size,
-    openedAt: Date.now()
+    openedAt: Date.now(),
+    personalOwnerId: item.personalOwnerId
   }
 }
 
@@ -61,6 +64,7 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
 
   openDocument: (item) =>
     set((state) => {
+      if (!isPersonalRecordVisible(item)) return state
       const existing = state.documents.find((document) => document.itemId === item.id)
       const documents = existing
         ? state.documents.map((document) =>
@@ -89,7 +93,10 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
       return { documents, activeItemId, activeSlideIdByItemId }
     }),
 
-  setActiveDocument: (itemId) => set({ activeItemId: itemId }),
+  setActiveDocument: (itemId) => {
+    const document = get().documents.find((entry) => entry.itemId === itemId)
+    if (!document || isPersonalRecordVisible(document)) set({ activeItemId: itemId })
+  },
 
   updateDocumentName: (itemId, name) =>
     set((state) => ({

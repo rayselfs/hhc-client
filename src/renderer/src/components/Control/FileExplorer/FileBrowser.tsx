@@ -1,5 +1,7 @@
 import { groupItemsByDate } from '@renderer/lib/file-explorer-grouping'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { isPersonalRootFolder } from '@renderer/lib/sync-readonly'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 import { useCurrentFolderDisplay } from '@renderer/stores/file-explorer'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -576,20 +578,23 @@ export function FileBrowser({
     }
   }, [fileItems])
 
+  const personalStatuses = usePersonalSyncStore((state) => state.itemStatuses)
   const allItems: GridViewItem[] = useMemo(
     () => [
-      ...folders.map((folder) =>
-        buildFolderViewItem(folder, {
+      ...folders.map((folder) => ({
+        ...buildFolderViewItem(folder, {
           health: syncFolderHealthById[folder.id],
           healthTooltip: syncFolderHealthById[folder.id]
             ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id], t)
             : undefined,
           syncState: syncStates[folder.id]
-        })
-      ),
+        }),
+        personalStatus: personalStatuses[folder.id]
+      })),
       ...fileItems.map((item) => ({
         id: item.id,
         name: item.name,
+        personalStatus: personalStatuses[item.id],
         isFolder: false,
         mimeType: item.mimeType,
         size: item.size,
@@ -611,6 +616,7 @@ export function FileBrowser({
     ],
     [
       folders,
+      personalStatuses,
       fileItems,
       syncFolderHealthById,
       thumbnails,
@@ -838,6 +844,11 @@ export function FileBrowser({
 
   const handleRenameSubmit = useCallback(
     (itemId: string, baseName: string): void => {
+      const folder = useFileExplorerStore.getState().folders[itemId]
+      if (folder && isPersonalRootFolder(folder)) {
+        setRenamingItemId(null)
+        return
+      }
       if (isCurrentFolderReadOnly) {
         setRenamingItemId(null)
         return
@@ -955,6 +966,8 @@ export function FileBrowser({
 
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (!item) return
+      const folder = useFileExplorerStore.getState().folders[itemId]
+      if (folder && isPersonalRootFolder(folder)) return
       if (isNameRegion && !isCurrentFolderReadOnly) {
         cancelPendingRename()
         pendingRenameItemIdRef.current = itemId
@@ -1106,6 +1119,13 @@ export function FileBrowser({
       setDraggedIds(new Set())
 
       const { active, over } = event
+      const catalog = useFileExplorerStore.getState().folders
+      if (
+        [String(active.id), ...currentDraggedIds].some(
+          (id) => catalog[id] && isPersonalRootFolder(catalog[id])
+        )
+      )
+        return
       if (!over || active.id === over.id) return
 
       const activeData = active.data.current as FileExplorerDndData | undefined

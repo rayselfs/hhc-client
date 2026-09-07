@@ -4,6 +4,7 @@ import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { readPresentationArrayBuffer } from './presentation-source'
 import { persistEditablePresentationCreation } from './editable-presentation-creation'
 import { normalizeTextParagraphs } from './presentation-rich-text'
+import { validatePortablePresentation } from './portable-presentation'
 import { FOLDER_DURATION_MS, type FileItemRecord } from '@shared/types/folder'
 import type { PlaceholderInfo, PresentationData } from '@aiden0z/pptx-renderer'
 import type { SlideData, SlideNode } from '@aiden0z/pptx-renderer'
@@ -212,6 +213,7 @@ export interface EditablePresentationSlide {
 }
 
 export interface EditablePresentationDocument {
+  schemaVersion?: 1
   id: string
   name: string
   sourceItemId?: string
@@ -502,6 +504,7 @@ export function createBlankEditablePresentationDocument(
   return {
     id,
     name,
+    schemaVersion: 1,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
     defaultSlideBackground: createDefaultSlideBackground(),
@@ -1035,12 +1038,14 @@ async function createEditablePresentationItem(
   const itemId = document.id
   const blob = createDocumentBlob(document)
   const db = await openFileExplorerDB()
+  const parent = await db.get('folder-records', parentId)
   const siblings = (await db.getAllFromIndex('folder-items', 'by-parent', parentId)).filter(
     (item) => item.deletedAt == null
   )
   const now = Date.now()
   const item: FileItemRecord = {
     id: itemId,
+    ...(parent?.personalOwnerId ? { personalOwnerId: parent.personalOwnerId } : {}),
     parentId,
     type: 'file',
     sortIndex: Math.max(-1, ...siblings.map((item) => item.sortIndex)) + 1,
@@ -1086,6 +1091,7 @@ export function convertPresentationData(
 
   return {
     id: documentId,
+    schemaVersion: 1,
     name: `${stripPresentationExtension(source.name)} Editable`,
     sourceItemId: source.id,
     sourceBlobId: getBlobId(source),
@@ -1746,18 +1752,28 @@ export async function loadEditablePresentationSnapshot(
   const blobId = getBlobId(source)
   const db = await openFileExplorerDB()
   const record = await db.get('file-blobs', blobId)
-  if (!record?.blob) {
+  if (!record || (!record.blob && record.storage !== 'native-fs')) {
     throw new Error(`Editable presentation source is missing: ${source.id}`)
   }
-  const cacheKey = `${blobId}:${record.revision ?? `size-${record.blob.size}`}`
+  const catalog = await db.get('folder-items', source.id)
+  const personalName =
+    catalog?.type === 'file' && catalog.personalOwnerId
+      ? stripPresentationExtension(catalog.name)
+      : undefined
+  const cacheKey = `${source.id}:${blobId}:${record.revision ?? `size-${record.blob?.size ?? record.size}`}:${personalName ?? ''}`
   const cached = editableDocumentCache.get(cacheKey)
   if (cached) {
     editableDocumentCache.delete(cacheKey)
     editableDocumentCache.set(cacheKey, cached)
     return { document: cached, revision: record.revision ?? 0 }
   }
-  const body = await readBlobText(record.blob)
-  const document = parseEditablePresentation(body)
+  const body = record.blob
+    ? await readBlobText(record.blob)
+    : new TextDecoder('utf-8', { fatal: true }).decode(
+        await readPresentationArrayBuffer({ ...source, mimeType: EDITABLE_PRESENTATION_MIME_TYPE })
+      )
+  const document = { ...parseEditablePresentation(body), id: source.id }
+  if (personalName !== undefined) document.name = personalName
   editableDocumentCache.set(cacheKey, document)
   while (editableDocumentCache.size > EDITABLE_DOCUMENT_CACHE_LIMIT) {
     const oldestKey = editableDocumentCache.keys().next().value
@@ -1951,6 +1967,7 @@ function createDocumentBlob(document: EditablePresentationDocument): Blob {
 
 function parseEditablePresentation(value: string): EditablePresentationDocument {
   const parsed = JSON.parse(value) as Partial<EditablePresentationDocument>
+  validatePortablePresentation(parsed)
   if (
     !parsed.id ||
     !parsed.name ||
@@ -1978,9 +1995,8 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
   }
   return {
     id: parsed.id,
+    schemaVersion: 1,
     name: parsed.name,
-    sourceItemId: parsed.sourceItemId,
-    sourceBlobId: parsed.sourceBlobId,
     width: parsed.width,
     height: parsed.height,
     defaultSlideBackground: normalizeSlideBackground(

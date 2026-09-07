@@ -1273,5 +1273,26 @@
       "connection": "Projection connection failed. Retry to reconnect.",
       "playback": "Video playback failed. Select the source again."
     }
+  },
+  "personalCloud": {
+    "title": "Cloud folder",
+    "idle": "Preparing cloud folder",
+    "pending": "Saved locally, pending sync",
+    "syncing": "Syncing",
+    "synced": "Synced",
+    "conflict": "Conflict needs attention",
+    "auth-required": "Sign in again",
+    "failed": "Sync failed; local data retained",
+    "offline": "Offline; editing available",
+    "backup": "Save a local copy",
+    "keepCloud": "Keep cloud version",
+    "retry": "Sync again",
+    "busy": "Sync is running. Try again shortly.",
+    "backupFailed": "Could not complete the backup. Original data retained.",
+    "changed": "Content changed. Review the conflict again.",
+    "backupConfirm": "Copy all {{count}} affected items to local media, then replace their local changes with the cloud versions.",
+    "discardConfirm": "Discard local changes to {{count}} affected items and download the cloud versions. This does not modify the cloud.",
+    "copyCreated": "Version conflict: local content preserved in a conflict copy",
+    "missingFonts": "Fonts may be missing on this device: {{fonts}}. Fallback fonts are displayed; the original font settings are retained."
   }
 }

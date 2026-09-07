@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { FolderRecord } from '@shared/types/folder'
+import { isPersonalRootFolder } from '@renderer/lib/sync-readonly'
 
 export type DndItemData =
   | { type: 'folder'; item: FolderRecord }
@@ -28,7 +29,11 @@ export function SortableFolderItem({
   isMultiDrag,
   children
 }: SortableFolderItemProps): React.JSX.Element {
-  const sortable = useSortable({ id, data: { type: 'folder', item: folder } as DndItemData })
+  const sortable = useSortable({
+    id,
+    data: { type: 'folder', item: folder } as DndItemData,
+    disabled: { draggable: isPersonalRootFolder(folder), droppable: false }
+  })
   const droppable = useDroppable({
     id: `drop-${id}`,
     data: { type: 'folder-dropzone', folderId: id } as DndItemData,

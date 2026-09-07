@@ -1,5 +1,6 @@
 import React from 'react'
-import { Folder, Star } from 'lucide-react'
+import { Cloud, Folder, Star } from 'lucide-react'
+import type { PersonalItemStatus } from '@renderer/stores/personal-sync'
 import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { getFileIcon } from './getFileIcon'
@@ -14,6 +15,8 @@ import { FileItemStatus } from '../FileItemStatus'
 import type { MediaProcessingStatus } from '@renderer/lib/media-job-view-state'
 
 export interface GridViewItem {
+  isPersonalRoot?: boolean
+  personalStatus?: PersonalItemStatus
   id: string
   name: string
   isFolder: boolean
@@ -37,6 +40,7 @@ export interface GridViewItem {
 
 function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
   if (item.isFolder) {
+    if (item.isPersonalRoot) return <Cloud size={iconSize} className="text-accent" />
     return <Folder size={iconSize} className="text-accent" fill="currentColor" />
   }
 
@@ -191,6 +195,7 @@ export const GridView = React.memo(function GridView({
                 (!item.isFolder && (item.syncStatus || item.processingStatus)) ? (
                   <span className="absolute -bottom-1 -right-1 rounded-full bg-background/90 p-0.5">
                     <FileItemStatus
+                      personalStatus={item.personalStatus}
                       variant="icon"
                       folderHealth={item.syncFolderHealth}
                       folderHealthTooltip={item.syncFolderHealthTooltip}

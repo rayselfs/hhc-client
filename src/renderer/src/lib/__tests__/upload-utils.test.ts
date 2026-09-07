@@ -11,10 +11,15 @@ vi.mock('@heroui/react/toast', () => ({
   toast: { success: vi.fn(), danger: vi.fn(), warning: vi.fn() }
 }))
 
-vi.mock('@renderer/stores/file-explorer', () => ({
-  addFileItemToStore: vi.fn(),
-  useFileExplorerStore: { getState: vi.fn() }
-}))
+vi.mock('@renderer/stores/file-explorer', () => {
+  const store = { getState: vi.fn() }
+  return {
+    addFileItemToStore: vi.fn(),
+    useFileExplorerStore: store,
+    createExplorerFolder: (name: string, parentId: string) =>
+      store.getState().addFolder(name, parentId)
+  }
+})
 
 vi.mock('@renderer/lib/thumbnail-generator', () => ({
   generateThumbnail: vi.fn().mockResolvedValue(null),
@@ -217,7 +222,13 @@ describe('uploadFiles web preflight', () => {
     const supported = setRelativePath(makeFile('slide.png', 100), 'Sunday/slide.png')
     const unsupported = setRelativePath(makeFile('notes.txt', 100, ''), 'Sunday/notes.txt')
 
-    await expect(uploadFolderFiles([supported, unsupported], 'root', vi.fn())).resolves.toBe(1)
+    await expect(
+      uploadFolderFiles(
+        [supported, unsupported],
+        'root',
+        vi.fn(() => 'folder')
+      )
+    ).resolves.toBe(1)
 
     expect(toast.warning).toHaveBeenCalledWith('Skipped 1 unsupported file(s)')
   })

@@ -1,5 +1,11 @@
 import type { FolderRecord } from '@shared/types/folder'
 
+export function isPersonalRootFolder(
+  folder: Pick<FolderRecord, 'personalOwnerId' | 'parentId'>
+): boolean {
+  return Boolean(folder.personalOwnerId && folder.parentId === 'file-root')
+}
+
 export function getReadOnlySyncAncestor(
   folderId: string,
   folders: Record<string, FolderRecord>

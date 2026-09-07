@@ -5,6 +5,10 @@ import { openFileExplorerDB, type FileExplorerDBSchema } from './file-explorer-d
 import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { saveThumbnail } from './thumbnail-db'
 import { isFileItem } from '@shared/types/folder'
+import { getBlobId } from './blob-identity'
+import { commitPersonalFileMutation } from './personal-sync-db'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
+import { publishPersistedFileItem } from '@renderer/stores/file-explorer'
 
 export interface EditablePresentationRevisionWrite {
   itemId: string
@@ -35,6 +39,42 @@ export async function persistEditablePresentationRevision(
   const body = JSON.stringify(write.document)
   const blob = new Blob([body], { type: EDITABLE_PRESENTATION_MIME_TYPE })
   const db = await dependencies.openFileExplorerDB()
+  const personalNode = await db.get('personal-sync-nodes', write.itemId)
+  if (personalNode) {
+    const item = await db.get('folder-items', write.itemId)
+    if (!item || !isFileItem(item)) throw new Error('Personal presentation catalog item is missing')
+    const source = await db.get('file-blobs', getBlobId(item))
+    if (!source || write.revision <= (source.revision ?? 0)) {
+      throw new Error('Personal presentation source is missing or revision is stale')
+    }
+    const snapshotId = crypto.randomUUID()
+    const catalog = {
+      ...item,
+      personalOwnerId: personalNode.ownerId,
+      name: write.catalogName ?? item.name,
+      url: `blob:${snapshotId}`,
+      size: blob.size
+    }
+    await commitPersonalFileMutation(
+      {
+        ownerId: personalNode.ownerId,
+        nodeId: item.id,
+        remoteId: personalNode.remoteId,
+        operationId: crypto.randomUUID(),
+        localRevision: personalNode.localRevision + 1,
+        contentRevision: write.revision,
+        mutation: { type: 'replace-content' },
+        catalog
+      },
+      new File([body], catalog.name, { type: EDITABLE_PRESENTATION_MIME_TYPE })
+    )
+    if (usePersonalSyncStore.getState().activeOwnerId === personalNode.ownerId) {
+      publishPersistedFileItem(catalog)
+      usePersonalSyncStore.setState({ syncStatus: 'pending', errorCode: null })
+      window.dispatchEvent(new CustomEvent('hhc:personal-sync', { detail: personalNode.ownerId }))
+    }
+    return { revision: write.revision, mirrorWarnings: [] }
+  }
   const tx = db.transaction(['file-blobs', 'folder-items'], 'readwrite')
   const sourceStore = tx.objectStore('file-blobs')
   const catalogStore = tx.objectStore('folder-items')

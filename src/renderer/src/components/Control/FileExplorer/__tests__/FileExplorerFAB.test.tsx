@@ -31,9 +31,11 @@ vi.mock('@heroui/react/dropdown', () => ({
 }))
 
 vi.mock('@renderer/stores/file-explorer', () => ({
+  createExplorerFolder: vi.fn(async () => 'folder'),
   useFileExplorerStore: (selector: (state: unknown) => unknown) =>
     selector({
       currentFolderId: 'file-root',
+      folders: {},
       getChildFolders: () => [],
       addFolder: vi.fn()
     })

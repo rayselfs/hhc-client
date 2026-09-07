@@ -1,3 +1,4 @@
+import type { PersonalNativeApi } from '../shared/personal-cloud'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   IpcInvokeChannel,
@@ -109,9 +110,11 @@ const speechApi = {
 }
 
 const nativeFsApi = {
-  importFile: (id: string, file: File) => {
+  importFile: async (id: string, file: File) => {
     const sourcePath = webUtils.getPathForFile(file)
-    return typedInvoke('native-fs:import-file', id, sourcePath)
+    if (sourcePath) return typedInvoke('native-fs:import-file', id, sourcePath)
+    if (file.size > 200 * 1024 * 1024) throw new Error('Generated file exceeds 200 MiB')
+    return typedInvoke('native-fs:import-file', id, new Uint8Array(await file.arrayBuffer()))
   },
   getUrl: (id: string, mimeType: string) =>
     `hhc-media://file/${encodeURIComponent(id)}?type=${encodeURIComponent(mimeType)}`,
@@ -184,6 +187,18 @@ const hhcAuthApi = {
   ) => typedOn('hhc-auth:session-changed', callback)
 }
 
+const personalCloudApi: PersonalNativeApi = {
+  ensureSpace: (input) => typedInvoke('personal-cloud:ensureSpace', input),
+  getChanges: (input) => typedInvoke('personal-cloud:getChanges', input),
+  createUpload: (input) => typedInvoke('personal-cloud:createUpload', input),
+  getUpload: (input) => typedInvoke('personal-cloud:getUpload', input),
+  uploadSnapshot: (input) => typedInvoke('personal-cloud:uploadSnapshot', input),
+  completeUpload: (input) => typedInvoke('personal-cloud:completeUpload', input),
+  mutate: (input) => typedInvoke('personal-cloud:mutate', input),
+  downloadSnapshot: (input) => typedInvoke('personal-cloud:downloadSnapshot', input),
+  cancel: (input) => typedInvoke('personal-cloud:cancel', input)
+}
+
 const hhcAssetsApi = {
   listCollections: (cursor?: string) => typedInvoke('hhc-assets:list-collections', cursor),
   getCollectionChanges: (request: IpcInvokeMap['hhc-assets:get-collection-changes']['args'][0]) =>
@@ -233,6 +248,7 @@ const api = {
   oneDrive: oneDriveApi,
   hhcAuth: hhcAuthApi,
   hhcAssets: hhcAssetsApi,
+  personalCloud: personalCloudApi,
   lanRemote: lanRemoteApi
 }
 

@@ -12,6 +12,9 @@ import {
 } from './cloud-provider'
 import { listProviderConnectionsByType, type ProviderConnectionRecord } from './sync-db'
 import type { MeetingWindowsApi, MediaSyncWindow } from './meeting-windows-api'
+import { startPersonalSync } from './personal-sync-runtime'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
+import { getCurrentHhcSession } from './hhc-auth'
 
 const LOCAL_SYNC_POLL_MS = 3_000
 const ONEDRIVE_IDLE_REFRESH_MS = 60_000
@@ -273,6 +276,25 @@ async function refreshAllHhcFolders(options: SyncRuntimeOptions): Promise<HhcRef
 }
 
 export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
+  let personalOwner: string | null = null
+  let stopPersonal: (() => void) | undefined
+  const reconcilePersonal = (): void => {
+    const account = usePersonalSyncStore.getState()
+    const owner = account.accountStatus === 'authenticated' ? account.activeOwnerId : null
+    if (owner === personalOwner) return
+    stopPersonal?.()
+    stopPersonal = undefined
+    personalOwner = owner
+    const auth = options.hhcAuth
+    if (owner && auth)
+      stopPersonal = startPersonalSync(owner, {
+        getSession: async () => getCurrentHhcSession(),
+        getAccessToken: auth.getAccessToken,
+        refreshAccessToken: auth.refreshAccessToken
+      })
+  }
+  const unsubscribePersonal = usePersonalSyncStore.subscribe(reconcilePersonal)
+  reconcilePersonal()
   let localInterval: number | undefined
   if (isElectron()) {
     void refreshAllLocalSyncFolders().catch((error) => {
@@ -442,6 +464,8 @@ export function startSyncRuntime(options: SyncRuntimeOptions = {}): () => void {
 
   return () => {
     stopped = true
+    unsubscribePersonal()
+    stopPersonal?.()
     unsubscribeOfflinePolicy()
     window.removeEventListener('online', resumeHhc)
     window.removeEventListener('focus', resumeHhc)

@@ -4,8 +4,10 @@ import type { SyncFolderHealthStatus } from '@renderer/lib/sync-folder-health'
 import { SyncStatusBadge, SyncStatusIcon } from './views/SyncStatusBadge'
 import type { MediaProcessingStatus } from '@renderer/lib/media-job-view-state'
 import { useTranslation } from 'react-i18next'
+import type { PersonalItemStatus } from '@renderer/stores/personal-sync'
 
 interface FileItemStatusProps {
+  personalStatus?: PersonalItemStatus
   syncStatus?: SyncEntryStatus
   downloadedBytes?: number
   downloadTotalBytes?: number
@@ -17,6 +19,7 @@ interface FileItemStatusProps {
 }
 
 export function FileItemStatus({
+  personalStatus,
   syncStatus,
   downloadedBytes,
   downloadTotalBytes,
@@ -27,6 +30,16 @@ export function FileItemStatus({
   processingProgress
 }: FileItemStatusProps): React.JSX.Element | null {
   const { t } = useTranslation()
+  if (personalStatus) {
+    const label = t(`personalCloud.${personalStatus}`)
+    const Icon = personalStatus === 'synced' ? CheckCircle2 : AlertTriangle
+    return (
+      <span title={label} aria-label={label} className="inline-flex items-center gap-1 text-xs">
+        <Icon size={14} className={personalStatus === 'synced' ? 'text-success' : 'text-warning'} />
+        {variant === 'badge' ? label : null}
+      </span>
+    )
+  }
   if (folderHealth && folderHealth !== 'unknown') {
     const icon =
       folderHealth === 'syncing' ? (

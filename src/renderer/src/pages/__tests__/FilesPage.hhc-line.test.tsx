@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     currentFolderId: 'file-root',
     folders: {},
     items: {},
+    _foldersArray: [],
     _itemsByParent: {},
     _childFoldersByParent: {},
     persistenceStatus: 'ready',
@@ -55,6 +56,8 @@ vi.mock('react-router-dom', () => ({
 }))
 
 vi.mock('@renderer/stores/file-explorer', () => ({
+  createExplorerFolder: vi.fn(async () => 'folder'),
+  copyExplorerFolder: vi.fn(async () => 'copy'),
   FILE_EXPLORER_ROOT_ID: 'file-root',
   useFileExplorerStore: Object.assign(
     (selector: (state: typeof mocks.fileState) => unknown) => selector(mocks.fileState),

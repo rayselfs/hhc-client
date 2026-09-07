@@ -11,6 +11,8 @@ import CloudFolderPickerDialog, {
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 import {
+  createExplorerFolder,
+  copyExplorerFolder,
   deleteFolderFromStore,
   removeFileItemFromStore,
   useFileExplorerStore,
@@ -45,11 +47,12 @@ import {
   resolveUniqueName,
   validateDisplayName
 } from '@renderer/lib/file-naming'
-import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
+import { isFolderReadOnlyBySyncLink, isPersonalRootFolder } from '@renderer/lib/sync-readonly'
 import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
 import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
+import { PersonalCloudStatus } from '@renderer/components/Control/FileExplorer/PersonalCloudStatus'
 
 const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
@@ -120,7 +123,7 @@ export default function FilesPage(): React.JSX.Element {
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const foldersById = useFileExplorerStore((state) => state.folders)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
-  const addFolder = useFileExplorerStore((state) => state.addFolder)
+  const addFolder = createExplorerFolder
   const moveItem = useFileExplorerStore((state) => state.moveItem)
   const copyItem = useFileExplorerStore((state) => state.copyItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
@@ -231,6 +234,7 @@ export default function FilesPage(): React.JSX.Element {
     const state = useFileExplorerStore.getState()
     for (const id of ids) {
       const folder = state.folders[id]
+      if (folder && isPersonalRootFolder(folder)) return true
       if (folder && isFolderReadOnlyBySyncLink(folder.id, state.folders)) return true
       const item = state.items[id]
       if (item && isFolderReadOnlyBySyncLink(item.parentId, state.folders)) return true
@@ -578,7 +582,15 @@ export default function FilesPage(): React.JSX.Element {
       folderName: string,
       expiresAt: number | null | undefined
     ): Promise<void> {
-      const newFolderId = addFolder(folderName, targetParentId, expiresAt)
+      const current = useFileExplorerStore.getState()
+      if (
+        current.folders[sourceId]?.personalOwnerId ||
+        current.folders[targetParentId]?.personalOwnerId
+      ) {
+        await copyExplorerFolder(sourceId, targetParentId)
+        return
+      }
+      const newFolderId = await addFolder(folderName, targetParentId, expiresAt)
       await useFileExplorerStore.getState().ensureItemsLoaded(sourceId)
       const s = useFileExplorerStore.getState()
       for (const item of s.getItems(sourceId)) {
@@ -641,6 +653,7 @@ export default function FilesPage(): React.JSX.Element {
     const state = useFileExplorerStore.getState()
     const target = state.folders[id]
     if (!target) return
+    if (isPersonalRootFolder(target)) return
     if (isFolderReadOnlyBySyncLink(target.id, state.folders)) return
     setEditingId(id)
     setEditModalName(target.name)
@@ -744,10 +757,9 @@ export default function FilesPage(): React.JSX.Element {
         return
       }
 
-      const isReadOnly = isFolderReadOnlyBySyncLink(
-        folder.id,
-        useFileExplorerStore.getState().folders
-      )
+      const isReadOnly =
+        isPersonalRootFolder(folder) ||
+        isFolderReadOnlyBySyncLink(folder.id, useFileExplorerStore.getState().folders)
       showFolderMenu({
         folder,
         isAlreadySelected,
@@ -804,7 +816,7 @@ export default function FilesPage(): React.JSX.Element {
     setIsCreateFolderModalOpen(true)
   }, [getChildFolders, currentFolderId, t, isCurrentFolderReadOnly])
 
-  const handleCreateFolderSubmit = useCallback((): void => {
+  const handleCreateFolderSubmit = useCallback(async (): Promise<void> => {
     const name = createFolderName.trim()
     if (isCurrentFolderReadOnly) return
     if (!validateDisplayName(name)) {
@@ -816,8 +828,14 @@ export default function FilesPage(): React.JSX.Element {
       toast.danger(t('fileExplorer.folderAlreadyExists', 'A folder with this name already exists'))
       return
     }
-    addFolder(name, currentFolderId, computeExpiresAt(createFolderDuration))
-    setIsCreateFolderModalOpen(false)
+    try {
+      await addFolder(name, currentFolderId, computeExpiresAt(createFolderDuration))
+      setIsCreateFolderModalOpen(false)
+    } catch (error) {
+      toast.danger(
+        error instanceof Error ? error.message : t('fileExplorer.invalidName', 'Invalid name')
+      )
+    }
   }, [
     createFolderName,
     createFolderDuration,
@@ -887,6 +905,7 @@ export default function FilesPage(): React.JSX.Element {
         onChange={(e) => void handleFolderChange(e)}
       />
       <FileExplorerShell itemCount={itemCount} selectedCount={selectedCount}>
+        <PersonalCloudStatus />
         <FolderPersistenceStatus
           className="mx-3 mt-3"
           status={persistenceStatus}
@@ -947,6 +966,7 @@ export default function FilesPage(): React.JSX.Element {
         onFolderNameChange={setCreateFolderName}
         folderDuration={createFolderDuration}
         onFolderDurationChange={setCreateFolderDuration}
+        hideDuration={Boolean(foldersById[currentFolderId]?.personalOwnerId)}
       />
       <FolderModal
         isOpen={isEditModalOpen}
@@ -961,6 +981,7 @@ export default function FilesPage(): React.JSX.Element {
         folderDuration={editModalDuration}
         onFolderDurationChange={setEditModalDuration}
         isRetentionLocked={editingIsFavorited}
+        hideDuration={Boolean(editingId && foldersById[editingId]?.personalOwnerId)}
       />
       <Outlet />
     </>

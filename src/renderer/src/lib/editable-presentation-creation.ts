@@ -9,6 +9,8 @@ import { dispatchRecoverySourceChanged } from './recovery-source-events'
 import { deleteThumbnail, saveThumbnail } from './thumbnail-db'
 import { deleteDerivedAssetsForSource } from './media-work-db'
 import type { IDBPDatabase } from 'idb'
+import { commitPersonalFileMutation } from './personal-sync-db'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 
 export interface EditablePresentationCreationInput {
   item: FileItemRecord
@@ -45,6 +47,42 @@ export async function persistEditablePresentationCreation(
 
   try {
     const db = await dependencies.openFileExplorerDB()
+    const parent = await db.get('folder-records', input.item.parentId)
+    if (parent?.personalOwnerId) {
+      const ownerId = parent.personalOwnerId
+      if (usePersonalSyncStore.getState().activeOwnerId !== ownerId)
+        throw new Error('Personal account changed')
+      const state = await db.get('personal-sync-state', ownerId)
+      const parentNode = await db.get('personal-sync-nodes', parent.id)
+      if (!state || (parent.id !== state.rootId && parentNode?.ownerId !== ownerId)) {
+        throw new Error('Personal presentation destination is unavailable')
+      }
+      const item = { ...input.item, personalOwnerId: ownerId, expiresAt: null }
+      await commitPersonalFileMutation(
+        {
+          ownerId,
+          nodeId: item.id,
+          remoteId: item.id,
+          localRevision: 1,
+          operationId: crypto.randomUUID(),
+          catalog: item,
+          mutation: {
+            type: 'create-file',
+            name: item.name,
+            parentId: parent.id === state.rootId ? '' : (parentNode?.remoteId ?? '')
+          }
+        },
+        new File([input.blob], item.name, { type: item.mimeType })
+      )
+      // A derived thumbnail failure cannot undo an already-durable personal operation.
+      await dependencies.saveThumbnail(item.id, input.thumbnail).catch(() => undefined)
+      if (usePersonalSyncStore.getState().activeOwnerId === ownerId) {
+        dependencies.publishItem(item)
+        usePersonalSyncStore.setState({ syncStatus: 'pending', errorCode: null })
+        window.dispatchEvent(new CustomEvent('hhc:personal-sync', { detail: ownerId }))
+      }
+      return
+    }
     const tx = db.transaction(['file-blobs', 'folder-items'], 'readwrite')
     await Promise.all([
       tx.objectStore('file-blobs').put({

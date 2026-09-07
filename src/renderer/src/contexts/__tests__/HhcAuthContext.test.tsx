@@ -82,6 +82,20 @@ function wrapper({ children }: { children: React.ReactNode }): React.JSX.Element
   return <HhcAuthProvider>{children}</HhcAuthProvider>
 }
 
+it('retries an offline bootstrap online and preserves a later subscription session', async () => {
+  const adapter = createAdapter(new Error('Offline'))
+  authFactory.adapters.push(adapter)
+  const { result } = renderHook(() => useHhcAuth(), { wrapper })
+  await waitFor(() => expect(result.current.status).toBe('unavailable'))
+  vi.mocked(adapter.getSession).mockResolvedValue(SESSION)
+  act(() => window.dispatchEvent(new Event('online')))
+  await waitFor(() => expect(result.current.session).toEqual(SESSION))
+  act(() => adapter.emit(null))
+  await waitFor(() => expect(result.current.status).toBe('anonymous'))
+  act(() => window.dispatchEvent(new Event('focus')))
+  expect(adapter.getSession).toHaveBeenCalledTimes(2)
+})
+
 beforeEach(() => {
   authFactory.adapters = []
   authFactory.create.mockClear()
