@@ -1,3 +1,4 @@
+import type { PersonalMutationRequest } from '@shared/personal-cloud'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { openFileExplorerDB, type FileBlobRecord } from './file-explorer-db'
 import { getBlobId } from './blob-identity'
@@ -49,6 +50,10 @@ export interface PersonalOutboxRecord {
   mimeType?: string
   sizeBytes?: number
   createdAt: number
+  uploadAttempt?: number
+  uploadId?: string
+  submittedRequest?: PersonalMutationRequest
+  failure?: string
 }
 
 export interface PersonalLocalMutationWrite {
@@ -281,7 +286,8 @@ export async function acknowledgePersonalOperation(
   ownerId: string,
   operationId: string,
   result: { itemId: string; nodeRevision: number; collectionRevision: number },
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  workerId?: string
 ): Promise<void> {
   signal?.throwIfAborted()
   if (
@@ -324,6 +330,7 @@ export async function acknowledgePersonalOperation(
       outbox.index('by-owner').getAll(ownerId)
     ])
     if (!node || !state || node.ownerId !== ownerId) throw new Error('Personal owner is missing')
+    if (workerId) assertPersonalSyncLease(state, workerId)
     if (pending.some((entry) => entry.sequence < operation.sequence)) {
       throw new Error('Personal acknowledgements must follow outbox order')
     }
@@ -366,6 +373,7 @@ export async function acknowledgePersonalOperation(
         await blobs.put({ ...snapshot, refCount: Math.max(0, (snapshot.refCount ?? 1) - 1) })
     }
     signal?.throwIfAborted()
+    if (workerId) assertPersonalSyncLease(state, workerId)
     await tx.done
   } catch (error) {
     abort()
@@ -373,5 +381,93 @@ export async function acknowledgePersonalOperation(
     throw error
   } finally {
     signal?.removeEventListener('abort', abort)
+  }
+}
+
+export const PERSONAL_SYNC_LEASE_MS = 30_000
+
+export function assertPersonalSyncLease(state: PersonalSyncState, workerId: string): void {
+  if (state.lease?.workerId !== workerId || state.lease.expiresAt <= Date.now()) {
+    throw new Error('Personal sync lease expired or changed')
+  }
+}
+
+async function updatePersonalSyncLease(
+  ownerId: string,
+  workerId: string,
+  mode: 'acquire' | 'renew' | 'release'
+): Promise<boolean> {
+  if (!ownerId || !workerId) throw new Error('Missing personal sync lease identity')
+  const db = await openFileExplorerDB()
+  const tx = db.transaction('personal-sync-state', 'readwrite')
+  const state = await tx.store.get(ownerId)
+  const now = Date.now()
+  const owned = state?.lease?.workerId === workerId
+  const active = (state?.lease?.expiresAt ?? 0) > now
+  const allowed =
+    state && (mode === 'acquire' ? !active || owned : owned && (mode === 'release' || active))
+  if (allowed) {
+    await tx.store.put({
+      ...state,
+      lease: mode === 'release' ? undefined : { workerId, expiresAt: now + PERSONAL_SYNC_LEASE_MS }
+    })
+  }
+  await tx.done
+  return Boolean(allowed)
+}
+
+export function acquirePersonalSyncLease(ownerId: string, workerId: string): Promise<boolean> {
+  return updatePersonalSyncLease(ownerId, workerId, 'acquire')
+}
+
+export function renewPersonalSyncLease(ownerId: string, workerId: string): Promise<boolean> {
+  return updatePersonalSyncLease(ownerId, workerId, 'renew')
+}
+
+export async function releasePersonalSyncLease(ownerId: string, workerId: string): Promise<void> {
+  await updatePersonalSyncLease(ownerId, workerId, 'release')
+}
+
+export async function updatePersonalOperationTransfer(
+  ownerId: string,
+  workerId: string,
+  operationId: string,
+  update: Pick<PersonalOutboxRecord, 'uploadAttempt' | 'uploadId' | 'submittedRequest' | 'failure'>,
+  signal: AbortSignal
+): Promise<PersonalOutboxRecord> {
+  signal.throwIfAborted()
+  const db = await openFileExplorerDB()
+  const tx = db.transaction(['personal-sync-state', 'personal-sync-outbox'], 'readwrite')
+  try {
+    const state = await tx.objectStore('personal-sync-state').get(ownerId)
+    if (!state) throw new Error('Personal owner is missing')
+    assertPersonalSyncLease(state, workerId)
+    const outbox = tx.objectStore('personal-sync-outbox')
+    const operation = await outbox.get(operationId)
+    if (!operation || operation.ownerId !== ownerId)
+      throw new Error('Personal operation is missing')
+    if (
+      operation.submittedRequest &&
+      (('submittedRequest' in update &&
+        JSON.stringify(operation.submittedRequest) !== JSON.stringify(update.submittedRequest)) ||
+        ('uploadId' in update && operation.uploadId !== update.uploadId) ||
+        ('uploadAttempt' in update && operation.uploadAttempt !== update.uploadAttempt))
+    ) {
+      throw new Error('Submitted personal mutation is immutable')
+    }
+    const next = { ...operation, ...update }
+    await outbox.put(next)
+    signal.throwIfAborted()
+    assertPersonalSyncLease(state, workerId)
+    await tx.done
+    return next
+  } catch (error) {
+    try {
+      tx.abort()
+    } catch {
+      /* Already aborted. */
+    }
+    await tx.done.catch(() => undefined)
+    throw error
   }
 }

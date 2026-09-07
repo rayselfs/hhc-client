@@ -4,6 +4,9 @@ import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
   acknowledgePersonalOperation,
+  acquirePersonalSyncLease,
+  renewPersonalSyncLease,
+  releasePersonalSyncLease,
   commitPersonalLocalMutation,
   listPersonalOutbox,
   type PersonalLocalMutationWrite
@@ -268,5 +271,48 @@ it('preserves pending data when an ACK belongs to another owner or an aborted se
   expect(await listPersonalOutbox('alice')).toHaveLength(1)
   expect(await (await openFileExplorerDB()).get('personal-sync-nodes', item.id)).toMatchObject({
     syncedLocalRevision: 0
+  })
+})
+
+describe('personal worker lease', () => {
+  it('allows one worker and fences an expired worker after takeover', async () => {
+    const acquired = await Promise.all([
+      acquirePersonalSyncLease('alice', 'worker-a'),
+      acquirePersonalSyncLease('alice', 'worker-b')
+    ])
+    expect(acquired.filter(Boolean)).toHaveLength(1)
+    const winner = acquired[0] ? 'worker-a' : 'worker-b'
+    const loser = acquired[0] ? 'worker-b' : 'worker-a'
+    expect(await renewPersonalSyncLease('alice', loser)).toBe(false)
+    const db = await openFileExplorerDB()
+    const state = await db.get('personal-sync-state', 'alice')
+    if (!state) throw new Error('Missing state')
+    await db.put('personal-sync-state', { ...state, lease: { workerId: winner, expiresAt: 0 } })
+    expect(await acquirePersonalSyncLease('alice', loser)).toBe(true)
+    await releasePersonalSyncLease('alice', winner)
+    expect(await renewPersonalSyncLease('alice', winner)).toBe(false)
+    expect(await renewPersonalSyncLease('alice', loser)).toBe(true)
+  })
+
+  it('keeps outbox and snapshot references when a stale worker acknowledges', async () => {
+    await commitPersonalLocalMutation(createWrite())
+    await acquirePersonalSyncLease('alice', 'current-worker')
+    await expect(
+      acknowledgePersonalOperation(
+        'alice',
+        'operation-1',
+        {
+          itemId: 'remote-file',
+          nodeRevision: 1,
+          collectionRevision: 1
+        },
+        undefined,
+        'stale-worker'
+      )
+    ).rejects.toThrow('lease')
+    expect(await listPersonalOutbox('alice')).toHaveLength(1)
+    expect(await (await openFileExplorerDB()).get('file-blobs', 'snapshot-1')).toMatchObject({
+      refCount: 2
+    })
   })
 })
