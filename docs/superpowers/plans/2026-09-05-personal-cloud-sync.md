@@ -274,3 +274,11 @@ expect(pendingOperations).toHaveLength(1)
 - Added the persisted last-owner preference, with runtime active owner/status in Zustand. HhcAuthContext hides personal records immediately on logout/account transition; only unavailable auth (offline startup) restores the last owner. Folder initialization and lazy item reads filter personal ownership; owner switches synchronously remove old catalog records from the visible store without deleting durable data. Refresh publication is generation-fenced. Personal deck saves publish while offline for the active owner, and durable item moves remove old-parent membership.
 - Focused verification: 76 auth/folder/visibility tests, then 31 deck/visibility/file-store tests; node/web typechecks and changed-file ESLint passed. A broad text edit initially touched the legacy deck path; its two failing regression tests caught it and the edit was corrected before this checkpoint.
 - Remaining ownership integration includes closing/fencing already-open personal editor/projection sessions on account departure, mutation entrypoint ownership checks, and scheduler generation cancellation. No personal root has been enabled yet.
+
+### Local subtree and action checkpoint
+
+- `3056d6ba` records account visibility integration.
+- Folder delete/restore now atomically records affected subtree local revisions in the parent outbox operation. Child dirty state survives a later restore until its own parent ACK. Server subtree members share one collection revision; pulled tombstones use that revision as the deletion group, so independently deleted children are not implicitly restored.
+- Local transactions validate parent mapping, live destination, normalized/legal names, sibling collisions, tombstone transitions and folder cycles. Pending operations retain their original expected revisions.
+- Added personal action functions for local-space initialization, nested folders, file snapshots and rename/move/delete/restore with durable publication and account checks. These are not yet wired into all UI callers and local-space initialization is not automatically invoked yet.
+- Verification: 26 subtree/pull/runtime tests, 20 action/DB tests, node/web typechecks and changed-file ESLint passed. Logs `/tmp/hhc-personal-subtree-final-tests.log`, `/tmp/hhc-personal-actions-tests.log`, `/tmp/hhc-personal-actions-typecheck.log`.

@@ -24,6 +24,7 @@ export interface PersonalSyncNode {
   lastOperationId?: string
   remoteAssetId?: string
   remoteHead?: PersonalRemoteNode
+  deletionGroup?: string
 }
 
 export interface PersonalSyncState {
@@ -57,6 +58,7 @@ export interface PersonalOutboxRecord {
   uploadId?: string
   submittedRequest?: PersonalMutationRequest
   failure?: string
+  subtree?: { nodeId: string; localRevision: number }[]
 }
 
 export interface PersonalLocalMutationWrite {
@@ -185,10 +187,94 @@ export async function commitPersonalLocalMutation(
       .objectStore(isFile ? 'folder-items' : 'folder-records')
       .get(write.nodeId)
     if (!node && existingCatalog) throw new Error('Personal node collides with an existing item')
+    let remoteParentId = ''
     if (write.catalog.parentId !== state.rootId) {
       const parent = write.catalog.parentId ? await nodes.get(write.catalog.parentId) : undefined
-      if (!parent || parent.ownerId !== write.ownerId || parent.kind !== 'folder') {
-        throw new Error('Personal parent belongs to a different owner or is missing')
+      const parentFolder = parent
+        ? await tx.objectStore('folder-records').get(parent.id)
+        : undefined
+      if (
+        !parent ||
+        parent.ownerId !== write.ownerId ||
+        parent.kind !== 'folder' ||
+        !parentFolder ||
+        parentFolder.deletedAt
+      ) {
+        throw new Error('Personal parent belongs to a different owner, is deleted or is missing')
+      }
+      remoteParentId = parent.remoteId
+    }
+    if ('parentId' in write.mutation && write.mutation.parentId !== remoteParentId) {
+      throw new Error('Personal mutation parent differs from its catalog')
+    }
+    if (existingCatalog?.deletedAt && write.mutation.type !== 'restore') {
+      throw new Error('Personal deleted nodes must be restored before editing')
+    }
+    if (write.mutation.type === 'delete' && !write.catalog.deletedAt) {
+      throw new Error('Personal deletion requires a local tombstone')
+    }
+    if (
+      write.mutation.type === 'restore' &&
+      (!existingCatalog?.deletedAt || write.catalog.deletedAt)
+    ) {
+      throw new Error('Personal restore requires an existing tombstone')
+    }
+    const name = write.catalog.name
+    if (
+      typeof name !== 'string' ||
+      !name.trim() ||
+      name !== name.normalize('NFC') ||
+      Array.from(name).length > 255 ||
+      /[/\\]/.test(name) ||
+      Array.from(name).some(
+        (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127
+      )
+    ) {
+      throw new Error('Invalid personal name')
+    }
+    if ('name' in write.mutation && write.mutation.name !== name) {
+      throw new Error('Personal mutation name differs from its catalog')
+    }
+    if (write.mutation.type === 'move') {
+      const visited = new Set<string>([write.nodeId])
+      let ancestor = write.catalog.parentId
+      while (ancestor && ancestor !== state.rootId) {
+        if (visited.has(ancestor)) throw new Error('Personal folder cycle detected')
+        visited.add(ancestor)
+        ancestor = (await tx.objectStore('folder-records').get(ancestor))?.parentId ?? null
+      }
+    } else if (
+      existingCatalog &&
+      write.mutation.type !== 'restore' &&
+      existingCatalog.parentId !== write.catalog.parentId
+    ) {
+      throw new Error('Personal parent can only change through a move')
+    }
+    if (
+      isCreate ||
+      ['rename', 'move', 'restore'].includes(write.mutation.type) ||
+      (existingCatalog && 'name' in existingCatalog && existingCatalog.name !== name)
+    ) {
+      const [folders, items] = await Promise.all([
+        tx
+          .objectStore('folder-records')
+          .index('by-parent')
+          .getAll(write.catalog.parentId ?? ''),
+        tx
+          .objectStore('folder-items')
+          .index('by-parent')
+          .getAll(write.catalog.parentId ?? '')
+      ])
+      if (
+        [...folders, ...items].some(
+          (entry) =>
+            entry.id !== write.nodeId &&
+            !entry.deletedAt &&
+            'name' in entry &&
+            entry.name.normalize('NFC') === name
+        )
+      ) {
+        throw new Error('Personal name already exists')
       }
     }
 
@@ -206,6 +292,67 @@ export async function commitPersonalLocalMutation(
             refCount: Math.max(0, (previous.refCount ?? 1) - 1)
           })
         }
+      }
+    }
+    const subtree: NonNullable<PersonalOutboxRecord['subtree']> = []
+    const deletionGroup =
+      write.mutation.type === 'delete'
+        ? write.operationId
+        : write.mutation.type === 'restore'
+          ? undefined
+          : node?.deletionGroup
+    if (!isFile && ['delete', 'restore'].includes(write.mutation.type)) {
+      const [folders, items, ownerNodes] = await Promise.all([
+        tx.objectStore('folder-records').getAll(),
+        tx.objectStore('folder-items').getAll(),
+        nodes.index('by-owner').getAll(write.ownerId)
+      ])
+      const mappings = new Map(ownerNodes.map((entry) => [entry.id, entry]))
+      const children = new Map<string, (FolderRecord | FileItemRecord)[]>()
+      for (const entry of [...folders, ...items]) {
+        if (
+          !entry.parentId ||
+          ('type' in entry && entry.type !== 'file') ||
+          !mappings.has(entry.id)
+        )
+          continue
+        const list = children.get(entry.parentId) ?? []
+        list.push(entry)
+        children.set(entry.parentId, list)
+      }
+      const queue = [...(children.get(write.nodeId) ?? [])]
+      const visited = new Set<string>([write.nodeId])
+      for (let index = 0; index < queue.length; index += 1) {
+        const child = queue[index]
+        if (visited.has(child.id)) throw new Error('Personal folder cycle detected')
+        visited.add(child.id)
+        queue.push(...(children.get(child.id) ?? []))
+        const childNode = mappings.get(child.id)
+        if (!childNode) throw new Error('Personal subtree mapping is missing')
+        if (
+          write.mutation.type === 'delete'
+            ? Boolean(child.deletedAt)
+            : !node?.deletionGroup || childNode.deletionGroup !== node.deletionGroup
+        )
+          continue
+        const updated = {
+          ...child,
+          personalOwnerId: write.ownerId,
+          expiresAt: null,
+          deletedAt: write.catalog.deletedAt,
+          originalParentId:
+            write.mutation.type === 'delete' ? (child.parentId ?? undefined) : undefined
+        }
+        if ('type' in updated) await tx.objectStore('folder-items').put(updated)
+        else await tx.objectStore('folder-records').put(updated)
+        const localRevision = childNode.localRevision + 1
+        await nodes.put({
+          ...childNode,
+          localRevision,
+          deletionGroup,
+          lastOperationId: write.operationId
+        })
+        subtree.push({ nodeId: child.id, localRevision })
       }
     }
     if ('type' in write.catalog) {
@@ -233,7 +380,8 @@ export async function commitPersonalLocalMutation(
       remoteRevision: node?.remoteRevision ?? 0,
       lastOperationId,
       remoteAssetId: node?.remoteAssetId,
-      remoteHead: node?.remoteHead
+      remoteHead: node?.remoteHead,
+      deletionGroup
     })
     await tx.objectStore('personal-sync-outbox').add({
       id: write.operationId,
@@ -243,6 +391,7 @@ export async function commitPersonalLocalMutation(
       sequence: state.sequence + 1,
       localRevision: write.localRevision,
       mutation: write.mutation,
+      ...(subtree.length ? { subtree } : {}),
       expectedRevision: node?.remoteRevision ?? 0,
       expectedCollectionRevision: state.collectionRevision,
       dependsOn: node?.lastOperationId,
@@ -371,6 +520,25 @@ export async function acknowledgePersonalOperation(
       ),
       lastOperationId: node.lastOperationId === operationId ? undefined : node.lastOperationId
     })
+    for (const member of operation.subtree ?? []) {
+      const child = await nodes.get(member.nodeId)
+      if (!child || child.ownerId !== ownerId)
+        throw new Error('Personal subtree acknowledgement is missing')
+      const nextRevision = Math.min(
+        ...remaining
+          .filter((entry) => entry.nodeId === child.id)
+          .map((entry) => entry.localRevision)
+      )
+      await nodes.put({
+        ...child,
+        remoteRevision: Math.max(child.remoteRevision, result.nodeRevision),
+        syncedLocalRevision: Math.max(
+          child.syncedLocalRevision,
+          Math.min(member.localRevision, nextRevision - 1)
+        ),
+        lastOperationId: child.lastOperationId === operationId ? undefined : child.lastOperationId
+      })
+    }
     await states.put({
       ...state,
       collectionRevision:

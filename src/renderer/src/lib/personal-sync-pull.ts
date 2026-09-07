@@ -194,7 +194,8 @@ export async function commitPersonalChangePage(
         localRevision: previous?.localRevision ?? 0,
         syncedLocalRevision: previous?.syncedLocalRevision ?? 0,
         remoteRevision: remote.revision,
-        remoteAssetId: remote.assetId
+        remoteAssetId: remote.assetId,
+        deletionGroup: remote.deletedAt ? String(remote.revision) : undefined
       }
       await nodes.put(node)
       byRemote.set(remote.id, node)

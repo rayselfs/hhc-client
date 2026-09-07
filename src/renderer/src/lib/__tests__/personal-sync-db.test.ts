@@ -329,3 +329,96 @@ it('does not treat a noncontiguous ACK as proof that remote subtree changes were
   expect(await db.get('personal-sync-state', 'alice')).toMatchObject({ collectionRevision: 0 })
   expect(await db.get('personal-sync-nodes', item.id)).toMatchObject({ remoteRevision: 5 })
 })
+
+it('keeps restored subtree members dirty until the restore acknowledgement arrives', async () => {
+  const folder = {
+    id: 'folder',
+    personalOwnerId: 'alice',
+    parentId: 'personal-root',
+    name: 'Folder',
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null
+  }
+  await commitPersonalLocalMutation({
+    ownerId: 'alice',
+    nodeId: folder.id,
+    remoteId: 'remote-folder',
+    operationId: 'create-folder',
+    localRevision: 1,
+    catalog: folder,
+    mutation: { type: 'create-folder', name: folder.name, parentId: '' }
+  })
+  await acknowledgePersonalOperation('alice', 'create-folder', {
+    itemId: 'remote-folder',
+    nodeRevision: 1,
+    collectionRevision: 1
+  })
+  const child = { ...item, parentId: folder.id }
+  await commitPersonalLocalMutation({
+    ...createWrite(),
+    catalog: child,
+    mutation: { type: 'create-file', name: child.name, parentId: 'remote-folder' }
+  })
+  await acknowledgePersonalOperation('alice', 'operation-1', {
+    itemId: 'remote-file',
+    nodeRevision: 2,
+    collectionRevision: 2
+  })
+  await commitPersonalLocalMutation({
+    ownerId: 'alice',
+    nodeId: folder.id,
+    remoteId: 'remote-folder',
+    operationId: 'delete-folder',
+    localRevision: 2,
+    catalog: { ...folder, deletedAt: 100 },
+    mutation: { type: 'delete' }
+  })
+  const db = await openFileExplorerDB()
+  expect(await db.get('folder-items', child.id)).toMatchObject({ deletedAt: 100 })
+  await commitPersonalLocalMutation({
+    ownerId: 'alice',
+    nodeId: folder.id,
+    remoteId: 'remote-folder',
+    operationId: 'restore-folder',
+    localRevision: 3,
+    catalog: folder,
+    mutation: { type: 'restore' }
+  })
+  await acknowledgePersonalOperation('alice', 'delete-folder', {
+    itemId: 'remote-folder',
+    nodeRevision: 3,
+    collectionRevision: 3
+  })
+  expect(await db.get('personal-sync-nodes', child.id)).toMatchObject({
+    localRevision: 3,
+    syncedLocalRevision: 2
+  })
+  expect((await db.get('folder-items', child.id))?.deletedAt).toBeUndefined()
+  await acknowledgePersonalOperation('alice', 'restore-folder', {
+    itemId: 'remote-folder',
+    nodeRevision: 4,
+    collectionRevision: 4
+  })
+  expect(await db.get('personal-sync-nodes', child.id)).toMatchObject({
+    localRevision: 3,
+    syncedLocalRevision: 3,
+    remoteRevision: 4
+  })
+})
+
+it.each(['bad/name', 'bad\\name', '', 'e\u0301'])(
+  'rejects invalid or unnormalized local name %j atomically',
+  async (name) => {
+    const write = createWrite()
+    await expect(
+      commitPersonalLocalMutation({
+        ...write,
+        catalog: { ...item, name },
+        mutation: { type: 'create-file', name, parentId: '' }
+      })
+    ).rejects.toThrow('name')
+    expect(await listPersonalOutbox('alice')).toEqual([])
+    expect(await (await openFileExplorerDB()).get('file-blobs', 'snapshot-1')).toBeUndefined()
+  }
+)
