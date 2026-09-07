@@ -1755,7 +1755,12 @@ export async function loadEditablePresentationSnapshot(
   if (!record || (!record.blob && record.storage !== 'native-fs')) {
     throw new Error(`Editable presentation source is missing: ${source.id}`)
   }
-  const cacheKey = `${source.id}:${blobId}:${record.revision ?? `size-${record.blob?.size ?? record.size}`}`
+  const catalog = await db.get('folder-items', source.id)
+  const personalName =
+    catalog?.type === 'file' && catalog.personalOwnerId
+      ? stripPresentationExtension(catalog.name)
+      : undefined
+  const cacheKey = `${source.id}:${blobId}:${record.revision ?? `size-${record.blob?.size ?? record.size}`}:${personalName ?? ''}`
   const cached = editableDocumentCache.get(cacheKey)
   if (cached) {
     editableDocumentCache.delete(cacheKey)
@@ -1768,6 +1773,7 @@ export async function loadEditablePresentationSnapshot(
         await readPresentationArrayBuffer({ ...source, mimeType: EDITABLE_PRESENTATION_MIME_TYPE })
       )
   const document = { ...parseEditablePresentation(body), id: source.id }
+  if (personalName !== undefined) document.name = personalName
   editableDocumentCache.set(cacheKey, document)
   while (editableDocumentCache.size > EDITABLE_DOCUMENT_CACHE_LIMIT) {
     const oldestKey = editableDocumentCache.keys().next().value

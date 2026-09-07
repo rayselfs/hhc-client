@@ -68,8 +68,11 @@ export async function persistEditablePresentationRevision(
       },
       new File([body], catalog.name, { type: EDITABLE_PRESENTATION_MIME_TYPE })
     )
-    if (usePersonalSyncStore.getState().activeOwnerId === personalNode.ownerId)
+    if (usePersonalSyncStore.getState().activeOwnerId === personalNode.ownerId) {
       publishPersistedFileItem(catalog)
+      usePersonalSyncStore.setState({ syncStatus: 'pending', errorCode: null })
+      window.dispatchEvent(new CustomEvent('hhc:personal-sync', { detail: personalNode.ownerId }))
+    }
     return { revision: write.revision, mirrorWarnings: [] }
   }
   const tx = db.transaction(['file-blobs', 'folder-items'], 'readwrite')

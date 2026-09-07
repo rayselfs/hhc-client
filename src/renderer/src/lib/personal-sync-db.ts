@@ -11,7 +11,8 @@ export type PersonalLocalMutation =
   | { type: 'replace-content' }
   | { type: 'rename'; name: string }
   | { type: 'move'; parentId: string }
-  | { type: 'delete' | 'restore' }
+  | { type: 'delete' }
+  | { type: 'restore'; name?: string }
 
 export interface PersonalSyncNode {
   id: string

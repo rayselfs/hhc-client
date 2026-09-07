@@ -7,7 +7,16 @@ import {
   commitPersonalLocalMutation,
   listPersonalOutbox
 } from '../personal-sync-db'
-import { advancePersonalOutbox } from '../personal-sync-runtime'
+import { advancePersonalOutbox, startPersonalSync } from '../personal-sync-runtime'
+import { releasePersonalSyncLease } from '../personal-sync-db'
+import { usePersonalSyncStore } from '../../stores/personal-sync'
+import {
+  preservePersonalContentConflict,
+  getPersonalConflictScope,
+  acceptPersonalCloudVersion
+} from '../personal-sync-conflicts'
+
+vi.mock('../personal-cloud-provider', () => ({ createPersonalCloudProvider: () => api }))
 
 const upload: PersonalUploadState = {
   id: 'upload',
@@ -113,4 +122,109 @@ it('retains conflicting content and stops retrying the destructive operation', a
     failure: 'conflict',
     snapshotBlobId: 'snapshot'
   })
+})
+
+it('preserves conflicting bytes as one queued copy and keeps the editor item identity', async () => {
+  api.mutate.mockRejectedValue(new PersonalCloudHttpError(409, 'AST_CONFLICT'))
+  await run()
+  expect(
+    await preservePersonalContentConflict('alice', 'worker', new AbortController().signal)
+  ).toBe(true)
+  const db = await openFileExplorerDB()
+  const pending = await listPersonalOutbox('alice')
+  expect(pending).toHaveLength(1)
+  expect(pending[0]).toMatchObject({
+    nodeId: 'file',
+    sequence: 1,
+    snapshotBlobId: 'snapshot',
+    expectedRevision: 0,
+    mutation: { type: 'create-file' }
+  })
+  expect(pending[0].remoteId).not.toBe('remote')
+  expect(await db.get('folder-items', 'file')).toMatchObject({
+    name: expect.stringContaining('conflict')
+  })
+  expect(await db.get('file-blobs', 'snapshot')).toMatchObject({ refCount: 2 })
+  expect(
+    await preservePersonalContentConflict('alice', 'worker', new AbortController().signal)
+  ).toBe(false)
+})
+
+it('reserves a separate local mapping for the cloud original and rejects stale workers', async () => {
+  const db = await openFileExplorerDB()
+  const node = await db.get('personal-sync-nodes', 'file')
+  if (!node) throw new Error('Missing test node')
+  await db.put('personal-sync-nodes', { ...node, remoteRevision: 1 })
+  api.mutate.mockRejectedValue(new PersonalCloudHttpError(409, 'AST_CONFLICT'))
+  await run()
+  await expect(
+    preservePersonalContentConflict('alice', 'other-worker', new AbortController().signal)
+  ).rejects.toThrow()
+  expect((await listPersonalOutbox('alice'))[0].id).toBe('operation')
+  await preservePersonalContentConflict('alice', 'worker', new AbortController().signal)
+  const nodes = await db.getAll('personal-sync-nodes')
+  expect(nodes).toHaveLength(2)
+  expect(nodes.find((entry) => entry.remoteId === 'remote')).toMatchObject({
+    id: expect.not.stringMatching(/^file$/),
+    localRevision: 0,
+    remoteRevision: 0
+  })
+})
+
+it('rejects a stale conflict choice, then atomically resets only the reviewed nodes', async () => {
+  api.mutate.mockRejectedValue(new PersonalCloudHttpError(409, 'AST_CONFLICT'))
+  await run()
+  const scope = await getPersonalConflictScope('alice')
+  if (!scope) throw new Error('Missing test conflict')
+  const db = await openFileExplorerDB()
+  const node = scope.nodes[0]
+  await db.put('personal-sync-nodes', { ...node, localRevision: node.localRevision + 1 })
+  await expect(
+    acceptPersonalCloudVersion('alice', 'worker', scope, new AbortController().signal)
+  ).rejects.toThrow('conflict changed')
+  expect(await listPersonalOutbox('alice')).toHaveLength(1)
+  expect(await db.get('file-blobs', 'snapshot')).toMatchObject({ refCount: 2 })
+  const current = await getPersonalConflictScope('alice')
+  if (!current) throw new Error('Missing current conflict')
+  await acceptPersonalCloudVersion('alice', 'worker', current, new AbortController().signal)
+  expect(await listPersonalOutbox('alice')).toEqual([])
+  expect(await db.get('folder-items', 'file')).toBeUndefined()
+  expect(await db.get('personal-sync-nodes', 'file')).toMatchObject({
+    remoteId: 'remote',
+    localRevision: 0
+  })
+  expect(await db.get('file-blobs', 'snapshot')).toMatchObject({ refCount: 0 })
+})
+
+it('aborts the account worker and fences a successful mutation arriving after stop', async () => {
+  usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+  await releasePersonalSyncLease('alice', 'worker')
+  let receivedSignal: AbortSignal | undefined
+  let finish: (() => void) | undefined
+  api.mutate.mockImplementation((_request, signal: AbortSignal) => {
+    receivedSignal = signal
+    return new Promise((resolve) => {
+      finish = () => resolve({ itemId: 'remote', nodeRevision: 1, collectionRevision: 1 })
+    })
+  })
+  const stop = startPersonalSync('alice', {
+    getSession: async () => ({ userId: 'alice', displayName: 'Alice', roles: [] }),
+    getAccessToken: async () => 'token',
+    refreshAccessToken: async () => 'token'
+  })
+  try {
+    await vi.waitFor(() => expect(finish).toBeDefined())
+    stop()
+    finish?.()
+    expect(receivedSignal?.aborted).toBe(true)
+    await vi.waitFor(async () =>
+      expect(
+        (await (await openFileExplorerDB()).get('personal-sync-state', 'alice'))?.lease
+      ).toBeUndefined()
+    )
+    expect(await listPersonalOutbox('alice')).toHaveLength(1)
+  } finally {
+    stop()
+    usePersonalSyncStore.getState().setAccount('anonymous')
+  }
 })

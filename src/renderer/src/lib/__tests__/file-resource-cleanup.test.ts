@@ -429,3 +429,56 @@ describe('file resource cleanup', () => {
     await expect(listResourceCleanupRecords()).resolves.toEqual([])
   })
 })
+
+it('protects active and unsynced personal files while purging only expired clean cloud trash', async () => {
+  const db = await openFileExplorerDB()
+  const now = Date.now()
+  const day = 86_400_000
+  await db.put('folder-records', {
+    id: 'cloud',
+    personalOwnerId: 'alice',
+    name: 'Cloud',
+    parentId: 'file-root',
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null
+  })
+  for (const [id, deletedAt, dirty] of [
+    ['active', undefined, false],
+    ['recent', now - 29 * day, false],
+    ['pending', now - 31 * day, true],
+    ['expired', now - 31 * day, false]
+  ] as const) {
+    await db.put('folder-items', {
+      id,
+      personalOwnerId: 'alice',
+      parentId: 'cloud',
+      type: 'file',
+      name: `${id}.png`,
+      url: `blob:${id}`,
+      size: 3,
+      mimeType: 'image/png',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      deletedAt
+    })
+    await db.put('file-blobs', { id, blob: new Blob(['one']), size: 3, refCount: dirty ? 2 : 1 })
+    await db.put('personal-sync-nodes', {
+      id,
+      ownerId: 'alice',
+      remoteId: id,
+      kind: 'file',
+      localRevision: dirty ? 2 : 1,
+      syncedLocalRevision: 1,
+      remoteRevision: 1
+    })
+  }
+  const result = await cleanupFileResources({ folderIds: ['cloud'] })
+  expect(result.folderIds).toEqual([])
+  expect(result.itemIds).toEqual(['expired'])
+  expect(await db.get('folder-records', 'cloud')).toBeDefined()
+  for (const id of ['active', 'recent', 'pending'])
+    expect(await db.get('file-blobs', id)).toBeDefined()
+  expect(await db.get('personal-sync-nodes', 'expired')).toBeUndefined()
+})

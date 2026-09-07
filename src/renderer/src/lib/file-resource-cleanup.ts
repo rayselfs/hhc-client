@@ -5,6 +5,7 @@ import { deferMediaResourceCleanup, isMediaResourceLocked } from './media-resour
 import { createResourceCleanupRecord, retryResourceCleanup } from './resource-cleanup-journal'
 import { mediaJobQueue } from './media-job-queue'
 import type { MediaJobRecord, MediaJobType } from './media-work-db'
+import type { PersonalOutboxRecord, PersonalSyncNode } from './personal-sync-db'
 
 export interface CleanupResult {
   folderIds: string[]
@@ -42,18 +43,59 @@ function collectDescendantFolderIds(rootIds: string[], folders: FolderRecord[]):
   return result
 }
 
+function protectedPersonalIds(
+  folders: FolderRecord[],
+  items: AnyItemRecord[],
+  nodes: PersonalSyncNode[],
+  outbox: PersonalOutboxRecord[]
+): Set<string> {
+  const protectedIds = new Set<string>()
+  const mappings = new Map(nodes.map((node) => [node.id, node]))
+  const records = new Map([...folders, ...items].map((record) => [record.id, record]))
+  const cutoff = Date.now() - 30 * 86_400_000
+  for (const record of records.values()) {
+    const node = mappings.get(record.id)
+    if (!record.personalOwnerId && !node) continue
+    if (
+      !record.deletedAt ||
+      record.deletedAt >= cutoff ||
+      !node ||
+      node.localRevision !== node.syncedLocalRevision
+    ) {
+      protectedIds.add(record.id)
+    }
+  }
+  for (const operation of outbox) {
+    protectedIds.add(operation.nodeId)
+    for (const member of operation.subtree ?? []) protectedIds.add(member.nodeId)
+  }
+  for (const id of [...protectedIds]) {
+    let parent = records.get(id)?.parentId
+    const seen = new Set<string>()
+    while (parent && !seen.has(parent)) {
+      seen.add(parent)
+      protectedIds.add(parent)
+      parent = records.get(parent)?.parentId
+    }
+  }
+  return protectedIds
+}
+
 export async function listFileResourceCleanupItemIds(request: CleanupRequest): Promise<string[]> {
   const db = await openFileExplorerDB()
-  const [folders, items] = await Promise.all([
+  const [folders, items, nodes, outbox] = await Promise.all([
     db.getAll('folder-records'),
-    db.getAll('folder-items')
+    db.getAll('folder-items'),
+    db.getAll('personal-sync-nodes'),
+    db.getAll('personal-sync-outbox')
   ])
+  const protectedIds = protectedPersonalIds(folders, items, nodes, outbox)
   const folderIds = collectDescendantFolderIds(request.folderIds ?? [], folders)
   const requestedItemIds = new Set(request.itemIds ?? [])
   for (const item of items) {
     if (folderIds.has(item.parentId)) requestedItemIds.add(item.id)
   }
-  return [...requestedItemIds]
+  return [...requestedItemIds].filter((id) => !protectedIds.has(id))
 }
 
 function makeCleanupRecord(
@@ -130,20 +172,36 @@ async function cleanupFileResourcesSerial(request: CleanupRequest): Promise<Clea
 async function cleanupFileResourcesAfterJobFence(request: CleanupRequest): Promise<CleanupResult> {
   const db = await openFileExplorerDB()
   const tx = db.transaction(
-    ['folder-records', 'folder-items', 'file-blobs', 'resource-cleanup-journal'],
+    [
+      'folder-records',
+      'folder-items',
+      'file-blobs',
+      'resource-cleanup-journal',
+      'personal-sync-nodes',
+      'personal-sync-outbox'
+    ],
     'readwrite'
   )
   const folderStore = tx.objectStore('folder-records')
   const itemStore = tx.objectStore('folder-items')
   const blobStore = tx.objectStore('file-blobs')
   const journalStore = tx.objectStore('resource-cleanup-journal')
-  const [folders, items] = await Promise.all([folderStore.getAll(), itemStore.getAll()])
+  const nodeStore = tx.objectStore('personal-sync-nodes')
+  const [folders, items, nodes, outbox] = await Promise.all([
+    folderStore.getAll(),
+    itemStore.getAll(),
+    nodeStore.getAll(),
+    tx.objectStore('personal-sync-outbox').getAll()
+  ])
+  const protectedIds = protectedPersonalIds(folders, items, nodes, outbox)
 
   const folderIds = collectDescendantFolderIds(request.folderIds ?? [], folders)
   const requestedItemIds = new Set(request.itemIds ?? [])
   const targetItems = items.filter(
-    (item) => requestedItemIds.has(item.id) || folderIds.has(item.parentId)
+    (item) =>
+      !protectedIds.has(item.id) && (requestedItemIds.has(item.id) || folderIds.has(item.parentId))
   )
+  for (const id of protectedIds) folderIds.delete(id)
 
   const blobReferenceRemovals = new Map<string, number>()
   const thumbnailIdsByBlob = new Map<string, string[]>()
@@ -188,7 +246,9 @@ async function cleanupFileResourcesAfterJobFence(request: CleanupRequest): Promi
 
   await Promise.all([
     ...targetItems.map((item) => itemStore.delete(item.id)),
+    ...targetItems.map((item) => nodeStore.delete(item.id)),
     ...[...folderIds].map((folderId) => folderStore.delete(folderId)),
+    ...[...folderIds].map((folderId) => nodeStore.delete(folderId)),
     ...cleanupRecords.map((record) => journalStore.put(record))
   ])
   await tx.done

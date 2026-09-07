@@ -58,3 +58,18 @@ it('routes public rename and delete actions through the outbox and blocks the le
     deletedAt: expect.any(Number)
   })
 })
+
+it('queues a chosen restore name in the same operation as restoring the folder', async () => {
+  const folder = await createPersonalFolder('Sunday', 'personal:space')
+  await mutatePersonalNode(folder, { type: 'delete' })
+  await createPersonalFolder('Sunday', 'personal:space')
+  await mutatePersonalNode(folder, { type: 'restore', name: 'Sunday restored' })
+  expect((await listPersonalOutbox('alice')).at(-1)?.mutation).toEqual({
+    type: 'restore',
+    name: 'Sunday restored'
+  })
+  expect(await (await openFileExplorerDB()).get('folder-records', folder)).toMatchObject({
+    name: 'Sunday restored',
+    deletedAt: undefined
+  })
+})

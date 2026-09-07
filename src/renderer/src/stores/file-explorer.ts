@@ -485,7 +485,11 @@ async function copyPersonalBoundaryFile(itemId: string, parentId: string): Promi
   }
 }
 
-export async function copyExplorerFolder(id: string, parentId: string): Promise<string> {
+export async function copyExplorerFolder(
+  id: string,
+  parentId: string,
+  options: { includeDeleted?: boolean } = {}
+): Promise<string> {
   const state = useFileExplorerStore.getState()
   const source = state.folders[id]
   if (!source || !isPersonalRecordVisible(source)) throw new Error('Copy source is unavailable')
@@ -497,21 +501,20 @@ export async function copyExplorerFolder(id: string, parentId: string): Promise<
     ancestor = state.folders[ancestor]?.parentId ?? null
   }
   await state.ensureItemsLoaded(id)
-  const items = useFileExplorerStore
-    .getState()
-    .getItems(id)
-    .filter((item) => !item.deletedAt)
-  const folders = useFileExplorerStore
-    .getState()
-    .getChildFolders(id)
-    .filter((folder) => !folder.deletedAt)
+  const loaded = useFileExplorerStore.getState()
+  const items = loaded._itemsArray.filter(
+    (item) => item.parentId === id && (options.includeDeleted || !item.deletedAt)
+  )
+  const folders = loaded._foldersArray.filter(
+    (folder) => folder.parentId === id && (options.includeDeleted || !folder.deletedAt)
+  )
   const target = await createExplorerFolder(source.name, parentId)
   if (!target) throw new Error('Copy destination is unavailable')
   for (const item of items) {
     if (!(await useFileExplorerStore.getState().copyItem(item.id, target)))
       throw new Error('File copy failed')
   }
-  for (const folder of folders) await copyExplorerFolder(folder.id, target)
+  for (const folder of folders) await copyExplorerFolder(folder.id, target, options)
   return target
 }
 
@@ -529,6 +532,7 @@ function personalWrite(
     .catch(reportPersonalWriteError)
 }
 useFileExplorerStore.setState({
+  purgeTrash: purgeExpiredTrashFromStore,
   updateFolder: (id, updates) => {
     if (!isPersonalNode(id)) return localFileActions.updateFolder(id, updates)
     if (updates.name !== undefined) personalWrite(id, { type: 'rename', name: updates.name })

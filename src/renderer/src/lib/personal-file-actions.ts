@@ -170,7 +170,8 @@ export async function mutatePersonalNode(
   mutation:
     | { type: 'rename'; name: string }
     | { type: 'move'; parentId: string }
-    | { type: 'delete' | 'restore' }
+    | { type: 'delete' }
+    | { type: 'restore'; name?: string }
 ): Promise<void> {
   const ownerId = activeOwner()
   const db = await openFileExplorerDB()
@@ -205,8 +206,14 @@ export async function mutatePersonalNode(
         : undefined
       const parentId =
         originalParent && !originalParent.deletedAt ? originalParent.id : state.rootId
-      catalog = { ...stored, parentId, deletedAt: undefined, originalParentId: undefined }
-      operation = { type: 'restore' as const }
+      catalog = {
+        ...stored,
+        name: mutation.name?.trim().normalize('NFC') ?? stored.name,
+        parentId,
+        deletedAt: undefined,
+        originalParentId: undefined
+      }
+      operation = { type: 'restore' as const, ...(mutation.name ? { name: catalog.name } : {}) }
       break
     }
   }

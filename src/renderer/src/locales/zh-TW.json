@@ -1273,5 +1273,25 @@
       "connection": "投影連線失敗，請重試。",
       "playback": "影像無法播放，請重新選擇來源。"
     }
+  },
+  "personalCloud": {
+    "title": "雲端資料夾",
+    "idle": "已儲存本機",
+    "pending": "已儲存本機，待同步",
+    "syncing": "同步中",
+    "synced": "已同步",
+    "conflict": "有衝突需要處理",
+    "auth-required": "需要重新登入",
+    "failed": "同步失敗，本機資料已保留",
+    "offline": "離線，可繼續編輯",
+    "backup": "另存本機副本",
+    "keepCloud": "保留雲端",
+    "retry": "重新同步",
+    "busy": "同步正在執行，請稍後重試",
+    "backupFailed": "無法完成本機副本，原始資料已保留",
+    "changed": "內容已變更，請重新檢視衝突",
+    "backupConfirm": "將受影響的 {{count}} 個項目完整複製到本機多媒體，再以雲端版本取代這些項目的本機修改。",
+    "discardConfirm": "將捨棄受影響的 {{count}} 個項目的本機修改，重新下載雲端版本。此操作不會修改雲端。",
+    "copyCreated": "版本衝突：已保留本機內容為衝突副本"
   }
 }

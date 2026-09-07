@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     currentFolderId: 'file-root',
     folders: {},
     items: {},
+    _foldersArray: [],
     _itemsByParent: {},
     _childFoldersByParent: {},
     persistenceStatus: 'ready',

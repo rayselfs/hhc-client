@@ -1,7 +1,11 @@
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { PersonalChangePage, PersonalRemoteNode } from '@shared/personal-cloud'
 import type { PersonalCloudProvider } from './personal-cloud-provider'
-import { openFileExplorerDB, type FileBlobRecord } from './file-explorer-db'
+import {
+  openFileExplorerDB,
+  isFileBlobRecordAvailable,
+  type FileBlobRecord
+} from './file-explorer-db'
 import { assertPersonalSyncLease, type PersonalSyncNode } from './personal-sync-db'
 import { createResourceCleanupRecord } from './resource-cleanup-journal'
 import { getBlobId } from './blob-identity'
@@ -45,7 +49,8 @@ export async function pullPersonalChanges(
       continue
     const item = node ? await db.get('folder-items', node.id) : undefined
     const blob = item?.type === 'file' ? await db.get('file-blobs', getBlobId(item)) : undefined
-    if (!blob || node?.remoteAssetId !== remote.assetId) pending.push(remote)
+    if (!blob || node?.remoteAssetId !== remote.assetId || !(await isFileBlobRecordAvailable(blob)))
+      pending.push(remote)
   }
   const stage = async (index: number): Promise<void> => {
     signal.throwIfAborted()
@@ -125,6 +130,12 @@ export async function commitPersonalChangePage(
       signal.throwIfAborted()
       revision = Math.max(revision, remote.revision)
       const previous = byRemote.get(remote.id)
+      if (
+        !previous &&
+        remote.deletedAt &&
+        Date.parse(remote.deletedAt) <= Date.now() - 30 * 86_400_000
+      )
+        continue
       if (previous && previous.remoteRevision > remote.revision) continue
       if (previous && previous.localRevision !== previous.syncedLocalRevision) {
         await nodes.put({ ...previous, remoteHead: remote })

@@ -52,6 +52,7 @@ import { SyncProviderIcon } from '@renderer/components/icons/SyncProviderIcon'
 import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
 import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
+import { PersonalCloudStatus } from '@renderer/components/Control/FileExplorer/PersonalCloudStatus'
 
 const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
@@ -903,6 +904,7 @@ export default function FilesPage(): React.JSX.Element {
         onChange={(e) => void handleFolderChange(e)}
       />
       <FileExplorerShell itemCount={itemCount} selectedCount={selectedCount}>
+        <PersonalCloudStatus />
         <FolderPersistenceStatus
           className="mx-3 mt-3"
           status={persistenceStatus}

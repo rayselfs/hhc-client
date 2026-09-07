@@ -22,7 +22,7 @@ export type PersonalCloudProvider = Omit<PersonalCloudHttpApi, 'putUpload' | 'do
 }
 
 export function createPersonalCloudProvider(
-  auth: HhcAuthAdapter,
+  auth: Pick<HhcAuthAdapter, 'getSession' | 'getAccessToken' | 'refreshAccessToken'>,
   ownerId: string
 ): PersonalCloudProvider {
   if (isElectron()) {

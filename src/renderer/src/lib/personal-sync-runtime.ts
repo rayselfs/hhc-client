@@ -1,7 +1,20 @@
 import { PersonalCloudHttpError, type PersonalMutationRequest } from '@shared/personal-cloud'
-import type { PersonalCloudProvider } from './personal-cloud-provider'
+import type { HhcAuthAdapter } from '@shared/hhc-auth'
+import { createPersonalCloudProvider, type PersonalCloudProvider } from './personal-cloud-provider'
+import { openFileExplorerDB } from './file-explorer-db'
+import { ensurePersonalLocalSpace } from './personal-file-actions'
+import { pullPersonalChanges } from './personal-sync-pull'
+import { refreshPersonalCatalog } from '@renderer/stores/file-explorer'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
+import { preservePersonalContentConflict } from './personal-sync-conflicts'
+import { toast } from '@heroui/react/toast'
+import i18n from '@renderer/i18n'
 import {
   acknowledgePersonalOperation,
+  acquirePersonalSyncLease,
+  assertPersonalSyncLease,
+  renewPersonalSyncLease,
+  releasePersonalSyncLease,
   listPersonalOutbox,
   updatePersonalOperationTransfer,
   type PersonalOutboxRecord
@@ -117,5 +130,174 @@ function mutationRequest(operation: PersonalOutboxRecord): PersonalMutationReque
     expectedRevision: operation.expectedRevision,
     expectedCollectionRevision: operation.expectedCollectionRevision,
     ...(operation.uploadId ? { uploadId: operation.uploadId } : {})
+  }
+}
+
+export function requestPersonalSync(ownerId: string): void {
+  window.dispatchEvent(new CustomEvent('hhc:personal-sync', { detail: ownerId }))
+}
+
+export function startPersonalSync(
+  ownerId: string,
+  auth: Pick<HhcAuthAdapter, 'getSession' | 'getAccessToken' | 'refreshAccessToken'>
+): () => void {
+  const workerId = crypto.randomUUID()
+  const api = createPersonalCloudProvider(auth, ownerId)
+  let stopped = false
+  let running = false
+  let pending = false
+  let failures = 0
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let controller: AbortController | undefined
+  const publish = (
+    syncStatus: ReturnType<typeof usePersonalSyncStore.getState>['syncStatus'],
+    errorCode: string | null = null
+  ): void => {
+    if (!stopped && usePersonalSyncStore.getState().activeOwnerId === ownerId) {
+      usePersonalSyncStore.setState({ syncStatus, errorCode })
+    }
+  }
+  const schedule = (delay: number): void => {
+    if (stopped) return
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = undefined
+      void run()
+    }, delay)
+  }
+  const run = async (): Promise<void> => {
+    if (stopped || running) return
+    running = true
+    const current = new AbortController()
+    controller = current
+    const signal = current.signal
+    let renewal: ReturnType<typeof setInterval> | undefined
+    let delay = 30_000
+    try {
+      if (usePersonalSyncStore.getState().activeOwnerId !== ownerId) return
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        publish('pending')
+        return
+      }
+      const db = await openFileExplorerDB()
+      if (!(await db.get('personal-sync-state', ownerId))) {
+        await ensurePersonalLocalSpace(ownerId, await api.ensureSpace(signal), signal)
+      }
+      signal.throwIfAborted()
+      if (!(await acquirePersonalSyncLease(ownerId, workerId))) {
+        await refreshPersonalCatalog(ownerId)
+        delay = 2_000
+        return
+      }
+      renewal = setInterval(() => {
+        void renewPersonalSyncLease(ownerId, workerId)
+          .then((owned) => {
+            if (!owned) current.abort()
+          })
+          .catch(() => current.abort())
+      }, 10_000)
+      publish('syncing')
+      let result: Awaited<ReturnType<typeof advancePersonalOutbox>> = 'empty'
+      for (let count = 0; count < 50; count += 1) {
+        result = await advancePersonalOutbox(ownerId, workerId, api, signal)
+        if (result !== 'acknowledged') break
+      }
+      let more = false
+      for (let count = 0; count < 10; count += 1) {
+        try {
+          more = await pullPersonalChanges(ownerId, workerId, api, signal)
+        } catch (error) {
+          if (error instanceof PersonalCloudHttpError && error.status === 404) {
+            const tx = db.transaction('personal-sync-state', 'readwrite')
+            const state = await tx.store.get(ownerId)
+            if (state) {
+              try {
+                assertPersonalSyncLease(state, workerId)
+                signal.throwIfAborted()
+                await tx.store.put({ ...state, cursor: undefined, pullRevision: undefined })
+                signal.throwIfAborted()
+                await tx.done
+              } catch (resetError) {
+                try {
+                  tx.abort()
+                } catch {
+                  /* Already aborted. */
+                }
+                await tx.done.catch(() => undefined)
+                throw resetError
+              }
+            } else await tx.done
+          }
+          throw error
+        }
+        if (!more) break
+      }
+      const preserved = !more && (await preservePersonalContentConflict(ownerId, workerId, signal))
+      if (preserved) {
+        toast.warning(i18n.t('personalCloud.copyCreated'))
+        result = 'scanning'
+      }
+      await refreshPersonalCatalog(ownerId)
+      signal.throwIfAborted()
+      const remaining = await listPersonalOutbox(ownerId)
+      const failure = remaining[0]?.failure
+      publish(
+        failure === 'conflict'
+          ? 'conflict'
+          : failure
+            ? 'failed'
+            : remaining.length || more
+              ? 'pending'
+              : 'synced',
+        failure ?? null
+      )
+      failures = 0
+      if (more || (remaining.length && result !== 'blocked')) delay = 2_000
+    } catch (error) {
+      if (!stopped) {
+        failures += 1
+        const status = error instanceof PersonalCloudHttpError ? error.status : 0
+        const code = error instanceof PersonalCloudHttpError ? error.code : 'sync-failed'
+        publish(status === 401 ? 'auth-required' : 'failed', code)
+        delay = Math.max(
+          Math.min(60_000, 2 ** Math.min(failures, 6) * 1_000),
+          error instanceof PersonalCloudHttpError ? error.retryAfterMs : 0
+        )
+      }
+    } finally {
+      if (renewal) clearInterval(renewal)
+      await releasePersonalSyncLease(ownerId, workerId).catch(() => undefined)
+      if (controller === current) controller = undefined
+      running = false
+      if (pending) {
+        pending = false
+        delay = 0
+      }
+      schedule(delay)
+    }
+  }
+  const wake = (): void => {
+    if (running) pending = true
+    else schedule(0)
+  }
+  const requested = (event: Event): void => {
+    if (event instanceof CustomEvent && event.detail === ownerId) wake()
+  }
+  const visible = (): void => {
+    if (document.visibilityState === 'visible') wake()
+  }
+  window.addEventListener('online', wake)
+  window.addEventListener('focus', wake)
+  window.addEventListener('hhc:personal-sync', requested)
+  document.addEventListener('visibilitychange', visible)
+  schedule(0)
+  return () => {
+    stopped = true
+    controller?.abort()
+    if (timer) clearTimeout(timer)
+    window.removeEventListener('online', wake)
+    window.removeEventListener('focus', wake)
+    window.removeEventListener('hhc:personal-sync', requested)
+    document.removeEventListener('visibilitychange', visible)
   }
 }
