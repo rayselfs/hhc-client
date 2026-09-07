@@ -14,6 +14,7 @@ import {
 
 const item: FileItemRecord = {
   id: 'local-file',
+  personalOwnerId: 'alice',
   parentId: 'personal-root',
   type: 'file',
   name: 'Image.png',
@@ -315,4 +316,16 @@ describe('personal worker lease', () => {
       refCount: 2
     })
   })
+})
+
+it('does not treat a noncontiguous ACK as proof that remote subtree changes were observed', async () => {
+  await commitPersonalLocalMutation(createWrite())
+  await acknowledgePersonalOperation('alice', 'operation-1', {
+    itemId: 'remote-file',
+    nodeRevision: 5,
+    collectionRevision: 5
+  })
+  const db = await openFileExplorerDB()
+  expect(await db.get('personal-sync-state', 'alice')).toMatchObject({ collectionRevision: 0 })
+  expect(await db.get('personal-sync-nodes', item.id)).toMatchObject({ remoteRevision: 5 })
 })

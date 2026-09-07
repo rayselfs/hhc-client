@@ -18,7 +18,7 @@ export type PersonalCloudProvider = Omit<PersonalCloudHttpApi, 'putUpload' | 'do
     revision: number,
     blobId: string,
     signal: AbortSignal
-  ): Promise<FileBlobRecord>
+  ): Promise<FileBlobRecord & { mimeType: string }>
 }
 
 export function createPersonalCloudProvider(
@@ -70,7 +70,12 @@ export function createPersonalCloudProvider(
           (request) => native.downloadSnapshot({ ...request, itemId, revision, blobId }),
           signal
         )
-        return { id: result.fileId, storage: 'native-fs', size: result.size }
+        return {
+          id: result.fileId,
+          storage: 'native-fs',
+          size: result.size,
+          mimeType: result.mimeType
+        }
       }
     }
   }
@@ -119,7 +124,7 @@ export function createPersonalCloudProvider(
         const blob = new Blob(chunks, {
           type: response.headers.get('content-type') ?? 'application/octet-stream'
         })
-        return { id: blobId, storage: 'indexed-db', size, blob }
+        return { id: blobId, storage: 'indexed-db', size, blob, mimeType: blob.type }
       } finally {
         await reader.cancel().catch(() => undefined)
         reader.releaseLock()

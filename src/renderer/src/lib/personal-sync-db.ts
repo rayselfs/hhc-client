@@ -1,4 +1,4 @@
-import type { PersonalMutationRequest } from '@shared/personal-cloud'
+import type { PersonalMutationRequest, PersonalRemoteNode } from '@shared/personal-cloud'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { openFileExplorerDB, type FileBlobRecord } from './file-explorer-db'
 import { getBlobId } from './blob-identity'
@@ -22,6 +22,8 @@ export interface PersonalSyncNode {
   syncedLocalRevision: number
   remoteRevision: number
   lastOperationId?: string
+  remoteAssetId?: string
+  remoteHead?: PersonalRemoteNode
 }
 
 export interface PersonalSyncState {
@@ -31,6 +33,7 @@ export interface PersonalSyncState {
   collectionRevision: number
   sequence: number
   cursor?: string
+  pullRevision?: number
   lease?: { workerId: string; expiresAt: number }
 }
 
@@ -206,9 +209,13 @@ export async function commitPersonalLocalMutation(
       }
     }
     if ('type' in write.catalog) {
-      await tx.objectStore('folder-items').put({ ...write.catalog, expiresAt: null })
+      await tx
+        .objectStore('folder-items')
+        .put({ ...write.catalog, personalOwnerId: write.ownerId, expiresAt: null })
     } else {
-      await tx.objectStore('folder-records').put({ ...write.catalog, expiresAt: null })
+      await tx
+        .objectStore('folder-records')
+        .put({ ...write.catalog, personalOwnerId: write.ownerId, expiresAt: null })
     }
     const renameAfterContent =
       write.mutation.type === 'replace-content' &&
@@ -224,7 +231,9 @@ export async function commitPersonalLocalMutation(
       localRevision: write.localRevision,
       syncedLocalRevision: node?.syncedLocalRevision ?? 0,
       remoteRevision: node?.remoteRevision ?? 0,
-      lastOperationId
+      lastOperationId,
+      remoteAssetId: node?.remoteAssetId,
+      remoteHead: node?.remoteHead
     })
     await tx.objectStore('personal-sync-outbox').add({
       id: write.operationId,
@@ -364,7 +373,10 @@ export async function acknowledgePersonalOperation(
     })
     await states.put({
       ...state,
-      collectionRevision: Math.max(state.collectionRevision, result.collectionRevision)
+      collectionRevision:
+        result.collectionRevision === state.collectionRevision + 1
+          ? result.collectionRevision
+          : state.collectionRevision
     })
     if (operation.snapshotBlobId) {
       const blobs = tx.objectStore('file-blobs')

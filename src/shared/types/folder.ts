@@ -10,6 +10,7 @@ export interface FolderSyncLink {
 }
 
 export interface FolderRecord {
+  personalOwnerId?: string
   id: string
   name: string
   parentId: string | null
@@ -23,6 +24,7 @@ export interface FolderRecord {
 }
 
 export interface ItemRecord {
+  personalOwnerId?: string
   id: string
   parentId: string
   type: 'verse' | 'file'
