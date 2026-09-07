@@ -443,3 +443,31 @@ test('VLC production matrix', async ({ browserName: _browserName }, testInfo) =>
       .toBe(true)
   })
 })
+
+test('persists generated document bytes through native storage', async ({
+  browserName: _browserName
+}, testInfo) => {
+  const configuredPath = process.env.PACKAGED_APP_PATH
+  if (!configuredPath) throw new Error('PACKAGED_APP_PATH is required')
+  ;({ app: electronApp } = await launchPackaged(
+    resolve(configuredPath),
+    testInfo.outputPath('user-data')
+  ))
+  const control = await electronApp.firstWindow()
+  const result = await control.evaluate(async () => {
+    const id = crypto.randomUUID()
+    const content = JSON.stringify({ schemaVersion: 1, name: 'Native generated snapshot' })
+    try {
+      const imported = await window.api.nativeFs.importFile(
+        id,
+        new File([content], 'generated.lpdeck', { type: 'application/vnd.hhc.presenter+json' })
+      )
+      const response = await fetch(window.api.nativeFs.getUrl(id, 'application/json'))
+      return { size: imported.size, text: await response.text(), expected: content }
+    } finally {
+      await window.api.nativeFs.delete(id)
+    }
+  })
+  expect(result.text).toBe(result.expected)
+  expect(result.size).toBe(Buffer.byteLength(result.expected))
+})
