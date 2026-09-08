@@ -1,3 +1,4 @@
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useCallback, useEffect, useRef } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
@@ -13,11 +14,14 @@ export default function MediaWorkspacePage(): React.JSX.Element {
   const { stopProjection } = useProjection()
   const isPresenting = useMediaProjectionStore((state) => state.isPresenting)
   const endLiveSession = useMediaProjectionStore((state) => state.endLiveSession)
+  const filesPath = useFileExplorerStore((state) =>
+    state.folders[state.currentFolderId]?.personalOwnerId ? '/cloud-files' : '/files'
+  )
   const isClosingRef = useRef(false)
 
   useEffect(() => {
-    if (!isPresenting) navigate('/files', { replace: true })
-  }, [isPresenting, navigate])
+    if (!isPresenting) navigate(filesPath, { replace: true })
+  }, [filesPath, isPresenting, navigate])
 
   const handleExit = useCallback(async (): Promise<void> => {
     if (isClosingRef.current) return

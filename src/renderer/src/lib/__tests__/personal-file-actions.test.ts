@@ -13,7 +13,7 @@ import { listPersonalOutbox } from '../personal-sync-db'
 beforeEach(async () => {
   usePersonalSyncStore.getState().setAccount('anonymous')
   await resetFileExplorerDBForTests()
-  usePersonalSyncStore.getState().setAccount('authenticated', 'alice')
+  usePersonalSyncStore.getState().setAccount('authenticated', 'alice', true)
   await ensurePersonalLocalSpace(
     'alice',
     { id: 'space', revision: 100 },
@@ -50,7 +50,7 @@ it('retains offline edits and refuses another account mutation of the same local
   const folder = await createPersonalFolder('Draft', 'personal:space')
   usePersonalSyncStore.getState().setAccount('unavailable')
   await mutatePersonalNode(folder, { type: 'rename', name: 'Offline' })
-  usePersonalSyncStore.getState().setAccount('authenticated', 'bob')
+  usePersonalSyncStore.getState().setAccount('authenticated', 'bob', true)
   await expect(mutatePersonalNode(folder, { type: 'delete' })).rejects.toThrow('unavailable')
   expect(await (await openFileExplorerDB()).get('folder-records', folder)).toMatchObject({
     name: 'Offline'

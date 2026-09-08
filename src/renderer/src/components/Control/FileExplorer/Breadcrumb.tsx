@@ -4,18 +4,25 @@ import { ChevronRight } from 'lucide-react'
 import type { FolderRecord } from '@shared/types/folder'
 
 export interface BreadcrumbProps {
+  rootFolderId?: string
+  rootLabel?: string
   currentFolderId: string
   getFolderPath: (id: string) => FolderRecord[]
   onNavigate: (folderId: string | null) => void
 }
 
 export default function Breadcrumb({
+  rootFolderId,
+  rootLabel,
   currentFolderId,
   getFolderPath,
   onNavigate
 }: BreadcrumbProps): React.JSX.Element {
   const { t } = useTranslation()
-  const path = getFolderPath(currentFolderId).filter((folder) => folder.parentId !== null)
+  const fullPath = getFolderPath(currentFolderId)
+  const path = rootFolderId
+    ? fullPath.slice(fullPath.findIndex((folder) => folder.id === rootFolderId) + 1)
+    : fullPath.filter((folder) => folder.parentId !== null)
 
   return (
     <nav
@@ -24,10 +31,10 @@ export default function Breadcrumb({
     >
       <button
         type="button"
-        onClick={() => onNavigate(null)}
+        onClick={() => onNavigate(rootFolderId ?? null)}
         className="shrink-0 text-base text-foreground/70 hover:text-foreground transition-colors px-1 py-0.5 rounded hover:bg-default/60"
       >
-        {t('fileExplorer.breadcrumb.root')}
+        {rootLabel ?? t('fileExplorer.breadcrumb.root')}
       </button>
 
       {path.map((folder, index) => {

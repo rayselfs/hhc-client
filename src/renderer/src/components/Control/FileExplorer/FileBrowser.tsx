@@ -443,7 +443,9 @@ export function FileBrowser({
 
   const folders = useMemo(
     () =>
-      rawFolders.filter((folder) => !folder.deletedAt).sort((a, b) => a.sortIndex - b.sortIndex),
+      rawFolders
+        .filter((folder) => !folder.deletedAt && !isPersonalRootFolder(folder))
+        .sort((a, b) => a.sortIndex - b.sortIndex),
     [rawFolders]
   )
   const fileItems = useMemo(
@@ -466,14 +468,19 @@ export function FileBrowser({
     const raw = searchAllItems(
       searchQuery,
       useFileExplorerStore.getState(),
-      t('fileExplorer.breadcrumb.root')
+      t(
+        useFileExplorerStore.getState().folders[currentFolderId]?.personalOwnerId
+          ? 'nav.cloudFiles'
+          : 'fileExplorer.breadcrumb.root'
+      ),
+      useFileExplorerStore.getState().folders[currentFolderId]?.personalOwnerId ?? null
     )
     return [...raw].sort((a, b) => {
       const nameA = a.kind === 'file' ? a.item.name : a.folder.name
       const nameB = b.kind === 'file' ? b.item.name : b.folder.name
       return nameA.localeCompare(nameB)
     })
-  }, [searchQuery, searchRevision, t])
+  }, [currentFolderId, searchQuery, searchRevision, t])
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 

@@ -1,3 +1,4 @@
+import { isPersonalRootFolder } from './sync-readonly'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { FolderStoreState } from '@renderer/stores/folder'
 
@@ -8,7 +9,8 @@ export type SearchResult =
 export function searchAllItems(
   query: string,
   storeState: FolderStoreState,
-  rootLabel: string
+  rootLabel: string,
+  ownerId?: string | null
 ): SearchResult[] {
   if (query.trim() === '') return []
 
@@ -18,10 +20,13 @@ export function searchAllItems(
   for (const record of storeState._itemsArray) {
     if (record.type !== 'file') continue
     if (record.deletedAt) continue
+    if (ownerId !== undefined && (record.personalOwnerId ?? null) !== ownerId) continue
     if (!record.name.toLowerCase().includes(lowerQuery)) continue
 
     const item = record as FileItemRecord
-    const pathFolders = storeState.getFolderPath(item.parentId).filter((f) => f.parentId !== null)
+    const pathFolders = storeState
+      .getFolderPath(item.parentId)
+      .filter((f) => f.parentId !== null && !isPersonalRootFolder(f))
     const folderPath = '/' + [rootLabel, ...pathFolders.map((f) => f.name)].join('/')
 
     results.push({ kind: 'file', item, folderPath })
@@ -32,12 +37,13 @@ export function searchAllItems(
   if (results.length < 20) {
     for (const folder of storeState._foldersArray) {
       if (folder.parentId === null) continue
-      if (folder.deletedAt) continue
+      if (folder.deletedAt || isPersonalRootFolder(folder)) continue
+      if (ownerId !== undefined && (folder.personalOwnerId ?? null) !== ownerId) continue
       if (!folder.name.toLowerCase().includes(lowerQuery)) continue
 
       const pathFolders = storeState
         .getFolderPath(folder.parentId)
-        .filter((f) => f.parentId !== null)
+        .filter((f) => f.parentId !== null && !isPersonalRootFolder(f))
       const folderPath = '/' + [rootLabel, ...pathFolders.map((f) => f.name)].join('/')
 
       results.push({ kind: 'folder', folder, folderPath })

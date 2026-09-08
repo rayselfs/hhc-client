@@ -31,7 +31,10 @@ test('two clients preserve an offline rename conflict and replay a lost commit r
     await context.route('https://account.alive.org.tw/api/account/v1/**', async (route) => {
       const path = new URL(route.request().url()).pathname
       const json = path.endsWith('/session')
-        ? { authenticated: true, user: { id: 'qa-owner', display_name: 'Cloud QA' } }
+        ? {
+            authenticated: true,
+            user: { id: 'qa-owner', display_name: 'Cloud QA', presenter_cloud_access: true }
+          }
         : path.endsWith('/csrf-token')
           ? { csrf_token: 'qa-csrf' }
           : { access_token: token }
@@ -89,11 +92,7 @@ test('two clients preserve an offline rename conflict and replay a lost commit r
     const page = await context.newPage()
     await page.goto('/')
     await completeOnboarding(page)
-    await page.goto('/#/files')
-    await page
-      .locator('[data-file-item][role="button"]')
-      .filter({ hasText: 'Cloud folder' })
-      .dblclick()
+    await page.getByRole('link', { name: 'Cloud documents', exact: true }).click()
     await expect(
       page.locator('[data-file-item][role="button"]').filter({ hasText: 'original.png' })
     ).toBeVisible()
@@ -118,9 +117,12 @@ test('two clients preserve an offline rename conflict and replay a lost commit r
     await rename(a, 'original.png', 'offline')
     await rename(b, 'original.png', 'cloud')
     await expect.poll(() => remote.name).toBe('cloud.png')
-    await expect(b.getByRole('status').filter({ hasText: 'Cloud folder · Synced' })).toBeVisible({
-      timeout: 20000
-    })
+    await expect
+      .poll(() => requests.filter((request) => request.name === 'cloud.png').length, {
+        timeout: 20000
+      })
+      .toBe(2)
+    await expect(b.getByText('Cloud folder · Synced', { exact: true })).toHaveCount(0)
     expect(requests.filter((request) => request.name === 'cloud.png')).toHaveLength(2)
     expect(receipts.size).toBe(1)
     await contexts[0].setOffline(false)

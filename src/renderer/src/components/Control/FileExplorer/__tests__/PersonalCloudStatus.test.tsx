@@ -13,7 +13,7 @@ vi.mock('@renderer/contexts/PresentationSessionRegistryContext', () => ({
 }))
 afterEach(cleanup)
 
-it('shows retry before a root exists without offering destructive conflict actions for network failure', () => {
+it('shows failures before a root exists without offering destructive conflict actions for network failure', () => {
   usePersonalSyncStore.setState({
     activeOwnerId: 'owner',
     accountStatus: 'authenticated',
@@ -22,6 +22,17 @@ it('shows retry before a root exists without offering destructive conflict actio
   })
   render(<PersonalCloudStatus />)
   expect(screen.getByRole('status')).toHaveTextContent('personalCloud.failed')
-  expect(screen.getByRole('button', { name: 'personalCloud.retry' })).toBeEnabled()
+  expect(screen.queryByRole('button', { name: 'personalCloud.retry' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'personalCloud.keepCloud' })).toBeNull()
+})
+
+it('keeps normal background synchronization invisible', () => {
+  usePersonalSyncStore.setState({
+    activeOwnerId: 'owner',
+    accountStatus: 'authenticated',
+    syncStatus: 'syncing',
+    itemStatuses: {}
+  })
+  const { container } = render(<PersonalCloudStatus />)
+  expect(container).toBeEmptyDOMElement()
 })

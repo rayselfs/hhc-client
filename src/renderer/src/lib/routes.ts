@@ -11,7 +11,7 @@ export function isServiceRoute(pathname: string): boolean {
 }
 
 export function isFilesRoute(pathname: string): boolean {
-  return pathname === '/files'
+  return pathname === '/files' || pathname === '/cloud-files'
 }
 
 export function isFavoritesRoute(pathname: string): boolean {

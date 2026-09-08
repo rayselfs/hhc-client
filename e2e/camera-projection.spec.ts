@@ -18,7 +18,7 @@ async function selectCamera(page: Page): Promise<void> {
   await page.getByRole('option').first().click()
 }
 
-test('projects one camera with matching framing, survives navigation and reload, keeps capture after projection stops', async ({
+test('projects one camera, restores framing after navigation, and releases capture outside Camera', async ({
   page,
   context
 }) => {
@@ -48,7 +48,7 @@ test('projects one camera with matching framing, survives navigation and reload,
     .locator('header')
     .getByRole('button', { name: /^Start projection$|^開始投影$|^开始投影$/ })
     .click()
-  const projection = await popup
+  let projection = await popup
   await expect(projection.getByTestId('camera-projection')).toBeVisible()
   await expect
     .poll(
@@ -111,8 +111,7 @@ test('projects one camera with matching framing, survives navigation and reload,
   await expect
     .poll(() => projection.getByTestId('camera-stage').getAttribute('data-frame'))
     .toContain('"width":960')
-  await page.locator('nav a[href="#/files"]').click()
-  await expect(projection.getByTestId('camera-projection')).toBeVisible()
+  const savedFrame = await editor.getByTestId('camera-stage').getAttribute('data-frame')
   await projection.reload()
   await expect
     .poll(
@@ -120,7 +119,29 @@ test('projects one camera with matching framing, survives navigation and reload,
       { timeout: 15000 }
     )
     .toBeGreaterThan(0)
+  await page.locator('nav a[href="#/files"]').click()
+  await expect.poll(() => projection.isClosed()).toBe(true)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          Reflect.get(window, '__cameraTracks').filter(
+            (track: MediaStreamTrack) => track.readyState === 'live'
+          ).length
+      )
+    )
+    .toBe(0)
   await page.getByRole('link', { name: /^Camera$|^攝影機$|^摄像头$/, exact: true }).click()
+  await expect
+    .poll(() => editor.getByTestId('camera-stage').getAttribute('data-frame'))
+    .toBe(savedFrame)
+  const restoredPopup = context.waitForEvent('page')
+  await page
+    .locator('header')
+    .getByRole('button', { name: /^Start projection$|^開始投影$|^开始投影$/ })
+    .click()
+  projection = await restoredPopup
+  await expect(projection.getByTestId('camera-projection')).toBeVisible()
   await page.evaluate(() => {
     for (const track of Reflect.get(window, '__cameraTracks') as MediaStreamTrack[]) {
       track.stop()
@@ -145,6 +166,18 @@ test('projects one camera with matching framing, survives navigation and reload,
     .getByRole('button', { name: /^Stop projection$|^停止投影$/ })
     .click()
   await expect.poll(() => projection.isClosed()).toBe(true)
+  await expect
+    .poll(() =>
+      workspace
+        .locator('video')
+        .evaluate(
+          (video: HTMLVideoElement) =>
+            (video.srcObject as MediaStream)
+              .getVideoTracks()
+              .filter((track) => track.readyState === 'live').length
+        )
+    )
+    .toBe(1)
   await page.locator('nav a[href="#/files"]').click()
   await expect
     .poll(() =>
@@ -155,7 +188,7 @@ test('projects one camera with matching framing, survives navigation and reload,
           ).length
       )
     )
-    .toBe(1)
+    .toBe(0)
 })
 
 test('allows retry after camera permission is denied', async ({ page }) => {
@@ -205,6 +238,9 @@ test('remembers the camera across page reload without starting projection', asyn
         (video.srcObject as MediaStream).getVideoTracks()[0].getSettings().deviceId
     )
   expect(deviceId).not.toBe('')
+  await page.getByRole('spinbutton', { name: 'X', exact: true }).fill('123')
+  await page.getByRole('spinbutton', { name: /Width|寬度|宽度/ }).fill('960')
+  const savedFrame = await page.getByTestId('camera-stage').getAttribute('data-frame')
   await page.reload()
   await expect
     .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth))
@@ -217,6 +253,7 @@ test('remembers the camera across page reload without starting projection', asyn
           (video.srcObject as MediaStream).getVideoTracks()[0].getSettings().deviceId
       )
   ).toBe(deviceId)
+  await expect(page.getByTestId('camera-stage')).toHaveAttribute('data-frame', savedFrame!)
   expect(context.pages()).toHaveLength(1)
   await page.locator('nav a[href="#/files"]').click()
   await page.getByRole('link', { name: /^Camera$|^攝影機$|^摄像头$/, exact: true }).click()

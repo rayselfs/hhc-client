@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersonalSyncStore } from '@renderer/stores/personal-sync'
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
 import {
@@ -10,7 +11,8 @@ import {
   Star,
   Trash2,
   Files,
-  Camera
+  Camera,
+  Cloud
 } from 'lucide-react'
 import { Dropdown } from '@renderer/components/Common/MenuPopover'
 import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
@@ -26,12 +28,13 @@ interface NavItem {
 interface MediaSubItem {
   to: string
   icon: React.ComponentType<{ className?: string; size?: number }>
-  labelKey: 'nav.files' | 'nav.favorites' | 'nav.trash'
+  labelKey: 'nav.files' | 'nav.favorites' | 'nav.trash' | 'nav.cloudFiles'
   disabled: boolean
 }
 
 const MEDIA_SUB_ITEMS: MediaSubItem[] = [
   { to: '/files', icon: Files, labelKey: 'nav.files', disabled: false },
+  { to: '/cloud-files', icon: Cloud, labelKey: 'nav.cloudFiles', disabled: true },
   { to: '/favorites', icon: Star, labelKey: 'nav.favorites', disabled: false },
   { to: '/trash', icon: Trash2, labelKey: 'nav.trash', disabled: false }
 ]
@@ -49,6 +52,10 @@ function useIsCollapsed(): boolean {
 
 export default function Sidebar(): React.JSX.Element {
   const { t } = useTranslation()
+  const cloudOwnerId = usePersonalSyncStore((state) => state.activeOwnerId)
+  const mediaItems = MEDIA_SUB_ITEMS.map((item) =>
+    item.to === '/cloud-files' ? { ...item, disabled: !cloudOwnerId } : item
+  )
   const location = useLocation()
   const navigate = useNavigate()
   const runPresentationSafeAction = usePresentationSafeAction()
@@ -76,7 +83,7 @@ export default function Sidebar(): React.JSX.Element {
 
   const isActive = (to: string): boolean => location.pathname === to
 
-  const activeSubItem = MEDIA_SUB_ITEMS.find((item) => location.pathname === item.to)
+  const activeSubItem = mediaItems.find((item) => location.pathname === item.to)
   const MediaGroupIcon = activeSubItem ? activeSubItem.icon : Film
   const navigateSafely = (path: string): void => {
     void runPresentationSafeAction(() => navigate(path))
@@ -122,7 +129,7 @@ export default function Sidebar(): React.JSX.Element {
               </Dropdown.Trigger>
               <Dropdown.Popover>
                 <Dropdown.Menu onAction={(key) => navigateSafely(String(key))}>
-                  {MEDIA_SUB_ITEMS.map(({ to, icon: Icon, labelKey, disabled }) => (
+                  {mediaItems.map(({ to, icon: Icon, labelKey, disabled }) => (
                     <Dropdown.Item
                       key={to}
                       id={to}
@@ -155,7 +162,7 @@ export default function Sidebar(): React.JSX.Element {
               </button>
               {mediaOpen && (
                 <ul className="mt-0.5 flex flex-col gap-0.5">
-                  {MEDIA_SUB_ITEMS.map(({ to, icon: Icon, labelKey, disabled }) =>
+                  {mediaItems.map(({ to, icon: Icon, labelKey, disabled }) =>
                     disabled ? (
                       <li key={to}>
                         <button

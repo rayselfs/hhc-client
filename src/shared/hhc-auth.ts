@@ -6,6 +6,7 @@ export interface HhcSession {
   displayName: string
   avatarUrl?: string
   roles: string[]
+  presenterCloudAccess?: boolean
 }
 
 export interface HhcPendingSignIn {

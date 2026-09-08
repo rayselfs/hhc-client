@@ -1,9 +1,11 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import type { HhcSession } from '@shared/hhc-auth'
 
 const mocks = vi.hoisted(() => ({
+  listFolders: vi.fn<() => Promise<CloudRemoteFolder[]>>(),
   session: null as HhcSession | null,
   getAccessToken: vi.fn<() => Promise<string | null>>(),
   refreshAccessToken: vi.fn<() => Promise<string | null>>(),
@@ -11,7 +13,7 @@ const mocks = vi.hoisted(() => ({
     id: providerId,
     supportsFolderNavigation: providerId === 'hhc-line' ? false : undefined,
     getConnectedAccount: vi.fn(async () => null),
-    listFolders: vi.fn(async () => []),
+    listFolders: vi.fn<() => Promise<CloudRemoteFolder[]>>(async () => []),
     importFolder: vi.fn(),
     refreshFolder: vi.fn()
   })),
@@ -153,6 +155,9 @@ describe('FilesPage HHC LINE role resolution', () => {
       displayName: 'Ada',
       roles: ['media_sync_user']
     }
+    mocks.listFolders
+      .mockReset()
+      .mockResolvedValue([{ remoteItemId: 'folder', name: 'Group', parentRemoteItemId: null }])
     mocks.getAccessToken.mockReset()
     mocks.refreshAccessToken.mockReset()
     mocks.getCloudProviderAdapter.mockReset()
@@ -161,15 +166,15 @@ describe('FilesPage HHC LINE role resolution', () => {
       id: providerId,
       supportsFolderNavigation: providerId === 'hhc-line' ? false : undefined,
       getConnectedAccount: vi.fn(async () => null),
-      listFolders: vi.fn(async () => []),
+      listFolders: mocks.listFolders,
       importFolder: vi.fn(),
       refreshFolder: vi.fn()
     }))
   })
 
-  it('keeps HHC LINE visible and disabled while claims for the current user resolve', async () => {
-    let resolveToken!: (token: string | null) => void
-    mocks.getAccessToken.mockReturnValue(
+  it('keeps HHC LINE visible and disabled while folders for the current user resolve', async () => {
+    let resolveToken!: (folders: CloudRemoteFolder[]) => void
+    mocks.listFolders.mockReturnValue(
       new Promise((resolve) => {
         resolveToken = resolve
       })
@@ -177,12 +182,14 @@ describe('FilesPage HHC LINE role resolution', () => {
     const view = render(<FilesPage />)
 
     expect(screen.getByRole('button', { name: 'Sync LINE group' })).toBeDisabled()
-    expect(mocks.getAccessToken).toHaveBeenCalledTimes(1)
+    expect(mocks.listFolders).toHaveBeenCalledTimes(1)
 
-    await act(async () => resolveToken('token'))
+    await act(async () =>
+      resolveToken([{ remoteItemId: 'folder', name: 'Group', parentRemoteItemId: null }])
+    )
     expect(await screen.findByRole('button', { name: 'Sync LINE group' })).toBeEnabled()
     view.rerender(<FilesPage />)
-    expect(mocks.getAccessToken).toHaveBeenCalledTimes(1)
+    expect(mocks.listFolders).toHaveBeenCalledTimes(1)
     expect(mocks.getCloudProviderAdapter).toHaveBeenCalledWith(
       'hhc-line',
       expect.objectContaining({
@@ -198,9 +205,20 @@ describe('FilesPage HHC LINE role resolution', () => {
     render(<FilesPage />)
 
     const action = await screen.findByRole('button', { name: 'Sync LINE group' })
-    expect(action).toBeEnabled()
+    await waitFor(() => expect(action).toBeEnabled())
     await userEvent.click(action)
     expect(screen.getByText('LINE media picker open')).toBeInTheDocument()
+  })
+
+  it('disables an empty ACL result and recovers when a folder becomes available', async () => {
+    mocks.listFolders.mockResolvedValueOnce([])
+    render(<FilesPage />)
+    await waitFor(() => expect(mocks.listFolders).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('button', { name: 'Sync LINE group' })).toBeDisabled()
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Sync LINE group' })).toBeEnabled()
+    )
   })
 
   it('keeps HHC LINE visible and disabled while signed out', () => {

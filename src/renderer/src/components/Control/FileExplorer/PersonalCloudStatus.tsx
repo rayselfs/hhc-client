@@ -27,7 +27,7 @@ export function PersonalCloudStatus(): React.JSX.Element | null {
   return ownerId ? <PersonalCloudAccountStatus key={ownerId} ownerId={ownerId} /> : null
 }
 
-function PersonalCloudAccountStatus({ ownerId }: { ownerId: string }): React.JSX.Element {
+function PersonalCloudAccountStatus({ ownerId }: { ownerId: string }): React.JSX.Element | null {
   const { t } = useTranslation()
   const status = usePersonalSyncStore((state) => state.syncStatus)
   const hasBlockedItems = usePersonalSyncStore((state) =>
@@ -109,6 +109,11 @@ function PersonalCloudAccountStatus({ ownerId }: { ownerId: string }): React.JSX
     }
   }
   const displayedStatus = accountStatus === 'unavailable' ? 'offline' : status
+  if (
+    accountStatus === 'unavailable' ||
+    (status !== 'failed' && status !== 'conflict' && !hasBlockedItems)
+  )
+    return null
   return (
     <div className="mx-3 mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border p-3">
       <span role="status" className="mr-auto text-sm">
@@ -134,14 +139,6 @@ function PersonalCloudAccountStatus({ ownerId }: { ownerId: string }): React.JSX
           </Button>
         </>
       ) : null}
-      <Button
-        size="sm"
-        variant="tertiary"
-        isDisabled={busy || accountStatus !== 'authenticated'}
-        onPress={() => requestPersonalSync(ownerId)}
-      >
-        {t('personalCloud.retry')}
-      </Button>
     </div>
   )
 }

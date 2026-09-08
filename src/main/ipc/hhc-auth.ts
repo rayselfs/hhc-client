@@ -14,7 +14,7 @@ import { isMainWindow } from './validate'
 
 const CLIENT_ID = 'hhc-desktop'
 const REDIRECT_URI = 'hhc-presenter://auth/account'
-const SCOPE = 'openid profile'
+const SCOPE = 'openid profile presenter:cloud:use'
 const REVOKE_TIMEOUT_MS = 5000
 
 type AccountAuthAction = Extract<HhcPresenterProtocolAction, { kind: 'account-auth' }>
@@ -496,7 +496,10 @@ class MainHhcAuthService implements HhcAuthService {
       ...(typeof data.avatar_url === 'string' && data.avatar_url
         ? { avatarUrl: data.avatar_url }
         : {}),
-      roles: access.roles
+      roles: access.roles,
+      ...(typeof data.presenter_cloud_access === 'boolean'
+        ? { presenterCloudAccess: data.presenter_cloud_access }
+        : {})
     }
     this.notify()
     return this.session
