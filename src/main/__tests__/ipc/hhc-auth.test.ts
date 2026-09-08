@@ -103,7 +103,8 @@ function profileResponse(userId = 'user-1'): Response {
     first_name: ' Alice ',
     last_name: ' Chen ',
     avatar_url: 'https://account.example/avatar.png',
-    roles: ['ignored-server-role']
+    roles: ['ignored-server-role'],
+    permissions: []
   })
 }
 
@@ -499,6 +500,22 @@ describe('HhcAuthService authorization', () => {
 })
 
 describe('HhcAuthService credentials and session', () => {
+  it('rejects a malformed profile permission list without granting the legacy flag', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch.mockResolvedValueOnce(tokenResponse('refresh-1')).mockResolvedValueOnce(
+      jsonResponse({
+        id: 'user-1',
+        email: 'alice@example.com',
+        presenter_cloud_access: true,
+        permissions: ['*', true]
+      })
+    )
+    await expect(service.completeProtocolCallback(callbackFromOpenedUrl())).rejects.toThrow(
+      'Invalid HHC account permissions'
+    )
+  })
+
   it('does not access secure storage when no credential exists', async () => {
     const service = createHhcAuthService({ now: () => now })
 
@@ -550,7 +567,8 @@ describe('HhcAuthService credentials and session', () => {
       userId: 'user-1',
       displayName: 'Alice Chen',
       avatarUrl: 'https://account.example/avatar.png',
-      roles: ['media_sync_user']
+      roles: ['media_sync_user'],
+      permissions: []
     })
     expect(mockNetFetch.mock.calls[1][0]).toBe('https://account.alive.org.tw/api/account/v1/me')
     expect(mockNetFetch.mock.calls[1][1].headers).toMatchObject({

@@ -1,6 +1,7 @@
 import {
   HHC_AUTH_CALLBACK_CHANNEL,
   HHC_AUTH_TRANSACTION_TTL_MS,
+  readHhcPermissions,
   type HhcAuthAdapter,
   type HhcPendingSignIn,
   type HhcSession
@@ -34,7 +35,7 @@ type SessionResponse = {
     id?: string
     display_name?: string
     avatar_url?: string
-    presenter_cloud_access?: boolean
+    permissions?: unknown
   }
 }
 
@@ -201,9 +202,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       displayName: data.user.display_name,
       ...(data.user.avatar_url ? { avatarUrl: data.user.avatar_url } : {}),
       roles,
-      ...(typeof data.user.presenter_cloud_access === 'boolean'
-        ? { presenterCloudAccess: data.user.presenter_cloud_access }
-        : {})
+      permissions: readHhcPermissions(data.user.permissions)
     }
     this.notify()
     return this.session
@@ -234,11 +233,13 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     ) {
       return null
     }
+    this.accessToken = null
+    const refreshedSession = await this.getSession()
+    if (generation !== this.authGeneration || refreshedSession?.userId !== expectedUserId)
+      return null
     this.accessToken = token
-    this.session = { ...session, roles: readClaims(token, session.userId, this.now()) }
+    this.session = { ...refreshedSession, roles: readClaims(token, expectedUserId, this.now()) }
     this.notify()
-    await this.getSession()
-    if (generation !== this.authGeneration || this.session?.userId !== expectedUserId) return null
     return token
   }
 
@@ -257,11 +258,13 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     ) {
       return null
     }
+    this.accessToken = null
+    const refreshedSession = await this.getSession()
+    if (generation !== this.authGeneration || refreshedSession?.userId !== expectedUserId)
+      return null
     this.accessToken = token
-    this.session = { ...session, roles: readClaims(token, session.userId, this.now()) }
+    this.session = { ...refreshedSession, roles: readClaims(token, expectedUserId, this.now()) }
     this.notify()
-    await this.getSession()
-    if (generation !== this.authGeneration || this.session?.userId !== expectedUserId) return null
     return token
   }
 
@@ -408,9 +411,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
         displayName: sessionData.user.display_name,
         ...(sessionData.user.avatar_url ? { avatarUrl: sessionData.user.avatar_url } : {}),
         roles,
-        ...(typeof sessionData.user.presenter_cloud_access === 'boolean'
-          ? { presenterCloudAccess: sessionData.user.presenter_cloud_access }
-          : {})
+        permissions: readHhcPermissions(sessionData.user.permissions)
       }
       this.notify()
       return true

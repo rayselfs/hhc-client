@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { APP_CONFIG } from '@shared/app-config'
 import {
   HHC_AUTH_TRANSACTION_TTL_MS,
+  readHhcPermissions,
   type HhcPendingSignIn,
   type HhcSession
 } from '@shared/hhc-auth'
@@ -497,9 +498,7 @@ class MainHhcAuthService implements HhcAuthService {
         ? { avatarUrl: data.avatar_url }
         : {}),
       roles: access.roles,
-      ...(typeof data.presenter_cloud_access === 'boolean'
-        ? { presenterCloudAccess: data.presenter_cloud_access }
-        : {})
+      permissions: readHhcPermissions(data.permissions)
     }
     this.notify()
     return this.session

@@ -78,6 +78,71 @@ describe('browser HHC auth', () => {
     vi.unstubAllGlobals()
   })
 
+  it.each([undefined, null, ['*', true]])(
+    'rejects missing or malformed permissions despite the legacy flag: %j',
+    async (permissions) => {
+      const { adapter } = createAdapter({
+        fetcher: async () =>
+          response({
+            authenticated: true,
+            user: {
+              id: 'user-1',
+              display_name: 'Ada',
+              presenter_cloud_access: true,
+              permissions
+            }
+          })
+      })
+      await expect(adapter.getSession()).rejects.toThrow('Invalid HHC account permissions')
+      adapter.dispose()
+    }
+  )
+
+  it('maps permissions without using the legacy cloud flag', async () => {
+    const { adapter } = createAdapter({
+      fetcher: async () =>
+        response({
+          authenticated: true,
+          user: {
+            id: 'user-1',
+            display_name: 'Ada',
+            presenter_cloud_access: false,
+            permissions: ['presenter:cloud:use']
+          }
+        })
+    })
+    await expect(adapter.getSession()).resolves.toMatchObject({
+      permissions: ['presenter:cloud:use']
+    })
+    adapter.dispose()
+  })
+
+  it('does not cache a token whose permission refresh fails', async () => {
+    let permissions: unknown = []
+    let issued = 0
+    const token = jwt({ sub: 'user-1', roles: [], exp: 9_999_999_999 })
+    const { adapter } = createAdapter({
+      accountOrigin: 'https://permission-failure.example',
+      fetcher: async (input) => {
+        const url = String(input)
+        if (url.endsWith('/session'))
+          return response({
+            authenticated: true,
+            user: { id: 'user-1', display_name: 'Ada', permissions }
+          })
+        if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf' })
+        issued += 1
+        return response({ access_token: token })
+      }
+    })
+    await adapter.getSession()
+    permissions = null
+    await expect(adapter.refreshAccessToken()).rejects.toThrow('Invalid HHC account permissions')
+    await expect(adapter.getAccessToken()).rejects.toThrow('Invalid HHC account permissions')
+    expect(issued).toBe(2)
+    adapter.dispose()
+  })
+
   it('creates an S256 PKCE challenge', async () => {
     await expect(createPkceChallenge('abc')).resolves.toBe(
       'ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0'
@@ -202,7 +267,10 @@ describe('browser HHC auth', () => {
       }
       if (String(input).endsWith('/session')) {
         return Promise.resolve(
-          response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+          response({
+            authenticated: true,
+            user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+          })
         )
       }
       throw new Error(`Unexpected URL: ${String(input)}`)
@@ -323,7 +391,7 @@ describe('browser HHC auth', () => {
       if (String(input).endsWith('/session')) {
         return response({
           authenticated: true,
-          user: { id: 'user-1', display_name: 'Ada', avatar_url: 'https://avatar' }
+          user: { permissions: [], id: 'user-1', display_name: 'Ada', avatar_url: 'https://avatar' }
         })
       }
       throw new Error(`Unexpected URL: ${String(input)}`)
@@ -373,7 +441,8 @@ describe('browser HHC auth', () => {
       userId: 'user-1',
       displayName: 'Ada',
       avatarUrl: 'https://avatar',
-      roles: ['media_sync_user']
+      roles: ['media_sync_user'],
+      permissions: []
     })
 
     target.dispatchEvent(
@@ -395,7 +464,10 @@ describe('browser HHC auth', () => {
         })
       }
       if (String(input).endsWith('/session')) {
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       }
       throw new Error(`Unexpected URL: ${String(input)}`)
     })
@@ -463,7 +535,10 @@ describe('browser HHC auth', () => {
     const accessToken = jwt({ sub: 'user-1', roles: ['media_sync_user'], exp: 9_999_999_999 })
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       if (String(input).endsWith('/session'))
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       if (String(input).endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
       if (String(input).endsWith('/session/access-token'))
         return response({ access_token: accessToken })
@@ -474,7 +549,8 @@ describe('browser HHC auth', () => {
     await expect(adapter.getSession()).resolves.toEqual({
       userId: 'user-1',
       displayName: 'Ada',
-      roles: []
+      roles: [],
+      permissions: []
     })
     await expect(adapter.getAccessToken()).resolves.toBe(accessToken)
     const csrf = fetcher.mock.calls.find(([url]) => String(url).endsWith('/csrf-token'))?.[1]
@@ -498,7 +574,10 @@ describe('browser HHC auth', () => {
     let accessTokenRequests = 0
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).endsWith('/session')) {
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       }
       if (String(input).endsWith('/csrf-token')) return response({ csrf_token: 'csrf-refresh' })
       if (String(input).endsWith('/session/access-token')) {
@@ -513,7 +592,8 @@ describe('browser HHC auth', () => {
     await expect(adapter.getAccessToken()).resolves.toBe(firstToken)
     await expect(adapter.refreshAccessToken()).resolves.toBe(secondToken)
     await expect(adapter.getSession()).resolves.toMatchObject({
-      roles: ['media_sync_user', 'reader']
+      roles: ['media_sync_user', 'reader'],
+      permissions: []
     })
     expect(accessTokenRequests).toBe(2)
   })
@@ -524,7 +604,10 @@ describe('browser HHC auth', () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/session'))
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       if (url.endsWith('/csrf-token')) return response({ csrf_token: `csrf-${++csrfRequests}` })
       if (url.endsWith('/session/access-token')) {
         accessRequests++
@@ -545,7 +628,10 @@ describe('browser HHC auth', () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/session'))
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
       if (url.endsWith('/session/access-token'))
         return response({ access_token: jwt({ sub: 'user-1', roles: [], exp: 9_999_999_999 }) })
@@ -586,7 +672,10 @@ describe('browser HHC auth', () => {
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
     await adapter.signOut()
     resolveSession(
-      response({ authenticated: true, user: { id: 'user-a', display_name: 'User A' } })
+      response({
+        authenticated: true,
+        user: { permissions: [], id: 'user-a', display_name: 'User A' }
+      })
     )
 
     await expect(staleSession).resolves.toBeNull()
@@ -598,7 +687,10 @@ describe('browser HHC auth', () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/session')) {
-        return response({ authenticated: true, user: { id: userId, display_name: userId } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: userId, display_name: userId }
+        })
       }
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-explicit-sign-in' })
       if (url.endsWith('/session/logout')) return response({})
@@ -632,7 +724,11 @@ describe('browser HHC auth', () => {
           return Promise.resolve(
             response({
               authenticated: true,
-              user: { id: `user-${user}`, display_name: `User ${user.toUpperCase()}` }
+              user: {
+                permissions: [],
+                id: `user-${user}`,
+                display_name: `User ${user.toUpperCase()}`
+              }
             })
           )
         }
@@ -678,7 +774,10 @@ describe('browser HHC auth', () => {
       }
       if (url.endsWith('/session')) {
         return Promise.resolve(
-          response({ authenticated: true, user: { id: 'user-b', display_name: 'User B' } })
+          response({
+            authenticated: true,
+            user: { permissions: [], id: 'user-b', display_name: 'User B' }
+          })
         )
       }
       throw new Error(`Unexpected URL: ${url}`)
@@ -712,7 +811,10 @@ describe('browser HHC auth', () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/session'))
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
       if (url.endsWith('/session/access-token')) {
         accessRequests++
@@ -773,7 +875,10 @@ describe('browser HHC auth', () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/session'))
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
       if (url.endsWith('/session/access-token')) {
         tokenIssues++
@@ -806,7 +911,10 @@ describe('browser HHC auth', () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/session'))
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
       if (url.endsWith('/session/access-token')) return response({ access_token: accessToken })
       throw new Error(`Unexpected URL: ${url}`)
@@ -823,7 +931,10 @@ describe('browser HHC auth', () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/session'))
-        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+        return response({
+          authenticated: true,
+          user: { permissions: [], id: 'user-1', display_name: 'Ada' }
+        })
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
       if (url.endsWith('/session/access-token')) {
         issues++

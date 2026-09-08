@@ -209,7 +209,10 @@ test('restores the HHC account session without storing the access token', async 
         headers: { ...corsHeaders, 'content-type': 'application/json' },
         body: JSON.stringify(
           authenticated && hasSessionCookie
-            ? { authenticated: true, user: { id: 'user-1', display_name: 'Ada Lovelace' } }
+            ? {
+                authenticated: true,
+                user: { id: 'user-1', display_name: 'Ada Lovelace', permissions: [] }
+              }
             : { authenticated: false }
         )
       })
