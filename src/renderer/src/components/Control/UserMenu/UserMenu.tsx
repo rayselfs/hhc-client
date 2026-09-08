@@ -13,7 +13,10 @@ import {
   Power,
   CircleUser,
   Info,
-  X
+  X,
+  House,
+  ShieldCheck,
+  UserRound
 } from 'lucide-react'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
@@ -21,9 +24,10 @@ import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
 import MacUpdateInstallDialog from '@renderer/components/Control/UserMenu/MacUpdateInstallDialog'
 import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
-import { isElectron, isMac } from '@renderer/lib/env'
+import { isElectron, isMac, isWeb } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
 import { selectUpdateStatus, selectAvailableVersion } from '@renderer/stores/selectors/update'
+import { canAccessHhcAdmin } from '@shared/hhc-auth'
 
 interface UserMenuProps {
   isExpanded: boolean
@@ -41,7 +45,7 @@ export default function UserMenu({
   isExpanded,
   onOpenPreferences
 }: UserMenuProps): React.JSX.Element {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
   const [isShortcutsOpen, setShortcutsOpen] = useState(false)
   const [isAboutOpen, setAboutOpen] = useState(false)
   const confirm = useConfirm()
@@ -56,6 +60,12 @@ export default function UserMenu({
   const { status, session, signInStatus, signIn, cancelSignIn, signOut } = useHhcAuth()
   const accountLabel =
     status === 'authenticated' && session ? session.displayName : t('userMenu.guest')
+  const websiteLocale =
+    i18n.resolvedLanguage === 'zh-TW'
+      ? 'zh-Hant'
+      : i18n.resolvedLanguage === 'zh-CN'
+        ? 'zh-Hans'
+        : 'en'
 
   const avatarInitials =
     accountLabel
@@ -235,6 +245,36 @@ export default function UserMenu({
               <Keyboard className="size-4" />
               {t('userMenu.keyboardShortcuts')}
             </Dropdown.Item>
+            {status === 'authenticated' && session && isWeb() ? (
+              <>
+                <Dropdown.Item
+                  id="officialSite"
+                  href={`https://www.alive.org.tw/${websiteLocale}`}
+                  className={`data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground ${glassDividerClass}`}
+                >
+                  <House className="size-4" />
+                  {t('userMenu.officialSite')}
+                </Dropdown.Item>
+                {canAccessHhcAdmin(session.permissions) ? (
+                  <Dropdown.Item
+                    id="adminManagement"
+                    href="https://admin.alive.org.tw/"
+                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                  >
+                    <ShieldCheck className="size-4" />
+                    {t('userMenu.adminManagement')}
+                  </Dropdown.Item>
+                ) : null}
+                <Dropdown.Item
+                  id="accountManagement"
+                  href="https://account.alive.org.tw/profile"
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
+                  <UserRound className="size-4" />
+                  {t('userMenu.accountManagement')}
+                </Dropdown.Item>
+              </>
+            ) : null}
             <Dropdown.Item
               id="about"
               className={`data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground ${glassDividerClass}`}

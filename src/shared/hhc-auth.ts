@@ -43,3 +43,28 @@ export function hasHhcPermission(
     (permissions?.includes('*') === true || permissions?.includes(required) === true)
   )
 }
+
+const hhcAdminCapabilities = [
+  'cms:read',
+  'campaigns:read',
+  'users:read',
+  'rbac:read',
+  'media-sync:manage',
+  'dsr:read'
+] as const
+type HhcAdminCapability = (typeof hhcAdminCapabilities)[number]
+
+const hhcAdminLegacyPermissions: Partial<Record<HhcAdminCapability, string>> = {
+  'campaigns:read': 'cms:read',
+  'users:read': 'users:manage',
+  'rbac:read': 'rbac:manage',
+  'dsr:read': 'dsr:manage'
+} as const
+
+export function canAccessHhcAdmin(permissions: readonly string[] | undefined): boolean {
+  return hhcAdminCapabilities.some((capability) => {
+    if (hasHhcPermission(permissions, capability)) return true
+    const legacyPermission = hhcAdminLegacyPermissions[capability]
+    return legacyPermission !== undefined && hasHhcPermission(permissions, legacyPermission)
+  })
+}
