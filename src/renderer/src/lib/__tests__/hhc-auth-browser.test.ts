@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   BrowserHhcAuthAdapter,
+  completeBrowserRedirectSignIn,
   createBrowserHhcAuthAdapter,
-  createPkceChallenge
+  createPkceChallenge,
+  HHC_AUTH_REDIRECT_TRANSACTION_KEY
 } from '../hhc-auth-browser'
 
 const ACCOUNT_ORIGIN = 'https://account.alive.org.tw'
@@ -47,11 +49,17 @@ function createAdapter(
     open?: ReturnType<typeof vi.fn>
     accountOrigin?: string
   } = {}
-): { adapter: BrowserHhcAuthAdapter; open: ReturnType<typeof vi.fn>; target: Window } {
+): {
+  adapter: BrowserHhcAuthAdapter
+  assign: ReturnType<typeof vi.fn>
+  open: ReturnType<typeof vi.fn>
+  target: Window
+} {
   const open = options.open ?? vi.fn(() => popup())
+  const assign = vi.fn()
   const target = new EventTarget() as Window
   Object.assign(target, {
-    location: { href: `${CLIENT_ORIGIN}/#/files`, origin: CLIENT_ORIGIN },
+    location: { href: `${CLIENT_ORIGIN}/#/files`, origin: CLIENT_ORIGIN, assign },
     open
   })
 
@@ -62,6 +70,7 @@ function createAdapter(
       now: options.now ?? (() => 1_000),
       window: target
     }),
+    assign,
     open,
     target
   }
@@ -71,6 +80,8 @@ describe('browser HHC auth', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     broadcastChannels.length = 0
+    sessionStorage.clear()
+    document.cookie = 'hhc_sso_hint=; Max-Age=0; Path=/'
     vi.stubGlobal('BroadcastChannel', MockBroadcastChannel)
   })
 
@@ -189,6 +200,122 @@ describe('browser HHC auth', () => {
     expect(url.searchParams.get('code_challenge')).toHaveLength(43)
   })
 
+  it('redirects once with prompt=none when the shared SSO hint exists', async () => {
+    document.cookie = 'hhc_sso_hint=1; Path=/'
+    const { adapter, assign } = createAdapter()
+
+    await expect(adapter.attemptPassiveSignIn()).resolves.toBe(true)
+    await expect(adapter.attemptPassiveSignIn()).resolves.toBe(false)
+
+    expect(assign).toHaveBeenCalledOnce()
+    const url = new URL(String(assign.mock.calls[0]?.[0]))
+    expect(url.origin).toBe(ACCOUNT_ORIGIN)
+    expect(url.pathname).toBe('/api/account/v1/oauth/authorize')
+    expect(url.searchParams.get('prompt')).toBe('none')
+    expect(url.searchParams.get('client_id')).toBe('client-web')
+    expect(sessionStorage.length).toBe(2)
+  })
+
+  it('exchanges a stored passive callback and restores its same-origin route', async () => {
+    const replace = vi.fn()
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init).toMatchObject({ method: 'POST', credentials: 'include' })
+      expect(Object.fromEntries(new URLSearchParams(String(init?.body)))).toMatchObject({
+        grant_type: 'authorization_code',
+        client_id: 'client-web',
+        redirect_uri: `${CLIENT_ORIGIN}/oauth/callback`,
+        code_verifier: 'verifier-1',
+        code: 'code-1'
+      })
+      return response({ access_token: 'access-token' })
+    })
+    sessionStorage.setItem(
+      HHC_AUTH_REDIRECT_TRANSACTION_KEY,
+      JSON.stringify({
+        state: 'state-1',
+        codeVerifier: 'verifier-1',
+        expiresAt: 2_000,
+        returnRoute: `${CLIENT_ORIGIN}/#/files`
+      })
+    )
+
+    await expect(
+      completeBrowserRedirectSignIn(
+        { code: 'code-1', state: 'state-1' },
+        {
+          fetcher,
+          now: () => 1_000,
+          storage: sessionStorage,
+          location: { origin: CLIENT_ORIGIN, replace }
+        }
+      )
+    ).resolves.toBe(true)
+
+    expect(fetcher).toHaveBeenCalledWith(
+      `${ACCOUNT_ORIGIN}/api/account/v1/oauth/token`,
+      expect.anything()
+    )
+    expect(replace).toHaveBeenCalledWith(`${CLIENT_ORIGIN}/#/files`)
+    expect(sessionStorage.getItem(HHC_AUTH_REDIRECT_TRANSACTION_KEY)).toBeNull()
+  })
+
+  it('restores the route without a token exchange when passive sign-in is declined', async () => {
+    const replace = vi.fn()
+    const fetcher = vi.fn()
+    sessionStorage.setItem(
+      HHC_AUTH_REDIRECT_TRANSACTION_KEY,
+      JSON.stringify({
+        state: 'state-1',
+        codeVerifier: 'verifier-1',
+        expiresAt: 2_000,
+        returnRoute: `${CLIENT_ORIGIN}/#/files`
+      })
+    )
+
+    await expect(
+      completeBrowserRedirectSignIn(
+        { error: 'login_required', state: 'state-1' },
+        {
+          fetcher,
+          now: () => 1_000,
+          storage: sessionStorage,
+          location: { origin: CLIENT_ORIGIN, replace }
+        }
+      )
+    ).resolves.toBe(true)
+
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith(`${CLIENT_ORIGIN}/#/files`)
+  })
+
+  it('rejects a passive callback return route outside Presenter Web', async () => {
+    const replace = vi.fn()
+    const fetcher = vi.fn()
+    sessionStorage.setItem(
+      HHC_AUTH_REDIRECT_TRANSACTION_KEY,
+      JSON.stringify({
+        state: 'state-1',
+        codeVerifier: 'verifier-1',
+        expiresAt: 2_000,
+        returnRoute: 'https://attacker.example/steal'
+      })
+    )
+
+    await expect(
+      completeBrowserRedirectSignIn(
+        { code: 'code-1', state: 'state-1' },
+        {
+          fetcher,
+          now: () => 1_000,
+          storage: sessionStorage,
+          location: { origin: CLIENT_ORIGIN, replace }
+        }
+      )
+    ).rejects.toThrow('Invalid HHC redirect transaction')
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(replace).not.toHaveBeenCalled()
+  })
+
   it('fails explicitly when the sign-in popup is blocked', async () => {
     const { adapter } = createAdapter({ open: vi.fn(() => null) })
     await expect(adapter.signIn()).rejects.toThrow('Sign-in popup was blocked')
@@ -304,7 +431,7 @@ describe('browser HHC auth', () => {
       if (String(input).endsWith('/csrf-token')) {
         return Promise.resolve(response({ csrf_token: 'csrf-sign-out' }))
       }
-      if (String(input).endsWith('/session/logout')) {
+      if (String(input).endsWith('/session/logout-all')) {
         return new Promise<Response>((resolve) => {
           resolveLogout = resolve
         })
@@ -319,6 +446,21 @@ describe('browser HHC auth', () => {
 
     resolveLogout(response({}))
     await signingOut
+  })
+
+  it('ends the shared Account session when signing out of Presenter Web', async () => {
+    const requests: string[] = []
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
+      if (url.endsWith('/session/logout-all')) return response({})
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const { adapter } = createAdapter({ fetcher })
+
+    await expect(adapter.signOut()).resolves.toBeUndefined()
+    expect(requests.at(-1)).toBe(`${ACCOUNT_ORIGIN}/api/account/v1/session/logout-all`)
   })
 
   it('waits for token completion before clearing the cookie session', async () => {
@@ -337,7 +479,7 @@ describe('browser HHC auth', () => {
         requests.push('csrf')
         return Promise.resolve(response({ csrf_token: 'csrf-after-completion' }))
       }
-      if (url.endsWith('/session/logout')) {
+      if (url.endsWith('/session/logout-all')) {
         requests.push('logout')
         return new Promise<Response>((resolve) => {
           resolveLogout = resolve
@@ -635,7 +777,7 @@ describe('browser HHC auth', () => {
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
       if (url.endsWith('/session/access-token'))
         return response({ access_token: jwt({ sub: 'user-1', roles: [], exp: 9_999_999_999 }) })
-      if (url.endsWith('/session/logout')) return response({ error_code: 'ERR' }, 500)
+      if (url.endsWith('/session/logout-all')) return response({ error_code: 'ERR' }, 500)
       throw new Error(`Unexpected URL: ${url}`)
     })
     const { adapter } = createAdapter({ fetcher, accountOrigin: 'https://logout.example' })
@@ -658,7 +800,7 @@ describe('browser HHC auth', () => {
       }
       if (url.endsWith('/csrf-token'))
         return Promise.resolve(response({ csrf_token: 'csrf-fence' }))
-      if (url.endsWith('/session/logout')) return Promise.resolve(response({}))
+      if (url.endsWith('/session/logout-all')) return Promise.resolve(response({}))
       throw new Error(`Unexpected URL: ${url}`)
     })
     const { adapter } = createAdapter({
@@ -693,7 +835,7 @@ describe('browser HHC auth', () => {
         })
       }
       if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-explicit-sign-in' })
-      if (url.endsWith('/session/logout')) return response({})
+      if (url.endsWith('/session/logout-all')) return response({})
       throw new Error(`Unexpected URL: ${url}`)
     })
     const { adapter } = createAdapter({

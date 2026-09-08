@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import icon from '@renderer/assets/icon.png'
 import { HHC_AUTH_CALLBACK_CHANNEL } from '@shared/hhc-auth'
+import {
+  completeBrowserRedirectSignIn,
+  HHC_AUTH_REDIRECT_TRANSACTION_KEY
+} from '@renderer/lib/hhc-auth-browser'
 
 export default function HhcOAuthCallbackPage(): React.JSX.Element {
   const [status, setStatus] = useState<'pending' | 'complete' | 'failed'>('pending')
@@ -11,12 +15,43 @@ export default function HhcOAuthCallbackPage(): React.JSX.Element {
     const params = new URLSearchParams(window.location.search)
     const codes = params.getAll('code')
     const states = params.getAll('state')
+    const errors = params.getAll('error')
+    if (sessionStorage.getItem(HHC_AUTH_REDIRECT_TRANSACTION_KEY)) {
+      if (
+        states.length !== 1 ||
+        !states[0] ||
+        !(
+          (codes.length === 1 && codes[0] && errors.length === 0) ||
+          (errors.length === 1 && errors[0] && codes.length === 0)
+        )
+      ) {
+        const timer = window.setTimeout(() => setStatus('failed'))
+        return () => window.clearTimeout(timer)
+      }
+      let active = true
+      const payload = codes[0]
+        ? { code: codes[0], state: states[0] }
+        : { error: errors[0], state: states[0] }
+      void completeBrowserRedirectSignIn(payload).then(
+        (completed) => {
+          if (active) setStatus(completed ? 'complete' : 'failed')
+        },
+        () => {
+          if (active) setStatus('failed')
+        }
+      )
+      return () => {
+        active = false
+      }
+    }
+
     if (codes.length !== 1 || states.length !== 1 || !codes[0] || !states[0]) {
       const timer = window.setTimeout(() => setStatus('failed'))
       return () => window.clearTimeout(timer)
     }
 
     const payload = { code: codes[0], state: states[0] }
+
     let channel =
       typeof BroadcastChannel === 'undefined'
         ? null

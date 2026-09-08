@@ -90,8 +90,28 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     let unsubscribe: (() => void) | null = null
     let retryBootstrap = (): void => {}
     const retry = (): void => retryBootstrap()
+    let activityTimer: number | null = null
+    const revalidate = (): void => {
+      if (!adapter?.revalidateOnPageActivity || activityTimer !== null) return
+      activityTimer = window.setTimeout(() => {
+        activityTimer = null
+        retryBootstrap()
+      }, 0)
+    }
+    const revalidateFocus = (): void => {
+      if (adapter?.revalidateOnPageActivity) revalidate()
+      else retry()
+    }
+    const revalidateVisible = (): void => {
+      if (document.visibilityState === 'visible') revalidate()
+    }
+    const revalidateRestored = (event: PageTransitionEvent): void => {
+      if (event.persisted) revalidate()
+    }
     window.addEventListener('online', retry)
-    window.addEventListener('focus', retry)
+    window.addEventListener('focus', revalidateFocus)
+    window.addEventListener('pageshow', revalidateRestored)
+    document.addEventListener('visibilitychange', revalidateVisible)
 
     void createHhcAuthAdapter()
       .then(async (createdAdapter) => {
@@ -102,9 +122,9 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
         }
 
         adapterRef.current = createdAdapter
-        const bootstrapEpoch = sessionEpochRef.current
         let bootstrapUnavailable = false
         let bootstrapRunning = false
+        let sessionNotificationVersion = 0
         let cleanupUserId: string | null = null
         let cleanupInFlight = false
         let pendingSession: HhcSession | null = null
@@ -141,7 +161,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
           sessionTransitionPromiseRef.current = transition
         }
 
-        unsubscribe = createdAdapter.subscribe((nextSession) => {
+        const applySession = (nextSession: HhcSession | null): void => {
           if (!active) return
           bootstrapUnavailable = false
           if (nextSession) {
@@ -171,21 +191,36 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
             return
           }
           publishSession(nextSession, !nextSession || previousUserId !== nextUserId)
+        }
+
+        unsubscribe = createdAdapter.subscribe((nextSession) => {
+          sessionNotificationVersion += 1
+          applySession(nextSession)
         })
 
         const bootstrap = async (): Promise<void> => {
           if (bootstrapRunning) return
           bootstrapRunning = true
+          const requestEpoch = sessionEpochRef.current
+          const requestNotificationVersion = sessionNotificationVersion
           try {
             const nextSession = await createdAdapter.getSession()
-            if (!active || sessionEpochRef.current !== bootstrapEpoch) return
-            bootstrapUnavailable = false
-            sessionRef.current = nextSession
-            setSession(nextSession)
-            setStatus(nextSession ? 'authenticated' : 'anonymous')
+            if (!active) return
+            if (
+              sessionEpochRef.current === requestEpoch &&
+              sessionNotificationVersion === requestNotificationVersion
+            )
+              applySession(nextSession)
+            if (!nextSession) await createdAdapter.attemptPassiveSignIn?.()
           } catch {
-            if (!active || sessionEpochRef.current !== bootstrapEpoch) return
+            if (
+              !active ||
+              sessionEpochRef.current !== requestEpoch ||
+              sessionNotificationVersion !== requestNotificationVersion
+            )
+              return
             bootstrapUnavailable = true
+            if (sessionRef.current) return
             sessionRef.current = null
             setSession(null)
             setStatus('unavailable')
@@ -195,10 +230,9 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
         }
         retryBootstrap = () => {
           if (
-            bootstrapUnavailable &&
             active &&
             !signOutPendingRef.current &&
-            sessionEpochRef.current === bootstrapEpoch
+            (bootstrapUnavailable || createdAdapter.revalidateOnPageActivity)
           )
             void bootstrap()
         }
@@ -213,7 +247,10 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     return () => {
       active = false
       window.removeEventListener('online', retry)
-      window.removeEventListener('focus', retry)
+      window.removeEventListener('focus', revalidateFocus)
+      window.removeEventListener('pageshow', revalidateRestored)
+      document.removeEventListener('visibilitychange', revalidateVisible)
+      if (activityTimer !== null) window.clearTimeout(activityTimer)
       unsubscribe?.()
       if (adapterRef.current === adapter) adapterRef.current = null
       sessionRef.current = null

@@ -123,6 +123,73 @@ describe('HhcAuthContext', () => {
     expect(result.current.session).toEqual(session)
   })
 
+  it('attempts passive browser sign-in after an anonymous bootstrap', async () => {
+    const adapter = Object.assign(createAdapter(null), {
+      attemptPassiveSignIn: vi.fn(async () => true)
+    })
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+    expect(adapter.attemptPassiveSignIn).toHaveBeenCalledOnce()
+  })
+
+  it('revalidates browser sessions when the page regains focus', async () => {
+    const adapter = Object.assign(createAdapter(null), { revalidateOnPageActivity: true })
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+    vi.mocked(adapter.getSession).mockResolvedValue(SESSION)
+
+    act(() => window.dispatchEvent(new Event('focus')))
+
+    await waitFor(() => expect(result.current.session).toEqual(SESSION))
+    expect(adapter.getSession).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not revalidate Electron sessions on page activity', async () => {
+    const adapter = createAdapter(null)
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+
+    act(() => window.dispatchEvent(new Event('focus')))
+
+    expect(adapter.getSession).toHaveBeenCalledOnce()
+  })
+
+  it('retries an unavailable Electron bootstrap when the window regains focus', async () => {
+    const adapter = createAdapter(new Error('Offline'))
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('unavailable'))
+    vi.mocked(adapter.getSession).mockResolvedValue(SESSION)
+
+    act(() => window.dispatchEvent(new Event('focus')))
+
+    await waitFor(() => expect(result.current.session).toEqual(SESSION))
+    expect(adapter.getSession).toHaveBeenCalledTimes(2)
+  })
+
+  it('preserves a browser session across a transient revalidation failure', async () => {
+    const adapter = Object.assign(createAdapter(SESSION), { revalidateOnPageActivity: true })
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+    vi.mocked(adapter.getSession).mockRejectedValueOnce(new Error('Offline'))
+
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() => expect(adapter.getSession).toHaveBeenCalledTimes(2))
+
+    expect(result.current.status).toBe('authenticated')
+    expect(result.current.session).toEqual(SESSION)
+
+    vi.mocked(adapter.getSession).mockResolvedValueOnce({ ...SESSION, userId: 'user-2' })
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() => expect(accessMocks.cleanupAccount).toHaveBeenCalledWith('user-1'))
+    await waitFor(() => expect(result.current.session?.userId).toBe('user-2'))
+  })
+
   it('becomes unavailable without mutating local or OneDrive folders when bootstrap fails', async () => {
     const folders = {
       local: {
