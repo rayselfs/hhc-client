@@ -139,3 +139,13 @@ Implementation completion requires contract and policy tests, affected repositor
 - Session expansion must be deployed before consumers require permissions.
 - Do not remove legacy scope renewal until old-client compatibility is verified; prefer an explicit pending retirement over breaking existing offline queues.
 - Do not remove role-name compatibility on the strength of a migration file alone; verify assigned permission data first.
+
+## Execution checkpoint
+
+- Account PR #68 merged: additive permissions contract, shared effective grants, DSR legacy entry correction, current client scope/active checks, and filtered refresh scope persistence. Production rollout follows CI.
+- frontend-platform PR #43 merged and v0.6.24 published; package and packed-consumer checks passed.
+- Admin PR #85 and website PR #79 migrate consumers. A read-only production lookup confirmed admin role permission `*`, allowing removal of the frontend role-name bypass without changing assignments.
+- Presenter PR #53 migrates both modes; 3,216 unit tests and synthetic native IPC smoke passed. Browser coverage passed after updating the legacy session fixture to provide explicit empty permissions.
+- Gateway and Asset verification passed without source changes. account-fe has no direct old-flag consumer requiring source migration in this additive rollout.
+- Retained compatibility: Account's deprecated Boolean fields and legacy Presenter cloud-scope renewal. Retirement remains explicitly pending supported-old-client evidence; no production permission assignments or automation changes were made.
+- Verified production token configuration: Account defaults to 15 minutes with no override; Gateway explicitly permits 60 seconds clock skew. Existing JWT-based checks may therefore accept an issued token for up to 16 minutes. This is not an immediate-revocation SLA.
