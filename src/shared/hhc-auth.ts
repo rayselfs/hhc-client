@@ -6,7 +6,7 @@ export interface HhcSession {
   displayName: string
   avatarUrl?: string
   roles: string[]
-  presenterCloudAccess?: boolean
+  permissions?: string[]
 }
 
 export interface HhcPendingSignIn {
@@ -22,4 +22,24 @@ export interface HhcAuthAdapter {
   signOut(): Promise<void>
   subscribe(listener: (session: HhcSession | null) => void): () => void
   dispose(): void
+}
+
+export function readHhcPermissions(value: unknown): string[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every((permission) => typeof permission === 'string' && permission.length > 0)
+  ) {
+    throw new Error('Invalid HHC account permissions')
+  }
+  return value
+}
+
+export function hasHhcPermission(
+  permissions: readonly string[] | undefined,
+  required: string
+): boolean {
+  return (
+    required.length > 0 &&
+    (permissions?.includes('*') === true || permissions?.includes(required) === true)
+  )
 }
