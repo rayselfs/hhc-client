@@ -19,6 +19,16 @@ const csrfRequests = new Map<string, Promise<string>>()
 
 type BrowserWindow = Pick<Window, 'addEventListener' | 'removeEventListener' | 'location' | 'open'>
 
+export const HHC_AUTH_REDIRECT_TRANSACTION_KEY = 'hhc_presenter_web_oauth_transaction'
+export const HHC_AUTH_PASSIVE_ATTEMPT_KEY = 'hhc_presenter_web_passive_sso_attempted'
+
+type RedirectTransaction = {
+  state: string
+  codeVerifier: string
+  expiresAt: number
+  returnRoute: string
+}
+
 type Transaction = {
   state: string
   codeVerifier: string
@@ -41,11 +51,72 @@ type SessionResponse = {
 
 type TokenResponse = { access_token?: string }
 
+type RedirectCompletionOptions = {
+  fetcher?: typeof fetch
+  location?: Pick<Location, 'origin' | 'replace'>
+  now?: () => number
+  storage?: Pick<Storage, 'getItem' | 'removeItem'>
+}
+
 export type BrowserHhcAuthOptions = {
   accountOrigin?: string
   fetcher?: typeof fetch
   now?: () => number
   window?: BrowserWindow
+}
+
+export async function completeBrowserRedirectSignIn(
+  payload: { state: string } & ({ code: string } | { error: string }),
+  options: RedirectCompletionOptions = {}
+): Promise<boolean> {
+  const storage = options.storage ?? sessionStorage
+  const raw = storage.getItem(HHC_AUTH_REDIRECT_TRANSACTION_KEY)
+  if (!raw) return false
+  storage.removeItem(HHC_AUTH_REDIRECT_TRANSACTION_KEY)
+
+  let transaction: RedirectTransaction
+  try {
+    transaction = JSON.parse(raw) as RedirectTransaction
+  } catch {
+    throw new Error('Invalid HHC redirect transaction')
+  }
+  const now = options.now ?? Date.now
+  const location = options.location ?? window.location
+  const returnRoute = new URL(transaction.returnRoute)
+  if (
+    transaction.state !== payload.state ||
+    !transaction.codeVerifier ||
+    !Number.isFinite(transaction.expiresAt) ||
+    transaction.expiresAt <= now() ||
+    returnRoute.origin !== location.origin
+  )
+    throw new Error('Invalid HHC redirect transaction')
+
+  if ('error' in payload) {
+    location.replace(returnRoute.toString())
+    return true
+  }
+
+  const fetcher = options.fetcher ?? ((...args) => window.fetch(...args))
+  const response = await fetcher(HHC_AUTH.token, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: HHC_AUTH.clientId,
+      redirect_uri: HHC_AUTH.callbackUri,
+      code_verifier: transaction.codeVerifier,
+      code: payload.code
+    }).toString()
+  })
+  const data = await responseJson<TokenResponse>(response)
+  if (!data.access_token) throw new Error('HHC account did not issue an access token')
+  location.replace(returnRoute.toString())
+  return true
 }
 
 function base64Url(bytes: Uint8Array): string {
@@ -106,6 +177,7 @@ function csrfRejected(response: Response, data: { error_code?: unknown }): boole
 }
 
 export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
+  readonly revalidateOnPageActivity = true
   private readonly accountApi: string
   private readonly authorize: string
   private readonly callbackUri: string
@@ -166,6 +238,37 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     return this.beginSignIn(popup, this.authGeneration)
   }
 
+  async attemptPassiveSignIn(): Promise<boolean> {
+    if (
+      this.signedOut ||
+      this.transaction ||
+      this.completionInFlight ||
+      this.signOutInFlight ||
+      !document.cookie.split(';').some((cookie) => cookie.trim() === 'hhc_sso_hint=1') ||
+      sessionStorage.getItem(HHC_AUTH_PASSIVE_ATTEMPT_KEY) === '1'
+    )
+      return false
+
+    const state = randomValue()
+    const codeVerifier = randomValue()
+    const redirectTransaction: RedirectTransaction = {
+      state,
+      codeVerifier,
+      expiresAt: this.now() + HHC_AUTH_TRANSACTION_TTL_MS,
+      returnRoute: this.window.location.href
+    }
+    sessionStorage.setItem(HHC_AUTH_PASSIVE_ATTEMPT_KEY, '1')
+    sessionStorage.setItem(HHC_AUTH_REDIRECT_TRANSACTION_KEY, JSON.stringify(redirectTransaction))
+    try {
+      this.window.location.assign(await this.authorizationUrl(state, codeVerifier, 'none'))
+      return true
+    } catch (error) {
+      sessionStorage.removeItem(HHC_AUTH_PASSIVE_ATTEMPT_KEY)
+      sessionStorage.removeItem(HHC_AUTH_REDIRECT_TRANSACTION_KEY)
+      throw error
+    }
+  }
+
   cancelSignIn(): Promise<void> {
     if (this.transaction) {
       this.authGeneration += 1
@@ -204,6 +307,8 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       roles,
       permissions: readHhcPermissions(data.user.permissions)
     }
+    sessionStorage.removeItem(HHC_AUTH_PASSIVE_ATTEMPT_KEY)
+    sessionStorage.removeItem(HHC_AUTH_REDIRECT_TRANSACTION_KEY)
     this.notify()
     return this.session
   }
@@ -285,7 +390,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     this.clearSession()
     if (completion) await completion.catch(() => undefined)
     try {
-      await responseJson(await this.protectedPost('/session/logout'))
+      await responseJson(await this.protectedPost('/session/logout-all'))
     } finally {
       csrfTokens.delete(this.accountApi)
     }
@@ -311,6 +416,18 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     }, HHC_AUTH_TRANSACTION_TTL_MS)
     this.transaction = transaction
 
+    const url = await this.authorizationUrl(state, codeVerifier)
+    if (generation !== this.authGeneration || this.signedOut || this.transaction !== transaction)
+      return pending
+    popup.location.href = url
+    return pending
+  }
+
+  private async authorizationUrl(
+    state: string,
+    codeVerifier: string,
+    prompt?: 'none'
+  ): Promise<string> {
     const url = new URL(this.authorize)
     url.search = new URLSearchParams({
       client_id: HHC_AUTH.clientId,
@@ -319,12 +436,10 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       code_challenge: await createPkceChallenge(codeVerifier),
       code_challenge_method: 'S256',
       scope: HHC_AUTH.scope,
-      state
+      state,
+      ...(prompt ? { prompt } : {})
     }).toString()
-    if (generation !== this.authGeneration || this.signedOut || this.transaction !== transaction)
-      return pending
-    popup.location.href = url.toString()
-    return pending
+    return url.toString()
   }
 
   private readonly onMessage = (event: MessageEvent<unknown>): void => {

@@ -15,6 +15,8 @@ export interface HhcPendingSignIn {
 
 export interface HhcAuthAdapter {
   getSession(): Promise<HhcSession | null>
+  attemptPassiveSignIn?(): Promise<boolean>
+  readonly revalidateOnPageActivity?: boolean
   signIn(): Promise<HhcPendingSignIn>
   cancelSignIn(): Promise<void>
   getAccessToken(): Promise<string | null>

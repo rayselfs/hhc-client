@@ -3,6 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@renderer/i18n'
 import HhcOAuthCallbackPage from '../HhcOAuthCallbackPage'
 
+const redirectMocks = vi.hoisted(() => ({ complete: vi.fn(async () => false) }))
+
+vi.mock('@renderer/lib/hhc-auth-browser', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@renderer/lib/hhc-auth-browser')>()),
+  completeBrowserRedirectSignIn: redirectMocks.complete
+}))
+
 describe('HhcOAuthCallbackPage', () => {
   const channels: Array<
     EventTarget & {
@@ -14,6 +21,9 @@ describe('HhcOAuthCallbackPage', () => {
 
   beforeEach(() => {
     channels.length = 0
+    sessionStorage.clear()
+    redirectMocks.complete.mockReset()
+    redirectMocks.complete.mockResolvedValue(false)
     vi.stubGlobal(
       'BroadcastChannel',
       class extends EventTarget {
@@ -26,6 +36,33 @@ describe('HhcOAuthCallbackPage', () => {
         }
       }
     )
+  })
+
+  it('completes a stored full-page callback without broadcasting it to a popup', async () => {
+    Object.defineProperty(window, 'opener', { configurable: true, value: null })
+    sessionStorage.setItem('hhc_presenter_web_oauth_transaction', '{}')
+    redirectMocks.complete.mockResolvedValueOnce(true)
+    window.history.replaceState({}, '', '/oauth/callback?code=code-1&state=state-1')
+
+    render(<HhcOAuthCallbackPage />)
+
+    expect(await screen.findByText('Sign-in complete')).toBeInTheDocument()
+    expect(channels).toHaveLength(0)
+  })
+
+  it('returns from a declined passive sign-in without treating it as a popup callback', async () => {
+    sessionStorage.setItem('hhc_presenter_web_oauth_transaction', '{}')
+    redirectMocks.complete.mockResolvedValueOnce(true)
+    window.history.replaceState({}, '', '/oauth/callback?error=login_required&state=state-1')
+
+    render(<HhcOAuthCallbackPage />)
+
+    expect(await screen.findByText('Sign-in complete')).toBeInTheDocument()
+    expect(redirectMocks.complete).toHaveBeenCalledWith({
+      error: 'login_required',
+      state: 'state-1'
+    })
+    expect(channels).toHaveLength(0)
   })
 
   afterEach(() => {
