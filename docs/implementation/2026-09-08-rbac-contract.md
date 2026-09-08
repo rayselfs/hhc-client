@@ -17,7 +17,7 @@ Account token issuance rechecks the current OAuth client's active state and allo
 - Presenter: 3,216 unit tests, lint, typecheck, desktop/web builds; browser offline conflict and lost-response replay E2E. Full browser coverage: 48 tests passed and one existing platform skip; the remaining legacy session fixture was updated with explicit empty permissions and its full browser-projection suite then passed.
 - Native Electron IPC smoke: synthetic account verifies permission mapping, revocation, and malformed profile rejection. No production credentials or remote writes were used.
 - Gateway verifier suite and Asset personal-space/ACL unit checks passed on clean exports of current main; no source changes needed.
-- account-fe has no direct dependency on either deprecated access field in its source; no migration is required while its installed SDK remains supported by additive responses.
+- account-fe was upgraded from SDK 0.6.7 to 0.7.0 before server retirement; its mock session now returns the profile permissions.
 
 ## Contract retirement and user acceptance
 
@@ -25,7 +25,7 @@ The user approved immediate removal of `admin_access`, `presenter_cloud_access` 
 
 Account production has no ACCESS_TOKEN_EXPIRY override, so its configured default lifetime is 15 minutes. Gateway production explicitly allows 60 seconds of clock skew. Existing locally verified JWTs may therefore remain accepted for up to 16 minutes after issuance; permission/session refresh alone does not invalidate them. Gateway verifies JWTs locally; a permission snapshot refresh is not proof of immediate rejection of every already-issued JWT. Report the deployed expiry configuration and existing invalidation behavior separately before claiming a production revocation SLA.
 
-Deliver in dependency order: Account producer, published SDK, website/Admin and Presenter consumers. Preserve the compatible Account producer when rolling a consumer back. Keep the existing scheduled automation paused.
+The additive rollout preceded retirement. Retirement shipped SDK and website consumers first, then Account removal. A rollback to consumers requiring old fields must first restore a compatible Account producer. Keep the existing scheduled automation paused.
 
 ## Retirement release evidence
 
