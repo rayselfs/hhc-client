@@ -8,7 +8,7 @@ import { PresentationSessionRegistryProvider } from '@renderer/contexts/Presenta
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import UserMenu from '../UserMenu'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
-import { isElectron, isMac } from '@renderer/lib/env'
+import { isElectron, isMac, isWeb } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
 
 const auth = vi.hoisted(() => ({
@@ -18,6 +18,7 @@ const auth = vi.hoisted(() => ({
       userId: string
       displayName: string
       roles: string[]
+      permissions?: string[]
       avatarUrl?: string
     } | null,
     signInStatus: 'idle' as 'idle' | 'pending' | 'cancelled' | 'expired',
@@ -45,7 +46,8 @@ vi.mock('@heroui/react/toast', async (importOriginal) => {
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn(() => false),
-  isMac: vi.fn(() => false)
+  isMac: vi.fn(() => false),
+  isWeb: vi.fn(() => true)
 }))
 
 function renderUserMenu(
@@ -81,6 +83,7 @@ beforeEach(async () => {
   toastDanger.mockClear()
   vi.mocked(isElectron).mockReturnValue(false)
   vi.mocked(isMac).mockReturnValue(false)
+  vi.mocked(isWeb).mockReturnValue(true)
   useUpdateStore.getState().reset()
   updateApi.installDownloaded.mockClear()
   updateApi.downloadMacInstaller.mockClear()
@@ -260,6 +263,89 @@ describe('UserMenu', () => {
     ).toBeInTheDocument()
     fireEvent.click(screen.getByText('Logout').closest('[role="menuitem"]')!)
     expect(auth.value.signOut).toHaveBeenCalledOnce()
+  })
+
+  it('shows website and account links after Presenter tools in authenticated web mode', () => {
+    auth.value.status = 'authenticated'
+    auth.value.session = {
+      userId: 'user-1',
+      displayName: 'Ada Lovelace',
+      roles: [],
+      permissions: []
+    }
+
+    renderUserMenu()
+
+    const items = screen.getAllByRole('menuitem')
+    const labels = items.map((item) => item.textContent)
+    expect(labels.indexOf('Keyboard Shortcuts')).toBeLessThan(labels.indexOf('Official site'))
+    expect(labels.indexOf('Account management')).toBeLessThan(labels.indexOf('About'))
+    expect(screen.getByRole('menuitem', { name: 'Official site' })).toHaveAttribute(
+      'href',
+      'https://www.alive.org.tw/en'
+    )
+    expect(screen.getByRole('menuitem', { name: 'Account management' })).toHaveAttribute(
+      'href',
+      'https://account.alive.org.tw/profile'
+    )
+    expect(screen.queryByRole('menuitem', { name: 'Admin' })).not.toBeInTheDocument()
+  })
+
+  it('shows admin management only with an admin capability in web mode', () => {
+    auth.value.status = 'authenticated'
+    auth.value.session = {
+      userId: 'user-1',
+      displayName: 'Ada Lovelace',
+      roles: [],
+      permissions: ['cms:read']
+    }
+
+    renderUserMenu()
+
+    expect(screen.getByRole('menuitem', { name: 'Admin' })).toHaveAttribute(
+      'href',
+      'https://admin.alive.org.tw/'
+    )
+  })
+
+  it.each([
+    ['zh-TW', 'zh-Hant'],
+    ['zh-CN', 'zh-Hans'],
+    ['en', 'en']
+  ])('links %s to the matching website locale', async (language, websiteLocale) => {
+    await i18n.changeLanguage(language)
+    auth.value.status = 'authenticated'
+    auth.value.session = {
+      userId: 'user-1',
+      displayName: 'Ada Lovelace',
+      roles: [],
+      permissions: []
+    }
+
+    renderUserMenu()
+
+    expect(screen.getByRole('menuitem', { name: i18n.t('userMenu.officialSite') })).toHaveAttribute(
+      'href',
+      `https://www.alive.org.tw/${websiteLocale}`
+    )
+  })
+
+  it('keeps product links out of the Electron menu', () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    vi.mocked(isWeb).mockReturnValue(false)
+    auth.value.status = 'authenticated'
+    auth.value.session = {
+      userId: 'user-1',
+      displayName: 'Ada Lovelace',
+      roles: [],
+      permissions: ['cms:read']
+    }
+
+    renderUserMenu()
+
+    expect(screen.queryByRole('menuitem', { name: 'Official site' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Admin' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Account management' })).not.toBeInTheDocument()
   })
 
   it('renders the authenticated account avatar', () => {
