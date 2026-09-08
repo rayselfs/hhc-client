@@ -2,11 +2,11 @@
 
 Account owns sorted effective permission codes (direct and role grants), returned by both `/session.user.permissions` and `/me.permissions`. New clients require a valid array; empty means no grants and missing/malformed means unavailable. No new access endpoint or per-application response field is introduced.
 
-The public website and Admin use account-client 0.6.24's shared capability policy. Generic checks recognize exact codes and `*`; historical CMS/campaign, manage/read, and DSR aliases remain explicit Admin policy. A read-only production role lookup confirmed that the admin role carries `*`; Admin now checks effective grants without a role-name bypass. Session entry never uses the old Boolean as a fallback.
+The public website and Admin use account-client 0.7.0's shared capability policy. Generic checks recognize exact codes and `*`; historical CMS/campaign, manage/read, and DSR aliases remain explicit Admin policy. A read-only production role lookup confirmed that the admin role carries `*`; Admin now checks effective grants without a role-name bypass. Session entry never uses the old Boolean as a fallback.
 
 Presenter reads permissions in Electron and browser mode and checks `presenter:cloud:use`. Browser tokens are published only after successful permission refresh. Owner-bound offline state and outbox preservation remain intact. Logout-failure recovery restores the current permission result as well as the current account.
 
-Account token issuance rechecks the current OAuth client's active state and allowed scopes, intersects requested scopes with user grants, and persists the resulting scope during rotation, including an empty result. Old Presenter sessions retain their narrowly scoped cloud renewal exception until supported-client reauthorization is verified. This is a compatibility hold, not the pattern for new clients.
+Account token issuance rechecks the current OAuth client's active state and allowed scopes, intersects requested scopes with user grants, and persists the resulting scope during rotation, including an empty result. Retirement of the legacy Presenter cloud renewal exception was explicitly approved. Old sessions missing the cloud scope must sign in again; Presenter 2.5.2 already requests the scope at login.
 
 ## Verification
 
@@ -19,10 +19,25 @@ Account token issuance rechecks the current OAuth client's active state and allo
 - Gateway verifier suite and Asset personal-space/ACL unit checks passed on clean exports of current main; no source changes needed.
 - account-fe has no direct dependency on either deprecated access field in its source; no migration is required while its installed SDK remains supported by additive responses.
 
-## Compatibility and remaining gates
+## Contract retirement and user acceptance
 
-Keep `admin_access` and `presenter_cloud_access` in Account responses while supported old SDKs/desktops need them. Do not retire the Presenter legacy scope exception solely because new clients are released. Removal requires an explicit supported-client decision; no production role assignments were changed here.
+The user approved immediate removal of `admin_access`, `presenter_cloud_access` and the Presenter implicit scope exception. SDK 0.7.0 and all website consumers were deployed before Account removal. Windows real-account acceptance belongs to the user and does not block closure. No production role assignments were changed.
 
 Account production has no ACCESS_TOKEN_EXPIRY override, so its configured default lifetime is 15 minutes. Gateway production explicitly allows 60 seconds of clock skew. Existing locally verified JWTs may therefore remain accepted for up to 16 minutes after issuance; permission/session refresh alone does not invalidate them. Gateway verifies JWTs locally; a permission snapshot refresh is not proof of immediate rejection of every already-issued JWT. Report the deployed expiry configuration and existing invalidation behavior separately before claiming a production revocation SLA.
 
 Deliver in dependency order: Account producer, published SDK, website/Admin and Presenter consumers. Preserve the compatible Account producer when rolling a consumer back. Keep the existing scheduled automation paused.
+
+## Retirement release evidence
+
+SDK #44 / v0.7.0, account-fe #52, Admin #86, website #80 and Account #69 passed CI,
+merged and released. Account run 34182748567 completed successfully with ready revision
+`account-api--0000072`; website ready revision is `hhc-web--0000082`. Live session and
+profile returned 200 with permissions and no legacy access fields. All three website
+entry flows remained usable after removal. The profile check uses the Account/Admin
+host policy; the public website host intentionally does not expose `/me`.
+
+Retirement checks: full Go race suite with PostgreSQL/Redis, SDK package/consumer
+checks, account-fe 275 tests, Admin 471 tests, website 324 tests plus static-budget
+checks, affected builds and CI passed. Presenter v2.5.2 already requests cloud scope
+at login, so this retirement requires no new installer. All agent-owned delivery is
+complete; Windows real-account acceptance is the user's follow-up.
